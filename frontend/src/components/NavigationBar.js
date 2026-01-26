@@ -245,7 +245,7 @@ function NavigationBar({
           borderRight: `1px solid ${theme.palette.divider}`,
           backgroundColor: theme.palette.background.paper,
           transition: "width 0.3s ease-in-out",
-          overflow: sidebarCollapsed ? "visible" : "hidden",
+          overflow: "hidden",
         }}
       >
         <Box
@@ -254,7 +254,7 @@ function NavigationBar({
             p: sidebarCollapsed ? 1 : 3,
             position: "fixed",
             height: "100vh",
-            overflow: sidebarCollapsed ? "visible" : "hidden",
+            overflow: "hidden",
             transition: "width 0.3s ease-in-out",
             top: 0,
             left: 0,
@@ -418,17 +418,13 @@ function NavigationBar({
             </Box>
           )}
 
-          <ClickAwayListener onClickAway={() => (sidebarCollapsed ? setOpen(false) : null)}>
+          <ClickAwayListener onClickAway={() => setOpen(false)}>
             <Box
-              onMouseEnter={() => (sidebarCollapsed ? setOpen(true) : null)}
-              onMouseLeave={() => (sidebarCollapsed ? setOpen(false) : null)}
               sx={{
-                position: "fixed",
+                position: "absolute",
                 bottom: 24,
-                left: sidebarCollapsed ? 92 : 24,
-                right: sidebarCollapsed ? "auto" : 24,
-                width: sidebarCollapsed ? 220 : "auto",
-                zIndex: 1200,
+                left: sidebarCollapsed ? 12 : 24,
+                right: sidebarCollapsed ? 12 : 24,
               }}
             >
               <Box
@@ -464,23 +460,6 @@ function NavigationBar({
                     {open ? <CloseIcon sx={{ fontSize: 18 }} /> : <SettingsIcon sx={{ fontSize: 18 }} />}
                   </IconButton>
                 </Box>
-
-                {sidebarCollapsed && !open && (
-                  <Box sx={{ px: 1.5, pb: 1.25, display: "grid", gap: 1 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <IconButton onClick={() => onVolumeChange(muted ? 0.8 : 0)} sx={{ p: 0.5, color: theme.palette.text.secondary }}>
-                        {muted ? <VolumeOff sx={{ fontSize: 20 }} /> : <VolumeUp sx={{ fontSize: 20 }} />}
-                      </IconButton>
-                      <Slider
-                        value={Math.round(volume * 100)}
-                        onChange={(_, v) => onVolumeChange((Array.isArray(v) ? v[0] : v) / 100)}
-                        min={0}
-                        max={100}
-                        size="small"
-                      />
-                    </Box>
-                  </Box>
-                )}
 
                 <Collapse in={open} unmountOnExit>
                   <Box sx={{ px: 1.5, pb: 1.25, display: "grid", gap: 1 }}>
