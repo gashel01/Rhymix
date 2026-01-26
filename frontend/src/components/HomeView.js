@@ -30,6 +30,7 @@ function HomeView({
   onCreateTalkingDataset,
   onInferenceWithTracks,
   handleTrainWithDataset,
+  volume = 1,
 }) {
   const [talkingDatasets, setTalkingDatasets] = useState([]);
   const [activeTab, setActiveTab] = useState(0);
@@ -309,6 +310,7 @@ function HomeView({
               showVocalToggle={true}
               enablePlayBoth={true}
               vocalsFileType={vocalsFileType}
+              volume={volume}
               showDatasetButton={false}
               hasExports={availableFiles.length > 0}
               stopAllAudio={stopAllAudio}

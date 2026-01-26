@@ -581,6 +581,7 @@ function App() {
             handleTrainWithDataset={handleTrainWithDataset}
             onCreateTalkingDataset={handleCreateTalkingDataset}
             onInferenceWithTracks={handleInferenceWithTracks}
+            volume={volume}
           />
         );
 
@@ -627,6 +628,7 @@ function App() {
                 <DownloadResults
                   jobStatus={jobStatus}
                   handleReset={handleReset}
+                  volume={volume}
                 />
               )}
             </Box>
@@ -685,20 +687,21 @@ function App() {
 
       case "create-song":
         return (
-          <CreateSongView onBack={() => handleNavigation("home")} />
+          <CreateSongView onBack={() => handleNavigation("home")} volume={volume} />
         );
 
       case "models":
         return <ModelsView />;
 
       case "inference":
-        return <InferenceView onNavigate={handleNavigation} />;
+        return <InferenceView onNavigate={handleNavigation} volume={volume} />;
 
       case "talking-workflow":
         return (
           <TalkWorkflowPage
             onBack={() => handleNavigation("home")}
             handleTrainWithDataset={handleTrainWithDataset}
+            volume={volume}
           />
         );
 
@@ -760,6 +763,7 @@ function App() {
                 handleNavigation("home");
               }
             }}
+            volume={volume}
           />
         );
 
@@ -891,6 +895,7 @@ function App() {
           {showVoiceConversion && (
             <InferenceView
               onNavigate={handleNavigation}
+              volume={volume}
               onBack={() => {
                 setShowVoiceConversion(false);
                 setShowHomeView(true);

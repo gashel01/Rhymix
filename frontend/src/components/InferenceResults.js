@@ -54,7 +54,7 @@ import ErrorBoundary from "./ErrorBoundary";
 import { safePlay, safePause, safeSetMuted, getFileNameFromPath } from "./AudioTrackTable/utils";
 import { downloadFullSong } from "../utils/audioUtils";
 
-function InferenceResults({ inferenceData, onBack }) {
+function InferenceResults({ inferenceData, onBack, volume = 1 }) {
   const theme = useTheme();
 
   // Store original tracks
@@ -813,7 +813,7 @@ function InferenceResults({ inferenceData, onBack }) {
         <Grid item xs={12}>
           {results.length > 0 ? (
             <ErrorBoundary>
-              <AudioTrackTable
+            <AudioTrackTable
             trackPairs={getInferenceTrackPairs()}
             vocalMode={showOriginal ? 'original' : 'converted'}
             handleVocalModeChange={(event, newMode) => {
@@ -850,6 +850,7 @@ function InferenceResults({ inferenceData, onBack }) {
             externalDeleteResult={deleteResult}
             onClearDeleteResult={() => setDeleteResult(null)}
             defaultLabel="Inference Results"
+            volume={volume}
           />
             </ErrorBoundary>
           ) : (

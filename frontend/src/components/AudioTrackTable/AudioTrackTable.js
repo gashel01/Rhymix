@@ -11,7 +11,7 @@ import styles from "./AudioTrackTable.module.css";
 
 
 const AudioTrackTable = (props) => {
-  const { trackPairs = [], vocalMode = "raw", instrumentalWaveforms = {}, vocalWaveforms = {}, vocalsFileType = "processed_vocals", stopAllAudio } = props;
+  const { trackPairs = [], vocalMode = "raw", instrumentalWaveforms = {}, vocalWaveforms = {}, vocalsFileType = "processed_vocals", stopAllAudio, volume } = props;
 
   const [mutes, setMutes] = useState({ instrumental: {}, vocal: {} });
   const [playingBoth, setPlayingBoth] = useState(props.playingBoth);
@@ -115,6 +115,7 @@ const AudioTrackTable = (props) => {
                   handleDownloadFullSong={downloadFullSong}
                   isSelected={selectedRows.includes(pair.id)}
                   onRowSelect={(id, checked) => props.onRowSelect ? props.onRowSelect(id, checked) : setSelectedRows(prev => checked ? [...prev, id] : prev.filter(x => x !== id))}
+                  volume={volume}
                 />
               );
             })}

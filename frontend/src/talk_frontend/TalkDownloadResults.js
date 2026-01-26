@@ -103,6 +103,7 @@ function TalkDownloadResults({
   handleReset,
   showHeader = true,
   onTrainWithSpeaker,
+  volume = 1,
 }) {
   // Core state
   const [playing, setPlaying] = useState(null);
@@ -998,6 +999,7 @@ function TalkDownloadResults({
               segmentPlaybackTimer={segmentPlaybackTimer}
               setSegmentPlaybackTimer={setSegmentPlaybackTimer}
               setPlayingSegment={setPlayingSegment}
+              volume={volume}
             />
           </>
         )}
@@ -1028,6 +1030,7 @@ function TalkDownloadResults({
         handleWaveformReady={handleWaveformReady}
         handleDownloadSpeaker={handleDownloadSpeaker}
         formatDuration={formatDuration}
+        volume={volume}
       />
 
       <SpeakerRenameDialog

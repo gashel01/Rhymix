@@ -22,7 +22,7 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   marginBottom: theme.spacing(4),
 }));
 
-function TalkWorkflowPage({ onBack, handleTrainWithDataset }) {
+function TalkWorkflowPage({ onBack, handleTrainWithDataset, volume = 1 }) {
   const [activeStep, setActiveStep] = useState(0);
   const [files, setFiles] = useState([]);
   const [error, setError] = useState(null);
@@ -249,6 +249,7 @@ function TalkWorkflowPage({ onBack, handleTrainWithDataset }) {
             jobStatus={jobStatus}
             handleReset={handleReset}
             onTrainWithSpeaker={handleTrainWithDataset}
+            volume={volume}
           />
           
         );

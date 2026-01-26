@@ -136,7 +136,7 @@ const toKey = (s) => normalize(s).toLowerCase();
 // API base URL
 const API_BASE = "";
 
-function CreateSongView({ onBack, onGenerate }) {
+function CreateSongView({ onBack, onGenerate, volume = 1 }) {
   const theme = useTheme();
 
   // Core inputs
@@ -174,6 +174,12 @@ function CreateSongView({ onBack, onGenerate }) {
   const timerRef = useRef(null);
   const pollRef = useRef(null);
   const audioRef = useRef(null);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
 
   // Load existing songs and models on mount
   useEffect(() => {
@@ -472,6 +478,7 @@ function CreateSongView({ onBack, onGenerate }) {
       const playUrl = song.vocalsUrl || song.instrumentalUrl || song.audioUrl;
       if (playUrl) {
         audioRef.current = new Audio(`${API_BASE}${playUrl}`);
+        audioRef.current.volume = volume;
         audioRef.current.play().catch(e => console.error("Play error:", e));
         audioRef.current.onended = () => setPlayingId(null);
         setPlayingId(song.id);

@@ -13,7 +13,7 @@ import { useAudioPlayback } from "../hooks/useAudioPlayback";
 import { useVocalMode } from "../hooks/useVocalMode";
 import { downloadFile } from "../utils/audioUtils";
 
-function DownloadResults({ jobStatus, handleReset }) {
+function DownloadResults({ jobStatus, handleReset, volume = 1 }) {
   const {
     vocalMode,
     handleVocalModeChange,
@@ -155,6 +155,7 @@ function DownloadResults({ jobStatus, handleReset }) {
             showVocalToggle={true}
             enablePlayBoth={true}
             vocalsFileType={vocalsFileType}
+            volume={volume}
             showDatasetButton={true}
             handleDownloadDataset={handleDownloadDataset}
             hasExports={exports.length > 0}

@@ -45,6 +45,7 @@ const OriginalAudioSection = ({
   segmentPlaybackTimer,
   setSegmentPlaybackTimer,
   setPlayingSegment,
+  volume = 1,
 }) => {
   const mainWaveformRef = useRef(null);
   const isHandlingSeekRef = useRef(false);
@@ -122,6 +123,7 @@ const OriginalAudioSection = ({
             ref={mainWaveformRef}
             url={originalAudioUrl}
             isPlaying={playing === "original-audio"}
+            volume={volume}
             onPlayPause={() => {
               if (playing === "original-audio") {
                 setPlaying(null);
@@ -437,6 +439,7 @@ const SegmentDetailsPanel = ({
         <ColoredAudioWaveform
           url={segmentPlayerUrl}
           isPlaying={playing === "segment"}
+          volume={volume}
           onPlayPause={() => {
             if (playing === "segment") {
               setPlaying(null);

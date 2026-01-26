@@ -22,6 +22,7 @@ function WaveformCell({
   badgeText = null,
   isPrimary = false,
   emptyMessage = "No audio",
+  volume = 1,
 }) {
   return (
     <Grid  className={styles.container} sx={{ minWidth: 0 }}>
@@ -30,6 +31,7 @@ function WaveformCell({
           url={url}
           isPlaying={isPlaying}
           isMuted={isMuted}
+          volume={volume}
           onPlayPause={onPlayPause}
           onDownload={onDownload}
           progressColor={progressColor}

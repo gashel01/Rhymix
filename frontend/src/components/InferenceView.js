@@ -17,7 +17,7 @@ import AudioTrackTable from "./AudioTrackTable/AudioTrackTable";
 import { safePlay, safePause, safeSetMuted, getFileNameFromPath } from "./AudioTrackTable/utils";
 import ErrorBoundary from "./ErrorBoundary";
 
-function InferenceView({ onNavigate }) {
+function InferenceView({ onNavigate, volume = 1 }) {
   const theme = useTheme();
   const [inferenceResults, setInferenceResults] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -360,6 +360,7 @@ function InferenceView({ onNavigate }) {
               onDeselectAll={handleDeselectAllRows}
               handleDownloadFullSong={handleDownloadFullSong}
               defaultLabel=" "
+              volume={volume}
             />
             </ErrorBoundary>
           </Grid>

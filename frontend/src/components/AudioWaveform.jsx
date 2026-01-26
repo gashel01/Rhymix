@@ -24,6 +24,7 @@ const AudioWaveform = (
     onSeek = () => {},
     otherWaveform = null,
     isMuted = false,
+    volume = 1,
     onTimeUpdate = () => {},
   },
   ref
@@ -36,9 +37,51 @@ const AudioWaveform = (
   const [url, setUrl] = useState(initialUrl);
   const audioContext = useRef(null);
   const gainNode = useRef(null);
+  const volumeRef = useRef(volume);
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef(null);
   const isReadyRef = useRef(false); // Track if wavesurfer has finished loading
+
+  const clampVolume = (value) => {
+    if (Number.isFinite(value)) {
+      return Math.max(0, Math.min(1, value));
+    }
+    return 1;
+  };
+
+  const applyVolume = (nextVolume, mutedOverride = false) => {
+    const targetVolume = mutedOverride ? 0 : clampVolume(nextVolume);
+    const currentWavesurfer = waveSurferRef.current;
+
+    if (currentWavesurfer && typeof currentWavesurfer.setVolume === "function") {
+      currentWavesurfer.setVolume(targetVolume);
+      return;
+    }
+
+    if (gainNode.current && audioContext.current) {
+      try {
+        gainNode.current.gain.setValueAtTime(
+          gainNode.current.gain.value,
+          audioContext.current.currentTime
+        );
+        gainNode.current.gain.linearRampToValueAtTime(
+          targetVolume,
+          audioContext.current.currentTime + 0.1
+        );
+      } catch (err) {
+        console.error("Error updating gain for volume:", err);
+      }
+      return;
+    }
+
+    if (currentWavesurfer && currentWavesurfer.backend && currentWavesurfer.backend.gainNode) {
+      currentWavesurfer.backend.gainNode.gain.value = targetVolume;
+    }
+  };
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
 
   // Create wavesurfer function
   const createWaveSurfer = (audioUrl) => {
@@ -128,12 +171,8 @@ const AudioWaveform = (
             console.warn('gainNode created but not found in filters array');
           }
 
-          // Initialize mute state
-          if (isMuted) {
-            gainNode.current.gain.value = 0;
-          } else {
-            gainNode.current.gain.value = 1;
-          }
+        // Initialize volume/mute state
+        applyVolume(volumeRef.current, isMuted);
         }
 
         // Attach seek handlers only after waveform is ready (backend is initialized)
@@ -204,46 +243,8 @@ const AudioWaveform = (
             if (currentWavesurfer) currentWavesurfer.pause();
           },
           setMuted: (muted) => {
-            const currentWavesurfer = waveSurferRef.current;
             const targetMuted = !!muted;
-
-            if (currentWavesurfer && typeof currentWavesurfer.setMuted === "function") {
-              currentWavesurfer.setMuted(targetMuted);
-              return;
-            }
-
-            if (currentWavesurfer && typeof currentWavesurfer.setVolume === "function") {
-              currentWavesurfer.setVolume(targetMuted ? 0 : 1);
-              return;
-            }
-
-            let activeGainNode = gainNode.current;
-            let activeAudioContext = audioContext.current;
-            if (!activeGainNode && currentWavesurfer && currentWavesurfer.backend) {
-              const filters = currentWavesurfer.backend.filters || [];
-              activeGainNode = filters.find((f) => f && f.gain !== undefined);
-              activeAudioContext = currentWavesurfer.backend.ac;
-              if (activeGainNode) {
-                gainNode.current = activeGainNode;
-                audioContext.current = activeAudioContext;
-              }
-            }
-
-            if (activeGainNode && activeAudioContext) {
-              const gainValue = targetMuted ? 0 : 1;
-              try {
-                activeGainNode.gain.setValueAtTime(
-                  activeGainNode.gain.value,
-                  activeAudioContext.currentTime
-                );
-                activeGainNode.gain.linearRampToValueAtTime(
-                  gainValue,
-                  activeAudioContext.currentTime + 0.1
-                );
-              } catch (err) {
-                console.error('waveformWrapper.setMuted: error updating gain', err);
-              }
-            }
+            applyVolume(volumeRef.current, targetMuted);
           },
           getWavesurfer: () => waveSurferRef.current,
         };
@@ -401,56 +402,11 @@ const AudioWaveform = (
     }
   }, [isPlaying, ready]);
 
-  // Handle mute/unmute state
+  // Handle mute/unmute state and volume
   useEffect(() => {
-    const currentWavesurfer = waveSurferRef.current;
-    const targetMuted = !!isMuted;
-
-    if (currentWavesurfer && typeof currentWavesurfer.setMuted === "function") {
-      currentWavesurfer.setMuted(targetMuted);
-      return;
-    }
-
-    if (currentWavesurfer && typeof currentWavesurfer.setVolume === "function") {
-      currentWavesurfer.setVolume(targetMuted ? 0 : 1);
-      return;
-    }
-
-    if (gainNode.current && audioContext.current) {
-      const gainValue = targetMuted ? 0 : 1;
-      try {
-        gainNode.current.gain.setValueAtTime(
-          gainNode.current.gain.value,
-          audioContext.current.currentTime
-        );
-        gainNode.current.gain.linearRampToValueAtTime(
-          gainValue,
-          audioContext.current.currentTime + 0.1
-        );
-      } catch (err) {
-        console.error('Error updating mute state in useEffect:', err);
-      }
-      return;
-    }
-
-    if (currentWavesurfer && currentWavesurfer.backend && currentWavesurfer.backend.ac) {
-      const filters = currentWavesurfer.backend.filters || [];
-      const foundGainNode = filters.find((f) => f && f.gain !== undefined);
-      if (foundGainNode) {
-        gainNode.current = foundGainNode;
-        audioContext.current = currentWavesurfer.backend.ac;
-        const gainValue = targetMuted ? 0 : 1;
-        foundGainNode.gain.setValueAtTime(
-          foundGainNode.gain.value,
-          currentWavesurfer.backend.ac.currentTime
-        );
-        foundGainNode.gain.linearRampToValueAtTime(
-          gainValue,
-          currentWavesurfer.backend.ac.currentTime + 0.1
-        );
-      }
-    }
-  }, [isMuted, ready]);
+    if (!ready) return;
+    applyVolume(volume, isMuted);
+  }, [isMuted, volume, ready]);
 
   // Handle direct user interactions with the waveform
   useEffect(() => {
@@ -512,18 +468,7 @@ const AudioWaveform = (
 
   // Method to mute/unmute the audio without stopping playback
   const setMuted = (muted) => {
-    if (gainNode.current && audioContext.current) {
-      // Smoothly transition the gain to avoid clicks
-      const gainValue = muted ? 0 : 1;
-      gainNode.current.gain.setValueAtTime(
-        gainNode.current.gain.value,
-        audioContext.current.currentTime
-      );
-      gainNode.current.gain.linearRampToValueAtTime(
-        gainValue,
-        audioContext.current.currentTime + 0.1
-      );
-    }
+    applyVolume(volumeRef.current, muted);
   };
 
   // Expose the waveform control methods to parent component

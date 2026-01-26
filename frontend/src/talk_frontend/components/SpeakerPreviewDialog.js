@@ -30,6 +30,7 @@ const SpeakerPreviewDialog = ({
   handleWaveformReady,
   handleDownloadSpeaker,
   formatDuration,
+  volume = 1,
 }) => {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -119,6 +120,7 @@ const SpeakerPreviewDialog = ({
                         progressColor="#ff9800"
                         waveColor="#9e9e9e"
                         backgroundColor="#2a2a2a"
+                        volume={volume}
                         onReady={(waveform) =>
                           handleWaveformReady(`sample-${sample.id}`, waveform)
                         }

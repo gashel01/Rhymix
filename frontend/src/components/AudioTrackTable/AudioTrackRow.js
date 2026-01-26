@@ -9,7 +9,7 @@ import styles from './AudioTrackRow.module.css';
 const AudioTrackRow = (props) => {
   const { pair, index, vocalMode, vocalsFileType, isInstrumentalPlaying, isVocalPlaying, 
     internalMutedInstrumentals, internalMutedVocals, isSelected, onRowSelect, name , modelUsed,
-    handlePlayPauseModified, handlePlayBothModified, handleDownload, playingBoth, status = "completed" } = props;
+    handlePlayPauseModified, handlePlayBothModified, handleDownload, playingBoth, status = "completed", volume } = props;
 
   const iwRef = useRef(null);
   const vwRef = useRef(null);
@@ -52,6 +52,7 @@ const AudioTrackRow = (props) => {
         onDownload={() => handleDownload(type === 'inst' ? 'instrumental' : vocalsFileType, path)}
         onReady={type === 'inst' ? handleInstReady : handleVocalReady}
         onSeek={onSeek} badgeText={type === 'vocal' ? vocalMode : null}
+        volume={volume}
       />
     );
   };

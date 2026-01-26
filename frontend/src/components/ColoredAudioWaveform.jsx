@@ -31,6 +31,7 @@ const ColoredAudioWaveform = forwardRef(
       waveColor = "#8e8e8e",
       progressColor = "#ffffff",
       backgroundColor = "#2a2a2a",
+      volume = 1,
       onReady = () => {},
       onTimeUpdate = () => {}, // Add onTimeUpdate prop
       onSeek = () => {}, // Add onSeek prop
@@ -49,6 +50,30 @@ const ColoredAudioWaveform = forwardRef(
     const [currentTimeDisplay, setCurrentTimeDisplay] = useState(0);
     const [error, setError] = useState(null);
     const [zoom, setZoom] = useState(1); // Track zoom level
+    const volumeRef = useRef(volume);
+
+    const clampVolume = (value) => {
+      if (Number.isFinite(value)) {
+        return Math.max(0, Math.min(1, value));
+      }
+      return 1;
+    };
+
+    const applyVolume = (nextVolume) => {
+      const targetVolume = clampVolume(nextVolume);
+      const currentWavesurfer = wavesurferRef.current;
+      if (currentWavesurfer && typeof currentWavesurfer.setVolume === "function") {
+        currentWavesurfer.setVolume(targetVolume);
+        return;
+      }
+      if (currentWavesurfer?.backend?.gainNode) {
+        currentWavesurfer.backend.gainNode.gain.value = targetVolume;
+      }
+    };
+
+    useEffect(() => {
+      volumeRef.current = volume;
+    }, [volume]);
 
     // At the beginning of the component, add a function to create a consistent speaker-to-color mapping
     const getSpeakerColorMap = (speakers, colorPalette) => {
@@ -318,6 +343,7 @@ const ColoredAudioWaveform = forwardRef(
 
         // Complete the ready callbacks
         onReady(wavesurfer);
+        applyVolume(volumeRef.current);
       });
 
       wavesurfer.on("audioprocess", () => {
@@ -583,6 +609,12 @@ const ColoredAudioWaveform = forwardRef(
         }
       }
     }, [isPlaying, ready]);
+
+    useEffect(() => {
+      if (ready) {
+        applyVolume(volume);
+      }
+    }, [volume, ready]);
 
     // Update regions when filtered speakers change
     useEffect(() => {
