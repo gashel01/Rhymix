@@ -1,0 +1,12 @@
+.fullWidth {
+  width: 100%;
+}
+
+.label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.description {
+  margin-top: 0.5rem;
+}

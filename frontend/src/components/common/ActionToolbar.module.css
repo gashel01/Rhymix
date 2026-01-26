@@ -1,0 +1,22 @@
+.container {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.alignLeft {
+  justify-content: flex-start;
+}
+
+.alignRight {
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.alignCenter {
+  justify-content: center;
+}
+
+.alignSpaceBetween {
+  justify-content: space-between;
+}

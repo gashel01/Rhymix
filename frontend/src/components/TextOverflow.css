@@ -1,0 +1,19 @@
+.text-overflow-wrapper {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.text-overflow {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.text-overflow.selected {
+  text-decoration: underline;
+}
+
+.text-overflow.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

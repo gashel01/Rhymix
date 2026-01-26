@@ -1,0 +1,51 @@
+.row:nth-of-type(odd) {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.row:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.trackNameCell {
+  padding: 1rem;
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.waveformsCell {
+  padding: 0.5rem;
+  overflow: hidden;
+}
+
+.controlsSpacer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.checkboxCell {
+  /* Styles handled by sx prop */
+}
+
+.checkboxContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition-delay: 0s;
+}
+
+.checkboxContainerActive {
+  opacity: 1;
+  transition-delay: 0.3s;
+}
+
+.checkbox {
+  padding: 2px;
+}
+
+.checkbox .MuiSvgIcon-root {
+  font-size: 1rem;
+}

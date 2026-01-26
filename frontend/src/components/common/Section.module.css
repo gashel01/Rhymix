@@ -1,0 +1,15 @@
+.container {
+  height: 100%;
+}
+
+.title {
+  margin-bottom: 1rem;
+}
+
+.divider {
+  margin-bottom: 1.5rem;
+}
+
+.content {
+  width: 100%;
+}

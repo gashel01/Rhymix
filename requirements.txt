@@ -1,0 +1,42 @@
+# Core dependencies
+Flask==2.2.3
+Flask-Cors==3.0.10
+Werkzeug==2.2.3
+
+# Audio processing
+numba==0.56.4
+librosa==0.10.1
+soundfile==0.12.1
+pydub==0.25.1
+numpy==1.23.5
+scipy==1.10.1
+vocal
+noisereduce
+torchcrepe
+torchfcpe
+pedalboard
+faiss-cpu
+praat-parselmouth
+pyworld
+scikit-learn
+matplotlib
+tensorboardX
+llvmlite
+numba==0.56.4
+
+# Machine learning & Audio Models
+--extra-index-url https://download.pytorch.org/whl/cu118
+torch==2.1.0+cu118
+torchaudio==2.1.0+cu118
+pyannote.audio==3.1.1
+transformers==4.30.0
+
+# Utilities
+requests==2.28.2
+tqdm==4.65.0
+matplotlib==3.7.1
+python-dotenv==1.0.0
+gradio
+tensorboard
+wget
+beautifulsoup4 
