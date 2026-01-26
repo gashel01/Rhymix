@@ -10,46 +10,19 @@ import {
   Paper,
   CircularProgress,
   Alert,
-  Grid,
-  Card,
-  CardContent,
-  CardActions,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogContentText,
   DialogActions,
-  IconButton,
-  Drawer,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Slider ,
-  Collapse,
-  Divider,
 } from "@mui/material";
-import ClickAwayListener from "@mui/material/ClickAwayListener";
-import SettingsIcon from "@mui/icons-material/Settings";
-import CloseIcon from "@mui/icons-material/Close";
-import Brightness4 from "@mui/icons-material/Brightness4";
-import Brightness7 from "@mui/icons-material/Brightness7";
-import VolumeUp from "@mui/icons-material/VolumeUp";
-import VolumeOff from "@mui/icons-material/VolumeOff";
 
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import { GlobalStyles } from "@mui/material";
-import Brightness4Icon from "@mui/icons-material/Brightness4";
-import Brightness7Icon from "@mui/icons-material/Brightness7";
 import HomeIcon from "@mui/icons-material/Home";
-import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
-import VoiceChatIcon from "@mui/icons-material/VoiceChat";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
 import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
-import MenuIcon from "@mui/icons-material/Menu";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import FileUpload from "./components/FileUpload";
 import ProcessingStatus from "./components/ProcessingStatus";
 import DownloadResults from "./components/DownloadResults";
@@ -62,8 +35,8 @@ import InferenceParams from "./components/InferenceParams";
 import InferenceResults from "./components/InferenceResults";
 import ModelsView from "./components/ModelsView";
 import CreateSongView from "./components/CreateSongView";
-import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import NavigationBar from "./components/NavigationBar";
 import { uploadFiles, startProcessing, getJobStatus, cleanDirectories } from "./utils/apiService";
 
 // Tesla/Apple-inspired theme system
@@ -817,382 +790,25 @@ function App() {
         minHeight: "100vh",
         backgroundColor: 'background.default'
       }}>
-        {/* Mobile Menu Button */}
-        <IconButton
-          onClick={handleDrawerToggle}
-          sx={{
-            position: 'fixed',
-            top: 16,
-            left: 16,
-            zIndex: 1300,
-            display: { xs: 'flex', sm: 'none' },
-            backgroundColor: theme.palette.background.paper,
-            border: `1px solid ${theme.palette.divider}`,
-            boxShadow: theme.palette.mode === 'dark'
-              ? '0 4px 12px rgba(0,0,0,0.3)'
-              : '0 4px 12px rgba(0,0,0,0.1)',
-            '&:hover': {
-              backgroundColor: theme.palette.action.hover,
-            },
-          }}
-        >
-          <MenuIcon />
-        </IconButton>
-
-        {/* Navigation Drawer */}
-        <Drawer
-          variant="temporary"
-          open={drawerOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
-          }}
-          sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
-              width: 280,
-              backgroundColor: theme.palette.background.paper,
-              borderRight: `1px solid ${theme.palette.divider}`,
-            },
-          }}
-        >
-          <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.primary.main }}>
-              🎵 VocafdflForge
-            </Typography>
-          </Box>
-
-          <List sx={{ pt: 1 }}>
-            {navigationItems.map((item) => (
-              <ListItem key={item.id} disablePadding>
-                <ListItemButton
-                  onClick={() => handleNavigation(item.id)}
-                  selected={currentView === item.id}
-                  sx={{
-                    mx: 1,
-                    my: 0.5,
-                    borderRadius: 2,
-                    '&.Mui-selected': {
-                      backgroundColor: theme.palette.primary.main + '20',
-                      '&:hover': {
-                        backgroundColor: theme.palette.primary.main + '30',
-                      },
-                    },
-                  }}
-                >
-                  <ListItemIcon sx={{
-                    color: currentView === item.id ? theme.palette.primary.main : theme.palette.text.secondary,
-                    minWidth: 40
-                  }}>
-                    {item.icon}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={item.label}
-                    secondary={item.description}
-                    primaryTypographyProps={{
-                      fontWeight: currentView === item.id ? 600 : 500,
-                      fontSize: '0.95rem',
-                    }}
-                    secondaryTypographyProps={{
-                      fontSize: '0.75rem',
-                      color: theme.palette.text.secondary,
-                    }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-
-          {/* Mobile Theme Toggle */}
-          <Box sx={{
-            position: 'absolute',
-            bottom: 24,
-            left: 16,
-            right: 16,
-          }}>
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              p: 2,
-              borderRadius: 3,
-              backgroundColor: theme.palette.background.paper,
-              border: `1px solid ${theme.palette.divider}`,
-              boxShadow: theme.palette.mode === 'dark'
-                ? '0 4px 12px rgba(0,0,0,0.3)'
-                : '0 4px 12px rgba(0,0,0,0.1)',
-            }}>
-              <Typography variant="body2" sx={{
-                color: theme.palette.text.secondary,
-                fontWeight: 500
-              }}>
-                Theme
-              </Typography>
-
-              <IconButton
-                onClick={handleThemeToggle}
-                sx={{
-                  color: theme.palette.text.secondary,
-                  '&:hover': {
-                    color: theme.palette.primary.main,
-                    backgroundColor: theme.palette.action.hover,
-                  },
-                }}
-                title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              >
-                {darkMode ? (
-                  <Brightness7Icon />
-                ) : (
-                  <Brightness4Icon />
-                )}
-              </IconButton>
-            </Box>
-          </Box>
-        </Drawer>
-
-        {/* Desktop Sidebar */}
-        <Box
-          sx={{
-            display: { xs: 'none', sm: 'flex' },
-            width: sidebarCollapsed ? 72 : 280,
-            flexShrink: 0,
-            borderRight: `1px solid ${theme.palette.divider}`,
-            backgroundColor: theme.palette.background.paper,
-            transition: 'width 0.3s ease-in-out',
-            overflow: 'hidden',
-          }}
-        >
-          <Box sx={{
-            width: sidebarCollapsed ? 72 : 280,
-            p: sidebarCollapsed ? 1 : 3,
-            position: 'fixed',
-            height: '100vh',
-            overflow: 'hidden',
-            transition: 'width 0.3s ease-in-out',
-            top: 0,
-            left: 0,
-          }}>
-            <Box onClick={handleSidebarToggle} sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: sidebarCollapsed ? 'center' : 'space-between',
-              mb: sidebarCollapsed ? 2 : 4,
-              px: sidebarCollapsed ? 0 : 0,
-              
-            }}>
-              {!sidebarCollapsed && (
-                <Typography
-                  variant="h2"
-                  sx={{
-                    fontWeight: 700,
-                    color: theme.palette.primary.main,
-                  }}
-                >
-                  VocalForge
-                </Typography>
-              )}
-              {sidebarCollapsed && (
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 700,
-                    color: theme.palette.primary.main,
-                    fontSize: '1.5rem',
-                  }}
-                >
-                
-                </Typography>
-              )}
-              <IconButton
-               
-                sx={{
-                  color: theme.palette.text.secondary,
-                  '&:hover': {
-                    color: theme.palette.primary.main,
-                    backgroundColor: theme.palette.action.hover,
-                  },
-                  p: 1,
-                }}
-                size="small"
-              >
-                {sidebarCollapsed && (
-                  <MenuIcon sx={{ fontSize: 20 }} />
-                )}
-              </IconButton>
-            </Box>
-
-            <List sx={{ p: 0 }}>
-              {navigationItems.map((item) => (
-                <ListItem key={item.id} disablePadding sx={{ mb: sidebarCollapsed ? 0.5 : 1 }}>
-                  <ListItemButton
-                    onClick={() => handleNavigation(item.id)}
-                    selected={currentView === item.id}
-                    sx={{
-                      borderRadius: 3,
-                      py: sidebarCollapsed ? 1.5 : 1.5,
-                      px: sidebarCollapsed ? 1.5 : 2,
-                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                      transition: 'all 0.2s ease',
-                      '&.Mui-selected': {
-                        backgroundColor: theme.palette.primary.main + '20',
-                        border: `1px solid ${theme.palette.primary.main}40`,
-                        '&:hover': {
-                          backgroundColor: theme.palette.primary.main + '30',
-                        },
-                        '& .MuiListItemIcon-root': {
-                          color: theme.palette.primary.main,
-                        },
-                        '& .MuiListItemText-primary': {
-                          color: theme.palette.primary.main,
-                          fontWeight: 600,
-                        },
-                      },
-                      '&:hover': {
-                        backgroundColor: theme.palette.action.hover,
-                        transform: sidebarCollapsed ? 'none' : 'translateX(4px)',
-                      },
-                    }}
-                    title={sidebarCollapsed ? item.label : undefined}
-                  >
-                    <ListItemIcon sx={{
-                      color: theme.palette.text.secondary,
-                      minWidth: sidebarCollapsed ? 40 : 40,
-                      justifyContent: 'center',
-                      transition: 'color 0.2s ease'
-                    }}>
-                      {item.icon}
-                    </ListItemIcon>
-                    {!sidebarCollapsed && (
-                      <Box>
-                        <Typography variant="body1" sx={{
-                          fontWeight: 500,
-                          mb: 0.5,
-                          transition: 'color 0.2s ease'
-                        }}>
-                          {item.label}
-                        </Typography>
-                        <Typography variant="caption" sx={{
-                          color: theme.palette.text.secondary,
-                          lineHeight: 1.2
-                        }}>
-                          {item.description}
-                        </Typography>
-                      </Box>
-                    )}
-                  </ListItemButton>
-                </ListItem>
-              ))}
-            </List>
-
-            {!sidebarCollapsed && (
-              <>
-                <Divider sx={{ my: 3 }} />
-
-                {/* Quick Actions */}
-                <Typography variant="overline" sx={{
-                  color: theme.palette.text.secondary,
-                  fontWeight: 600,
-                  px: 1,
-                  mb: 2,
-                  display: 'block'
-                }}>
-                  Quick Actions
-                </Typography>
-
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={() => handleCleanDirectories(true)}
-                  disabled={loading}
-                  sx={{
-                    borderRadius: 2,
-                    py: 1.5,
-                    mb: 1,
-                    justifyContent: 'flex-start',
-                    borderColor: theme.palette.divider,
-                    color: theme.palette.text.primary,
-                    '&:hover': {
-                      borderColor: theme.palette.primary.main,
-                      backgroundColor: theme.palette.primary.main + '10',
-                    },
-                  }}
-                >
-                  🧹 Clean All Data
-                </Button>
-              </>
-            )}
-
-            {sidebarCollapsed && (
-              <Box sx={{ mt: 2 }}>
-                <IconButton
-                  onClick={() => handleCleanDirectories(true)}
-                  disabled={loading}
-                  sx={{
-                    color: theme.palette.text.secondary,
-                    '&:hover': {
-                      color: theme.palette.primary.main,
-                      backgroundColor: theme.palette.action.hover,
-                    },
-                    p: 1,
-                    width: '100%',
-                    borderRadius: 2,
-                    mb: 1,
-                  }}
-                  title="Clean All Data"
-                >
-                  🧹
-                </IconButton>
-              </Box>
-            )}
-
-            {/* Theme Toggle */}
-           
-              <ClickAwayListener onClickAway={() => setOpen(false)}>
-  <Box sx={{ position:"absolute", bottom:24, left:sidebarCollapsed?12:24, right:sidebarCollapsed?12:24 }}>
-    <Box sx={{
-      borderRadius:2, overflow:"hidden",
-      bgcolor:theme.palette.background.paper,
-      border:`1px solid ${theme.palette.divider}`,
-      boxShadow:theme.palette.mode==="dark"?"0 6px 18px rgba(0,0,0,.35)":"0 6px 18px rgba(0,0,0,.12)"
-    }}>
-      <Box sx={{ display:"flex", alignItems:"center", justifyContent:sidebarCollapsed?"center":"space-between", px:1.25, py:1 }}>
-        {!sidebarCollapsed && <Typography variant="body2" sx={{  p:.5, color:theme.palette.text.secondary, fontWeight:600 }}>Settings</Typography>}
-        <IconButton onClick={() => setOpen(o=>!o)} sx={{ p:.5, color:theme.palette.text.secondary }}>
-          {open ? <CloseIcon sx={{ fontSize:18 }} /> : <SettingsIcon sx={{ fontSize:18 }} />}
-        </IconButton>
-      </Box>
-
-      <Collapse in={open} unmountOnExit>
-        <Box sx={{ px:1.5, pb:1.25, display:"grid", gap:1 }}>
-          <Box sx={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-            <Typography variant="body2" sx={{ color:theme.palette.text.secondary, fontWeight:500 }}>Theme</Typography>
-            <IconButton onClick={handleThemeToggle} sx={{ p:.5, color:theme.palette.text.secondary }}>
-              {darkMode ? <Brightness7 sx={{ fontSize:20 }} /> : <Brightness4 sx={{ fontSize:20 }} />}
-            </IconButton>
-          </Box>
-
-          <Box sx={{ display:"flex", alignItems:"center", gap:1 }}>
-            <IconButton onClick={() => onVolumeChange(muted ? 0.8 : 0)} sx={{ p:.5, color:theme.palette.text.secondary }}>
-              {muted ? <VolumeOff sx={{ fontSize:20 }} /> : <VolumeUp sx={{ fontSize:20 }} />}
-            </IconButton>
-
-            <Slider
-              value={Math.round(volume * 100)}
-              onChange={(_, v) => onVolumeChange((Array.isArray(v)?v[0]:v) / 100)}
-              min={0}
-              max={100}
-              size="small"
-            />
-          </Box>
-        </Box>
-      </Collapse>
-    </Box>
-  </Box>
-</ClickAwayListener>
-
-          </Box>
-        </Box>
+        <NavigationBar
+          theme={theme}
+          darkMode={darkMode}
+          open={open}
+          setOpen={setOpen}
+          handleThemeToggle={handleThemeToggle}
+          handleDrawerToggle={handleDrawerToggle}
+          drawerOpen={drawerOpen}
+          navigationItems={navigationItems}
+          currentView={currentView}
+          handleNavigation={handleNavigation}
+          sidebarCollapsed={sidebarCollapsed}
+          handleSidebarToggle={handleSidebarToggle}
+          handleCleanDirectories={handleCleanDirectories}
+          loading={loading}
+          onVolumeChange={onVolumeChange}
+          muted={muted}
+          volume={volume}
+        />
 
         {/* Main Content */}
         <Box
