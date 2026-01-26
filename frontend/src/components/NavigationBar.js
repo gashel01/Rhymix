@@ -141,7 +141,7 @@ function NavigationBar({
           }}
         >
           <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.primary.main }}>
-            ✦ VocalForge
+            ✦ Rhymix
           </Typography>
           <IconButton onClick={handleDrawerToggle} size="small">
             <CloseIcon fontSize="small" />
@@ -278,7 +278,7 @@ function NavigationBar({
                   color: theme.palette.primary.main,
                 }}
               >
-                VocalForge
+                Rhymix
               </Typography>
             )}
             {sidebarCollapsed && (

@@ -1,57 +1,96 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  Box, Typography, Grid, Chip, Button, CircularProgress, IconButton, 
-  Container, Dialog, DialogTitle, DialogContent, DialogActions, Fade, 
-  TextField, InputAdornment, Stack, Pagination, LinearProgress, Drawer,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
+  Box, Typography, Grid, Chip, Button, CircularProgress, IconButton,
+  Container, Dialog, DialogTitle, DialogContent, DialogActions, Fade,
+  TextField, InputAdornment, Stack, Pagination, LinearProgress
 } from "@mui/material";
 import { useTheme, alpha } from "@mui/material/styles";
-import { 
-  CloudDownload as DownloadIcon, 
-  Delete as DeleteIcon, 
+import {
+  CloudDownload as DownloadIcon,
+  Delete as DeleteIcon,
   Search as SearchIcon,
   CloudQueue as CloudIcon,
   CloudOff as CloudOffIcon,
-  CompareArrows as CompareIcon,
-  Close as CloseIcon,
-  AccessTime as AccessTimeIcon
+  ArrowBack as ArrowBackIcon
 } from "@mui/icons-material";
-import PageHeader from "./common/PageHeader";
 
 // --- Original Sub-components (Design Preserved) ---
 
 const StatPill = ({ label, color, theme, style }) => (
   <Box sx={{
-    px: 1.5, py: 0.5, borderRadius: 2, display: 'flex', alignItems: 'center',
-    backgroundColor: alpha(color || theme.palette.text.primary, theme.palette.mode === 'dark' ? 0.1 : 0.06),
-    whiteSpace: 'nowrap', ...style
+    px: 1.4,
+    py: 0.45,
+    borderRadius: 999,
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: alpha(color || theme.palette.text.primary, theme.palette.mode === 'dark' ? 0.14 : 0.08),
+    border: `1px solid ${alpha(color || theme.palette.text.primary, theme.palette.mode === 'dark' ? 0.18 : 0.1)}`,
+    whiteSpace: 'nowrap',
+    ...style
   }}>
-    <Typography variant="caption" sx={{ fontWeight: 600, color: color || 'text.primary', fontSize: '0.75rem' }}>
+    <Typography variant="caption" sx={{ fontWeight: 600, color: color || 'text.primary', fontSize: '0.72rem', letterSpacing: 0.2 }}>
       {label}
     </Typography>
   </Box>
 );
 
-const ActionToolbar = ({ 
-  searchQuery, setSearchQuery, showOnline, setShowOnline, 
-  selectedCount, onClear, onDelete, onSelectAll, theme, isInferenceSelection 
+const ActionToolbar = ({
+  searchQuery, setSearchQuery, showOnline, setShowOnline,
+  selectedCount, onClear, onDelete, onSelectAll, theme, isInferenceSelection
 }) => (
-  <Box sx={{ 
-    p: 2, mb: 3, borderRadius: 2, border: `1px solid ${theme.palette.divider}`,
-    background: theme.palette.mode === 'dark' 
-      ? `linear-gradient(135deg, ${theme.palette.background.paper}, ${theme.palette.background.default})`
-      : `linear-gradient(135deg, #ffffff, #f8fafc)`,
-    display: 'flex', alignItems: 'center', gap: 2, minHeight: 64,
-    transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)', 
+  <Box sx={{
+    p: 2,
+    mb: 3,
+    borderRadius: 999,
+    border: `1px solid ${alpha(theme.palette.primary.main, 0.35)}`,
+    background: theme.palette.mode === 'dark'
+      ? 'linear-gradient(135deg, rgba(14,16,24,0.9), rgba(20,22,32,0.8))'
+      : 'linear-gradient(135deg, #ffffff, #f2f5ff)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 2,
+    minHeight: 64,
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 12px 30px rgba(4,10,30,0.55)'
+      : '0 12px 30px rgba(30,60,130,0.08)',
+    transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
   }}>
     {/* Bulk Selection (Hidden in Inference Mode to keep it clean) */}
     {!isInferenceSelection && (
       <Stack direction="row" spacing={1} alignItems="center">
-        <Button variant="outlined" size="small" onClick={onSelectAll} sx={{ borderRadius: 2, height: 40, whiteSpace: 'nowrap' }}>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={onSelectAll}
+          sx={{
+            borderRadius: 999,
+            height: 38,
+            px: 2,
+            whiteSpace: 'nowrap',
+            borderColor: alpha(theme.palette.primary.main, 0.45),
+            color: theme.palette.primary.main,
+            backgroundColor: alpha(theme.palette.primary.main, 0.08),
+            '&:hover': {
+              borderColor: theme.palette.primary.main,
+              backgroundColor: alpha(theme.palette.primary.main, 0.18),
+            },
+          }}
+        >
           Select All
         </Button>
         <Fade in={selectedCount > 0} unmountOnExit>
-          <Button variant="outlined" size="small" onClick={onClear} sx={{ borderRadius: 2, height: 40 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={onClear}
+            sx={{
+              borderRadius: 999,
+              height: 38,
+              borderColor: alpha(theme.palette.text.secondary, 0.5),
+              color: theme.palette.text.secondary,
+              '&:hover': { borderColor: theme.palette.text.primary, color: theme.palette.text.primary },
+            }}
+          >
             Clear
           </Button>
         </Fade>
@@ -59,38 +98,59 @@ const ActionToolbar = ({
     )}
 
     {/* Search & Cloud Toggle (Identical to Original Design) */}
-    <TextField 
+    <TextField
       fullWidth size="small"
-      placeholder="Search local and online models..." 
-      value={searchQuery} 
+      placeholder="Search local and online models..."
+      value={searchQuery}
       onChange={e => setSearchQuery(e.target.value)}
-      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: alpha(theme.palette.text.primary, 0.02) } }}
-      InputProps={{ 
+      sx={{
+        '& .MuiOutlinedInput-root': {
+          borderRadius: 999,
+          bgcolor: alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.35 : 0.03),
+          border: `1px solid ${alpha(theme.palette.primary.main, 0.35)}`,
+          boxShadow: theme.palette.mode === 'dark'
+            ? 'inset 0 0 0 1px rgba(70,140,255,0.2)'
+            : 'inset 0 0 0 1px rgba(70,140,255,0.1)',
+          '& fieldset': { border: 'none' },
+        },
+      }}
+      InputProps={{
         startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment>,
         endAdornment: (
           <InputAdornment position="end">
-            <IconButton onClick={() => setShowOnline(!showOnline)} color={showOnline ? "primary" : "default"} size="small">
+            <IconButton
+              onClick={() => setShowOnline(!showOnline)}
+              size="small"
+              sx={{
+                color: showOnline ? theme.palette.primary.main : theme.palette.text.secondary,
+                backgroundColor: alpha(theme.palette.primary.main, showOnline ? 0.18 : 0.06),
+                borderRadius: 2,
+                '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.28) },
+              }}
+            >
               {showOnline ? <CloudIcon /> : <CloudOffIcon />}
             </IconButton>
           </InputAdornment>
         )
-      }} 
+      }}
     />
 
     {/* Delete Action (Hidden in Inference Mode) */}
     {!isInferenceSelection && (
       <Box sx={{ position: 'relative', flexShrink: 0 }}>
-        <IconButton 
+        <IconButton
           onClick={onDelete} disabled={selectedCount === 0}
-          sx={{ 
-            width: 40, height: 40, 
-            bgcolor: selectedCount > 0 ? 'error.main' : alpha(theme.palette.error.main, 0.1), 
-            color: selectedCount > 0 ? 'white' : theme.palette.text.disabled, 
-            borderRadius: '50%', '&:hover': { bgcolor: 'error.dark' },
+          sx={{
+            width: 40,
+            height: 40,
+            bgcolor: selectedCount > 0 ? 'error.main' : alpha(theme.palette.error.main, 0.12),
+            color: selectedCount > 0 ? 'white' : theme.palette.text.disabled,
+            borderRadius: '50%',
+            '&:hover': { bgcolor: 'error.dark' },
             transition: 'all 0.3s ease'
           }}
         >
-          <DeleteIcon sx={{ fontSize: '1.25rem' }} /> 
+          <DeleteIcon sx={{ fontSize: '1.25rem' }} />
         </IconButton>
         <Fade in={selectedCount > 0}>
           <Box sx={{
@@ -249,13 +309,66 @@ function ModelsView({
   if (loading) return <Box sx={{ py: 10, textAlign: 'center' }}><CircularProgress /><Typography mt={2}>Loading models...</Typography></Box>;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <PageHeader 
-        title={isInferenceSelection ? "Select Model for Inference" : "Trained Voice Models"} 
-        onBack={isInferenceSelection ? onBack : null}
-      />
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Box
+        sx={{
+          borderRadius: 4,
+          border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+          background: theme.palette.mode === 'dark'
+            ? 'linear-gradient(160deg, rgba(18,20,30,0.92), rgba(10,10,14,0.95))'
+            : 'linear-gradient(160deg, #f8f9ff, #eef2ff)',
+          boxShadow: theme.palette.mode === 'dark'
+            ? '0 30px 80px rgba(0,0,0,0.45)'
+            : '0 30px 80px rgba(30,60,120,0.12)',
+          p: { xs: 2.5, md: 4 },
+          backdropFilter: 'blur(24px)',
+        }}
+      >
+        <Box
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+            p: 2.5,
+            background: theme.palette.mode === 'dark'
+              ? 'linear-gradient(135deg, rgba(23,25,40,0.92), rgba(16,18,28,0.92))'
+              : 'linear-gradient(135deg, #ffffff, #f5f8ff)',
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.18)}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+          }}
+        >
+          {isInferenceSelection ? (
+            <IconButton
+              onClick={onBack}
+              sx={{
+                borderRadius: 2,
+                color: theme.palette.text.secondary,
+                backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                '&:hover': { color: theme.palette.primary.main, backgroundColor: alpha(theme.palette.primary.main, 0.18) },
+              }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+          ) : (
+            <Box sx={{ width: 40 }} />
+          )}
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 600,
+              textAlign: 'center',
+              flex: 1,
+              letterSpacing: 0.4,
+            }}
+          >
+            {isInferenceSelection ? "Select Model for Inference" : "Trained Voice Models"}
+          </Typography>
+          <Box sx={{ width: 40 }} />
+        </Box>
 
-      <ActionToolbar 
+      <ActionToolbar
         searchQuery={searchQuery} setSearchQuery={(val) => { setSearchQuery(val); setCurrentPage(1); }}
         showOnline={showOnline} setShowOnline={setShowOnline}
         selectedCount={selected.size} 
@@ -266,21 +379,37 @@ function ModelsView({
         isInferenceSelection={isInferenceSelection}
       />
 
-      <Grid container spacing={2}>
+      <Grid container spacing={2.5}>
         {displayModels.map((model, i) => {
           const isSelected = selected.has(model.name);
           const downloadPct = downloadingProgress[model.url];
 
           return (
             <Grid item xs={12} sm={6} md={4} key={model.url || model.name || i}>
-              <Box 
-                onClick={() => handleCardClick(model)} 
+              <Box
+                onClick={() => handleCardClick(model)}
                 sx={{
-                  p: 2.5, borderRadius: 2, transition: '0.3s', cursor: model.isOnline ? 'default' : 'pointer',
-                  border: `1px solid ${isSelected ? theme.palette.primary.main : 'rgba(255, 255, 255, 0.08)'}`,
-                  backgroundColor: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.2 : 0.8),
-                  position: 'relative', height: '100%', display: 'flex', flexDirection: 'column',
-                  '&:hover': { transform: 'translateY(-2px)', boxShadow: theme.shadows[4] }
+                  p: 2.5,
+                  borderRadius: 3,
+                  transition: '0.3s',
+                  cursor: model.isOnline ? 'default' : 'pointer',
+                  border: `1px solid ${isSelected ? alpha(theme.palette.primary.main, 0.7) : 'rgba(255, 255, 255, 0.08)'}`,
+                  background: theme.palette.mode === 'dark'
+                    ? 'linear-gradient(160deg, rgba(28,30,40,0.9), rgba(12,12,16,0.9))'
+                    : 'linear-gradient(160deg, #ffffff, #f1f5ff)',
+                  position: 'relative',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  boxShadow: isSelected
+                    ? '0 0 0 1px rgba(72,130,255,0.4), 0 20px 40px rgba(20,40,90,0.35)'
+                    : '0 16px 30px rgba(0,0,0,0.25)',
+                  '&:hover': {
+                    transform: 'translateY(-3px)',
+                    boxShadow: isSelected
+                      ? '0 0 0 1px rgba(72,130,255,0.5), 0 24px 50px rgba(20,40,90,0.4)'
+                      : '0 20px 40px rgba(0,0,0,0.3)',
+                  }
                 }}
               >
                 {/* Download Progress Bar Overlay */}
@@ -291,7 +420,20 @@ function ModelsView({
                 )}
 
                 {model.isOnline && (
-                  <Chip label="Online" size="small" sx={{ position: 'absolute', top: 12, right: 12, height: 18, fontSize: '0.6rem', bgcolor: 'primary.main', color: 'white', fontWeight: 700 }} />
+                  <Chip
+                    label="Online"
+                    size="small"
+                    sx={{
+                      position: 'absolute',
+                      top: 12,
+                      right: 12,
+                      height: 20,
+                      fontSize: '0.6rem',
+                      bgcolor: 'primary.main',
+                      color: 'white',
+                      fontWeight: 700
+                    }}
+                  />
                 )}
 
                 <Box sx={{ mb: 1 }}>
@@ -314,18 +456,34 @@ function ModelsView({
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>Latest Checkpoints:</Typography>
                     <Stack direction="row" spacing={1}>
                       {model.checkpoints.slice(0, 3).map((cp, idx) => (
-                        <StatPill key={idx} label={`${cp.epochs}e`} color={'#fff'} theme={theme} style={{ bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '9px' }} />
+                        <StatPill
+                          key={idx}
+                          label={`${cp.epochs}e`}
+                          color={'#fff'}
+                          theme={theme}
+                          style={{
+                            bgcolor: 'rgba(255,255,255,0.04)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                          }}
+                        />
                       ))}
                     </Stack>
                   </Box>
                 )}
 
                 {model.isOnline ? (
-                  <Button 
-                    fullWidth variant="contained" 
-                    disabled={downloadPct !== undefined} 
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    disabled={downloadPct !== undefined}
                     onClick={(e) => { e.stopPropagation(); setActiveDownloadModel(model); setDownloadDialogOpen(true); }}
                     startIcon={downloadPct !== undefined ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
+                    sx={{
+                      borderRadius: 999,
+                      textTransform: 'none',
+                      background: 'linear-gradient(135deg, #2f6bff, #1b4ddb)',
+                      boxShadow: '0 12px 24px rgba(35,78,170,0.45)',
+                    }}
                   >
                     {downloadPct !== undefined ? `Downloading ${Math.round(downloadPct)}%` : 'Download'}
                   </Button>
@@ -333,7 +491,9 @@ function ModelsView({
                   <Chip
                     label={isInferenceSelection ? "SELECT MODEL" : (model.status?.toUpperCase() || "COMPLETED")}
                     sx={{
-                      height: 'auto', borderRadius: '12px', bgcolor: isInferenceSelection ? 'primary.main' : 'rgba(76, 175, 80, 0.15)',
+                      height: 'auto',
+                      borderRadius: '12px',
+                      bgcolor: isInferenceSelection ? 'primary.main' : 'rgba(76, 175, 80, 0.15)',
                       color: isInferenceSelection ? '#fff' : (model.status === 'completed' ? '#34C759' : '#FF9500'),
                       fontWeight: 600, '& .MuiChip-label': { px: 2, py: 0.8, fontSize: '0.65rem' },
                     }}
@@ -411,6 +571,7 @@ function ModelsView({
           }} variant="contained" color="error">Delete</Button>
         </DialogActions>
       </Dialog>
+      </Box>
     </Container>
   );
 }
