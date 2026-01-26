@@ -52,25 +52,25 @@ function NavigationBar({
     py: sidebarCollapsed ? 1.5 : 1.5,
     justifyContent: sidebarCollapsed ? "center" : "flex-start",
     transition: "all 0.25s ease",
-    border: `1px solid ${theme.palette.divider}`,
+    border: `1px solid ${theme.palette.mode === "dark" ? "rgba(90,120,255,0.12)" : theme.palette.divider}`,
     background:
       theme.palette.mode === "dark"
-        ? "linear-gradient(145deg, rgba(44,44,46,0.9), rgba(22,22,24,0.9))"
+        ? "linear-gradient(145deg, rgba(30,34,48,0.92), rgba(18,20,28,0.92))"
         : "linear-gradient(145deg, rgba(255,255,255,0.95), rgba(242,242,247,0.95))",
     boxShadow:
       theme.palette.mode === "dark"
-        ? "0 12px 24px rgba(0,0,0,0.3)"
+        ? "0 12px 24px rgba(0,0,0,0.35)"
         : "0 12px 24px rgba(0,0,0,0.08)",
     backdropFilter: "blur(18px)",
     "&.Mui-selected": {
       background:
         theme.palette.mode === "dark"
-          ? "linear-gradient(135deg, rgba(0,122,255,0.2), rgba(10,10,12,0.9))"
+          ? "linear-gradient(135deg, rgba(70,120,255,0.25), rgba(10,12,20,0.9))"
           : "linear-gradient(135deg, rgba(0,122,255,0.18), rgba(255,255,255,0.95))",
-      border: `1px solid ${theme.palette.primary.main}55`,
+      border: `1px solid ${theme.palette.primary.main}66`,
       boxShadow:
         theme.palette.mode === "dark"
-          ? "0 14px 28px rgba(0,0,0,0.4)"
+          ? "0 14px 28px rgba(0,0,0,0.45)"
           : "0 14px 28px rgba(0,0,0,0.12)",
       "& .MuiListItemIcon-root": {
         color: theme.palette.primary.main,
@@ -82,7 +82,7 @@ function NavigationBar({
     },
     "&:hover": {
       transform: sidebarCollapsed ? "none" : "translateX(4px)",
-      backgroundColor: theme.palette.action.hover,
+      backgroundColor: theme.palette.mode === "dark" ? "rgba(40,48,70,0.7)" : theme.palette.action.hover,
     },
   };
 
@@ -242,8 +242,11 @@ function NavigationBar({
           display: { xs: "none", sm: "flex" },
           width: sidebarCollapsed ? 80 : 288,
           flexShrink: 0,
-          borderRight: `1px solid ${theme.palette.divider}`,
-          backgroundColor: theme.palette.background.paper,
+          borderRight: `1px solid ${theme.palette.mode === "dark" ? "rgba(90,120,255,0.2)" : theme.palette.divider}`,
+          background:
+            theme.palette.mode === "dark"
+              ? "linear-gradient(180deg, rgba(20,22,32,0.95), rgba(12,12,18,0.95))"
+              : theme.palette.background.paper,
           transition: "width 0.3s ease-in-out",
           overflow: "hidden",
         }}
@@ -276,6 +279,7 @@ function NavigationBar({
                 sx={{
                   fontWeight: 700,
                   color: theme.palette.primary.main,
+                  letterSpacing: 0.6,
                 }}
               >
                 Rhymix
@@ -382,11 +386,11 @@ function NavigationBar({
                   py: 1.5,
                   mb: 1,
                   justifyContent: "flex-start",
-                  borderColor: theme.palette.divider,
+                  borderColor: theme.palette.mode === "dark" ? "rgba(90,120,255,0.25)" : theme.palette.divider,
                   color: theme.palette.text.primary,
                   "&:hover": {
                     borderColor: theme.palette.primary.main,
-                    backgroundColor: theme.palette.primary.main + "10",
+                    backgroundColor: theme.palette.primary.main + "18",
                   },
                 }}
               >
@@ -431,11 +435,11 @@ function NavigationBar({
                 sx={{
                   borderRadius: 2,
                   overflow: "hidden",
-                  bgcolor: theme.palette.background.paper,
-                  border: `1px solid ${theme.palette.divider}`,
+                  bgcolor: theme.palette.mode === "dark" ? "rgba(18,20,30,0.95)" : theme.palette.background.paper,
+                  border: `1px solid ${theme.palette.mode === "dark" ? "rgba(90,120,255,0.2)" : theme.palette.divider}`,
                   boxShadow:
                     theme.palette.mode === "dark"
-                      ? "0 6px 18px rgba(0,0,0,.35)"
+                      ? "0 6px 18px rgba(0,0,0,.4)"
                       : "0 6px 18px rgba(0,0,0,.12)",
                 }}
               >

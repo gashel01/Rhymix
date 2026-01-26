@@ -18,17 +18,30 @@ import {
 
 const StatPill = ({ label, color, theme, style }) => (
   <Box sx={{
-    px: 1.4,
-    py: 0.45,
+    px: 1.5,
+    py: 0.5,
     borderRadius: 999,
     display: 'flex',
     alignItems: 'center',
-    backgroundColor: alpha(color || theme.palette.text.primary, theme.palette.mode === 'dark' ? 0.14 : 0.08),
-    border: `1px solid ${alpha(color || theme.palette.text.primary, theme.palette.mode === 'dark' ? 0.18 : 0.1)}`,
+    background: theme.palette.mode === 'dark'
+      ? 'linear-gradient(135deg, rgba(22,26,38,0.9), rgba(14,16,24,0.9))'
+      : 'linear-gradient(135deg, #f8faff, #edf2ff)',
+    border: `1px solid ${alpha(color || theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.25 : 0.2)}`,
+    boxShadow: theme.palette.mode === 'dark'
+      ? 'inset 0 0 0 1px rgba(70,120,255,0.12)'
+      : 'inset 0 0 0 1px rgba(70,120,255,0.08)',
     whiteSpace: 'nowrap',
     ...style
   }}>
-    <Typography variant="caption" sx={{ fontWeight: 600, color: color || 'text.primary', fontSize: '0.72rem', letterSpacing: 0.2 }}>
+    <Typography
+      variant="caption"
+      sx={{
+        fontWeight: 600,
+        color: color || 'text.primary',
+        fontSize: '0.72rem',
+        letterSpacing: 0.25,
+      }}
+    >
       {label}
     </Typography>
   </Box>
@@ -44,15 +57,15 @@ const ActionToolbar = ({
     borderRadius: 999,
     border: `1px solid ${alpha(theme.palette.primary.main, 0.35)}`,
     background: theme.palette.mode === 'dark'
-      ? 'linear-gradient(135deg, rgba(14,16,24,0.9), rgba(20,22,32,0.8))'
-      : 'linear-gradient(135deg, #ffffff, #f2f5ff)',
+      ? 'linear-gradient(135deg, rgba(18,20,30,0.85), rgba(10,12,20,0.9))'
+      : 'linear-gradient(135deg, #ffffff, #f0f4ff)',
     display: 'flex',
     alignItems: 'center',
     gap: 2,
     minHeight: 64,
     boxShadow: theme.palette.mode === 'dark'
-      ? '0 12px 30px rgba(4,10,30,0.55)'
-      : '0 12px 30px rgba(30,60,130,0.08)',
+      ? '0 18px 40px rgba(8,12,28,0.6)'
+      : '0 18px 40px rgba(30,60,130,0.12)',
     transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
   }}>
     {/* Bulk Selection (Hidden in Inference Mode to keep it clean) */}
@@ -64,15 +77,15 @@ const ActionToolbar = ({
           onClick={onSelectAll}
           sx={{
             borderRadius: 999,
-            height: 38,
+            height: 36,
             px: 2,
             whiteSpace: 'nowrap',
             borderColor: alpha(theme.palette.primary.main, 0.45),
-            color: theme.palette.primary.main,
-            backgroundColor: alpha(theme.palette.primary.main, 0.08),
+            color: theme.palette.primary.light,
+            backgroundColor: alpha(theme.palette.primary.main, 0.12),
             '&:hover': {
               borderColor: theme.palette.primary.main,
-              backgroundColor: alpha(theme.palette.primary.main, 0.18),
+              backgroundColor: alpha(theme.palette.primary.main, 0.22),
             },
           }}
         >
@@ -85,7 +98,7 @@ const ActionToolbar = ({
             onClick={onClear}
             sx={{
               borderRadius: 999,
-              height: 38,
+              height: 36,
               borderColor: alpha(theme.palette.text.secondary, 0.5),
               color: theme.palette.text.secondary,
               '&:hover': { borderColor: theme.palette.text.primary, color: theme.palette.text.primary },
@@ -106,13 +119,14 @@ const ActionToolbar = ({
       sx={{
         '& .MuiOutlinedInput-root': {
           borderRadius: 999,
-          bgcolor: alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.35 : 0.03),
-          border: `1px solid ${alpha(theme.palette.primary.main, 0.35)}`,
+          bgcolor: theme.palette.mode === 'dark' ? 'rgba(12,14,22,0.75)' : 'rgba(255,255,255,0.9)',
+          border: `1px solid ${alpha(theme.palette.primary.main, 0.45)}`,
           boxShadow: theme.palette.mode === 'dark'
-            ? 'inset 0 0 0 1px rgba(70,140,255,0.2)'
-            : 'inset 0 0 0 1px rgba(70,140,255,0.1)',
+            ? 'inset 0 0 0 1px rgba(70,140,255,0.25)'
+            : 'inset 0 0 0 1px rgba(70,140,255,0.15)',
           '& fieldset': { border: 'none' },
         },
+        '& .MuiInputBase-input': { fontWeight: 500 },
       }}
       InputProps={{
         startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment>,
@@ -122,10 +136,10 @@ const ActionToolbar = ({
               onClick={() => setShowOnline(!showOnline)}
               size="small"
               sx={{
-                color: showOnline ? theme.palette.primary.main : theme.palette.text.secondary,
-                backgroundColor: alpha(theme.palette.primary.main, showOnline ? 0.18 : 0.06),
+                color: showOnline ? theme.palette.primary.light : theme.palette.text.secondary,
+                backgroundColor: alpha(theme.palette.primary.main, showOnline ? 0.22 : 0.08),
                 borderRadius: 2,
-                '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.28) },
+                '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.32) },
               }}
             >
               {showOnline ? <CloudIcon /> : <CloudOffIcon />}
@@ -312,16 +326,38 @@ function ModelsView({
     <Container maxWidth="xl" sx={{ py: 4 }}>
       <Box
         sx={{
-          borderRadius: 4,
-          border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+          borderRadius: 5,
+          border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
           background: theme.palette.mode === 'dark'
-            ? 'linear-gradient(160deg, rgba(18,20,30,0.92), rgba(10,10,14,0.95))'
+            ? 'radial-gradient(circle at top, rgba(40,44,60,0.7), rgba(12,12,18,0.96) 60%)'
             : 'linear-gradient(160deg, #f8f9ff, #eef2ff)',
           boxShadow: theme.palette.mode === 'dark'
-            ? '0 30px 80px rgba(0,0,0,0.45)'
+            ? '0 40px 90px rgba(0,0,0,0.55)'
             : '0 30px 80px rgba(30,60,120,0.12)',
           p: { xs: 2.5, md: 4 },
-          backdropFilter: 'blur(24px)',
+          backdropFilter: 'blur(28px)',
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            inset: 0,
+            borderRadius: 24,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.35)}`,
+            boxShadow: '0 0 30px rgba(72,130,255,0.25)',
+            pointerEvents: 'none',
+          },
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            inset: -40,
+            background: 'radial-gradient(circle at 15% 20%, rgba(70,120,255,0.18), rgba(0,0,0,0) 55%)',
+            pointerEvents: 'none',
+          },
+          '& > *': {
+            position: 'relative',
+            zIndex: 1,
+          },
         }}
       >
         <Box
@@ -330,7 +366,7 @@ function ModelsView({
             borderRadius: 3,
             p: 2.5,
             background: theme.palette.mode === 'dark'
-              ? 'linear-gradient(135deg, rgba(23,25,40,0.92), rgba(16,18,28,0.92))'
+              ? 'linear-gradient(135deg, rgba(26,30,44,0.9), rgba(16,18,26,0.92))'
               : 'linear-gradient(135deg, #ffffff, #f5f8ff)',
             border: `1px solid ${alpha(theme.palette.primary.main, 0.18)}`,
             display: 'flex',
@@ -360,7 +396,7 @@ function ModelsView({
               fontWeight: 600,
               textAlign: 'center',
               flex: 1,
-              letterSpacing: 0.4,
+              letterSpacing: 0.6,
             }}
           >
             {isInferenceSelection ? "Select Model for Inference" : "Trained Voice Models"}
@@ -393,22 +429,39 @@ function ModelsView({
                   borderRadius: 3,
                   transition: '0.3s',
                   cursor: model.isOnline ? 'default' : 'pointer',
-                  border: `1px solid ${isSelected ? alpha(theme.palette.primary.main, 0.7) : 'rgba(255, 255, 255, 0.08)'}`,
+                  border: `1px solid ${isSelected ? alpha(theme.palette.primary.main, 0.8) : 'rgba(255, 255, 255, 0.08)'}`,
                   background: theme.palette.mode === 'dark'
-                    ? 'linear-gradient(160deg, rgba(28,30,40,0.9), rgba(12,12,16,0.9))'
+                    ? 'linear-gradient(160deg, rgba(32,36,50,0.9), rgba(12,12,18,0.92))'
                     : 'linear-gradient(160deg, #ffffff, #f1f5ff)',
                   position: 'relative',
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
                   boxShadow: isSelected
-                    ? '0 0 0 1px rgba(72,130,255,0.4), 0 20px 40px rgba(20,40,90,0.35)'
-                    : '0 16px 30px rgba(0,0,0,0.25)',
+                    ? '0 0 0 1px rgba(72,130,255,0.5), 0 24px 48px rgba(20,40,90,0.45)'
+                    : '0 16px 30px rgba(0,0,0,0.35)',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    inset: -1,
+                    borderRadius: 16,
+                    background: isSelected
+                      ? 'linear-gradient(180deg, rgba(64,120,255,0.45), rgba(14,18,28,0))'
+                      : 'linear-gradient(180deg, rgba(64,120,255,0.25), rgba(14,18,28,0))',
+                    opacity: isSelected ? 1 : 0.6,
+                    filter: 'blur(10px)',
+                    pointerEvents: 'none',
+                    zIndex: 0,
+                  },
+                  '& > *': {
+                    position: 'relative',
+                    zIndex: 1,
+                  },
                   '&:hover': {
                     transform: 'translateY(-3px)',
                     boxShadow: isSelected
-                      ? '0 0 0 1px rgba(72,130,255,0.5), 0 24px 50px rgba(20,40,90,0.4)'
-                      : '0 20px 40px rgba(0,0,0,0.3)',
+                      ? '0 0 0 1px rgba(72,130,255,0.6), 0 28px 55px rgba(20,40,90,0.5)'
+                      : '0 22px 42px rgba(0,0,0,0.4)',
                   }
                 }}
               >
