@@ -38,6 +38,7 @@ import CreateSongView from "./components/CreateSongView";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import NavigationBar from "./components/NavigationBar";
 import { uploadFiles, startProcessing, getJobStatus, cleanDirectories } from "./utils/apiService";
+import { getGlassSurfaceStyles } from "./utils/glassStyles";
 
 // Tesla/Apple-inspired theme system
 const createAppTheme = (mode) => createTheme({
@@ -817,15 +818,28 @@ function App() {
             flexGrow: 1,
             p: 3,
             ml: {
-              sm: sidebarCollapsed ? '72px' : '280px', // Adjust for collapsed sidebar
-              xs: 0
+              sm: sidebarCollapsed ? "72px" : "280px", // Adjust for collapsed sidebar
+              xs: 0,
             }, // Account for sidebar
-            backgroundColor: 'background.default',
-            minHeight: '100vh',
-            transition: 'margin-left 0.3s ease-in-out',
+            backgroundColor: "background.default",
+            minHeight: "100vh",
+            transition: "margin-left 0.3s ease-in-out",
           }}
         >
-          <Container maxWidth="xl" sx={{ py: 2 }}>
+          <Container
+            maxWidth="xl"
+            sx={{
+              py: 3,
+              px: { xs: 2, md: 4 },
+              ...getGlassSurfaceStyles(theme, {
+                borderRadius: 28,
+                blur: 28,
+                glowStrength: theme.palette.mode === "dark"
+                  ? "0 28px 60px rgba(0, 0, 0, 0.55)"
+                  : "0 24px 48px rgba(59, 130, 246, 0.18)",
+              }),
+            }}
+          >
             {error && (
               <Alert
                 severity="error"

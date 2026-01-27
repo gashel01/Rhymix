@@ -22,6 +22,7 @@ import Brightness7 from "@mui/icons-material/Brightness7";
 import VolumeUp from "@mui/icons-material/VolumeUp";
 import VolumeOff from "@mui/icons-material/VolumeOff";
 import MenuIcon from "@mui/icons-material/Menu";
+import { getGlassSurfaceStyles } from "../utils/glassStyles";
 
 function NavigationBar({
   theme,
@@ -44,34 +45,38 @@ function NavigationBar({
 }) {
   const navCardHeight = sidebarCollapsed ? 60 : 76;
   const navCardRadius = 18;
+  const navCardGlass = getGlassSurfaceStyles(theme, {
+    borderRadius: navCardRadius,
+    blur: 20,
+    glowStrength: theme.palette.mode === "dark"
+      ? "0 18px 36px rgba(0, 0, 0, 0.45)"
+      : "0 16px 30px rgba(59, 130, 246, 0.18)",
+    backgroundOpacity: theme.palette.mode === "dark" ? 0.55 : 0.85,
+  });
 
   const sharedNavCardStyles = {
+    ...navCardGlass,
     minHeight: navCardHeight,
     borderRadius: navCardRadius,
     px: sidebarCollapsed ? 1.5 : 2,
     py: sidebarCollapsed ? 1.5 : 1.5,
     justifyContent: sidebarCollapsed ? "center" : "flex-start",
     transition: "all 0.25s ease",
-    border: `1px solid ${theme.palette.divider}`,
-    background:
-      theme.palette.mode === "dark"
-        ? "linear-gradient(145deg, rgba(44,44,46,0.9), rgba(22,22,24,0.9))"
-        : "linear-gradient(145deg, rgba(255,255,255,0.95), rgba(242,242,247,0.95))",
-    boxShadow:
-      theme.palette.mode === "dark"
-        ? "0 12px 24px rgba(0,0,0,0.3)"
-        : "0 12px 24px rgba(0,0,0,0.08)",
-    backdropFilter: "blur(18px)",
     "&.Mui-selected": {
       background:
         theme.palette.mode === "dark"
-          ? "linear-gradient(135deg, rgba(0,122,255,0.2), rgba(10,10,12,0.9))"
-          : "linear-gradient(135deg, rgba(0,122,255,0.18), rgba(255,255,255,0.95))",
-      border: `1px solid ${theme.palette.primary.main}55`,
+          ? "linear-gradient(135deg, rgba(0,122,255,0.22), rgba(10,10,14,0.88))"
+          : "linear-gradient(135deg, rgba(0,122,255,0.2), rgba(255,255,255,0.92))",
       boxShadow:
         theme.palette.mode === "dark"
-          ? "0 14px 28px rgba(0,0,0,0.4)"
-          : "0 14px 28px rgba(0,0,0,0.12)",
+          ? "0 20px 40px rgba(0,0,0,0.45)"
+          : "0 20px 36px rgba(59,130,246,0.22)",
+      "&::before": {
+        background:
+          theme.palette.mode === "dark"
+            ? "linear-gradient(135deg, rgba(255,255,255,0.45), rgba(0,122,255,0.35), rgba(255,255,255,0.15))"
+            : "linear-gradient(135deg, rgba(255,255,255,1), rgba(0,122,255,0.5), rgba(255,255,255,0.8))",
+      },
       "& .MuiListItemIcon-root": {
         color: theme.palette.primary.main,
       },
@@ -96,12 +101,13 @@ function NavigationBar({
           left: 16,
           zIndex: 1300,
           display: { xs: "flex", sm: "none" },
-          backgroundColor: theme.palette.background.paper,
-          border: `1px solid ${theme.palette.divider}`,
-          boxShadow:
-            theme.palette.mode === "dark"
-              ? "0 4px 12px rgba(0,0,0,0.3)"
-              : "0 4px 12px rgba(0,0,0,0.1)",
+          ...getGlassSurfaceStyles(theme, {
+            borderRadius: 14,
+            blur: 16,
+            glowStrength: theme.palette.mode === "dark"
+              ? "0 12px 24px rgba(0, 0, 0, 0.45)"
+              : "0 12px 20px rgba(59, 130, 246, 0.2)",
+          }),
           "&:hover": {
             backgroundColor: theme.palette.action.hover,
           },
@@ -122,12 +128,14 @@ function NavigationBar({
           "& .MuiDrawer-paper": {
             boxSizing: "border-box",
             width: 300,
-            background:
-              theme.palette.mode === "dark"
-                ? "linear-gradient(180deg, rgba(18,18,20,0.95), rgba(26,26,28,0.95))"
-                : "linear-gradient(180deg, rgba(255,255,255,0.95), rgba(242,242,247,0.95))",
-            borderRight: `1px solid ${theme.palette.divider}`,
-            backdropFilter: "blur(24px)",
+            ...getGlassSurfaceStyles(theme, {
+              borderRadius: 0,
+              blur: 26,
+              backgroundOpacity: theme.palette.mode === "dark" ? 0.7 : 0.92,
+              glowStrength: theme.palette.mode === "dark"
+                ? "0 24px 50px rgba(0, 0, 0, 0.5)"
+                : "0 20px 40px rgba(59, 130, 246, 0.18)",
+            }),
           },
         }}
       >
@@ -201,13 +209,13 @@ function NavigationBar({
               alignItems: "center",
               justifyContent: "space-between",
               p: 2,
-              borderRadius: 3,
-              backgroundColor: theme.palette.background.paper,
-              border: `1px solid ${theme.palette.divider}`,
-              boxShadow:
-                theme.palette.mode === "dark"
-                  ? "0 4px 12px rgba(0,0,0,0.3)"
-                  : "0 4px 12px rgba(0,0,0,0.1)",
+              ...getGlassSurfaceStyles(theme, {
+                borderRadius: 16,
+                blur: 18,
+                glowStrength: theme.palette.mode === "dark"
+                  ? "0 10px 24px rgba(0, 0, 0, 0.45)"
+                  : "0 12px 24px rgba(59, 130, 246, 0.18)",
+              }),
             }}
           >
             <Typography
@@ -242,8 +250,14 @@ function NavigationBar({
           display: { xs: "none", sm: "flex" },
           width: sidebarCollapsed ? 80 : 288,
           flexShrink: 0,
-          borderRight: `1px solid ${theme.palette.divider}`,
-          backgroundColor: theme.palette.background.paper,
+          ...getGlassSurfaceStyles(theme, {
+            borderRadius: 0,
+            blur: 26,
+            backgroundOpacity: theme.palette.mode === "dark" ? 0.72 : 0.92,
+            glowStrength: theme.palette.mode === "dark"
+              ? "0 24px 50px rgba(0, 0, 0, 0.45)"
+              : "0 18px 36px rgba(59, 130, 246, 0.15)",
+          }),
           transition: "width 0.3s ease-in-out",
           overflow: "hidden",
         }}
@@ -431,12 +445,13 @@ function NavigationBar({
                 sx={{
                   borderRadius: 2,
                   overflow: "hidden",
-                  bgcolor: theme.palette.background.paper,
-                  border: `1px solid ${theme.palette.divider}`,
-                  boxShadow:
-                    theme.palette.mode === "dark"
-                      ? "0 6px 18px rgba(0,0,0,.35)"
-                      : "0 6px 18px rgba(0,0,0,.12)",
+                  ...getGlassSurfaceStyles(theme, {
+                    borderRadius: 16,
+                    blur: 20,
+                    glowStrength: theme.palette.mode === "dark"
+                      ? "0 18px 36px rgba(0, 0, 0, 0.45)"
+                      : "0 16px 30px rgba(59, 130, 246, 0.18)",
+                  }),
                 }}
               >
                 <Box

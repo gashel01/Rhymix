@@ -17,6 +17,7 @@ import {
   AccessTime as AccessTimeIcon
 } from "@mui/icons-material";
 import PageHeader from "./common/PageHeader";
+import { getGlassSurfaceStyles } from "../utils/glassStyles";
 
 // --- Original Sub-components (Design Preserved) ---
 
@@ -32,16 +33,27 @@ const StatPill = ({ label, color, theme, style }) => (
   </Box>
 );
 
-const ActionToolbar = ({ 
-  searchQuery, setSearchQuery, showOnline, setShowOnline, 
-  selectedCount, onClear, onDelete, onSelectAll, theme, isInferenceSelection 
+const ActionToolbar = ({
+  searchQuery,
+  setSearchQuery,
+  showOnline,
+  setShowOnline,
+  selectedCount,
+  onClear,
+  onDelete,
+  onSelectAll,
+  theme,
+  isInferenceSelection,
+  glassStyles,
 }) => (
   <Box sx={{ 
-    p: 2, mb: 3, borderRadius: 2, border: `1px solid ${theme.palette.divider}`,
-    background: theme.palette.mode === 'dark' 
-      ? `linear-gradient(135deg, ${theme.palette.background.paper}, ${theme.palette.background.default})`
-      : `linear-gradient(135deg, #ffffff, #f8fafc)`,
-    display: 'flex', alignItems: 'center', gap: 2, minHeight: 64,
+    ...glassStyles,
+    p: 2,
+    mb: 3,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 2,
+    minHeight: 64,
     transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)', 
   }}>
     {/* Bulk Selection (Hidden in Inference Mode to keep it clean) */}
@@ -115,6 +127,22 @@ function ModelsView({
   onModelSelected 
 }) {
   const theme = useTheme();
+  const toolbarGlassStyles = getGlassSurfaceStyles(theme, {
+    borderRadius: 18,
+    blur: 18,
+    glowStrength: theme.palette.mode === "dark"
+      ? "0 18px 36px rgba(0, 0, 0, 0.45)"
+      : "0 16px 30px rgba(59, 130, 246, 0.18)",
+    backgroundOpacity: theme.palette.mode === "dark" ? 0.55 : 0.9,
+  });
+  const modelCardGlassStyles = getGlassSurfaceStyles(theme, {
+    borderRadius: 18,
+    blur: 20,
+    glowStrength: theme.palette.mode === "dark"
+      ? "0 20px 40px rgba(0, 0, 0, 0.5)"
+      : "0 18px 36px rgba(59, 130, 246, 0.2)",
+    backgroundOpacity: theme.palette.mode === "dark" ? 0.5 : 0.9,
+  });
   
   // State: Management & Display
   const [models, setModels] = useState([]);
@@ -264,6 +292,7 @@ function ModelsView({
         onDelete={() => setDeleteOpen(true)}
         theme={theme}
         isInferenceSelection={isInferenceSelection}
+        glassStyles={toolbarGlassStyles}
       />
 
       <Grid container spacing={2}>
@@ -276,11 +305,27 @@ function ModelsView({
               <Box 
                 onClick={() => handleCardClick(model)} 
                 sx={{
-                  p: 2.5, borderRadius: 2, transition: '0.3s', cursor: model.isOnline ? 'default' : 'pointer',
-                  border: `1px solid ${isSelected ? theme.palette.primary.main : 'rgba(255, 255, 255, 0.08)'}`,
-                  backgroundColor: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.2 : 0.8),
-                  position: 'relative', height: '100%', display: 'flex', flexDirection: 'column',
-                  '&:hover': { transform: 'translateY(-2px)', boxShadow: theme.shadows[4] }
+                  ...modelCardGlassStyles,
+                  p: 2.5,
+                  transition: "0.3s",
+                  cursor: model.isOnline ? "default" : "pointer",
+                  border: `1px solid ${isSelected ? theme.palette.primary.main : "transparent"}`,
+                  position: "relative",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  "&::before": {
+                    ...modelCardGlassStyles["&::before"],
+                    background: isSelected
+                      ? theme.palette.mode === "dark"
+                        ? "linear-gradient(135deg, rgba(255,255,255,0.55), rgba(0,122,255,0.4), rgba(255,255,255,0.2))"
+                        : "linear-gradient(135deg, rgba(255,255,255,1), rgba(0,122,255,0.55), rgba(255,255,255,0.8))"
+                      : modelCardGlassStyles["&::before"].background,
+                  },
+                  "&:hover": {
+                    transform: "translateY(-2px)",
+                    boxShadow: theme.shadows[4],
+                  },
                 }}
               >
                 {/* Download Progress Bar Overlay */}
@@ -353,7 +398,17 @@ function ModelsView({
       )}
 
       {/* --- Checkpoint Dialog (Inference Mode) --- */}
-      <Dialog open={checkpointDialogOpen} onClose={() => setCheckpointDialogOpen(false)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3 } }}>
+      <Dialog
+        open={checkpointDialogOpen}
+        onClose={() => setCheckpointDialogOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{
+          sx: {
+            ...getGlassSurfaceStyles(theme, { borderRadius: 20, blur: 22 }),
+          },
+        }}
+      >
         <DialogTitle sx={{ fontWeight: 700 }}>Choose Checkpoint</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" mb={3}>Select training epoch for <b>{targetInferenceModel?.name}</b></Typography>
@@ -385,7 +440,17 @@ function ModelsView({
       </Dialog>
 
       {/* --- Download & Delete Dialogs --- */}
-      <Dialog open={downloadDialogOpen} onClose={() => setDownloadDialogOpen(false)} PaperProps={{ sx: { borderRadius: 3, width: '100%', maxWidth: 400 } }}>
+      <Dialog
+        open={downloadDialogOpen}
+        onClose={() => setDownloadDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            ...getGlassSurfaceStyles(theme, { borderRadius: 20, blur: 22 }),
+            width: "100%",
+            maxWidth: 400,
+          },
+        }}
+      >
         <DialogTitle sx={{ textAlign: 'center' }}>Name your model</DialogTitle>
         <DialogContent>
             <TextField
@@ -400,7 +465,15 @@ function ModelsView({
         </DialogActions>
       </Dialog>
 
-      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} PaperProps={{ sx: { borderRadius: 3 } }}>
+      <Dialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        PaperProps={{
+          sx: {
+            ...getGlassSurfaceStyles(theme, { borderRadius: 20, blur: 22 }),
+          },
+        }}
+      >
         <DialogTitle>Confirm Deletion</DialogTitle>
         <DialogContent><Typography>Delete {selected.size} models? This cannot be undone.</Typography></DialogContent>
         <DialogActions sx={{ p: 2 }}>
