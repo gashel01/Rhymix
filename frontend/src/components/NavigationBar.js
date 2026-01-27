@@ -104,6 +104,7 @@ function NavigationBar({
           ...getGlassSurfaceStyles(theme, {
             borderRadius: 14,
             blur: 16,
+            withBorder: false,
             glowStrength: theme.palette.mode === "dark"
               ? "0 12px 24px rgba(0, 0, 0, 0.45)"
               : "0 12px 20px rgba(59, 130, 246, 0.2)",
@@ -132,6 +133,7 @@ function NavigationBar({
               borderRadius: 0,
               blur: 26,
               backgroundOpacity: theme.palette.mode === "dark" ? 0.7 : 0.92,
+              withBorder: false,
               glowStrength: theme.palette.mode === "dark"
                 ? "0 24px 50px rgba(0, 0, 0, 0.5)"
                 : "0 20px 40px rgba(59, 130, 246, 0.18)",
@@ -209,13 +211,14 @@ function NavigationBar({
               alignItems: "center",
               justifyContent: "space-between",
               p: 2,
-              ...getGlassSurfaceStyles(theme, {
-                borderRadius: 16,
-                blur: 18,
-                glowStrength: theme.palette.mode === "dark"
-                  ? "0 10px 24px rgba(0, 0, 0, 0.45)"
-                  : "0 12px 24px rgba(59, 130, 246, 0.18)",
-              }),
+            ...getGlassSurfaceStyles(theme, {
+              borderRadius: 16,
+              blur: 18,
+              withBorder: false,
+              glowStrength: theme.palette.mode === "dark"
+                ? "0 10px 24px rgba(0, 0, 0, 0.45)"
+                : "0 12px 24px rgba(59, 130, 246, 0.18)",
+            }),
             }}
           >
             <Typography
@@ -254,6 +257,7 @@ function NavigationBar({
             borderRadius: 0,
             blur: 26,
             backgroundOpacity: theme.palette.mode === "dark" ? 0.72 : 0.92,
+            withBorder: false,
             glowStrength: theme.palette.mode === "dark"
               ? "0 24px 50px rgba(0, 0, 0, 0.45)"
               : "0 18px 36px rgba(59, 130, 246, 0.15)",
@@ -448,6 +452,7 @@ function NavigationBar({
                   ...getGlassSurfaceStyles(theme, {
                     borderRadius: 16,
                     blur: 20,
+                    withBorder: false,
                     glowStrength: theme.palette.mode === "dark"
                       ? "0 18px 36px rgba(0, 0, 0, 0.45)"
                       : "0 16px 30px rgba(59, 130, 246, 0.18)",

@@ -13,41 +13,60 @@ export const getGlassSurfaceStyles = (theme, options = {}) => {
     highlightGradient = theme.palette.mode === "dark"
       ? "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0))"
       : "linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0))",
+    withBorder = true,
+    withHighlight = true,
+    overflow = "hidden",
   } = options;
 
   const background = theme.palette.mode === "dark"
     ? `linear-gradient(145deg, rgba(16,16,20,${backgroundOpacity}), rgba(28,28,34,${Math.min(backgroundOpacity + 0.18, 0.92)}))`
     : `linear-gradient(145deg, rgba(255,255,255,${backgroundOpacity}), rgba(248,250,255,${Math.min(backgroundOpacity + 0.08, 0.95)}))`;
 
-  return {
+  const baseStyles = {
     position: "relative",
     borderRadius,
     background,
-    border: `${borderWidth}px solid transparent`,
+    border: withBorder ? `${borderWidth}px solid transparent` : `${borderWidth}px solid ${theme.palette.divider}`,
     backdropFilter: `blur(${blur}px)`,
     boxShadow: glowStrength,
-    overflow: "hidden",
+    overflow,
     isolation: "isolate",
-    "&::before": {
-      content: '""',
-      position: "absolute",
-      inset: 0,
-      borderRadius: "inherit",
-      padding: `${borderWidth}px`,
-      background: borderGradient,
-      WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
-      WebkitMaskComposite: "xor",
-      maskComposite: "exclude",
-      pointerEvents: "none",
-    },
-    "&::after": {
-      content: '""',
-      position: "absolute",
-      inset: `${borderWidth}px`,
-      borderRadius: "inherit",
-      background: highlightGradient,
-      opacity: theme.palette.mode === "dark" ? 0.45 : 0.65,
-      pointerEvents: "none",
-    },
+  };
+
+  const borderStyles = withBorder
+    ? {
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: 0,
+          borderRadius: "inherit",
+          padding: `${borderWidth}px`,
+          background: borderGradient,
+          WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+          WebkitMaskComposite: "xor",
+          maskComposite: "exclude",
+          pointerEvents: "none",
+        },
+      }
+    : {};
+
+  const highlightStyles = withHighlight
+    ? {
+        "&::after": {
+          content: '""',
+          position: "absolute",
+          inset: `${borderWidth}px`,
+          borderRadius: "inherit",
+          background: highlightGradient,
+          opacity: theme.palette.mode === "dark" ? 0.45 : 0.65,
+          pointerEvents: "none",
+        },
+      }
+    : {};
+
+  return {
+    ...baseStyles,
+    ...borderStyles,
+    ...highlightStyles,
   };
 };

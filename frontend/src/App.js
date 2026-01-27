@@ -834,6 +834,7 @@ function App() {
               ...getGlassSurfaceStyles(theme, {
                 borderRadius: 28,
                 blur: 28,
+                withBorder: false,
                 glowStrength: theme.palette.mode === "dark"
                   ? "0 28px 60px rgba(0, 0, 0, 0.55)"
                   : "0 24px 48px rgba(59, 130, 246, 0.18)",
