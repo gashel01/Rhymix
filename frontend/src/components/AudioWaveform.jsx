@@ -30,6 +30,7 @@ const AudioWaveform = (
     backgroundColor,
     badgeText = null,
     isDark: isDarkProp,
+    volume = 1,
 
     // callbacks
     onReady = () => {},
@@ -58,6 +59,7 @@ const AudioWaveform = (
 
   const audioContext = useRef(null);
   const gainNode = useRef(null);
+  const volumeRef = useRef(volume);
 
   const isDark =
     typeof isDarkProp === "boolean"
@@ -117,21 +119,27 @@ const AudioWaveform = (
     setReady(false);
   };
 
-  const applyMuteToWavesurfer = (muted) => {
+  const clampVolume = (value) => {
+    if (typeof value !== "number" || Number.isNaN(value)) return 1;
+    return Math.max(0, Math.min(1, value));
+  };
+
+  const applyPlaybackVolume = (muted, value) => {
     const ws = waveSurferRef.current;
-    const targetMuted = !!muted;
     if (!ws) return;
 
-    // Prefer native methods
-    if (typeof ws.setMuted === "function") {
+    const targetMuted = !!muted;
+    const targetVolume = targetMuted ? 0 : clampVolume(value);
+
+    if (typeof ws.setVolume === "function") {
       try {
-        ws.setMuted(targetMuted);
+        ws.setVolume(targetVolume);
         return;
       } catch {}
     }
-    if (typeof ws.setVolume === "function") {
+    if (typeof ws.setMuted === "function") {
       try {
-        ws.setVolume(targetMuted ? 0 : 1);
+        ws.setMuted(targetMuted);
         return;
       } catch {}
     }
@@ -141,7 +149,7 @@ const AudioWaveform = (
       const ac = audioContext.current;
       const gn = gainNode.current;
       try {
-        const val = targetMuted ? 0 : 1;
+        const val = targetVolume;
         gn.gain.setValueAtTime(gn.gain.value, ac.currentTime);
         gn.gain.linearRampToValueAtTime(val, ac.currentTime + 0.08);
       } catch {}
@@ -210,8 +218,8 @@ const AudioWaveform = (
         }
       } catch {}
 
-      // ✅ Apply mute immediately on ready (critical)
-      applyMuteToWavesurfer(mutedValue);
+      // ✅ Apply volume + mute immediately on ready (critical)
+      applyPlaybackVolume(mutedValue, volumeRef.current);
 
       ws.on("seek", handleSeek);
       ws.on("interaction", handleSeek);
@@ -252,7 +260,7 @@ const AudioWaveform = (
         isPlaying: () => waveSurferRef.current?.isPlaying?.() ?? false,
         play: () => waveSurferRef.current?.play?.(),
         pause: () => waveSurferRef.current?.pause?.(),
-        setMuted: (muted) => applyMuteToWavesurfer(!!muted),
+        setMuted: (muted) => applyPlaybackVolume(!!muted, volumeRef.current),
         getWavesurfer: () => waveSurferRef.current,
       };
 
@@ -328,12 +336,16 @@ const AudioWaveform = (
     } catch {}
   }, [isPlaying, ready]);
 
-  // ✅ mute sync (works for both controlled and uncontrolled)
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
+  // ✅ mute + volume sync (works for both controlled and uncontrolled)
   useEffect(() => {
     if (!ready) return;
-    applyMuteToWavesurfer(mutedValue);
+    applyPlaybackVolume(mutedValue, volume);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mutedValue, ready]);
+  }, [mutedValue, volume, ready]);
 
   // expose imperative API
   React.useImperativeHandle(ref, () => ({
@@ -359,7 +371,7 @@ const AudioWaveform = (
     isPlaying: () => waveSurferRef.current?.isPlaying?.() ?? false,
     play: () => waveSurferRef.current?.play?.(),
     pause: () => waveSurferRef.current?.pause?.(),
-    setMuted: (muted) => applyMuteToWavesurfer(!!muted),
+    setMuted: (muted) => applyPlaybackVolume(!!muted, volumeRef.current),
     getWavesurfer: () => waveSurferRef.current,
   }));
 
@@ -375,7 +387,7 @@ const AudioWaveform = (
 
     // Uncontrolled fallback: update local + apply immediately
     setLocalMuted(next);
-    applyMuteToWavesurfer(next);
+    applyPlaybackVolume(next, volumeRef.current);
   };
 
   return (

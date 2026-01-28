@@ -10,6 +10,7 @@ function WaveformCell({
   url,
   isPlaying,
   isMuted,
+  volume,
   onPlayPause,
   onDownload,
   onReady,
@@ -30,6 +31,7 @@ function WaveformCell({
           url={url}
           isPlaying={isPlaying}
           isMuted={isMuted}
+          volume={volume}
           onPlayPause={onPlayPause}
           onDownload={onDownload}
           progressColor={progressColor}
@@ -53,4 +55,22 @@ function WaveformCell({
   );
 }
 
-export default WaveformCell;
+const areEqual = (prev, next) =>
+  prev.url === next.url &&
+  prev.isPlaying === next.isPlaying &&
+  prev.isMuted === next.isMuted &&
+  prev.volume === next.volume &&
+  prev.progressColor === next.progressColor &&
+  prev.waveColor === next.waveColor &&
+  prev.backgroundColor === next.backgroundColor &&
+  prev.badgeText === next.badgeText &&
+  prev.isPrimary === next.isPrimary &&
+  prev.emptyMessage === next.emptyMessage &&
+  prev.onPlayPause === next.onPlayPause &&
+  prev.onDownload === next.onDownload &&
+  prev.onReady === next.onReady &&
+  prev.onSeek === next.onSeek &&
+  prev.onFinish === next.onFinish &&
+  prev.otherWaveform === next.otherWaveform;
+
+export default React.memo(WaveformCell, areEqual);

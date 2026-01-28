@@ -9,7 +9,7 @@ import AudioTrackTable from "./AudioTrackTable/AudioTrackTable";
 import { safePlay, safePause } from "./AudioTrackTable/utils";
 import ErrorBoundary from "./ErrorBoundary";
 
-function InferenceView({ onNavigate, darkMode }) {
+function InferenceView({ onNavigate, darkMode, volume }) {
   // ---------- Theme tokens (same “new style”) ----------
   const isDark = useMemo(() => {
     if (typeof darkMode === "boolean") return darkMode;
@@ -240,12 +240,13 @@ function InferenceView({ onNavigate, darkMode }) {
   };
 
   // Transform past inference results into trackPairs format for AudioTrackTable
-  const getPastInferenceTrackPairs = useCallback(() => {
-    return inferenceResults.map((result) => ({
-      instrumental: result.outputFile, // same file (result)
-      vocal: result.outputFile,
-      name: result.trackName?.split("_instrumental")[0] || "Unknown Track",
-      modelName: result.modelName,
+  const pastInferenceTrackPairs = useMemo(
+    () =>
+      inferenceResults.map((result) => ({
+        instrumental: result.outputFile, // same file (result)
+        vocal: result.outputFile,
+        name: result.trackName?.split("_instrumental")[0] || "Unknown Track",
+        modelName: result.modelName,
       instrumentalUrl: `/api/download/instrumental/${result.outputFile.split("_").slice(1).join("_").split("-")[0]}`,
       originalVocalUrl: `/api/download/${result.params?.vocalsFileType || "processed_vocals"}/${result.outputFile
         .split("_")
@@ -262,9 +263,10 @@ function InferenceView({ onNavigate, darkMode }) {
               .split("_inferred")[0]}`,
       status: "completed",
       id: result.id,
-      result,
-    }));
-  }, [inferenceResults, vocalMode]);
+        result,
+      })),
+    [inferenceResults, vocalMode]
+  );
 
   const handleVocalModeChange = (event, newMode) => {
     // AudioTrackTable may pass (event, value)
@@ -512,7 +514,7 @@ function InferenceView({ onNavigate, darkMode }) {
               >
                 <ErrorBoundary>
                   <AudioTrackTable
-                    trackPairs={getPastInferenceTrackPairs()}
+                    trackPairs={pastInferenceTrackPairs}
                     vocalMode={vocalMode}
                     vocalModeType="inference"
                     handleVocalModeChange={handleVocalModeChange}
@@ -542,6 +544,7 @@ function InferenceView({ onNavigate, darkMode }) {
                     onDeselectAll={handleDeselectAllRows}
                     handleDownloadFullSong={handleDownloadFullSong}
                     defaultLabel=" "
+                    volume={volume}
                   />
                 </ErrorBoundary>
               </div>

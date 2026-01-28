@@ -692,7 +692,7 @@ function App() {
         return <ModelsView />;
 
       case "inference":
-        return <InferenceView onNavigate={handleNavigation} />;
+        return <InferenceView onNavigate={handleNavigation} volume={volume} />;
 
       case "talking-workflow":
         return (
@@ -733,6 +733,7 @@ function App() {
         return (
           <InferenceResults
             inferenceData={inferenceData}
+            volume={volume}
             onBack={(actionData) => {
               console.log('App received onBack actionData:', actionData);
               if (actionData && typeof actionData === 'object') {

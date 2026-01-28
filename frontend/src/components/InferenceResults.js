@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Box,
   Typography,
@@ -54,7 +54,7 @@ import ErrorBoundary from "./ErrorBoundary";
 import { safePlay, safePause, safeSetMuted, getFileNameFromPath } from "./AudioTrackTable/utils";
 import { downloadFullSong } from "../utils/audioUtils";
 
-function InferenceResults({ inferenceData, onBack }) {
+function InferenceResults({ inferenceData, onBack, volume }) {
   const theme = useTheme();
 
   // Store original tracks
@@ -506,20 +506,22 @@ function InferenceResults({ inferenceData, onBack }) {
   };
 
   // Transform inference results into trackPairs format for AudioTrackTable
-  const getInferenceTrackPairs = () => {
-    return results
-      .filter((result) => result && result.track && result.track.instrumental) // Filter out invalid results
-      .map((result) => ({
-        instrumental: result.track.instrumental,
-        vocal: showOriginal ? result.track.vocal : result.outputFile,
-        name: getTrackName(result.track),
-        instrumentalUrl: result.track.instrumentalUrl,
-        vocalUrl: showOriginal ? result.track.vocalUrl : `/api/download/inference/${result.outputFile}`,
-        status: result.status || 'unknown',
-        id: result.track.id,
-        result: result, // Keep reference to original result for actions
-      }));
-  };
+  const inferenceTrackPairs = useMemo(
+    () =>
+      results
+        .filter((result) => result && result.track && result.track.instrumental)
+        .map((result) => ({
+          instrumental: result.track.instrumental,
+          vocal: showOriginal ? result.track.vocal : result.outputFile,
+          name: getTrackName(result.track),
+          instrumentalUrl: result.track.instrumentalUrl,
+          vocalUrl: showOriginal ? result.track.vocalUrl : `/api/download/inference/${result.outputFile}`,
+          status: result.status || 'unknown',
+          id: result.track.id,
+          result,
+        })),
+    [results, showOriginal]
+  );
 
   // Waveform handling functions
   const handleInstrumentalWaveformReady = (trackPath, waveform) => {
@@ -814,7 +816,7 @@ function InferenceResults({ inferenceData, onBack }) {
           {results.length > 0 ? (
             <ErrorBoundary>
               <AudioTrackTable
-            trackPairs={getInferenceTrackPairs()}
+            trackPairs={inferenceTrackPairs}
             vocalMode={showOriginal ? 'original' : 'converted'}
             handleVocalModeChange={(event, newMode) => {
               if (newMode) {
@@ -850,6 +852,7 @@ function InferenceResults({ inferenceData, onBack }) {
             externalDeleteResult={deleteResult}
             onClearDeleteResult={() => setDeleteResult(null)}
             defaultLabel="Inference Results"
+            volume={volume}
           />
             </ErrorBoundary>
           ) : (

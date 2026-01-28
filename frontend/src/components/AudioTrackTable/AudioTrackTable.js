@@ -11,7 +11,15 @@ import styles from "./AudioTrackTable.module.css";
 
 
 const AudioTrackTable = (props) => {
-  const { trackPairs = [], vocalMode = "raw", instrumentalWaveforms = {}, vocalWaveforms = {}, vocalsFileType = "processed_vocals", stopAllAudio } = props;
+  const {
+    trackPairs = [],
+    vocalMode = "raw",
+    instrumentalWaveforms = {},
+    vocalWaveforms = {},
+    vocalsFileType = "processed_vocals",
+    stopAllAudio,
+    volume,
+  } = props;
 
   const [mutes, setMutes] = useState({ instrumental: {}, vocal: {} });
   const [playingBoth, setPlayingBoth] = useState(props.playingBoth);
@@ -45,6 +53,25 @@ const AudioTrackTable = (props) => {
     }));
     setPlayingBoth(isPlaying ? null : { id });
   };
+
+  const handlePlayPauseModified = React.useCallback((type, name, refs) => {
+    const isInst = type === "instrumental";
+    const targetKey = isInst ? "instrumental" : "vocal";
+
+    setMutes((prev) => {
+      const currentMuted = !!prev[targetKey][name];
+      const nextMuted = !currentMuted;
+      safeSetMuted(isInst ? refs.instrumental : refs.vocal, nextMuted);
+
+      return {
+        ...prev,
+        [targetKey]: {
+          ...prev[targetKey],
+          [name]: nextMuted,
+        },
+      };
+    });
+  }, []);
 
 
   // Sync Interval
@@ -105,12 +132,8 @@ const AudioTrackTable = (props) => {
                   isVocalPlaying={isPlaying || getFileNameFromPath(props.playingFile?.name) === getFileNameFromPath(pair.vocal)}
                   internalMutedInstrumentals={mutes.instrumental}
                   internalMutedVocals={mutes.vocal}
-                  handlePlayPauseModified={(type, name, refs) => {
-                    const isInst = type === "instrumental";
-                    const newState = !mutes[isInst ? 'instrumental' : 'vocal'][name];
-                    setMutes(prev => ({ ...prev, [isInst ? 'instrumental' : 'vocal']: { ...prev[isInst ? 'instrumental' : 'vocal'], [name]: newState } }));
-                    safeSetMuted(isInst ? refs.instrumental : refs.vocal, newState);
-                  }}
+                  volume={volume}
+                  handlePlayPauseModified={handlePlayPauseModified}
                   handlePlayBothModified={handlePlayBoth}
                   handleDownloadFullSong={downloadFullSong}
                   isSelected={selectedRows.includes(pair.id)}

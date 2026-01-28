@@ -19,6 +19,7 @@ const AudioTrackRow = (props) => {
     isVocalPlaying,
     internalMutedInstrumentals,
     internalMutedVocals,
+    volume,
     isSelected,
     onRowSelect,
     modelUsed,
@@ -186,6 +187,30 @@ const AudioTrackRow = (props) => {
     </span>
   );
 
+  const handleInstrumentalPlayPause = useCallback(() => {
+    handlePlayPauseModified("instrumental", instPath, { instrumental: iwRef.current, vocal: vwRef.current });
+  }, [handlePlayPauseModified, instPath]);
+
+  const handleVocalPlayPause = useCallback(() => {
+    handlePlayPauseModified(vocalsFileType, vocalPath, { instrumental: iwRef.current, vocal: vwRef.current });
+  }, [handlePlayPauseModified, vocalPath, vocalsFileType]);
+
+  const handleInstrumentalDownload = useCallback(() => {
+    handleDownload("instrumental", instPath);
+  }, [handleDownload, instPath]);
+
+  const handleVocalDownload = useCallback(() => {
+    handleDownload(vocalsFileType, vocalPath);
+  }, [handleDownload, vocalPath, vocalsFileType]);
+
+  const handleInstrumentalSeek = useCallback((time) => {
+    vwRef.current?.setCurrentTime?.(time);
+  }, []);
+
+  const handleVocalSeek = useCallback((time) => {
+    iwRef.current?.setCurrentTime?.(time);
+  }, []);
+
   const renderWaveform = (type, path, isPlaying, isMuted, color, onSeek) => {
     if (status === "processing") return <SpinnerBar color={color} />;
     if (status === "failed") return <FailedCell />;
@@ -201,15 +226,10 @@ const AudioTrackRow = (props) => {
         url={url}
         isPlaying={isPlaying}
         isMuted={isMuted}
+        volume={volume}
         progressColor={color}
-        onPlayPause={() =>
-          handlePlayPauseModified(
-            type === "inst" ? "instrumental" : vocalsFileType,
-            path,
-            { instrumental: iwRef.current, vocal: vwRef.current }
-          )
-        }
-        onDownload={() => handleDownload(type === "inst" ? "instrumental" : vocalsFileType, path)}
+        onPlayPause={type === "inst" ? handleInstrumentalPlayPause : handleVocalPlayPause}
+        onDownload={type === "inst" ? handleInstrumentalDownload : handleVocalDownload}
         onReady={type === "inst" ? handleInstReady : handleVocalReady}
         onSeek={onSeek}
         badgeText={type === "vocal" ? vocalMode : null}
@@ -251,7 +271,7 @@ const AudioTrackRow = (props) => {
                 isInstrumentalPlaying,
                 internalMutedInstrumentals?.[instPath],
                 "#ff9800",
-                (time) => vwRef.current?.setCurrentTime?.(time)
+                handleInstrumentalSeek
               )}
             </div>
 
@@ -275,7 +295,7 @@ const AudioTrackRow = (props) => {
                 isVocalPlaying,
                 internalMutedVocals?.[vocalPath],
                 "#1976d2",
-                (time) => iwRef.current?.setCurrentTime?.(time)
+                handleVocalSeek
               )}
             </div>
           </div>
