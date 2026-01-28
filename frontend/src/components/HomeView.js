@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, memo } from "react";
+import { useVolume } from "../contexts/VolumeContext";
 
 // keep your existing icon set (NOT changing icons)
 import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
@@ -21,8 +22,8 @@ function HomeView({
   onInferenceWithTracks,
   handleTrainWithDataset,
   darkMode,
-  volume,
 }) {
+  const { volumeRef } = useVolume();
   // ---------- Theme tokens (same “new style”) ----------
   const isDark = useMemo(() => {
     if (typeof darkMode === "boolean") return darkMode;
@@ -78,10 +79,10 @@ function HomeView({
         borderRadius: t.radiusLg,
         border: `1px solid ${t.hairline}`,
         background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-        backdropFilter: "blur(18px) saturate(140%)",
-        WebkitBackdropFilter: "blur(18px) saturate(140%)",
+            // backdropFilter: "blur(18px) saturate(140%)",
+            // WebkitBackdropFilter: "blur(18px) saturate(140%)",
         boxShadow: t.shadowSoft,
-        padding: 14,
+     
         ...style,
       }}
     >
@@ -343,41 +344,15 @@ function HomeView({
 
   // ---------- Render ----------
   return (
-    <div style={{ minHeight: "100vh", padding: "18px 0 32px 0" }}>
-      <div style={{ padding: "0 16px", maxWidth: t.maxW, margin: "0 auto" }}>
+    <div style={{ minHeight: "100vh",  }}>
+      <div style={{  margin: "0 auto" }}>
         {/* Sticky header */}
-        <div style={{ position: "sticky", top: t.stickyTop, zIndex: 50 }}>
-          <Glass style={{ padding: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ flex: "1 1 340px", minWidth: 240 }}>
-                <div style={{ fontSize: 26, fontWeight: 950, letterSpacing: -0.6, color: t.text, lineHeight: 1.1 }}>
-                  Your Data Files
-                </div>
-                <div style={{ marginTop: 4, fontSize: 13, fontWeight: 650, color: t.subtext }}>
-                  Select files for training or inference, or create new datasets.
-                </div>
-              </div>
-
-              <Btn
-                variant="primary"
-                onClick={handleCreateDatasetClick}
-                style={{ height: 40, padding: "0 14px" }}
-                title="Create Dataset"
-              >
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-                  <AddIcon style={{ fontSize: 18 }} />
-                  Create Dataset
-                </span>
-              </Btn>
-            </div>
-          </Glass>
-        </div>
-
+      
+        
         {/* Main */}
-        <div style={{ marginTop: 16 }}>
-          <Panel style={{ padding: 14 }}>
+          <Panel style={{  borderRadius: 0, border: "none" , padding: 0,  background: "transparent" }}>
             {/* Dataset Toggle */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            {/* <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
               <Segmented
                 value={activeTab}
                 onChange={(v) => setActiveTab(v)}
@@ -386,13 +361,14 @@ function HomeView({
                   { value: 1, label: "Talking Data", icon: <VoiceChatIcon style={{ fontSize: 18 }} /> },
                 ]}
               />
-              {/* optional right-side actions later */}
+             
             </div>
 
-            <Hairline style={{ margin: "14px 0" }} />
+            <Hairline style={{ margin: "14px 0" }} /> */}
 
             {/* Singing Data Tab */}
-            <TabPanel value={activeTab} index={0} sx={{ p: 0 }}>
+        
+            <TabPanel value={activeTab} index={0} sx={{ p: 0 , overflow: "visible" , }}>
               {loading ? (
                 <div style={{ display: "grid", placeItems: "center", padding: "48px 12px", textAlign: "center" }}>
                   <Spinner size={34} />
@@ -407,10 +383,14 @@ function HomeView({
                     style={{
                       borderRadius: t.radiusLg,
                       border: `1px solid ${t.hairline}`,
-                      overflow: "hidden",
-                      background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+                      overflow: "visible",
+                      border: "none",
+                      padding: 0,
+                 
                     }}
                   >
+
+                    
                     <AudioTrackTable
                       trackPairs={trackPairs}
                       vocalMode={vocalMode}
@@ -433,7 +413,31 @@ function HomeView({
                       handleTrainWithDataset={handleTrainWithDataset}
                       showInferenceButton={true}
                       handleInferenceWithTracks={onInferenceWithTracks}
-                      volume={volume}
+                      volume={volumeRef.current}
+                      header={ 
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap"  , padding: "0px 0px 10px 0px" }}>
+                        <div style={{ flex: "1 1 340px", minWidth: 240 }}>
+                          <div style={{ fontSize: 26, fontWeight: 750, color: t.text, lineHeight: 1.1 }}>
+                            Your Uploaded Files
+                          </div>
+                          <div style={{     fontSize: 14.5, fontWeight: 650, color: t.subtext }}>
+                            Select files for training or inference, or create new datasets.
+                          </div>
+                        </div>
+          
+                        <Btn
+                          variant="primary"
+                          onClick={handleCreateDatasetClick}
+                          style={{ height: 40, padding: "0 14px" }}
+                          title="Create Dataset"
+                        >
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                            <AddIcon style={{ fontSize: 18 }} />
+                            Create Dataset
+                          </span>
+                        </Btn>
+                      </div>
+                    }
                     />
                   </div>
                 </ErrorBoundary>
@@ -538,7 +542,7 @@ function HomeView({
               )}
             </TabPanel>
           </Panel>
-        </div>
+     
 
         {/* Create Dataset Modal (no MUI) */}
         <Modal
@@ -622,4 +626,15 @@ function HomeView({
   );
 }
 
-export default HomeView;
+// Memoize with custom comparison to ignore volume changes
+// Volume is accessed via context ref, so it doesn't cause re-renders
+export default memo(HomeView, (prevProps, nextProps) => {
+  return (
+    prevProps.onCreateSingingDataset === nextProps.onCreateSingingDataset &&
+    prevProps.onCreateTalkingDataset === nextProps.onCreateTalkingDataset &&
+    prevProps.onInferenceWithTracks === nextProps.onInferenceWithTracks &&
+    prevProps.handleTrainWithDataset === nextProps.handleTrainWithDataset &&
+    prevProps.darkMode === nextProps.darkMode
+    // volume is intentionally excluded - accessed via context
+  );
+});

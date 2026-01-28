@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { VolumeProvider } from "./contexts/VolumeContext";
 import {
   Box,
   Container,
@@ -58,7 +59,7 @@ const createAppTheme = (mode) => createTheme({
           },
           background: {
             default: '#000000',
-            paper: '#1C1C1E', // iOS dark gray
+            paper: 'transparent', // iOS dark gray
             surface: '#2C2C2E', // iOS surface color
           },
           text: {
@@ -173,7 +174,7 @@ const createAppTheme = (mode) => createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          backgroundColor: mode === 'dark' ? '#1C1C1E' : '#FFFFFF',
+          backgroundColor: mode === 'dark' ? 'rgba(28,28,34,0.72)' : '  rgba(255,255,255,0.74)',
           border: `1px solid ${mode === 'dark' ? '#38383A' : '#C6C6C8'}`,
         },
         elevation1: {
@@ -375,7 +376,7 @@ function App() {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
-  const handleNavigation = (view) => {
+  const handleNavigation = useCallback((view) => {
     setCurrentView(view);
     setShowHomeView(view === "home");
     setSelectedVocalsForTraining(null);
@@ -390,7 +391,7 @@ function App() {
     } else {
       window.history.replaceState(null, '', window.location.pathname);
     }
-  };
+  }, []);
 
   // Handle URL hash routing for navigation persistence
   useEffect(() => {
@@ -497,7 +498,7 @@ function App() {
     setShowHomeView(true);
   };
 
-  const handleTrainWithDataset = (selectedVocals) => {
+  const handleTrainWithDataset = useCallback((selectedVocals) => {
     console.log("Training with selected vocals:", selectedVocals);
 
     // If metadata is available, this is coming from diarization
@@ -509,23 +510,15 @@ function App() {
     setCurrentView("training");
     setShowHomeView(false);
     setShowVoiceConversion(false);
-  };
+  }, []);
 
-  const handleBackToHome = () => {
-    setCurrentView("home");
-    setShowHomeView(true);
-    setSelectedVocalsForTraining(null);
-    setSelectedTracksForInference(null);
-    setSelectedModelForInference(null);
-    setInferenceParams(null);
-    setInferenceData(null);
-  };
+
 
   // Global function for components to trigger view changes
-  const handleInferenceWithTracks = (tracks) => {
+  const handleInferenceWithTracks = useCallback((tracks) => {
     setSelectedTracksForInference(tracks);
     setCurrentView("inference-model-selection");
-  };
+  }, []);
 
   // Make function available globally
   window.appSetView = (view, data) => {
@@ -535,16 +528,15 @@ function App() {
     }
   };
 
-  const handleCreateTalkingDataset = () => {
+  const handleCreateTalkingDataset = useCallback(() => {
     setCurrentView("talking-workflow");
-  };
+  }, []);
 
-  const handleVoiceConversionClick = () => {
-    setShowVoiceConversion(true);
-    setShowHomeView(false);
-    setSelectedVocalsForTraining(null);
-  };
+  const handleCreateSingingDataset = useCallback(() => {
+    handleNavigation("datasets");
+  }, [handleNavigation]);
 
+  
   const navigationItems = [
     {
       id: 'home',
@@ -577,11 +569,10 @@ function App() {
       case "home":
         return (
           <HomeView
-            onCreateSingingDataset={() => handleNavigation("datasets")}
+            onCreateSingingDataset={handleCreateSingingDataset}
             handleTrainWithDataset={handleTrainWithDataset}
             onCreateTalkingDataset={handleCreateTalkingDataset}
             onInferenceWithTracks={handleInferenceWithTracks}
-            volume={volume}
           />
         );
 
@@ -694,7 +685,7 @@ function App() {
         return <ModelsView />;
 
       case "inference":
-        return <InferenceView onNavigate={handleNavigation} volume={volume} />;
+        return <InferenceView onNavigate={handleNavigation} />;
 
       case "talking-workflow":
         return (
@@ -786,49 +777,45 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <GlobalStyles {...globalStylesInputProps} />
+      <VolumeProvider volume={volume}>
 
-      <Box sx={{
+      <div style={{
         display: "flex",
-        flexDirection: "column",
+        
         minHeight: "100vh",
-        backgroundColor: 'background.default'
+        backgroundColor: '#1c1c1f99'// main back color 
       }}>
-        <NavigationBar
-          theme={theme}
-          darkMode={darkMode}
-          open={open}
-          setOpen={setOpen}
-          handleThemeToggle={handleThemeToggle}
-          handleDrawerToggle={handleDrawerToggle}
-          drawerOpen={drawerOpen}
-          navigationItems={navigationItems}
-          currentView={currentView}
-          handleNavigation={handleNavigation}
-          sidebarCollapsed={sidebarCollapsed}
-          handleSidebarToggle={handleSidebarToggle}
-          handleCleanDirectories={handleCleanDirectories}
-          loading={loading}
-          onVolumeChange={onVolumeChange}
-          muted={muted}
-          volume={volume}
-        />
-
+        <div style={{ position: 'relative', display: 'flex' }}>
+          <NavigationBar
+            theme={theme}
+            darkMode={darkMode}
+            open={open}
+            setOpen={setOpen}
+            handleThemeToggle={handleThemeToggle}
+            handleDrawerToggle={handleDrawerToggle}
+            drawerOpen={drawerOpen}
+            navigationItems={navigationItems}
+            currentView={currentView}
+            handleNavigation={handleNavigation}
+            sidebarCollapsed={sidebarCollapsed}
+            handleSidebarToggle={handleSidebarToggle}
+            handleCleanDirectories={handleCleanDirectories}
+            loading={loading}
+            onVolumeChange={onVolumeChange}
+            muted={muted}
+            volume={volume}
+          />
+        </div>
         {/* Main Content */}
-        <Box
+        <div
           component="main"
-          sx={{
+          style={{
             flexGrow: 1,
-            p: 3,
-            ml: {
-              sm: sidebarCollapsed ? '72px' : '280px', // Adjust for collapsed sidebar
-              xs: 0
-            }, // Account for sidebar
-            backgroundColor: 'background.default',
+            backgroundColor: 'transparent',
             minHeight: '100vh',
-            transition: 'margin-left 0.3s ease-in-out',
           }}
         >
-          <Container maxWidth="xl" sx={{ py: 2 }}>
+          <div >
             {error && (
               <Alert
                 severity="error"
@@ -844,7 +831,7 @@ function App() {
             )}
 
             {renderView()}
-          </Container>
+          </div>
 
           {/* Confirmation Dialog */}
           <Dialog
@@ -900,8 +887,11 @@ function App() {
               }}
             />
           )}
-        </Box>
-      </Box>
+        </div>
+
+
+      </div>
+      </VolumeProvider>
     </ThemeProvider>
   );
 }

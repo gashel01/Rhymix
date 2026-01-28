@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getAvailableFiles } from '../utils/apiService';
 
 /**
@@ -10,6 +10,7 @@ export const useAvailableFiles = () => {
   const [rawVocals, setRawVocals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const hasFetchedRef = useRef(false);
 
   const fetchFiles = async () => {
     try {
@@ -55,7 +56,11 @@ export const useAvailableFiles = () => {
   };
 
   useEffect(() => {
-    fetchFiles();
+    // Only fetch once, even if component re-renders
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchFiles();
+    }
   }, []);
 
   return {

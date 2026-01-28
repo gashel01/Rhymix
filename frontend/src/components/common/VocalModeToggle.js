@@ -44,7 +44,7 @@ function VocalModeToggle({ value, onChange, show = true, mode = 'inference' }) {
         <ToggleButton value={mode === 'dataset' ? 'raw' : 'converted'} sx={{ py: 0.5, px: 1 }}>
           {buttonLabels.left}
         </ToggleButton>
-        <ToggleButton value={mode === 'dataset' ? 'processed' : 'original'} sx={{ py: 0.5, px: 1 }}>
+        <ToggleButton value={mode === 'dataset' ? 'processed' : 'original'} sx={{ py: 0.5, px: 1 , backgroundColor:"rgba(0,0,0,0.2)" }}>
           {buttonLabels.right}
         </ToggleButton>
       </ToggleButtonGroup>

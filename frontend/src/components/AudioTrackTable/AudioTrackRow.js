@@ -30,6 +30,7 @@ const AudioTrackRow = (props) => {
     handleDownloadFullSong,
     playingBoth,
     status = "completed",
+    style,
   } = props;
 
   // inject CSS once (don’t render <style> inside <tbody>)
@@ -48,7 +49,7 @@ const AudioTrackRow = (props) => {
       /* 3-column grid: instrumental | controls | vocal  */
       .atr-grid{
         display:grid;
-        grid-template-columns: minmax(280px, 1fr) 74px minmax(280px, 1fr);
+        grid-template-columns: 50px minmax(280px, 1fr) 60px minmax(280px, 1fr) 50px;
         gap: 10px;
         align-items: center;
         width: 100%;
@@ -76,6 +77,7 @@ const AudioTrackRow = (props) => {
 
     return {
       isDark,
+      waveColor: isDark ? "rgba(255,255,255,0.92)" : "#1C1C1E",
       text: isDark ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.90)",
       subtext: isDark ? "rgba(255,255,255,0.62)" : "rgba(0,0,0,0.55)",
       hairline: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)",
@@ -225,10 +227,12 @@ const AudioTrackRow = (props) => {
 
     return (
       <WaveformCell
+        key={url} // Key based on URL so instrumental doesn't reload when vocal mode changes
         url={url}
         isPlaying={isPlaying}
         isMuted={isMuted}
         volume={volume}
+        waveColor={ t.waveColor }
         progressColor={color}
         onPlayPause={type === "inst" ? handleInstrumentalPlayPause : handleVocalPlayPause}
         onDownload={type === "inst" ? handleInstrumentalDownload : handleVocalDownload}
@@ -242,31 +246,31 @@ const AudioTrackRow = (props) => {
   const displayName = name || getCleanFileName(name) || `Track ${index + 1}`;
 
   return (
-    <tr style={{ borderBottom: `1px solid ${t.hairline}` }}>
-      {/* Name */}
-      <td style={{ width: "18%", minWidth: 180, padding: 12, alignContent: "center" }}>
-        <TextOverflow
-          text={displayName}
-          style={{ fontWeight: 900, letterSpacing: -0.2, color: t.text, display: "flex", alignItems: "center" }}
-        />
-        {modelUsed && <Pill>{modelUsed}</Pill>}
-      </td>
+    <tr style={{ ...style }}>
 
       {/* Waveforms + controls + bare checkbox */}
-      <td style={{ padding: 10, position: "relative" }}>
-        <div
-          style={{
-            borderRadius: t.radiusLg,
-            border: `1px solid ${t.hairline}`,
-            background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-            boxShadow: t.shadowSoft,
-            padding: 10,
-            position: "relative",
-          }}
-        >
-          <div className="atr-grid" style={{ paddingRight: 42 }}>
+      <td style={{ borderBottom: `1px solid ${t.hairline}`, padding: "5px 10px 10px 10px", position: "relative" }}>
+          {/* Name */}
+          <div style={{  display:"flex", width:"100%",  alignItems: "center",  justifyContent:"space-between"}}>
+            <TextOverflow
+              text={displayName}
+              style={{ fontWeight: 700, letterSpacing: -0.2, color: t.text, display: "flex", alignItems: "center" }}
+            />
+            {modelUsed && <Pill>{modelUsed}</Pill>}
+          </div>
+
+        <div >
+          <div className="atr-grid" style={{ marginTop:"10px" }}>
+           
+          <div className="atr-inst" style={{  padding: "5px 0px" }}>
+             
+            </div>
+
             {/* Instrumental */}
-            <div className="atr-inst">
+            <div className="atr-inst" style={{ backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 10, padding: "5px 0px" }}>
+
+
+
               {renderWaveform(
                 "inst",
                 instPath,
@@ -290,7 +294,7 @@ const AudioTrackRow = (props) => {
             </div>
 
             {/* Vocal */}
-            <div className="atr-vocal">
+            <div className="atr-vocal" style={{ backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 10, padding: "5px 0px" }}>
               {renderWaveform(
                 "vocal",
                 vocalPath,
@@ -299,20 +303,18 @@ const AudioTrackRow = (props) => {
                 "#1976d2",
                 handleVocalSeek
               )}
+             
             </div>
-          </div>
-
-          {/* Bare checkbox (no container styling) */}
-          <input
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+            <input
             type="checkbox"
             checked={!!isSelected}
             onChange={(e) => onRowSelect?.(pair.id, e.target.checked)}
             title={isSelected ? "Deselect row" : "Select row"}
             style={{
-              position: "absolute",
-              right: 12,
-              top: "50%",
-              transform: "translateY(-50%)",
+              
+             
+             
               width: 16,
               height: 16,
               accentColor: t.primary,
@@ -322,6 +324,11 @@ const AudioTrackRow = (props) => {
               outline: "none",
             }}
           />
+          </div>
+
+          </div>
+          {/* Bare checkbox (no container styling) */}
+          
         </div>
       </td>
     </tr>
@@ -347,6 +354,7 @@ const areEqual = (prev, next) =>
   prev.handleDownloadFullSong === next.handleDownloadFullSong &&
   prev.playingBoth === next.playingBoth &&
   prev.status === next.status &&
-  prev.onRowSelect === next.onRowSelect;
+  prev.onRowSelect === next.onRowSelect &&
+  prev.style === next.style;
 
 export default React.memo(AudioTrackRow, areEqual);

@@ -13,7 +13,7 @@ function TabPanel({ children, value, index, ...other }) {
       aria-labelledby={`dataset-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {value === index && <Box >{children}</Box>}
     </div>
   );
 }

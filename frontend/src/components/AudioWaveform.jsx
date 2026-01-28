@@ -4,6 +4,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import WaveSurfer from "wavesurfer.js";
+import { useVolume } from "../contexts/VolumeContext";
 
 /**
  * AudioWaveform (fixed mute)
@@ -26,11 +27,11 @@ const AudioWaveform = (
     // visuals
     height = 70,
     progressColor = "#1976d2",
-    waveColor = "#9e9e9e",
+    waveColor =  "#9e9e9e",
     backgroundColor,
     badgeText = null,
     isDark: isDarkProp,
-    volume = 1,
+    volume: volumeProp = 1, // Keep prop for backward compatibility
 
     // callbacks
     onReady = () => {},
@@ -59,7 +60,10 @@ const AudioWaveform = (
 
   const audioContext = useRef(null);
   const gainNode = useRef(null);
-  const volumeRef = useRef(volume);
+  
+  // Use volume from context if available, otherwise use prop
+  const volumeContext = useVolume();
+  const volumeRef = useRef(volumeContext?.volumeRef?.current ?? volumeProp ?? 1);
 
   const isDark =
     typeof isDarkProp === "boolean"
@@ -336,16 +340,58 @@ const AudioWaveform = (
     } catch {}
   }, [isPlaying, ready]);
 
+  // Update volume from context ref (doesn't cause re-renders)
   useEffect(() => {
-    volumeRef.current = volume;
-  }, [volume]);
+    if (volumeContext?.volumeRef) {
+      // Subscribe to volume changes from context
+      const checkVolume = () => {
+        const newVolume = volumeContext.volumeRef.current;
+        if (volumeRef.current !== newVolume && ready) {
+          volumeRef.current = newVolume;
+          applyPlaybackVolume(mutedValue, newVolume);
+        }
+      };
+      // Check periodically for volume changes (context ref doesn't trigger re-renders)
+      const interval = setInterval(checkVolume, 50);
+      return () => clearInterval(interval);
+    } else {
+      // Fallback to prop-based volume
+      volumeRef.current = volumeProp ?? 1;
+      if (ready) {
+        applyPlaybackVolume(mutedValue, volumeProp ?? 1);
+      }
+    }
+  }, [volumeContext?.volumeRef, ready, mutedValue, volumeProp, applyPlaybackVolume]);
+
+  // Update volume from context ref (doesn't cause re-renders)
+  useEffect(() => {
+    if (volumeContext?.volumeRef) {
+      // Subscribe to volume changes from context
+      const checkVolume = () => {
+        const newVolume = volumeContext.volumeRef.current;
+        if (volumeRef.current !== newVolume && ready) {
+          volumeRef.current = newVolume;
+          applyPlaybackVolume(mutedValue, newVolume);
+        }
+      };
+      // Check periodically for volume changes (context ref doesn't trigger re-renders)
+      const interval = setInterval(checkVolume, 50);
+      return () => clearInterval(interval);
+    } else {
+      // Fallback to prop-based volume
+      volumeRef.current = volumeProp ?? 1;
+      if (ready) {
+        applyPlaybackVolume(mutedValue, volumeProp ?? 1);
+      }
+    }
+  }, [volumeContext?.volumeRef, ready, mutedValue, volumeProp, applyPlaybackVolume]);
 
   // ✅ mute + volume sync (works for both controlled and uncontrolled)
   useEffect(() => {
     if (!ready) return;
-    applyPlaybackVolume(mutedValue, volume);
+    applyPlaybackVolume(mutedValue, volumeRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mutedValue, volume, ready]);
+  }, [mutedValue, ready]);
 
   // expose imperative API
   React.useImperativeHandle(ref, () => ({
@@ -399,7 +445,7 @@ const AudioWaveform = (
           height: `${height}px`,
          
           overflow: "hidden",
-          backgroundColor: t.bg,
+          backgroundColor: 'transparent',
           opacity: url ? (mutedValue ? 0.55 : 1) : 0.35,
        borderRadius: '12px',
         }}
@@ -410,8 +456,8 @@ const AudioWaveform = (
           variant="caption"
           sx={{
             position: "absolute",
-            top: 6,
-            right: 8,
+            top: 0,
+            right: 2,
             zIndex: 5,
             px: "8px",
             py: "2px",
@@ -420,9 +466,9 @@ const AudioWaveform = (
             fontWeight: 800,
             letterSpacing: -0.1,
             color: t.text,
-            border: `1px solid ${t.hairline}`,
+             border: `1px solid ${t.hairline}`,
             background: `linear-gradient(180deg, ${t.glass}, ${t.glass2})`,
-            backdropFilter: "blur(10px)",
+            backdropFilter: "blur(70px)",
             WebkitBackdropFilter: "blur(10px)",
           }}
         >
@@ -433,8 +479,8 @@ const AudioWaveform = (
       <Box
         sx={{
           position: "absolute",
-          right: 8,
-          bottom: 6,
+          right:2,
+          bottom: 0,
           zIndex: 5,
           display: "flex",
           gap: 0.75,
@@ -449,10 +495,10 @@ const AudioWaveform = (
             width: 30,
             height: 30,
             borderRadius: 2,
-            border: `1px solid ${t.hairline}`,
+             border: `1px solid ${t.hairline}`,
             background: `linear-gradient(180deg, ${t.glass}, ${t.glass2})`,
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
+            backdropFilter: "blur(70px)",
+            WebkitBackdropFilter: "blur(70px)",
             boxShadow: t.shadow,
             color: t.text,
             "&:hover": { background: `linear-gradient(180deg, ${t.glass}, ${t.glass})` },
@@ -473,10 +519,10 @@ const AudioWaveform = (
             width: 30,
             height: 30,
             borderRadius: 2,
-            border: `1px solid ${t.hairline}`,
+             border: `1px solid ${t.hairline}`,
             background: `linear-gradient(180deg, ${t.glass}, ${t.glass2})`,
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
+            backdropFilter: "blur(70px)",
+            WebkitBackdropFilter: "blur(70px)",
             boxShadow: t.shadow,
             color: t.text,
             "&:hover": { background: `linear-gradient(180deg, ${t.glass}, ${t.glass})` },

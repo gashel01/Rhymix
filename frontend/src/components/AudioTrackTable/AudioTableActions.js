@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import {
   Delete as DeleteIcon,
   School as SchoolIcon,
@@ -6,13 +6,6 @@ import {
   ArrowBack as ArrowBackIcon,
 } from "@mui/icons-material";
 
-/**
- * New-style (no MUI) AudioTableActions
- * - Keeps same props/signature
- * - Frosted/glass look + dark/light
- * - Sticky-friendly (no absolute center weirdness)
- * - Works well inside your new table header area
- */
 const AudioTableActions = ({
   selectedRows = [],
   trackPairs = [],
@@ -25,8 +18,9 @@ const AudioTableActions = ({
   onClear,
   onDelete,
   defaultLabel,
-  // optional: allow parent to pass darkMode explicitly (same pattern as your other views)
   darkMode,
+  children,
+  header,
 }) => {
   const hasSelection = selectedRows.length > 0;
 
@@ -52,20 +46,33 @@ const AudioTableActions = ({
       radiusLg: 18,
       radiusMd: 14,
       primary: isDark ? "rgba(10,132,255,1)" : "rgba(0,122,255,1)",
-      primaryWash: isDark ? "rgba(10,132,255,0.18)" : "rgba(0,122,255,0.12)",
       purple: "rgba(156,39,176,1)",
-      purpleWash: isDark ? "rgba(156,39,176,0.18)" : "rgba(156,39,176,0.12)",
       danger: "rgba(255,59,48,1)",
-      dangerWash: isDark ? "rgba(255,59,48,0.20)" : "rgba(255,59,48,0.14)",
-      success: "rgba(52,199,89,1)",
-      successWash: isDark ? "rgba(52,199,89,0.18)" : "rgba(52,199,89,0.12)",
     };
   }, [darkMode]);
 
   const getSelectedTracks = () =>
-    selectedRows
-      .map((id) => trackPairs.find((p) => p?.id === id))
-      .filter(Boolean);
+    selectedRows.map((id) => trackPairs.find((p) => p?.id === id)).filter(Boolean);
+
+  // ✅ NEW: stuck detection
+  const sentinelRef = useRef(null);
+  const [isStuck, setIsStuck] = useState(false);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        // when sentinel is NOT visible, sticky header has reached the top
+        setIsStuck(!entry.isIntersecting);
+      },
+      { threshold: 1 }
+    );
+
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const PillCount = () => (
     <div
@@ -89,41 +96,13 @@ const AudioTableActions = ({
     </div>
   );
 
-  const Btn = ({
-    children,
-    onClick,
-    variant = "secondary",
-    disabled,
-    title,
-    style,
-    icon,
-  }) => {
+  const Btn = ({ children, onClick, variant = "secondary", disabled, title, style, icon }) => {
     const v = {
-      primary: {
-        bg: `linear-gradient(135deg, ${t.primary} 0%, rgba(13,71,161,1) 100%)`,
-        fg: "white",
-        bd: "rgba(10,132,255,0.45)",
-      },
-      purple: {
-        bg: `linear-gradient(135deg, ${t.purple} 0%, rgba(123,31,162,1) 100%)`,
-        fg: "white",
-        bd: "rgba(156,39,176,0.45)",
-      },
-      secondary: {
-        bg: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-        fg: t.text,
-        bd: t.hairline,
-      },
-      outline: {
-        bg: "transparent",
-        fg: t.text,
-        bd: t.hairline,
-      },
-      danger: {
-        bg: `linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))`,
-        fg: "white",
-        bd: "rgba(255,59,48,0.45)",
-      },
+      primary: { bg: `linear-gradient(135deg, ${t.primary} 0%, rgba(13,71,161,1) 100%)`, fg: "white", bd: "rgba(10,132,255,0.45)" },
+      purple: { bg: `linear-gradient(135deg, ${t.purple} 0%, rgba(123,31,162,1) 100%)`, fg: "white", bd: "rgba(156,39,176,0.45)" },
+      secondary: { bg: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`, fg: t.text, bd: t.hairline },
+      outline: { bg: "transparent", fg: t.text, bd: t.hairline },
+      danger: { bg: `linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))`, fg: "white", bd: "rgba(255,59,48,0.45)" },
     }[variant];
 
     return (
@@ -172,137 +151,161 @@ const AudioTableActions = ({
   );
 
   return (
-    <div
-      style={{
-        marginBottom: 14,
-        padding: 12,
-        borderRadius: t.radiusLg,
-        border: `1px solid ${t.hairline}`,
-        background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
-        backdropFilter: "blur(18px) saturate(140%)",
-        WebkitBackdropFilter: "blur(18px) saturate(140%)",
-        boxShadow: t.shadow,
-      }}
-    >
+    <>
+      {/* ✅ NEW: sentinel placed just before sticky header */}
+      <div ref={sentinelRef} style={{ height: 1  }} />
+
       <div
-        className="ata-grid"
         style={{
-          display: "grid",
-          gap: 10,
-          alignItems: "center",
-          gridTemplateColumns: "1fr auto auto",
+          backdropFilter: isStuck ? "blur(20px)" : "none",
+
+          // ✅ TRANSITION between “floating card” and “stuck bar”
+          padding:  "12px 0 0 0" ,           // no left/right padding when stuck
+          borderRadius: isStuck ? 0 : t.radiusLg,     // square corners when stuck
+          border:  ` 1px solid ${t.hairline}`,
+         
+          margin: isStuck ? 0 : "24px 24px 0 24px",
+
+          background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
+          boxShadow: isStuck ? t.shadowSoft : t.shadow,
+          overflow: "hidden",
+
+          // ✅ smooth animation
+          transition:
+            "padding 180ms ease, border-radius 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
         }}
       >
-        {/* Left: selection info */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          {hasSelection ? <PillCount /> : null}
-
-          <div style={{ minWidth: 0 }}>
-            {hasSelection ? (
-              <div style={{ color: t.text, fontWeight: 950, letterSpacing: -0.2, lineHeight: 1.1 }}>
-                {selectedRows.length} track{selectedRows.length !== 1 ? "s" : ""} selected
-              </div>
-            ) : (
-              <div style={{ color: t.subtext, fontWeight: 750 }}>
-                {defaultLabel || "Select tracks to get started"}
-              </div>
-            )}
-          </div>
+      
+        <div style={{ display: header ? "block" : "none", padding:"0 12px" }}>
+        {header ? header : null}
         </div>
-
-        {/* Middle: primary actions */}
         <div
-          className="ata-actions"
+          className="ata-grid"
           style={{
-            display: "flex",
+            display: "grid",
             gap: 10,
-            justifyContent: "center",
-            flexWrap: "wrap",
-            opacity: hasSelection ? 1 : 0,
-            pointerEvents: hasSelection ? "auto" : "none",
-            transition: "opacity 160ms ease",
+            alignItems: "center",
+            marginTop: "12px",
+            gridTemplateColumns: "1fr auto auto",
+
+            // ✅ keep inner content padded while the outer container is edge-to-edge
+            padding:  "0 12px" ,
+        
+            transition: "padding 180ms ease",
           }}
         >
-          {showInferenceResultsActions ? (
-            <>
-              {onReturnToModelSelection && (
-                <Btn
-                  variant="primary"
-                  title="Model Selection"
-                  onClick={onReturnToModelSelection}
-                  icon={
-                    <SmallIcon>
-                      <PsychologyIcon />
-                    </SmallIcon>
-                  }
-                >
-                  Model Selection
-                </Btn>
+          {/* Left */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+            {hasSelection ? <PillCount /> : null}
+
+            <div style={{ minWidth: 0 }}>
+              {hasSelection ? (
+                <div style={{ color: t.text, fontWeight: 950, letterSpacing: -0.2, lineHeight: 1.1 }}>
+                  {selectedRows.length} track{selectedRows.length !== 1 ? "s" : ""} selected
+                </div>
+              ) : (
+                <div style={{ color: t.subtext, fontWeight: 400 }}>
+                  {defaultLabel || "Select tracks to get started"}
+                </div>
               )}
+            </div>
+          </div>
 
-              {onReturnToInferenceParams && (
-                <Btn
-                  variant="purple"
-                  title="Inference Params"
-                  onClick={onReturnToInferenceParams}
-                  icon={
-                    <SmallIcon>
-                      <ArrowBackIcon />
-                    </SmallIcon>
-                  }
-                >
-                  Inference Params
+          {/* Middle */}
+          <div
+            className="ata-actions"
+            style={{
+              display: "flex",
+              gap: 10,
+              justifyContent: "center",
+              flexWrap: "wrap",
+              opacity: hasSelection ? 1 : 0,
+              pointerEvents: hasSelection ? "auto" : "none",
+              transition: "opacity 160ms ease",
+            }}
+          >
+            {showInferenceResultsActions ? (
+              <>
+                {onReturnToModelSelection && (
+                  <Btn
+                    variant="primary"
+                    title="Model Selection"
+                    onClick={onReturnToModelSelection}
+                    icon={
+                      <SmallIcon>
+                        <PsychologyIcon />
+                      </SmallIcon>
+                    }
+                  >
+                    Model Selection
+                  </Btn>
+                )}
+
+                {onReturnToInferenceParams && (
+                  <Btn
+                    variant="purple"
+                    title="Inference Params"
+                    onClick={onReturnToInferenceParams}
+                    icon={
+                      <SmallIcon>
+                        <ArrowBackIcon />
+                      </SmallIcon>
+                    }
+                  >
+                    Inference Params
+                  </Btn>
+                )}
+              </>
+            ) : (
+              <>
+                {handleTrainWithDataset && (
+                  <Btn
+                    variant="primary"
+                    title="Train Model"
+                    onClick={() => handleTrainWithDataset(getSelectedTracks())}
+                    icon={
+                      <SmallIcon>
+                        <SchoolIcon />
+                      </SmallIcon>
+                    }
+                  >
+                    Train Model
+                  </Btn>
+                )}
+
+                {handleInferenceWithTracks && (
+                  <Btn
+                    variant="purple"
+                    title="Run Inference"
+                    onClick={() => handleInferenceWithTracks(getSelectedTracks())}
+                    icon={
+                      <SmallIcon>
+                        <PsychologyIcon />
+                      </SmallIcon>
+                    }
+                  >
+                    Run Inference
+                  </Btn>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Right */}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <Btn variant="outline" title="Select all" onClick={onSelectAll}>
+              Select All
+            </Btn>
+
+            {hasSelection ? (
+              <>
+                <Btn variant="outline" title="Clear selection" onClick={onClear}>
+                  Clear
                 </Btn>
-              )}
-            </>
-          ) : (
-            <>
-              {handleTrainWithDataset && (
-                <Btn
-                  variant="primary"
-                  title="Train Model"
-                  onClick={() => handleTrainWithDataset(getSelectedTracks())}
-                  icon={
-                    <SmallIcon>
-                      <SchoolIcon />
-                    </SmallIcon>
-                  }
-                >
-                  Train Model
-                </Btn>
-              )}
 
-              {handleInferenceWithTracks && (
-                <Btn
-                  variant="purple"
-                  title="Run Inference"
-                  onClick={() => handleInferenceWithTracks(getSelectedTracks())}
-                  icon={
-                    <SmallIcon>
-                      <PsychologyIcon />
-                    </SmallIcon>
-                  }
-                >
-                  Run Inference
-                </Btn>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Right: utility actions */}
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-          <Btn variant="outline" title="Select all" onClick={onSelectAll}>
-            Select All
-          </Btn>
-
-          {hasSelection ? (
-            <>
-              <Btn variant="outline" title="Clear selection" onClick={onClear}>
-                Clear
-              </Btn>
-
-              <div style={{ position: "relative" }}>
                 <Btn
                   variant="danger"
                   title="Delete selected"
@@ -316,46 +319,14 @@ const AudioTableActions = ({
                 >
                   Delete
                 </Btn>
-
-                <div
-                  style={{
-                    position: "absolute",
-                    top: -8,
-                    right: -8,
-                    width: 18,
-                    height: 18,
-                    borderRadius: 999,
-                    display: "grid",
-                    placeItems: "center",
-                    fontSize: 10,
-                    fontWeight: 950,
-                    color: "white",
-                    background: t.danger,
-                    border: `2px solid ${t.isDark ? "rgba(10,10,12,0.95)" : "rgba(255,255,255,0.95)"}`,
-                    boxShadow: t.shadowSoft,
-                  }}
-                  title={`${selectedRows.length} selected`}
-                >
-                  {selectedRows.length}
-                </div>
-              </div>
-            </>
-          ) : null}
+              </>
+            ) : null}
+          </div>
         </div>
-      </div>
 
-      <style>{`
-        @media (max-width: 900px){
-          .ata-grid{
-            grid-template-columns: 1fr;
-            gap: 12px;
-          }
-          .ata-actions{
-            justify-content: flex-start !important;
-          }
-        }
-      `}</style>
-    </div>
+        {children ? children : null}
+      </div>
+    </>
   );
 };
 

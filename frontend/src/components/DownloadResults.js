@@ -41,30 +41,34 @@ function DownloadResults({ jobStatus, handleReset, volume }) {
     }
   }, [jobStatus, vocalMode]);
 
-  if (!jobStatus || !jobStatus.output_files) {
-    return (
-      <Box sx={{ textAlign: "center", py: 4 }}>
-        <Typography variant="h6" gutterBottom>
-          No results available
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleReset}
-          startIcon={<ReplayIcon />}
-        >
-          Start New Process
-        </Button>
-      </Box>
-    );
-  }
+  
+  const handleVocalModeChangeWithCleanup = useCallback(
+    (event, newMode) => {
+      if (newMode !== null) {
+        stopAllAudio();
+        handleVocalModeChange(event, newMode);
+      }
+    },
+    [handleVocalModeChange, stopAllAudio]
+  );
 
-  // Calculate elapsed time for the entire process
-  const totalTime = Math.floor(jobStatus.completed_at - jobStatus.started_at);
-  const minutes = Math.floor(totalTime / 60);
-  const seconds = totalTime % 60;
+  const handleDownload = useCallback(
+    async (fileType, filename) => {
+      if (!filename) return;
+      const actualFileType = filename.includes("instrumental")
+        ? "instrumental"
+        : fileType;
+      await downloadFile(actualFileType, filename, vocalMode);
+    },
+    [vocalMode]
+  );
 
-  const { raw_vocals = [], processed_vocals = [], exports = [] } = jobStatus.output_files;
+  const handleDownloadDataset = useCallback(() => {
+    if (exports.length > 0) {
+      handleDownload("exports", exports[0]);
+    }
+  }, [exports, handleDownload]);
+
 
   const instrumentals = useMemo(
     () =>
@@ -93,33 +97,36 @@ function DownloadResults({ jobStatus, handleReset, volume }) {
     return pairs;
   }, [instrumentals, vocalsToShow]);
 
-  const handleVocalModeChangeWithCleanup = useCallback(
-    (event, newMode) => {
-      if (newMode !== null) {
-        stopAllAudio();
-        handleVocalModeChange(event, newMode);
-      }
-    },
-    [handleVocalModeChange, stopAllAudio]
-  );
 
-  const handleDownload = useCallback(
-    async (fileType, filename) => {
-      if (!filename) return;
-      const actualFileType = filename.includes("instrumental")
-        ? "instrumental"
-        : fileType;
-      await downloadFile(actualFileType, filename, vocalMode);
-    },
-    [vocalMode]
-  );
+  if (!jobStatus || !jobStatus.output_files) {
+    return (
+      <Box sx={{ textAlign: "center", py: 4 }}>
+        <Typography variant="h6" gutterBottom>
+          No results available
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleReset}
+          startIcon={<ReplayIcon />}
+        >
+          Start New Process
+        </Button>
+      </Box>
+    );
+  }
 
-  const handleDownloadDataset = useCallback(() => {
-    if (exports.length > 0) {
-      handleDownload("exports", exports[0]);
-    }
-  }, [exports, handleDownload]);
 
+
+  // Calculate elapsed time for the entire process
+  const totalTime = Math.floor(jobStatus.completed_at - jobStatus.started_at);
+  const minutes = Math.floor(totalTime / 60);
+  const seconds = totalTime % 60;
+
+  const { raw_vocals = [], processed_vocals = [], exports = [] } = jobStatus.output_files;
+
+ 
+ 
   return (
     <Box>
       <Box

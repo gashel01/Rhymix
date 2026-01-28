@@ -642,9 +642,7 @@ function InferenceResults({ inferenceData, onBack, volume }) {
           gap: 2,
           mb: 4,
           p: 3,
-          background: theme => theme.palette.mode === 'dark'
-            ? 'linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)'
-            : 'linear-gradient(135deg, #F2F2F7 0%, #FFFFFF 100%)',
+          background: 'transparent',
           borderRadius: 4,
           border: theme => `1px solid ${theme.palette.divider}`,
         }}>
@@ -860,9 +858,7 @@ function InferenceResults({ inferenceData, onBack, volume }) {
               borderRadius: 3,
               p: 4,
               textAlign: 'center',
-              background: theme => theme.palette.mode === 'dark'
-                ? 'linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)'
-                : 'linear-gradient(135deg, #F2F2F7 0%, #FFFFFF 100%)',
+              background: 'transparent',
             }}>
               <Typography variant="h6" color="text.secondary">
                 No inference results available

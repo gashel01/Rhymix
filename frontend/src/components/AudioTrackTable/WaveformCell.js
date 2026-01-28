@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography, Grid } from '@mui/material';
 import AudioWaveform from '../AudioWaveform';
+import { useVolume } from '../../contexts/VolumeContext';
 import styles from './WaveformCell.module.css';
 
 /**
@@ -10,7 +11,7 @@ function WaveformCell({
   url,
   isPlaying,
   isMuted,
-  volume,
+  volume: volumeProp, // Keep prop for backward compatibility but prefer context
   onPlayPause,
   onDownload,
   onReady,
@@ -24,11 +25,16 @@ function WaveformCell({
   isPrimary = false,
   emptyMessage = "No audio",
 }) {
+  const { volumeRef } = useVolume();
+  // Use context volume ref if available, fallback to prop
+  const volume = volumeRef?.current ?? volumeProp ?? 1;
+  
   return (
     <Grid  className={styles.container} sx={{ minWidth: 0 }}>
       {url ? (
         <AudioWaveform
           url={url}
+        
           isPlaying={isPlaying}
           isMuted={isMuted}
           volume={volume}
@@ -59,7 +65,7 @@ const areEqual = (prev, next) =>
   prev.url === next.url &&
   prev.isPlaying === next.isPlaying &&
   prev.isMuted === next.isMuted &&
-  prev.volume === next.volume &&
+  // volume is intentionally excluded - it's handled via context ref
   prev.progressColor === next.progressColor &&
   prev.waveColor === next.waveColor &&
   prev.backgroundColor === next.backgroundColor &&

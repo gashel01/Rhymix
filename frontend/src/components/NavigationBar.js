@@ -63,19 +63,9 @@ function NavigationBar({
   muted,
   volume,
 }) {
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window === "undefined" ? false : window.matchMedia("(max-width: 599px)").matches
-  );
+ 
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mql = window.matchMedia("(max-width: 599px)");
-    const onChange = () => setIsMobile(mql.matches);
-    onChange();
-    mql.addEventListener?.("change", onChange);
-    return () => mql.removeEventListener?.("change", onChange);
-  }, []);
-
+ 
   // Click-away for the settings popover (desktop)
   const settingsWrapRef = useRef(null);
   useEffect(() => {
@@ -161,7 +151,6 @@ function NavigationBar({
   const GlassPanel = ({ children, style }) => (
     <div
       style={{
-        borderRadius: tokens.radiusLg,
         border: `1px solid ${tokens.hairline}`,
         background: `linear-gradient(180deg, ${tokens.glassA}, ${tokens.glassB})`,
         backdropFilter: "blur(22px) saturate(140%)",
@@ -233,14 +222,14 @@ function NavigationBar({
         title={sidebarCollapsed && !mobile ? item.label : undefined}
         style={{
           width: "100%",
-          border: `1px solid ${
+          border: !selected ? "none" : `1px solid ${
             selected ? "rgba(10,132,255,0.35)" : tokens.hairline
           }`,
           borderRadius: tokens.radiusMd,
           background: selected
             ? `linear-gradient(135deg, ${tokens.primaryWash}, ${tokens.primaryWash2})`
-            : `linear-gradient(180deg, ${tokens.itemA}, ${tokens.itemB})`,
-          backdropFilter: "blur(16px)",
+            : "none",
+          // backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
           boxShadow: selected ? tokens.shadowSoft : "none",
           color: tokens.text,
@@ -256,14 +245,14 @@ function NavigationBar({
         onMouseEnter={(e) => {
           if (sidebarCollapsed && !mobile) return;
           if (selected) return;
-          e.currentTarget.style.background = `linear-gradient(180deg, ${tokens.hoverA}, ${tokens.hoverB})`;
+          // e.currentTarget.style.background = `linear-gradient(180deg, ${tokens.hoverA}, ${tokens.hoverB})`;
           e.currentTarget.style.transform = "translateX(3px)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = "translateX(0)";
           e.currentTarget.style.background = selected
             ? `linear-gradient(135deg, ${tokens.primaryWash}, ${tokens.primaryWash2})`
-            : `linear-gradient(180deg, ${tokens.itemA}, ${tokens.itemB})`;
+            : 'none';
         }}
       >
         <div
@@ -336,130 +325,27 @@ function NavigationBar({
     </div>
   );
 
-  // Mobile Drawer Overlay
-  const MobileDrawer = () => {
-    const onOverlayClick = () => handleDrawerToggle();
-
-    return (
-      <>
-        {/* overlay */}
-        <div
-          onClick={onOverlayClick}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: tokens.isDark ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.30)",
-            backdropFilter: "blur(2px)",
-            WebkitBackdropFilter: "blur(2px)",
-            zIndex: 1200,
-            opacity: drawerOpen ? 1 : 0,
-            pointerEvents: drawerOpen ? "auto" : "none",
-            transition: "opacity 160ms ease",
-          }}
-        />
-        {/* panel */}
-        <div
-          style={{
-            position: "fixed",
-            top: 14,
-            bottom: 14,
-            left: 14,
-            width: 340,
-            zIndex: 1250,
-            transform: drawerOpen ? "translateX(0)" : "translateX(-110%)",
-            transition: "transform 200ms ease",
-          }}
-        >
-          <GlassPanel style={{ height: "100%", padding: 12, position: "relative" }}>
-            {/* header */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "6px 6px 10px 6px",
-              }}
-            >
-              <Brand />
-              <IconCircleButton onClick={handleDrawerToggle} title="Close" ariaLabel="Close menu">
-                {/* keep your icon */}
-                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                  {/* CloseIcon */}
-                  {/** you pass MUI icons in your parent already; here we keep your CloseIcon import */}
-                  <CloseIcon fontSize="small" />
-                </span>
-              </IconCircleButton>
-            </div>
-
-            <Hairline style={{ margin: "4px 0 12px 0" }} />
-
-            {/* nav list */}
-            <div style={{ display: "grid", gap: 10, padding: "0 6px" }}>
-              {navigationItems.map((item) => (
-                <NavItem key={item.id} item={item} mobile />
-              ))}
-            </div>
-
-            {/* bottom theme card */}
-            <div style={{ position: "absolute", left: 12, right: 12, bottom: 12 }}>
-              <div
-                style={{
-                  borderRadius: tokens.radiusMd,
-                  border: `1px solid ${tokens.hairline}`,
-                  background: `linear-gradient(180deg, ${tokens.itemA}, ${tokens.itemB})`,
-                  padding: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div style={{ color: tokens.subtext, fontWeight: 650, fontSize: 12, letterSpacing: 0.4 }}>
-                  Appearance
-                </div>
-                <IconCircleButton
-                  onClick={handleThemeToggle}
-                  title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-                  ariaLabel="Toggle theme"
-                  style={{ padding: 7 }}
-                >
-                  {darkMode ? <Brightness7 /> : <Brightness4 />}
-                </IconCircleButton>
-              </div>
-            </div>
-          </GlassPanel>
-        </div>
-      </>
-    );
-  };
-
+ 
   return (
     <>
       {/* Mobile hamburger button */}
-      {isMobile && (
-        <div style={{ position: "fixed", top: 16, left: 16, zIndex: 1300 }}>
-          <IconCircleButton onClick={handleDrawerToggle} title="Menu" ariaLabel="Open menu">
-            <MenuIcon />
-          </IconCircleButton>
-        </div>
-      )}
+      
 
-      {/* Mobile drawer */}
-      {isMobile && <MobileDrawer />}
-
+     
       {/* Desktop sidebar */}
-      {!isMobile && (
+      
         <div style={{ width: tokens.sidebarW, flexShrink: 0 }}>
           <div
             style={{
               position: "fixed",
-              top: 14,
-              left: 14,
-              bottom: 14,
+              top: 0,
+              left: 0,
+              bottom: 0,
               width: tokens.sidebarW,
-              transition: "width 220ms ease",
+              transition: "width 120ms ease",
             }}
           >
-            <GlassPanel style={{ height: "100%", padding: sidebarCollapsed ? 10 : 12, position: "relative" }}>
+            <GlassPanel style={{ height: "100%", padding:  "12px 0px", position: "relative" }}>
               {/* header */}
               <div
                 onClick={handleSidebarToggle}
@@ -487,10 +373,10 @@ function NavigationBar({
                 )}
               </div>
 
-              <Hairline style={{ margin: "6px 0 12px 0" }} />
+              {/* <Hairline style={{ margin: "6px 0 12px 0" }} /> */}
 
               {/* nav */}
-              <div style={{ display: "grid", gap: 10, padding: "0 6px" }}>
+              <div style={{ display: "grid", gap: 10, padding: "12px 16px" }}>
                 {navigationItems.map((item) => (
                   <NavItem key={item.id} item={item} />
                 ))}
@@ -499,15 +385,15 @@ function NavigationBar({
               {/* quick actions */}
               {!sidebarCollapsed && (
                 <>
-                  <Hairline style={{ margin: "14px 12px" }} />
-                  <div style={{ padding: "0 10px 8px 10px" }}>
+                  <Hairline style={{ margin: "12px 16px" }} />
+                  <div style={{ padding: "12px 16px" }}>
                     <div style={{ color: tokens.subtext, fontWeight: 750, fontSize: 11, letterSpacing: 0.8 }}>
                       QUICK ACTIONS
                     </div>
                   </div>
 
-                  <div style={{ padding: "0 8px" }}>
-                    <button
+                  <div style={{ padding: "12px 16px" }}>
+                    <button 
                       type="button"
                       onClick={() => handleCleanDirectories(true)}
                       disabled={loading}
@@ -522,10 +408,11 @@ function NavigationBar({
                         fontWeight: 650,
                         textAlign: "left",
                         boxShadow: tokens.shadowSoft,
+                        textAlign: "center",
                         opacity: loading ? 0.6 : 1,
                       }}
                     >
-                      🧹&nbsp;&nbsp;Clean All Data
+                      Clean All Data
                     </button>
                   </div>
                 </>
@@ -651,7 +538,7 @@ function NavigationBar({
             </GlassPanel>
           </div>
         </div>
-      )}
+      
     </>
   );
 }

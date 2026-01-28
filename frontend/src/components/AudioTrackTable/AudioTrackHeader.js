@@ -16,22 +16,20 @@ const AudioTrackHeader = ({
   const rightLabel = "Vocals";
 
   return (
-    <TableHead>
+    <div  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%",  background:"rgba(255,255,255,0.1)",  padding: "5px 5px" , marginTop:"10px"}}>
       <TableRow sx={{
-        height: 48,
+       
+        width: "100%",
         bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'grey.50',
-        borderBottom: `1px solid ${theme.palette.divider}`,
-        '& .MuiTableCell-root': { borderBottom: 'none', color: 'text.primary', p: '8px 16px' }
+        '& .MuiTableCell-root': { borderBottom: 'none', color: 'text.primary' }
       }}>
-        <TableCell width="10%" className={styles.trackNameCell} sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
-          Track Name
-        </TableCell>
+        
 
-        <TableCell className={styles.waveformsCell} sx={{
+        <div className={styles.waveformsCell} sx={{
           width: (datasetSelectionMode || inferenceSelectionMode) ? "calc(90% - 40px)" : "90%",
           transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
-          p: "4px 8px", height: 40
-        }}>
+          p: "4px 8px", height: 40, width: "100%",
+              }}>
           <Grid container sx={{ width: '100%', m: 0, height: '100%', alignItems: 'center' }}>
             {/* Instrumental / Original Header */}
             <Grid item xs={12} md={5.5} sx={{ display: 'flex', justifyContent: 'center' }}>
@@ -48,9 +46,9 @@ const AudioTrackHeader = ({
               <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: '0.95rem', flex: 1, textAlign: 'center' }}>
                 {rightLabel}
               </Typography>
-              
+             
               {showVocalToggle && handleVocalModeChange && (
-                <Box sx={{ ml: 1, flexShrink: 0 }}>
+                <Box sx={{ flexShrink: 0, mr: 1 }}>
                   <VocalModeToggle
                     value={vocalMode}
                     onChange={handleVocalModeChange}
@@ -60,9 +58,9 @@ const AudioTrackHeader = ({
               )}
             </Grid>
           </Grid>
-        </TableCell>
+        </div>
       </TableRow>
-    </TableHead>
+    </div>
   );
 };
 

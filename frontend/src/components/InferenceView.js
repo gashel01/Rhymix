@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
+import { useVolume } from "../contexts/VolumeContext";
 
 // keep your existing icon set (NOT changing icons)
 import AudioFileIcon from "@mui/icons-material/AudioFile";
@@ -9,7 +10,8 @@ import AudioTrackTable from "./AudioTrackTable/AudioTrackTable";
 import { safePlay, safePause } from "./AudioTrackTable/utils";
 import ErrorBoundary from "./ErrorBoundary";
 
-function InferenceView({ onNavigate, darkMode, volume }) {
+function InferenceView({ onNavigate, darkMode }) {
+  const { volumeRef } = useVolume();
   // ---------- Theme tokens (same “new style”) ----------
   const isDark = useMemo(() => {
     if (typeof darkMode === "boolean") return darkMode;
@@ -70,8 +72,8 @@ function InferenceView({ onNavigate, darkMode, volume }) {
         borderRadius: t.radiusLg,
         border: `1px solid ${t.hairline}`,
         background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-        backdropFilter: "blur(18px) saturate(140%)",
-        WebkitBackdropFilter: "blur(18px) saturate(140%)",
+        // backdropFilter: "blur(18px) saturate(140%)",
+        // WebkitBackdropFilter: "blur(18px) saturate(140%)",
         boxShadow: t.shadowSoft,
         padding: 18,
         ...style,
@@ -218,8 +220,13 @@ function InferenceView({ onNavigate, darkMode, volume }) {
     resultsRef.current = inferenceResults;
   }, [inferenceResults]);
 
+  const hasFetchedRef = useRef(false);
   useEffect(() => {
-    fetchInferenceResults();
+    // Only fetch once, even if component re-renders
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchInferenceResults();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -411,49 +418,7 @@ function InferenceView({ onNavigate, darkMode, volume }) {
 
   return (
     <div style={{ minHeight: "100vh", padding: "18px 0 32px 0" }}>
-      <div style={{ padding: "0 16px", maxWidth: t.maxW, margin: "0 auto" }}>
-        {/* Sticky header */}
-        <div style={{ position: "sticky", top: t.stickyTop, zIndex: 50 }}>
-          <Glass style={{ padding: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: 16,
-                  display: "grid",
-                  placeItems: "center",
-                  border: `1px solid ${t.hairline}`,
-                  background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
-                  flexShrink: 0,
-                }}
-              >
-                <AudioFileIcon style={{ color: t.text }} />
-              </div>
-
-              <div style={{ flex: "1 1 340px", minWidth: 240 }}>
-                <div style={{ fontSize: 26, fontWeight: 950, letterSpacing: -0.6, color: t.text, lineHeight: 1.1 }}>
-                  Past Inference Results
-                </div>
-                <div style={{ marginTop: 4, fontSize: 13, fontWeight: 650, color: t.subtext }}>
-                  View, play, and download your previous voice inference results.
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <Btn
-                  variant="outline"
-                  onClick={fetchInferenceResults}
-                  style={{ height: 40, padding: "0 14px" }}
-                  title="Refresh"
-                >
-                  Refresh
-                </Btn>
-               
-              </div>
-            </div>
-          </Glass>
-        </div>
+      
 
         <div style={{ marginTop: 16 }}>
           {error && (
@@ -502,16 +467,7 @@ function InferenceView({ onNavigate, darkMode, volume }) {
               </div>
             </Panel>
           ) : (
-            <Panel style={{ padding: 14 }}>
-              {/* Table container (give it the frosted surface + allow horizontal scroll if needed) */}
-              <div
-                style={{
-                  borderRadius: t.radiusLg,
-                  border: `1px solid ${t.hairline}`,
-                  overflow: "hidden",
-                  background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                }}
-              >
+          
                 <ErrorBoundary>
                   <AudioTrackTable
                     trackPairs={pastInferenceTrackPairs}
@@ -544,20 +500,66 @@ function InferenceView({ onNavigate, darkMode, volume }) {
                     onDeselectAll={handleDeselectAllRows}
                     handleDownloadFullSong={handleDownloadFullSong}
                     defaultLabel=" "
-                    volume={volume}
+                    volume={volumeRef.current}
+                    header={  <div style={{ padding: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                      <div
+                        style={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: 16,
+                          display: "grid",
+                          placeItems: "center",
+                          border: `1px solid ${t.hairline}`,
+                          background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <AudioFileIcon style={{ color: t.text }} />
+                      </div>
+        
+                      <div style={{ flex: "1 1 340px", minWidth: 240 }}>
+                        <div style={{ fontSize: 26, fontWeight: 950, letterSpacing: -0.6, color: t.text, lineHeight: 1.1 }}>
+                          Past Inference Results
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 13, fontWeight: 650, color: t.subtext }}>
+                          View, play, and download your previous voice inference results.
+                        </div>
+                      </div>
+        
+                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <Btn
+                          variant="outline"
+                          onClick={fetchInferenceResults}
+                          style={{ height: 40, padding: "0 14px" }}
+                          title="Refresh"
+                        >
+                          Refresh
+                        </Btn>
+                       
+                      </div>
+                    </div>
+                  </div>}
                   />
                 </ErrorBoundary>
-              </div>
-            </Panel>
+            
           )}
         </div>
 
         <style>{`
           @keyframes spin{to{transform:rotate(360deg)}}
         `}</style>
-      </div>
+     
     </div>
   );
 }
 
-export default InferenceView;
+// Memoize with custom comparison to ignore volume changes
+// Volume is accessed via context ref, so it doesn't cause re-renders
+export default memo(InferenceView, (prevProps, nextProps) => {
+  return (
+    prevProps.onNavigate === nextProps.onNavigate &&
+    prevProps.darkMode === nextProps.darkMode
+    // volume is intentionally excluded - accessed via context
+  );
+});
