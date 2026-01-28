@@ -581,6 +581,7 @@ function App() {
             handleTrainWithDataset={handleTrainWithDataset}
             onCreateTalkingDataset={handleCreateTalkingDataset}
             onInferenceWithTracks={handleInferenceWithTracks}
+            volume={volume}
           />
         );
 
@@ -627,6 +628,7 @@ function App() {
                 <DownloadResults
                   jobStatus={jobStatus}
                   handleReset={handleReset}
+                  volume={volume}
                 />
               )}
             </Box>

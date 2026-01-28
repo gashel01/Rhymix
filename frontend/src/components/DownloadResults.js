@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -13,7 +13,7 @@ import { useAudioPlayback } from "../hooks/useAudioPlayback";
 import { useVocalMode } from "../hooks/useVocalMode";
 import { downloadFile } from "../utils/audioUtils";
 
-function DownloadResults({ jobStatus, handleReset }) {
+function DownloadResults({ jobStatus, handleReset, volume }) {
   const {
     vocalMode,
     handleVocalModeChange,
@@ -64,31 +64,34 @@ function DownloadResults({ jobStatus, handleReset }) {
   const minutes = Math.floor(totalTime / 60);
   const seconds = totalTime % 60;
 
-  const {
-    raw_vocals = [],
-    processed_vocals = [],
-    exports = [],
-  } = jobStatus.output_files;
+  const { raw_vocals = [], processed_vocals = [], exports = [] } = jobStatus.output_files;
 
-  // Get all instrumentals (matching pattern from vocals)
-  const instrumentals = raw_vocals
-    .filter((file) => file.includes("_vocals"))
-    .map((file) => file.replace("_vocals", "_instrumental"));
+  const instrumentals = useMemo(
+    () =>
+      raw_vocals
+        .filter((file) => file.includes("_vocals"))
+        .map((file) => file.replace("_vocals", "_instrumental")),
+    [raw_vocals]
+  );
 
-  // Determine which vocals to show based on mode
-  const vocalsToShow =
-    vocalMode === "processed" ? processed_vocals : raw_vocals;
+  const vocalsToShow = useMemo(
+    () => (vocalMode === "processed" ? processed_vocals : raw_vocals),
+    [processed_vocals, raw_vocals, vocalMode]
+  );
 
-  // Calculate pairs of instrumentals and vocals
-  const trackPairs = [];
-  const maxLength = Math.max(instrumentals.length, vocalsToShow.length);
+  const trackPairs = useMemo(() => {
+    const pairs = [];
+    const maxLength = Math.max(instrumentals.length, vocalsToShow.length);
 
-  for (let i = 0; i < maxLength; i++) {
-    trackPairs.push({
-      instrumental: instrumentals[i] || null,
-      vocal: vocalsToShow[i] || null,
-    });
-  }
+    for (let i = 0; i < maxLength; i += 1) {
+      pairs.push({
+        instrumental: instrumentals[i] || null,
+        vocal: vocalsToShow[i] || null,
+      });
+    }
+
+    return pairs;
+  }, [instrumentals, vocalsToShow]);
 
   const handleVocalModeChangeWithCleanup = (event, newMode) => {
     if (newMode !== null) {
@@ -158,6 +161,7 @@ function DownloadResults({ jobStatus, handleReset }) {
             showDatasetButton={true}
             handleDownloadDataset={handleDownloadDataset}
             hasExports={exports.length > 0}
+            volume={volume}
           />
           </ErrorBoundary>
         </Grid>

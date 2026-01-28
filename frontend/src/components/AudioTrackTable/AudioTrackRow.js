@@ -20,12 +20,14 @@ const AudioTrackRow = (props) => {
     internalMutedInstrumentals,
     internalMutedVocals,
     volume,
+    name,
     isSelected,
     onRowSelect,
     modelUsed,
     handlePlayPauseModified,
     handlePlayBothModified,
     handleDownload,
+    handleDownloadFullSong,
     playingBoth,
     status = "completed",
   } = props;
@@ -237,7 +239,7 @@ const AudioTrackRow = (props) => {
     );
   };
 
-  const displayName = props?.name || getCleanFileName(props?.name) || `Track ${index + 1}`;
+  const displayName = name || getCleanFileName(name) || `Track ${index + 1}`;
 
   return (
     <tr style={{ borderBottom: `1px solid ${t.hairline}` }}>
@@ -282,7 +284,7 @@ const AudioTrackRow = (props) => {
                 vocal={vocalPath}
                 isPlaying={isCurrentlyPlayingBoth}
                 onPlayBoth={() => handlePlayBothModified(instPath, vocalPath, vocalsFileType)}
-                onDownloadFullSong={props.handleDownloadFullSong}
+                onDownloadFullSong={handleDownloadFullSong}
                 disabled={status === "processing"}
               />
             </div>
@@ -326,4 +328,25 @@ const AudioTrackRow = (props) => {
   );
 };
 
-export default AudioTrackRow;
+const areEqual = (prev, next) =>
+  prev.pair === next.pair &&
+  prev.index === next.index &&
+  prev.vocalMode === next.vocalMode &&
+  prev.vocalsFileType === next.vocalsFileType &&
+  prev.isInstrumentalPlaying === next.isInstrumentalPlaying &&
+  prev.isVocalPlaying === next.isVocalPlaying &&
+  prev.internalMutedInstrumentals === next.internalMutedInstrumentals &&
+  prev.internalMutedVocals === next.internalMutedVocals &&
+  prev.volume === next.volume &&
+  prev.name === next.name &&
+  prev.isSelected === next.isSelected &&
+  prev.modelUsed === next.modelUsed &&
+  prev.handlePlayPauseModified === next.handlePlayPauseModified &&
+  prev.handlePlayBothModified === next.handlePlayBothModified &&
+  prev.handleDownload === next.handleDownload &&
+  prev.handleDownloadFullSong === next.handleDownloadFullSong &&
+  prev.playingBoth === next.playingBoth &&
+  prev.status === next.status &&
+  prev.onRowSelect === next.onRowSelect;
+
+export default React.memo(AudioTrackRow, areEqual);

@@ -21,6 +21,7 @@ function HomeView({
   onInferenceWithTracks,
   handleTrainWithDataset,
   darkMode,
+  volume,
 }) {
   // ---------- Theme tokens (same “new style”) ----------
   const isDark = useMemo(() => {
@@ -305,7 +306,7 @@ function HomeView({
     }
   };
 
-  const getTrackPairs = () => {
+  const trackPairs = useMemo(() => {
     const sourceFiles = vocalMode === "processed" ? availableFiles : rawVocals;
     const isProcessed = vocalMode === "processed";
 
@@ -319,7 +320,7 @@ function HomeView({
       isProcessed,
       id: pair.id || pair.name || `${pair.instrumentalPath || ""}-${pair.vocalPath || ""}-${index}`,
     }));
-  };
+  }, [availableFiles, rawVocals, vocalMode]);
 
   // Fetch talking datasets on mount
   useEffect(() => {
@@ -405,7 +406,7 @@ function HomeView({
                     }}
                   >
                     <AudioTrackTable
-                      trackPairs={getTrackPairs()}
+                      trackPairs={trackPairs}
                       vocalMode={vocalMode}
                       handleVocalModeChange={handleVocalModeChangeWithCleanup}
                       handlePlayPause={handlePlayPause}
@@ -426,6 +427,7 @@ function HomeView({
                       handleTrainWithDataset={handleTrainWithDataset}
                       showInferenceButton={true}
                       handleInferenceWithTracks={onInferenceWithTracks}
+                      volume={volume}
                     />
                   </div>
                 </ErrorBoundary>
