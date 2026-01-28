@@ -268,13 +268,13 @@ function InferenceView({ onNavigate, darkMode, volume }) {
     [inferenceResults, vocalMode]
   );
 
-  const handleVocalModeChange = (event, newMode) => {
+  const handleVocalModeChange = useCallback((event, newMode) => {
     // AudioTrackTable may pass (event, value)
     if (!newMode) return;
     setVocalMode(newMode);
-  };
+  }, []);
 
-  const handleDownload = async (result) => {
+  const handleDownload = useCallback(async (result) => {
     try {
       const response = await fetch(`/api/download/inference/${result.outputFile}`);
       if (!response.ok) throw new Error("Failed to download file");
@@ -291,9 +291,9 @@ function InferenceView({ onNavigate, darkMode, volume }) {
     } catch (e) {
       if (e.name !== "AbortError") console.error("Error downloading file:", e);
     }
-  };
+  }, []);
 
-  const handleDownloadFullSong = async (instrumental, vocal) => {
+  const handleDownloadFullSong = useCallback(async (instrumental, vocal) => {
     try {
       const response = await fetch(`/api/download/inference/${instrumental}`);
       if (!response.ok) throw new Error("Failed to download file");
@@ -310,10 +310,10 @@ function InferenceView({ onNavigate, darkMode, volume }) {
     } catch (e) {
       if (e.name !== "AbortError") console.error("Error downloading full song:", e);
     }
-  };
+  }, []);
 
   // Audio playback
-  const handlePlayPause = (trackId, type) => {
+  const handlePlayPause = useCallback((trackId, type) => {
     const key = `${trackId}-${type}`;
 
     if (playingFile?.id === key) {
@@ -349,14 +349,14 @@ function InferenceView({ onNavigate, darkMode, volume }) {
       safePlay(waveformToPlay, url);
       setPlayingFile({ id: key, waveform: waveformToPlay });
     }
-  };
+  }, [playingFile, convertedWaveforms, originalWaveforms, resultsRef]);
 
-  const handlePlayBoth = (trackId, track) => {
+  const handlePlayBoth = useCallback(() => {
     // For past results, only converted exists; keeping behavior consistent with your comment.
     console.log("Play both not available for past inference results");
-  };
+  }, []);
 
-  const stopAllAudio = () => {
+  const stopAllAudio = useCallback(() => {
     if (playingFile) {
       safePause(playingFile.waveform);
       setPlayingFile(null);
@@ -364,29 +364,29 @@ function InferenceView({ onNavigate, darkMode, volume }) {
     Object.values(instrumentalWaveforms).forEach((w) => safePause(w));
     Object.values(convertedWaveforms).forEach((w) => safePause(w));
     Object.values(originalWaveforms).forEach((w) => safePause(w));
-  };
+  }, [convertedWaveforms, instrumentalWaveforms, originalWaveforms, playingFile]);
 
   // Waveform ready
-  const handleConvertedWaveformReady = (trackPath, waveform) => {
+  const handleConvertedWaveformReady = useCallback((trackPath, waveform) => {
     setConvertedWaveforms((prev) => ({ ...prev, [trackPath]: waveform }));
-  };
+  }, []);
 
-  const handleOriginalWaveformReady = (trackPath, waveform) => {
+  const handleOriginalWaveformReady = useCallback((trackPath, waveform) => {
     setOriginalWaveforms((prev) => ({ ...prev, [trackPath]: waveform }));
-  };
+  }, []);
 
   // Row selection
-  const handleRowSelect = (resultId, isSelected) => {
+  const handleRowSelect = useCallback((resultId, isSelected) => {
     if (isSelected) setSelectedRows((prev) => [...prev, resultId]);
     else setSelectedRows((prev) => prev.filter((id) => id !== resultId));
-  };
+  }, []);
 
-  const handleSelectAllRows = () => setSelectedRows(inferenceResults.map((r) => r.id));
-  const handleDeselectAllRows = () => setSelectedRows([]);
+  const handleSelectAllRows = useCallback(() => setSelectedRows(inferenceResults.map((r) => r.id)), [inferenceResults]);
+  const handleDeselectAllRows = useCallback(() => setSelectedRows([]), []);
 
   // Navigation actions
-  const handleReturnToModelSelection = () => onNavigate?.("inference-model-selection");
-  const handleReturnToInferenceParams = () => onNavigate?.("inference-params");
+  const handleReturnToModelSelection = useCallback(() => onNavigate?.("inference-model-selection"), [onNavigate]);
+  const handleReturnToInferenceParams = useCallback(() => onNavigate?.("inference-params"), [onNavigate]);
 
   // ---------- UI states ----------
   if (loading) {

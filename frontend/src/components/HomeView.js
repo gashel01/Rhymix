@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 // keep your existing icon set (NOT changing icons)
 import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
@@ -295,16 +295,22 @@ function HomeView({
     onCreateTalkingDataset?.();
   };
 
-  const handleDownload = async (fileType, filePath) => {
-    await downloadFile(fileType, filePath, vocalMode);
-  };
+  const handleDownload = useCallback(
+    async (fileType, filePath) => {
+      await downloadFile(fileType, filePath, vocalMode);
+    },
+    [vocalMode]
+  );
 
-  const handleVocalModeChangeWithCleanup = (event, newMode) => {
-    if (newMode !== null) {
-      stopAllAudio();
-      handleVocalModeChange(event, newMode);
-    }
-  };
+  const handleVocalModeChangeWithCleanup = useCallback(
+    (event, newMode) => {
+      if (newMode !== null) {
+        stopAllAudio();
+        handleVocalModeChange(event, newMode);
+      }
+    },
+    [handleVocalModeChange, stopAllAudio]
+  );
 
   const trackPairs = useMemo(() => {
     const sourceFiles = vocalMode === "processed" ? availableFiles : rawVocals;

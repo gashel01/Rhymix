@@ -59,7 +59,8 @@ const AudioTrackTable = (props) => {
 
   const getWaveform = (type, pair) => {
     const key = pair[type];
-    return props[`${type}Waveforms`][key] || props[`${type}Waveforms`][getFileNameFromPath(key)];
+    const waveforms = type === "instrumental" ? instrumentalWaveforms : vocalWaveforms;
+    return waveforms[key] || waveforms[getFileNameFromPath(key)];
   };
 
   const handlePlayBothInternal = (inst, vocal) => {

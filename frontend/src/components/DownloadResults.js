@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -93,26 +93,32 @@ function DownloadResults({ jobStatus, handleReset, volume }) {
     return pairs;
   }, [instrumentals, vocalsToShow]);
 
-  const handleVocalModeChangeWithCleanup = (event, newMode) => {
-    if (newMode !== null) {
-      stopAllAudio();
-      handleVocalModeChange(event, newMode);
-    }
-  };
+  const handleVocalModeChangeWithCleanup = useCallback(
+    (event, newMode) => {
+      if (newMode !== null) {
+        stopAllAudio();
+        handleVocalModeChange(event, newMode);
+      }
+    },
+    [handleVocalModeChange, stopAllAudio]
+  );
 
-  const handleDownload = async (fileType, filename) => {
-    if (!filename) return;
-    const actualFileType = filename.includes("instrumental")
-      ? "instrumental"
-      : fileType;
-    await downloadFile(actualFileType, filename, vocalMode);
-  };
+  const handleDownload = useCallback(
+    async (fileType, filename) => {
+      if (!filename) return;
+      const actualFileType = filename.includes("instrumental")
+        ? "instrumental"
+        : fileType;
+      await downloadFile(actualFileType, filename, vocalMode);
+    },
+    [vocalMode]
+  );
 
-  const handleDownloadDataset = () => {
+  const handleDownloadDataset = useCallback(() => {
     if (exports.length > 0) {
       handleDownload("exports", exports[0]);
     }
-  };
+  }, [exports, handleDownload]);
 
   return (
     <Box>
