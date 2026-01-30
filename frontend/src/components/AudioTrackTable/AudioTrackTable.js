@@ -27,6 +27,8 @@ const AudioTrackTable = (props) => {
     vocalModeType,
     handleDownload,
     handleDownloadFullSong,
+    handleInstrumentalWaveformReady,
+    handleVocalWaveformReady,
     showVocalToggle,
     enablePlayBoth,
     showDatasetButton,
@@ -60,7 +62,7 @@ const AudioTrackTable = (props) => {
   const parentRef = useRef(null);
 
   const selectedRows = externalSelectedRows ?? internalSelectedRows;
-  const setSelectedRows = onRowSelect ? () => {} : setInternalSelectedRows;
+  const setSelectedRows = onRowSelect ? () => { } : setInternalSelectedRows;
 
   const pageSize = Math.max(1, Number(pageSizeProp) || 10);
   const totalPages = Math.max(1, Math.ceil(trackPairs.length / pageSize));
@@ -99,13 +101,7 @@ const AudioTrackTable = (props) => {
     [getWaveform('instrumental', pair), getWaveform('vocal', pair)].forEach(wf => {
       if (!wf) return;
       isPlaying ? wf.pause() : wf.play();
-      wf.setMuted?.(false);
     });
-
-    setMutes(prev => ({ 
-      instrumental: { ...prev.instrumental, [inst]: false }, 
-      vocal: { ...prev.vocal, [vocal]: false } 
-    }));
     setPlayingBoth(isPlaying ? null : { id });
   };
 
@@ -186,7 +182,7 @@ const AudioTrackTable = (props) => {
   }, [page, totalPages]);
 
   return (
-    <Box className={styles.container } style={{ border:"none" }} >
+    <Box className={styles.container} style={{ border: "none" }} >
       <AudioTableActions
         selectedRows={selectedRows}
         trackPairs={trackPairs}
@@ -207,99 +203,101 @@ const AudioTrackTable = (props) => {
         onReturnToModelSelection={onReturnToModelSelection}
         onReturnToInferenceParams={onReturnToInferenceParams}
         defaultLabel={defaultLabel}
-          children={<AudioTrackHeader
-            vocalMode={vocalMode}
-            handleVocalModeChange={handleVocalModeChange}
-            showVocalToggle={showVocalToggle}
-            vocalModeType={vocalModeType}
-            showDeleteColumn
-          />
+        children={<AudioTrackHeader
+          vocalMode={vocalMode}
+          handleVocalModeChange={handleVocalModeChange}
+          showVocalToggle={showVocalToggle}
+          vocalModeType={vocalModeType}
+          showDeleteColumn
+        />
         }
-        
+
         header={header}
       />
-     
 
-  <div style={{ padding:"24px" }}>
-      {(externalDeleteResult || deleteState.result) && (
-        <Alert
-          severity={(externalDeleteResult || deleteState.result).error ? "error" : "success"}
-          sx={{ mb: 2 }}
-          onClose={() => {
-            if (externalDeleteResult) {
-              onClearDeleteResult?.();
-              return;
-            }
-            setDeleteState((p) => ({ ...p, result: null }));
-          }}
-        >
-          {(externalDeleteResult || deleteState.result).error
-            ? `Error: ${(externalDeleteResult || deleteState.result).error}`
-            : `Deleted ${(externalDeleteResult || deleteState.result).total_deleted} files.`}
-        </Alert>
-      )}
 
-      <div className={styles.tableWrapper}>
-        <TableContainer 
-          component={Paper} 
-          variant="outlined" 
-          className={styles.tableContainer}
-          ref={parentRef}
-          sx={{ 
-            overflow: 'auto',
-          }}
-        >
-          <Table className={styles.table} stickyHeader>
-            
-            <TableBody
-              style={{
-                height: `${virtualizer.getTotalSize()}px`,
-                position: 'relative',
-              }}
-            >
-              {virtualizer.getVirtualItems().map((virtualRow) => {
-                const pair = paginatedTrackPairs[virtualRow.index];
-                if (!pair) return null;
-                const globalIndex = (page - 1) * pageSize + virtualRow.index;
-                const pairId = `${getFileNameFromPath(pair.instrumental)}-${getFileNameFromPath(pair.vocal)}`;
-                const isPlaying = playingBoth?.id === pairId;
-                return (
-                  <AudioTrackRow 
-                    key={pair.id || globalIndex} 
-                    pair={pair} 
-                    index={globalIndex}
-                    status={pair.status || "completed"} 
-                    name={ vocalModeType === "inference" ? getCleanFileNameAndModelForInference(pair.instrumental).name : getCleanFileName(pair.instrumental)}
-                    modelUsed={vocalModeType === "inference" ? getCleanFileNameAndModelForInference(pair.instrumental).model : null}
-                    instrumentalUrl={pair.instrumentalUrl || `/api/download/instrumental/${pair.instrumental}`}
-                    vocalUrl={pair.vocalUrl || `/api/download/${vocalsFileType}/${pair.vocal}`}
-                    playingBoth={playingBoth}
-                    vocalMode={vocalMode}
-                    vocalsFileType={vocalsFileType}
-                    isInstrumentalPlaying={isPlaying || getFileNameFromPath(playingFile?.name) === getFileNameFromPath(pair.instrumental)}
-                    isVocalPlaying={isPlaying || getFileNameFromPath(playingFile?.name) === getFileNameFromPath(pair.vocal)}
-                    internalMutedInstrumentals={mutedInstrumentals || mutes.instrumental}
-                    internalMutedVocals={mutedVocals || mutes.vocal}
-                    volume={volume}
-                    handlePlayPauseModified={handlePlayPauseModified}
-                    handlePlayBothModified={handlePlayBothInternal}
-                    handleDownload={handleDownload}
-                    handleDownloadFullSong={handleDownloadFullSong || downloadFullSong}
-                    isSelected={selectedRows.includes(pair.id)}
-                    onRowSelect={handleRowSelect}
-                    
-                  />
-                );
-              })}
-           
-            </TableBody>
-          </Table>
-        </TableContainer>
+      <div style={{ padding: "24px" }}>
+        {(externalDeleteResult || deleteState.result) && (
+          <Alert
+            severity={(externalDeleteResult || deleteState.result).error ? "error" : "success"}
+            sx={{ mb: 2 }}
+            onClose={() => {
+              if (externalDeleteResult) {
+                onClearDeleteResult?.();
+                return;
+              }
+              setDeleteState((p) => ({ ...p, result: null }));
+            }}
+          >
+            {(externalDeleteResult || deleteState.result).error
+              ? `Error: ${(externalDeleteResult || deleteState.result).error}`
+              : `Deleted ${(externalDeleteResult || deleteState.result).total_deleted} files.`}
+          </Alert>
+        )}
 
-     
-      </div>
+        <div className={styles.tableWrapper}>
+          <TableContainer
+            component={Paper}
+            variant="outlined"
+            className={styles.tableContainer}
+            ref={parentRef}
+            sx={{
+              overflow: 'auto',
+            }}
+          >
+            <Table className={styles.table} stickyHeader>
 
-      {trackPairs.length > pageSize && (
+              <TableBody
+                style={{
+                  height: `${virtualizer.getTotalSize()}px`,
+                  position: 'relative',
+                }}
+              >
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const pair = paginatedTrackPairs[virtualRow.index];
+                  if (!pair) return null;
+                  const globalIndex = (page - 1) * pageSize + virtualRow.index;
+                  const pairId = `${getFileNameFromPath(pair.instrumental)}-${getFileNameFromPath(pair.vocal)}`;
+                  const isPlaying = playingBoth?.id === pairId;
+                  return (
+                    <AudioTrackRow
+                      key={pair.id || globalIndex}
+                      pair={pair}
+                      index={globalIndex}
+                      status={pair.status || "completed"}
+                      name={vocalModeType === "inference" ? getCleanFileNameAndModelForInference(pair.instrumental).name : getCleanFileName(pair.instrumental)}
+                      modelUsed={vocalModeType === "inference" ? getCleanFileNameAndModelForInference(pair.instrumental).model : null}
+                      instrumentalUrl={pair.instrumentalUrl || `/api/download/instrumental/${pair.instrumental}`}
+                      vocalUrl={pair.vocalUrl || `/api/download/${vocalsFileType}/${pair.vocal}`}
+                      playingBoth={playingBoth}
+                      vocalMode={vocalMode}
+                      vocalsFileType={vocalsFileType}
+                      isInstrumentalPlaying={isPlaying || getFileNameFromPath(playingFile?.name) === getFileNameFromPath(pair.instrumental)}
+                      isVocalPlaying={isPlaying || getFileNameFromPath(playingFile?.name) === getFileNameFromPath(pair.vocal)}
+                      internalMutedInstrumentals={mutedInstrumentals || mutes.instrumental}
+                      internalMutedVocals={mutedVocals || mutes.vocal}
+                      volume={volume}
+                      handlePlayPauseModified={handlePlayPauseModified}
+                      handlePlayBothModified={handlePlayBothInternal}
+                      handleDownload={handleDownload}
+                      handleInstrumentalWaveformReady={handleInstrumentalWaveformReady}
+                      handleVocalWaveformReady={handleVocalWaveformReady}
+                      handleDownloadFullSong={handleDownloadFullSong || downloadFullSong}
+                      isSelected={selectedRows.includes(pair.id)}
+                      onRowSelect={handleRowSelect}
+
+                    />
+                  );
+                })}
+
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+
+        </div>
+
+        {trackPairs.length > pageSize && (
           <div className={styles.paginationOverlay} role="navigation" aria-label="Audio track pagination">
             <Button
               size="small"
@@ -343,23 +341,23 @@ const AudioTrackTable = (props) => {
           </div>
         )}
 
-        
 
-      <Dialog open={deleteState.open} onClose={() => setDeleteState(p => ({ ...p, open: false }))}>
-        <DialogTitle>Delete Tracks</DialogTitle>
-        <DialogContent>Permanently remove {selectedRows.length} tracks?</DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteState(p => ({ ...p, open: false }))}>Cancel</Button>
-          <Button onClick={async () => {
-             setDeleteState(p => ({ ...p, loading: true }));
-             const files = trackPairs.filter(p => selectedRows.includes(p.id)).flatMap(p => [p.vocal, p.instrumental]);
-             const res = await deleteFiles(files);
-             setDeleteState({ open: false, loading: false, result: res });
-             setSelectedRows([]);
-             window.location.reload();
-          }} color="error" variant="contained" disabled={deleteState.loading}>Delete</Button>
-        </DialogActions>
-      </Dialog>
+
+        <Dialog open={deleteState.open} onClose={() => setDeleteState(p => ({ ...p, open: false }))}>
+          <DialogTitle>Delete Tracks</DialogTitle>
+          <DialogContent>Permanently remove {selectedRows.length} tracks?</DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteState(p => ({ ...p, open: false }))}>Cancel</Button>
+            <Button onClick={async () => {
+              setDeleteState(p => ({ ...p, loading: true }));
+              const files = trackPairs.filter(p => selectedRows.includes(p.id)).flatMap(p => [p.vocal, p.instrumental]);
+              const res = await deleteFiles(files);
+              setDeleteState({ open: false, loading: false, result: res });
+              setSelectedRows([]);
+              window.location.reload();
+            }} color="error" variant="contained" disabled={deleteState.loading}>Delete</Button>
+          </DialogActions>
+        </Dialog>
 
       </div>
     </Box>

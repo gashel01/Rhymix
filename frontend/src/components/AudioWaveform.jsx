@@ -57,6 +57,7 @@ const AudioWaveform = (
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef(null);
   const isSyncingRef = useRef(false);
+  const restorePlaybackRef = useRef(null);
 
   const audioContext = useRef(null);
   const gainNode = useRef(null);
@@ -128,7 +129,7 @@ const AudioWaveform = (
     return Math.max(0, Math.min(1, value));
   };
 
-  const applyPlaybackVolume = (muted, value) => {
+  const applyPlaybackVolume = React.useCallback((muted, value) => {
     const ws = waveSurferRef.current;
     if (!ws) return;
 
@@ -148,17 +149,15 @@ const AudioWaveform = (
       } catch {}
     }
 
-    // GainNode fallback
     if (gainNode.current && audioContext.current) {
       const ac = audioContext.current;
       const gn = gainNode.current;
       try {
-        const val = targetVolume;
         gn.gain.setValueAtTime(gn.gain.value, ac.currentTime);
-        gn.gain.linearRampToValueAtTime(val, ac.currentTime + 0.08);
+        gn.gain.linearRampToValueAtTime(targetVolume, ac.currentTime + 0.08);
       } catch {}
     }
-  };
+  }, []);
 
   const createWaveSurfer = (audioUrl) => {
     if (!containerRef.current) return null;
@@ -222,8 +221,27 @@ const AudioWaveform = (
         }
       } catch {}
 
-      // ✅ Apply volume + mute immediately on ready (critical)
-      applyPlaybackVolume(mutedValue, volumeRef.current);
+      const restore = restorePlaybackRef.current;
+      const muteToApply = restore?.mutedValue ?? mutedValue;
+      const volToApply = restore?.volume ?? volumeRef.current;
+      applyPlaybackVolume(muteToApply, volToApply);
+
+      // Restore time: otherWaveform (e.g. instrumental) is source of truth when available
+      const timeToRestore =
+        typeof otherWaveform?.getCurrentTime === "function"
+          ? otherWaveform.getCurrentTime()
+          : restore?.lastTime;
+      if (typeof timeToRestore === "number" && timeToRestore >= 0) {
+        try {
+          const d = ws.getDuration?.() ?? 0;
+          if (d > 0 && d !== Infinity && !Number.isNaN(d)) {
+            const norm = Math.max(0, Math.min(1, timeToRestore / d));
+            ws.seekTo?.(norm);
+          } else if (typeof ws.setCurrentTime === "function") {
+            ws.setCurrentTime(timeToRestore);
+          }
+        } catch {}
+      }
 
       ws.on("seek", handleSeek);
       ws.on("interaction", handleSeek);
@@ -270,12 +288,16 @@ const AudioWaveform = (
 
       onReady(wrapper);
 
-      // respect external playing state
-      if (isPlaying) {
+      if (restore?.wasPlaying) {
+        try {
+          ws.play?.();
+        } catch {}
+      } else if (isPlaying) {
         try {
           ws.play?.();
         } catch {}
       }
+      restorePlaybackRef.current = null;
     });
 
     ws.load(audioUrl).catch((err) => {
@@ -300,14 +322,20 @@ const AudioWaveform = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialUrl]);
 
-  // create/destroy on url change
+  // create/destroy on url change – capture state before destroy for seamless restore (do NOT call onRequestStop)
   useEffect(() => {
     isMountedRef.current = true;
 
-    // If parent thinks it's playing, request global stop (prevents “carryover”)
-    if (isPlaying) {
+    // Capture state before destroy for seamless restore on URL change (prevents “carryover”)
+    const ws = waveSurferRef.current;
+    if (ws) {
       try {
-        onRequestStop?.();
+        restorePlaybackRef.current = {
+          wasPlaying: ws.isPlaying?.() ?? false,
+          lastTime: ws.getCurrentTime?.() ?? 0,
+          mutedValue,
+          volume: volumeRef.current ?? 1,
+        };
       } catch {}
     }
 
@@ -340,51 +368,25 @@ const AudioWaveform = (
     } catch {}
   }, [isPlaying, ready]);
 
-  // Update volume from context ref (doesn't cause re-renders)
+  // Single volume-sync effect (context ref or prop fallback). applyPlaybackVolume is stable (useCallback).
   useEffect(() => {
-    if (volumeContext?.volumeRef) {
-      // Subscribe to volume changes from context
-      const checkVolume = () => {
-        const newVolume = volumeContext.volumeRef.current;
-        if (volumeRef.current !== newVolume && ready) {
-          volumeRef.current = newVolume;
-          applyPlaybackVolume(mutedValue, newVolume);
-        }
-      };
-      // Check periodically for volume changes (context ref doesn't trigger re-renders)
-      const interval = setInterval(checkVolume, 50);
-      return () => clearInterval(interval);
-    } else {
-      // Fallback to prop-based volume
-      volumeRef.current = volumeProp ?? 1;
-      if (ready) {
-        applyPlaybackVolume(mutedValue, volumeProp ?? 1);
-      }
-    }
-  }, [volumeContext?.volumeRef, ready, mutedValue, volumeProp, applyPlaybackVolume]);
+    if (!ready) return;
 
-  // Update volume from context ref (doesn't cause re-renders)
-  useEffect(() => {
     if (volumeContext?.volumeRef) {
-      // Subscribe to volume changes from context
-      const checkVolume = () => {
+      const interval = setInterval(() => {
         const newVolume = volumeContext.volumeRef.current;
-        if (volumeRef.current !== newVolume && ready) {
+        if (volumeRef.current !== newVolume) {
           volumeRef.current = newVolume;
           applyPlaybackVolume(mutedValue, newVolume);
         }
-      };
-      // Check periodically for volume changes (context ref doesn't trigger re-renders)
-      const interval = setInterval(checkVolume, 50);
+      }, 75);
+
       return () => clearInterval(interval);
-    } else {
-      // Fallback to prop-based volume
-      volumeRef.current = volumeProp ?? 1;
-      if (ready) {
-        applyPlaybackVolume(mutedValue, volumeProp ?? 1);
-      }
     }
-  }, [volumeContext?.volumeRef, ready, mutedValue, volumeProp, applyPlaybackVolume]);
+
+    volumeRef.current = volumeProp ?? 1;
+    applyPlaybackVolume(mutedValue, volumeRef.current);
+  }, [ready, mutedValue, volumeProp, volumeContext?.volumeRef, applyPlaybackVolume]);
 
   // ✅ mute + volume sync (works for both controlled and uncontrolled)
   useEffect(() => {

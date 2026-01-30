@@ -28,13 +28,13 @@ function WaveformCell({
   const { volumeRef } = useVolume();
   // Use context volume ref if available, fallback to prop
   const volume = volumeRef?.current ?? volumeProp ?? 1;
-  
+
   return (
-    <Grid  className={styles.container} sx={{ minWidth: 0 }}>
+    <Grid className={styles.container} sx={{ minWidth: 0 }}>
       {url ? (
         <AudioWaveform
           url={url}
-        
+
           isPlaying={isPlaying}
           isMuted={isMuted}
           volume={volume}

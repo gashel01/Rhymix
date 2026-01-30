@@ -10,12 +10,11 @@ export const VolumeProvider = ({ children, volume }) => {
     volumeRef.current = volume;
   }, [volume]);
 
-  // Provide both ref and value - components can use ref to avoid re-renders
+  // Stable value: only ref, so consumers don't re-render when volume changes
   const value = React.useMemo(() => ({
-    volume,
     volumeRef,
     getVolume: () => volumeRef.current,
-  }), [volume]);
+  }), []);
 
   return (
     <VolumeContext.Provider value={value}>
@@ -27,8 +26,7 @@ export const VolumeProvider = ({ children, volume }) => {
 export const useVolume = () => {
   const context = useContext(VolumeContext);
   if (!context) {
-    // Fallback if not in provider
-    return { volume: 1, volumeRef: { current: 1 }, getVolume: () => 1 };
+    return { volumeRef: { current: 1 }, getVolume: () => 1 };
   }
   return context;
 };

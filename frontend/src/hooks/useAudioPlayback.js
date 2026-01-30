@@ -1,38 +1,36 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 /**
- * Hook to manage audio playback state
+ * Hook to manage audio playback state (InferenceView-style: instrumental + raw vocals + processed vocals).
  * @returns {Object} - Playback state and handlers
  */
 export const useAudioPlayback = () => {
   const [playingFile, setPlayingFile] = useState(null);
   const [playingBoth, setPlayingBoth] = useState(null);
   const [instrumentalWaveforms, setInstrumentalWaveforms] = useState({});
-  const [vocalWaveforms, setVocalWaveforms] = useState({});
+  const [rawVocalWaveforms, setRawVocalWaveforms] = useState({});
+  const [processedVocalWaveforms, setProcessedVocalWaveforms] = useState({});
   const instrumentalAudioRef = useRef(null);
   const vocalAudioRef = useRef(null);
   const lastSyncTime = useRef(0);
 
+  const getVocalWaveforms = useCallback((vocalType) => {
+    return vocalType === 'processed_vocals' ? processedVocalWaveforms : rawVocalWaveforms;
+  }, [processedVocalWaveforms, rawVocalWaveforms]);
+
   const handlePlayPause = useCallback((fileType, fileName) => {
-    // If already playing this file, pause it
     if (playingFile && playingFile.name === fileName) {
       setPlayingFile(null);
       return;
     }
 
-    // If playing something else, stop it
-    if (playingFile) {
-      setPlayingFile(null);
-    }
-
-    // Stop playing both if active
+    if (playingFile) setPlayingFile(null);
     if (playingBoth) {
       if (instrumentalAudioRef.current) instrumentalAudioRef.current.pause();
       if (vocalAudioRef.current) vocalAudioRef.current.pause();
       setPlayingBoth(null);
     }
 
-    // Start playing the new file
     setPlayingFile({
       name: fileName,
       type: fileType,
@@ -43,32 +41,23 @@ export const useAudioPlayback = () => {
     if (!instrumentalFile || !vocalFile) return;
 
     const pairId = `${instrumentalFile}-${vocalFile}`;
-    const iWaveform = instrumentalWaveforms[instrumentalFile];
-    const vWaveform = vocalWaveforms[vocalFile];
+    const iWaveform = instrumentalWaveforms[instrumentalFile] || instrumentalWaveforms[instrumentalFile?.split?.('/')?.pop?.()];
+    const vocalMap = vocalFileType === 'processed_vocals' ? processedVocalWaveforms : rawVocalWaveforms;
+    const vWaveform = vocalMap[vocalFile] || vocalMap[vocalFile?.split?.('/')?.pop?.()];
 
-    // If already playing this pair, stop it
     if (playingBoth && playingBoth.id === pairId) {
       setPlayingBoth(null);
       return;
     }
 
-    // If playing a single file, stop it
-    if (playingFile) {
-      setPlayingFile(null);
-    }
+    if (playingFile) setPlayingFile(null);
+    if (playingBoth) setPlayingBoth(null);
 
-    // If playing another pair, stop it
-    if (playingBoth) {
-      setPlayingBoth(null);
-    }
-
-    // Ensure waveforms are at the same position before playing
     if (iWaveform && vWaveform) {
-      iWaveform.setCurrentTime(0);
-      vWaveform.setCurrentTime(0);
+      iWaveform.setCurrentTime?.(0);
+      vWaveform.setCurrentTime?.(0);
     }
 
-    // Start playing both
     setPlayingBoth({
       id: pairId,
       instrumental: instrumentalFile,
@@ -77,7 +66,7 @@ export const useAudioPlayback = () => {
       instrumentalWaveform: iWaveform,
       vocalWaveform: vWaveform,
     });
-  }, [playingFile, playingBoth, instrumentalWaveforms, vocalWaveforms]);
+  }, [playingFile, playingBoth, instrumentalWaveforms, rawVocalWaveforms, processedVocalWaveforms]);
 
   const handleInstrumentalWaveformReady = useCallback((filename, waveform) => {
     setInstrumentalWaveforms((prev) => ({
@@ -86,59 +75,57 @@ export const useAudioPlayback = () => {
     }));
   }, []);
 
-  const handleVocalWaveformReady = useCallback((filename, waveform) => {
-    setVocalWaveforms((prev) => ({
+  const handleRawVocalWaveformReady = useCallback((filename, waveform) => {
+    setRawVocalWaveforms((prev) => ({
+      ...prev,
+      [filename]: waveform,
+    }));
+  }, []);
+
+  const handleProcessedVocalWaveformReady = useCallback((filename, waveform) => {
+    setProcessedVocalWaveforms((prev) => ({
       ...prev,
       [filename]: waveform,
     }));
   }, []);
 
   const stopAllAudio = useCallback(() => {
-    // Stop any currently playing file
-    if (playingFile) {
-      setPlayingFile(null);
-    }
-
-    // Stop playing both tracks if active
+    if (playingFile) setPlayingFile(null);
     if (playingBoth) {
       if (instrumentalAudioRef.current) instrumentalAudioRef.current.pause();
       if (vocalAudioRef.current) vocalAudioRef.current.pause();
       setPlayingBoth(null);
     }
 
-    // Stop all waveform players
-    Object.values(instrumentalWaveforms).forEach((waveform) => {
-      if (waveform && typeof waveform.stop === 'function') {
-        waveform.stop();
-      }
-    });
-
-    Object.values(vocalWaveforms).forEach((waveform) => {
-      if (waveform && typeof waveform.stop === 'function') {
-        waveform.stop();
-      }
-    });
-  }, [playingFile, playingBoth, instrumentalWaveforms, vocalWaveforms]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      stopAllAudio();
+    const pauseAll = (waveforms) => {
+      Object.values(waveforms || {}).forEach((w) => {
+        if (w?.pause) w.pause();
+      });
     };
+    pauseAll(instrumentalWaveforms);
+    pauseAll(rawVocalWaveforms);
+    pauseAll(processedVocalWaveforms);
+  }, [playingFile, playingBoth, instrumentalWaveforms, rawVocalWaveforms, processedVocalWaveforms]);
+
+  useEffect(() => {
+    return () => { stopAllAudio(); };
   }, [stopAllAudio]);
 
   return {
     playingFile,
     playingBoth,
     instrumentalWaveforms,
-    vocalWaveforms,
+    rawVocalWaveforms,
+    processedVocalWaveforms,
+    getVocalWaveforms,
     instrumentalAudioRef,
     vocalAudioRef,
     lastSyncTime,
     handlePlayPause,
     handlePlayBoth,
     handleInstrumentalWaveformReady,
-    handleVocalWaveformReady,
+    handleRawVocalWaveformReady,
+    handleProcessedVocalWaveformReady,
     stopAllAudio,
     setPlayingFile,
     setPlayingBoth,

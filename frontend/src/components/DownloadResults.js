@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Box,
   Typography,
@@ -11,9 +11,22 @@ import AudioTrackTable from "./AudioTrackTable";
 import ErrorBoundary from "./ErrorBoundary";
 import { useAudioPlayback } from "../hooks/useAudioPlayback";
 import { useVocalMode } from "../hooks/useVocalMode";
+import { useVolume } from "../contexts/VolumeContext";
 import { downloadFile } from "../utils/audioUtils";
 
-function DownloadResults({ jobStatus, handleReset, volume }) {
+function DownloadResults({ jobStatus, handleReset, volume: volumeProp }) {
+  const { volumeRef } = useVolume();
+  const volume = volumeProp !== undefined ? volumeProp : (volumeRef?.current ?? 1);
+  const jobStatusRef = useRef(jobStatus);
+  useEffect(() => {
+    jobStatusRef.current = jobStatus;
+  }, [jobStatus]);
+
+  const outputFiles = jobStatus?.output_files;
+  const raw_vocals = outputFiles?.raw_vocals ?? [];
+  const processed_vocals = outputFiles?.processed_vocals ?? [];
+  const exportsList = outputFiles?.exports ?? [];
+
   const {
     vocalMode,
     handleVocalModeChange,
@@ -24,24 +37,27 @@ function DownloadResults({ jobStatus, handleReset, volume }) {
     playingFile,
     playingBoth,
     instrumentalWaveforms,
-    vocalWaveforms,
+    rawVocalWaveforms,
+    processedVocalWaveforms,
     handlePlayPause,
     handlePlayBoth,
     handleInstrumentalWaveformReady,
-    handleVocalWaveformReady,
+    handleRawVocalWaveformReady,
+    handleProcessedVocalWaveformReady,
     stopAllAudio,
   } = useAudioPlayback();
 
+  const vocalWaveforms = vocalMode === "processed" ? processedVocalWaveforms : rawVocalWaveforms;
+  const handleVocalWaveformReady = vocalMode === "processed" ? handleProcessedVocalWaveformReady : handleRawVocalWaveformReady;
+
   useEffect(() => {
-    if (jobStatus && jobStatus.output_files) {
-      const { raw_vocals = [], processed_vocals = [] } = jobStatus.output_files;
+    if (jobStatus?.output_files) {
       console.log("Raw vocals:", raw_vocals);
       console.log("Processed vocals:", processed_vocals);
       console.log("Current mode:", vocalMode);
     }
-  }, [jobStatus, vocalMode]);
+  }, [jobStatus, vocalMode, raw_vocals, processed_vocals]);
 
-  
   const handleVocalModeChangeWithCleanup = useCallback(
     (event, newMode) => {
       if (newMode !== null) {
@@ -64,41 +80,39 @@ function DownloadResults({ jobStatus, handleReset, volume }) {
   );
 
   const handleDownloadDataset = useCallback(() => {
-    if (exports.length > 0) {
-      handleDownload("exports", exports[0]);
-    }
-  }, [exports, handleDownload]);
+    const list = jobStatusRef.current?.output_files?.exports ?? [];
+    if (list.length > 0) handleDownload("exports", list[0]);
+  }, [handleDownload]);
 
+  const rawKey = JSON.stringify(raw_vocals);
+  const processedKey = JSON.stringify(processed_vocals);
 
   const instrumentals = useMemo(
     () =>
-      raw_vocals
+      (raw_vocals || [])
         .filter((file) => file.includes("_vocals"))
         .map((file) => file.replace("_vocals", "_instrumental")),
-    [raw_vocals]
+    [rawKey]
   );
 
   const vocalsToShow = useMemo(
-    () => (vocalMode === "processed" ? processed_vocals : raw_vocals),
-    [processed_vocals, raw_vocals, vocalMode]
+    () => [...(vocalMode === "processed" ? processed_vocals : raw_vocals)],
+    [processedKey, rawKey, vocalMode]
   );
 
   const trackPairs = useMemo(() => {
     const pairs = [];
     const maxLength = Math.max(instrumentals.length, vocalsToShow.length);
-
     for (let i = 0; i < maxLength; i += 1) {
       pairs.push({
         instrumental: instrumentals[i] || null,
         vocal: vocalsToShow[i] || null,
       });
     }
-
     return pairs;
   }, [instrumentals, vocalsToShow]);
 
-
-  if (!jobStatus || !jobStatus.output_files) {
+  if (!jobStatus || !outputFiles) {
     return (
       <Box sx={{ textAlign: "center", py: 4 }}>
         <Typography variant="h6" gutterBottom>
@@ -116,17 +130,12 @@ function DownloadResults({ jobStatus, handleReset, volume }) {
     );
   }
 
-
-
-  // Calculate elapsed time for the entire process
   const totalTime = Math.floor(jobStatus.completed_at - jobStatus.started_at);
   const minutes = Math.floor(totalTime / 60);
   const seconds = totalTime % 60;
 
-  const { raw_vocals = [], processed_vocals = [], exports = [] } = jobStatus.output_files;
 
- 
- 
+
   return (
     <Box>
       <Box
@@ -156,26 +165,26 @@ function DownloadResults({ jobStatus, handleReset, volume }) {
         <Grid item xs={12}>
           <ErrorBoundary>
             <AudioTrackTable
-            trackPairs={trackPairs}
-            vocalMode={vocalMode}
-            handleVocalModeChange={handleVocalModeChangeWithCleanup}
-            handlePlayPause={handlePlayPause}
-            handleDownload={handleDownload}
-            handlePlayBoth={handlePlayBoth}
-            handleInstrumentalWaveformReady={handleInstrumentalWaveformReady}
-            handleVocalWaveformReady={handleVocalWaveformReady}
-            playingFile={playingFile}
-            playingBoth={playingBoth}
-            instrumentalWaveforms={instrumentalWaveforms}
-            vocalWaveforms={vocalWaveforms}
-            showVocalToggle={true}
-            enablePlayBoth={true}
-            vocalsFileType={vocalsFileType}
-            showDatasetButton={true}
-            handleDownloadDataset={handleDownloadDataset}
-            hasExports={exports.length > 0}
-            volume={volume}
-          />
+              trackPairs={trackPairs}
+              vocalMode={vocalMode}
+              handleVocalModeChange={handleVocalModeChangeWithCleanup}
+              handlePlayPause={handlePlayPause}
+              handleDownload={handleDownload}
+              handlePlayBoth={handlePlayBoth}
+              handleInstrumentalWaveformReady={handleInstrumentalWaveformReady}
+              handleVocalWaveformReady={handleVocalWaveformReady}
+              playingFile={playingFile}
+              playingBoth={playingBoth}
+              instrumentalWaveforms={instrumentalWaveforms}
+              vocalWaveforms={vocalWaveforms}
+              showVocalToggle={true}
+              enablePlayBoth={true}
+              vocalsFileType={vocalsFileType}
+              showDatasetButton={true}
+              handleDownloadDataset={handleDownloadDataset}
+              hasExports={exportsList.length > 0}
+              volume={volume}
+            />
           </ErrorBoundary>
         </Grid>
       </Grid>

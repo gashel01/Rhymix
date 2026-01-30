@@ -28,6 +28,8 @@ const AudioTrackRow = (props) => {
     handlePlayBothModified,
     handleDownload,
     handleDownloadFullSong,
+    handleInstrumentalWaveformReady,
+    handleVocalWaveformReady,
     playingBoth,
     status = "completed",
     style,
@@ -106,15 +108,19 @@ const AudioTrackRow = (props) => {
   // Sync vocal position with instrumental when vocal ready
   const handleVocalReady = useCallback((wf) => {
     vwRef.current = wf;
+    const key = getFileNameFromPath(vocalPath) || vocalPath;
+    handleVocalWaveformReady?.(key, wf);
     if (iwRef.current?.getCurrentTime) {
       const instTime = iwRef.current.getCurrentTime();
       if (instTime > 0 && wf?.setCurrentTime) wf.setCurrentTime(instTime);
     }
-  }, []);
+  }, [vocalPath, handleVocalWaveformReady]);
 
   const handleInstReady = useCallback((wf) => {
     iwRef.current = wf;
-  }, []);
+    const key = getFileNameFromPath(instPath) || instPath;
+    handleInstrumentalWaveformReady?.(key, wf);
+  }, [instPath, handleInstrumentalWaveformReady]);
 
   // ---------- UI bits ----------
   const SpinnerBar = ({ color = "#1976d2" }) => (
@@ -220,25 +226,33 @@ const AudioTrackRow = (props) => {
     if (status === "failed") return <FailedCell />;
     if (!path) return <FailedCell />;
 
+    // Deterministic URLs only – no pair.instrumentalUrl/vocalUrl fallback (avoids instrumental remount on vocal mode change)
     const url =
       type === "inst"
         ? pair?.instrumentalUrl || `/api/download/instrumental/${path}`
         : pair?.vocalUrl || `/api/download/${vocalsFileType}/${path}`;
 
+    // Instrumental key: file identity only (never changes with vocal mode). Vocal key: file + variant (remounts only vocal).
+    const stableKey =
+      type === "inst"
+        ? `inst:${getFileNameFromPath(path)}`
+        : `vocal:${vocalsFileType}:${getFileNameFromPath(path)}`;
+
     return (
       <WaveformCell
-        key={url} // Key based on URL so instrumental doesn't reload when vocal mode changes
+        key={stableKey}
         url={url}
         isPlaying={isPlaying}
         isMuted={isMuted}
         volume={volume}
-        waveColor={ t.waveColor }
+        waveColor={t.waveColor}
         progressColor={color}
         onPlayPause={type === "inst" ? handleInstrumentalPlayPause : handleVocalPlayPause}
         onDownload={type === "inst" ? handleInstrumentalDownload : handleVocalDownload}
         onReady={type === "inst" ? handleInstReady : handleVocalReady}
         onSeek={onSeek}
         badgeText={type === "vocal" ? vocalMode : null}
+        otherWaveform={type === "vocal" ? iwRef.current : undefined}
       />
     );
   };
@@ -250,20 +264,20 @@ const AudioTrackRow = (props) => {
 
       {/* Waveforms + controls + bare checkbox */}
       <td style={{ borderBottom: `1px solid ${t.hairline}`, padding: "5px 10px 10px 10px", position: "relative" }}>
-          {/* Name */}
-          <div style={{  display:"flex", width:"100%",  alignItems: "center",  justifyContent:"space-between"}}>
-            <TextOverflow
-              text={displayName}
-              style={{ fontWeight: 700, letterSpacing: -0.2, color: t.text, display: "flex", alignItems: "center" }}
-            />
-            {modelUsed && <Pill>{modelUsed}</Pill>}
-          </div>
+        {/* Name */}
+        <div style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between" }}>
+          <TextOverflow
+            text={displayName}
+            style={{ fontWeight: 700, letterSpacing: -0.2, color: t.text, display: "flex", alignItems: "center" }}
+          />
+          {modelUsed && <Pill>{modelUsed}</Pill>}
+        </div>
 
         <div >
-          <div className="atr-grid" style={{ marginTop:"10px" }}>
-           
-          <div className="atr-inst" style={{  padding: "5px 0px" }}>
-             
+          <div className="atr-grid" style={{ marginTop: "10px" }}>
+
+            <div className="atr-inst" style={{ padding: "5px 0px" }}>
+
             </div>
 
             {/* Instrumental */}
@@ -303,32 +317,32 @@ const AudioTrackRow = (props) => {
                 "#1976d2",
                 handleVocalSeek
               )}
-             
+
             </div>
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-            <input
-            type="checkbox"
-            checked={!!isSelected}
-            onChange={(e) => onRowSelect?.(pair.id, e.target.checked)}
-            title={isSelected ? "Deselect row" : "Select row"}
-            style={{
-              
-             
-             
-              width: 16,
-              height: 16,
-              accentColor: t.primary,
-              cursor: "pointer",
-              background: "transparent",
-              border: "none",
-              outline: "none",
-            }}
-          />
-          </div>
+              <input
+                type="checkbox"
+                checked={!!isSelected}
+                onChange={(e) => onRowSelect?.(pair.id, e.target.checked)}
+                title={isSelected ? "Deselect row" : "Select row"}
+                style={{
+
+
+
+                  width: 16,
+                  height: 16,
+                  accentColor: t.primary,
+                  cursor: "pointer",
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                }}
+              />
+            </div>
 
           </div>
           {/* Bare checkbox (no container styling) */}
-          
+
         </div>
       </td>
     </tr>
@@ -350,6 +364,8 @@ const areEqual = (prev, next) =>
   prev.modelUsed === next.modelUsed &&
   prev.handlePlayPauseModified === next.handlePlayPauseModified &&
   prev.handlePlayBothModified === next.handlePlayBothModified &&
+  prev.handleInstrumentalWaveformReady === next.handleInstrumentalWaveformReady &&
+  prev.handleVocalWaveformReady === next.handleVocalWaveformReady &&
   prev.handleDownload === next.handleDownload &&
   prev.handleDownloadFullSong === next.handleDownloadFullSong &&
   prev.playingBoth === next.playingBoth &&

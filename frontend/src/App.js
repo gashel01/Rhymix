@@ -258,6 +258,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [showHomeView, setShowHomeView] = useState(true);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [createDatasetModalOpen, setCreateDatasetModalOpen] = useState(false);
   const [currentView, setCurrentView] = useState("home");
   const [selectedVocalsForTraining, setSelectedVocalsForTraining] =
     useState(null);
@@ -464,7 +465,8 @@ function App() {
     }
 
     if (activeStep === 0) {
-      setConfirmDialogOpen(true);
+      // setConfirmDialogOpen(true);
+      handleProcessFiles();
     } else {
       setActiveStep(activeStep + 1);
     }
@@ -496,6 +498,7 @@ function App() {
     setActiveStep(0);
     setCurrentView("home");
     setShowHomeView(true);
+    setCreateDatasetModalOpen(false);
   };
 
   const handleTrainWithDataset = useCallback((selectedVocals) => {
@@ -532,9 +535,7 @@ function App() {
     setCurrentView("talking-workflow");
   }, []);
 
-  const handleCreateSingingDataset = useCallback(() => {
-    handleNavigation("datasets");
-  }, [handleNavigation]);
+  const onOpenCreateDataset = useCallback(() => setCreateDatasetModalOpen(true), []);
 
   
   const navigationItems = [
@@ -564,12 +565,13 @@ function App() {
     },
   ];
 
+
   const renderView = () => {
     switch (currentView) {
       case "home":
         return (
           <HomeView
-            onCreateSingingDataset={handleCreateSingingDataset}
+            onOpenCreateDataset={onOpenCreateDataset}
             handleTrainWithDataset={handleTrainWithDataset}
             onCreateTalkingDataset={handleCreateTalkingDataset}
             onInferenceWithTracks={handleInferenceWithTracks}
@@ -875,6 +877,61 @@ function App() {
                 Yes, Upload and Process
               </Button>
             </DialogActions>
+          </Dialog>
+
+          {/* Create Dataset Modal - rendered in App so HomeView doesn't re-render on jobStatus/polling */}
+          <Dialog
+            open={createDatasetModalOpen}
+            onClose={() => setCreateDatasetModalOpen(false)}
+            maxWidth="md"
+            fullWidth
+            PaperProps={{ sx: { borderRadius: 3 } }}
+          >
+            <DialogTitle sx={{ textAlign: "center", fontWeight: 700 }}>
+              Create Singing Dataset
+            </DialogTitle>
+            <DialogContent>
+              <Paper sx={{ p: 4, borderRadius: 3 }}>
+                <Stepper activeStep={activeStep} sx={{ mb: 6 }}>
+                  {steps.map((label) => (
+                    <Step key={label}>
+                      <StepLabel sx={{ '& .MuiStepLabel-label': { fontSize: '0.9rem', fontWeight: 600 } }}>
+                        {label}
+                      </StepLabel>
+                    </Step>
+                  ))}
+                </Stepper>
+                <Box sx={{ mt: 4, mb: 4 }}>
+                  {activeStep === 0 && (
+                    <FileUpload files={files} setFiles={setFiles} setError={setError} loading={loading} setLoading={setLoading} />
+                  )}
+                  {activeStep === 1 && <ProcessingStatus jobStatus={jobStatus} />}
+                  {activeStep === 2 && (
+                    <DownloadResults jobStatus={jobStatus} handleReset={handleReset} />
+                  )}
+                </Box>
+                <Box sx={{ display: "flex", flexDirection: "row", pt: 4, gap: 2, justifyContent: 'center' }}>
+                  <Button disabled={activeStep === 0 || loading || activeStep === 1} onClick={handleBack} variant="outlined" sx={{ minWidth: 120, borderRadius: 2 }}>
+                    Back
+                  </Button>
+                  <Box sx={{ flex: "1 1 auto" }} />
+                  {activeStep === steps.length - 1 ? (
+                    <Button onClick={handleReset} disabled={loading} variant="contained" sx={{ minWidth: 140, borderRadius: 2 }}>
+                      Start New Process
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleNext}
+                      disabled={loading || (activeStep === 0 && files.length === 0) || (activeStep === 1 && (!jobStatus || jobStatus.status !== "completed"))}
+                      variant="contained"
+                      sx={{ minWidth: 120, borderRadius: 2 }}
+                    >
+                      {loading ? <CircularProgress size={20} /> : "Next"}
+                    </Button>
+                  )}
+                </Box>
+              </Paper>
+            </DialogContent>
           </Dialog>
 
           {/* Legacy Voice Conversion (if needed) */}
