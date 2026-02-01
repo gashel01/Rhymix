@@ -25,7 +25,6 @@ import HomeIcon from "@mui/icons-material/Home";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
 import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
 import FileUpload from "./components/FileUpload";
-import ProcessingStatus from "./components/ProcessingStatus";
 // import DownloadResults from "./components/DownloadResults";
 import HomeView from "./components/HomeView";
 import TrainingView from "./components/TrainingView";
@@ -224,7 +223,7 @@ const createAppTheme = (mode) => createTheme({
   },
 });
 
-const steps = ["Upload Files", "Process Files", "Download Results"];
+const steps = ["Upload Files"];
 
 const globalStylesInputProps = {
   styles: {
@@ -255,6 +254,7 @@ function App() {
   const [jobStatus, setJobStatus] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [optimisticTracks, setOptimisticTracks] = useState([]);
   const [showHomeView, setShowHomeView] = useState(true);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [createDatasetModalOpen, setCreateDatasetModalOpen] = useState(false);
@@ -439,14 +439,60 @@ function App() {
 
   const handleProcessFiles = async () => {
     setLoading(true);
+    const nowIso = new Date().toISOString();
+    const pendingUploads = files.map((file, index) => ({
+      tempId: `upload-${Date.now()}-${index}`,
+      originalName: file.name,
+      displayName: file.name,
+      createdAt: nowIso,
+      processing: {
+        state: "uploading",
+        step: "upload",
+        message: "Uploading...",
+        progress: 0,
+        updatedAt: nowIso,
+      },
+    }));
+    if (pendingUploads.length) {
+      setOptimisticTracks((prev) => [...pendingUploads, ...prev]);
+    }
+    setCreateDatasetModalOpen(false);
     try {
       // Step 1: Upload files
-      await uploadFiles(files);
+      const uploadResponse = await uploadFiles(files);
+      const uploadedRecords = uploadResponse?.files || [];
+      const processingStamp = new Date().toISOString();
+      if (uploadedRecords.length) {
+        setOptimisticTracks((prev) =>
+          prev.map((track) => {
+            const pendingIndex = pendingUploads.findIndex((p) => p.tempId === track.tempId);
+            if (pendingIndex === -1) return track;
+            const record = uploadedRecords[pendingIndex];
+            if (!record) return track;
+            return {
+              ...track,
+              trackId: record.fileId,
+              fileId: record.fileId,
+              originalName: record.originalName || track.originalName,
+              displayName: record.safeDisplayName || record.originalName || track.displayName,
+              createdAt: record.createdAt || track.createdAt,
+              processing: {
+                state: "processing",
+                step: "processing",
+                message: "Starting processing...",
+                progress: 0,
+                updatedAt: processingStamp,
+              },
+            };
+          })
+        );
+      }
 
       // Step 2: Start processing
       const response = await startProcessing(config);
       setJobId(response.job_id);
-      setActiveStep(activeStep + 1);
+      setActiveStep(0);
+      setFiles([]);
     } catch (err) {
       console.error("Error:", err);
       setError(`Failed to process: ${err.message}`);
@@ -461,15 +507,8 @@ function App() {
       return;
     }
 
-    if (activeStep === 1) {
-      return;
-    }
-
     if (activeStep === 0) {
-      // setConfirmDialogOpen(true);
       handleProcessFiles();
-    } else {
-      setActiveStep(activeStep + 1);
     }
   };
 
@@ -500,6 +539,7 @@ function App() {
     setCurrentView("home");
     setShowHomeView(true);
     setCreateDatasetModalOpen(false);
+    setOptimisticTracks([]);
   };
 
   const handleTrainWithDataset = useCallback((selectedVocals) => {
@@ -576,6 +616,8 @@ function App() {
             handleTrainWithDataset={handleTrainWithDataset}
             onCreateTalkingDataset={handleCreateTalkingDataset}
             onInferenceWithTracks={handleInferenceWithTracks}
+            optimisticTracks={optimisticTracks}
+            onOptimisticTracksChange={setOptimisticTracks}
           />
         );
 
@@ -614,10 +656,6 @@ function App() {
                 />
               )}
 
-              {activeStep === 1 && (
-                <ProcessingStatus jobStatus={jobStatus} />
-              )}
-
               {/* {activeStep === 2 && (
                 <DownloadResults
                   jobStatus={jobStatus}
@@ -627,46 +665,23 @@ function App() {
               )} */}
             </Box>
 
-            <Box sx={{
-              display: "flex",
-              flexDirection: "row",
-              pt: 4,
-              gap: 2,
-              justifyContent: 'center'
-            }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "row",
+                pt: 4,
+                gap: 2,
+                justifyContent: "center",
+              }}
+            >
               <Button
-                disabled={activeStep === 0 || loading || activeStep === 1}
-                onClick={handleBack}
-                variant="outlined"
-                sx={{ minWidth: 120, borderRadius: 2 }}
+                onClick={handleNext}
+                disabled={loading || files.length === 0}
+                variant="contained"
+                sx={{ minWidth: 160, borderRadius: 2 }}
               >
-                Back
+                {loading ? <CircularProgress size={20} /> : "Upload & Start"}
               </Button>
-              <Box sx={{ flex: "1 1 auto" }} />
-              {activeStep === steps.length - 1 ? (
-                <Button
-                  onClick={handleReset}
-                  disabled={loading}
-                  variant="contained"
-                  sx={{ minWidth: 140, borderRadius: 2 }}
-                >
-                  Start New Process
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleNext}
-                  disabled={
-                    loading ||
-                    (activeStep === 0 && files.length === 0) ||
-                    (activeStep === 1 &&
-                      (!jobStatus || jobStatus.status !== "completed"))
-                  }
-                  variant="contained"
-                  sx={{ minWidth: 120, borderRadius: 2 }}
-                >
-                  {loading ? <CircularProgress size={20} /> : "Next"}
-                </Button>
-              )}
             </Box>
           </Paper>
         );
@@ -873,30 +888,19 @@ function App() {
                   {activeStep === 0 && (
                     <FileUpload files={files} setFiles={setFiles} setError={setError} loading={loading} setLoading={setLoading} />
                   )}
-                  {activeStep === 1 && <ProcessingStatus jobStatus={jobStatus} />}
                   {/* {activeStep === 2 && (
                     <DownloadResults jobStatus={jobStatus} handleReset={handleReset} />
                   )} */}
                 </Box>
-                <Box sx={{ display: "flex", flexDirection: "row", pt: 4, gap: 2, justifyContent: 'center' }}>
-                  <Button disabled={activeStep === 0 || loading || activeStep === 1} onClick={handleBack} variant="outlined" sx={{ minWidth: 120, borderRadius: 2 }}>
-                    Back
+                <Box sx={{ display: "flex", flexDirection: "row", pt: 4, gap: 2, justifyContent: "center" }}>
+                  <Button
+                    onClick={handleNext}
+                    disabled={loading || files.length === 0}
+                    variant="contained"
+                    sx={{ minWidth: 160, borderRadius: 2 }}
+                  >
+                    {loading ? <CircularProgress size={20} /> : "Upload & Start"}
                   </Button>
-                  <Box sx={{ flex: "1 1 auto" }} />
-                  {activeStep === steps.length - 1 ? (
-                    <Button onClick={handleReset} disabled={loading} variant="contained" sx={{ minWidth: 140, borderRadius: 2 }}>
-                      Start New Process
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleNext}
-                      disabled={loading || (activeStep === 0 && files.length === 0) || (activeStep === 1 && (!jobStatus || jobStatus.status !== "completed"))}
-                      variant="contained"
-                      sx={{ minWidth: 120, borderRadius: 2 }}
-                    >
-                      {loading ? <CircularProgress size={20} /> : "Next"}
-                    </Button>
-                  )}
                 </Box>
               </Paper>
             </DialogContent>

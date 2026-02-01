@@ -68,6 +68,25 @@ sys.path.append(applio_path)
 rvc_path = os.path.join(applio_path, "rvc")
 sys.path.append(rvc_path)
 
+def _extract_hf_model_id(url: str) -> str:
+    if not url:
+        return ""
+    match = re.search(r'huggingface\.co/([^/\s?#]+/[^/\s?#]+)', url)
+    return match.group(1) if match else ""
+
+def _normalize_tag_list(title: str) -> list[str]:
+    tags = []
+    if not title:
+        return tags
+    t = title.lower()
+    if "rmvpe" in t:
+        tags.append("rmvpe")
+    if "v2" in t:
+        tags.append("v2")
+    if "v1" in t and "v2" not in t:
+        tags.append("v1")
+    return tags
+
 # ===============================
 # CENTRALIZED PATH MANAGEMENT
 # ===============================
@@ -329,6 +348,7 @@ logger = logging.getLogger(__name__)
 
 # Store active jobs
 active_jobs = {}
+download_jobs = {}
 
 # Paths are now managed by PathManager (paths object above)
 
@@ -1532,35 +1552,77 @@ def training_status(job_id):
 def available_models():
     try:
         root = Path(paths.APPLIO_MODELS_DIR)
-        if not root.exists(): return jsonify({"models": []})
+        if not root.exists():
+            return jsonify({"models": []})
 
         models = []
         for d in (p for p in root.iterdir() if p.is_dir()):
-            pths = [f for f in d.glob("*.pth") if not f.name.startswith(("D_","G_")) and "e_" in f.name]
-            if not pths: continue
+            pths = [f for f in d.glob("*.pth")]
+            if not pths:
+                continue
+            info_path = d / "model_info.json"
+            info = json.loads(info_path.read_text()) if info_path.exists() else {}
+
+            # split model name to find the correct number of epoch in the string ex: 'Cardi B (RVCv2, RMVPE, 400 Epochs)'
+            
 
             idx = next(d.glob("*.index"), None)
-            info = json.loads((d/"model_info.json").read_text()) if (d/"model_info.json").exists() else {}
+            model_id = info.get("model_id") or info.get("modelId") or d.name
+            model_name = info.get("model_name") or info.get("name") or d.name
+            folder_name = d.name
+            installed_at = info.get("installed_at")
+            info_epochs = info.get("epochs")
+            epochs = None
+            if info_epochs is None or info_epochs == 0:
+                findepoch = info.get("model_name")
 
-            cps = sorted(({
-                "filename": f.name,
-                "epochs": int(m.group(1)) if (m := re.search(r'_(\d+)e_', f.name)) else 0,
-                "isBest": "best" in f.name.lower(),
-                "created": datetime.fromtimestamp(f.stat().st_ctime).isoformat(),
-                "path": str(f.relative_to(root)),
-                "size_mb": round(f.stat().st_size / (1024**2), 2)
-            } for f in pths), key=lambda x: x["epochs"], reverse=True)
+                # make regex safe
+                if not isinstance(findepoch, (str, bytes)):
+                    findepoch = "" if findepoch is None else str(findepoch)
 
+                match = re.search(r'(\d+)\s*Epochs?', findepoch, flags=re.IGNORECASE)
+                epochs = int(match.group(1)) if match else None
+            else:
+                epochs = int(info_epochs)
+
+            
+
+
+            info_rate = info.get("rate")
+
+            def _checkpoint_entry(f: Path) -> dict:
+                epoch, rate = _extract_epoch_rate_from_filename(f.name)
+                logging.info(f"!!!!!!!!!! epoch  rate : {f.name}!!!!!!!!!!!!!!!!!! {epoch}, {rate}")
+                if epoch is None:
+                    epoch = info_epochs or 0
+                if rate is None:
+                    rate = info_rate
+                created_time = installed_at or datetime.fromtimestamp(f.stat().st_ctime).isoformat()
+                return {
+                    "filename": f.name,
+                    "epochs": epochs if epochs is not None else epoch if epoch is not None else 0,
+                    "rate": rate,
+                    "isBest": "best" in f.name.lower(),
+                    "created": created_time,
+                    "path": str(f.relative_to(root)),
+                    "size_mb": round(f.stat().st_size / (1024 ** 2), 2),
+                }
+
+            cps = sorted((_checkpoint_entry(f) for f in pths), key=lambda x: x["epochs"], reverse=True)
+            latest_created = cps[0]["created"] if cps else datetime.now().isoformat()
             size = sum(f.stat().st_size for f in pths) + (idx.stat().st_size if idx else 0)
+
             models.append({
-                "name": d.name,
-                "created": max(cps, key=lambda x: x["created"])["created"],
-                "epochs": cps[0]["epochs"],
-                "size_mb": round(size / (1024**2), 2),
+                "name": folder_name,
+                "modelId": model_id,
+                "created": latest_created,
+                "installed_at": installed_at,
+                "epochs": cps[0]["epochs"] if cps else 0,
+                "size_mb": round(size / (1024 ** 2), 2),
                 "sampleRate": info.get("sample_rate", 48000),
                 "status": "completed",
                 "checkpoints": cps,
-                "indexPath": str(idx.relative_to(root)) if idx else None
+                "indexPath": str(idx.relative_to(root)) if idx else None,
             })
 
         return jsonify({"models": sorted(models, key=lambda x: x["created"], reverse=True)})
@@ -1597,13 +1659,17 @@ from flask import request, jsonify
 
 @app.route('/api/search-online-models')
 def search_online_models():
-    q = request.args.get('query', '')
-    page = request.args.get('page', 1)
-    if not q: return jsonify({"models": [], "total_pages": 1})
+    q = request.args.get("query", "")
+    page = request.args.get("page", 1)
+    if not q:
+        return jsonify({"models": [], "total_pages": 1})
 
     try:
-        raw = requests.post("https://voice-models.com/fetch_data.php",
-                            data={'page': page, 'search': q}, timeout=10).json()
+        raw = requests.post(
+            "https://voice-models.com/fetch_data.php",
+            data={"page": page, "search": q},
+            timeout=10,
+        ).json()
 
         models = []
         html = (raw.get("table") or "").strip()
@@ -1611,20 +1677,29 @@ def search_online_models():
             soup = BeautifulSoup(html, "html.parser")
             for tr in soup.select("tr"):
                 tds = tr.find_all("td")
-                if len(tds) < 2: continue
+                if len(tds) < 2:
+                    continue
                 a = tds[0].find("a", class_="fs-5")
                 b = tds[1].find("button", class_="copy-btn")
-                if not (a and b): continue
+                if not (a and b):
+                    continue
                 title = a.get_text(strip=True)
-                m = re.search(r'(\d+)\s?(?:epochs|epoch|e)\b', title, re.I)
+                model_url = b.get("data-clipboard-text")
+                model_id = _extract_hf_model_id(model_url)
+                author = model_id.split("/")[0] if model_id else None
+                tags = _normalize_tag_list(title)
                 badge = tds[0].find("span", class_="badge")
+                # logging.info(f"!!!!!!!!!!   {re}")
+                m = re.search(r"(\d+)\s?(?:epochs|epoch|e)\b", title, re.I)
+                size_text = badge.get_text(strip=True).replace(" MB", "") if badge else None
                 models.append({
                     "name": title,
-                    "url": b.get("data-clipboard-text"),
+                    "url": model_url,
+                    "modelId": model_id,
+                    "author": author,
+                    "tags": tags,
                     "epochs": int(m.group(1)) if m else None,
-                    "size_mb": badge.get_text(strip=True).replace(" MB", "") if badge else None,
-                    "is_rmvpe": "rmvpe" in title.lower(),
-                    "is_v2": "v2" in title.lower()
+                    "size_mb": size_text,
                 })
 
         total_pages = 1
@@ -1632,8 +1707,9 @@ def search_online_models():
         if pg:
             last = BeautifulSoup(pg, "html.parser").find("li", class_="last")
             onclick = last.find("a").get("onclick") if last and last.find("a") else ""
-            m = re.search(r'\((\d+)', onclick)
-            if m: total_pages = int(m.group(1))
+            m = re.search(r"\((\d+)", onclick)
+            if m:
+                total_pages = int(m.group(1))
 
         return jsonify({"models": models, "total_pages": total_pages, "current_page": int(page)})
 
@@ -1641,327 +1717,300 @@ def search_online_models():
         return jsonify({"error": str(e), "models": []}), 500
 
 
+def _safe_model_dir_name(user_query: str, model_name: str, model_id: str) -> str:
+    base = user_query or model_name or model_id or "downloaded_model"
+    base = base.replace("/", "_")
+    safe = secure_filename(base)
+    return safe or "downloaded_model"
+
+
+def _is_ignored_path(path: Path) -> bool:
+    for part in path.parts:
+        if part.startswith(".") or part == "__MACOSX":
+            return True
+    return False
+
+
+def _find_model_artifacts(root: Path) -> tuple[list[Path], list[Path]]:
+    pths = [p for p in root.rglob("*.pth") if p.is_file() and not _is_ignored_path(p)]
+    indexes = [p for p in root.rglob("*.index") if p.is_file() and not _is_ignored_path(p)]
+    return pths, indexes
+
+
+def _select_best_pth(pths: list[Path]) -> Path | None:
+    if not pths:
+        return None
+
+    def score(p: Path) -> tuple[int, int]:
+        name = p.stem.lower()
+        pattern = bool(re.search(r'(?:^|[_-])(g|final|best|latest)(?:[_-]|$)', name))
+        return (1 if pattern else 0, p.stat().st_size)
+
+    return max(pths, key=score)
+
+
+def _select_index(indexes: list[Path], pth: Path | None) -> Path | None:
+    if not indexes:
+        return None
+    if pth:
+        base = pth.stem.lower()
+        for idx in indexes:
+            if idx.stem.lower() == base:
+                return idx
+    return indexes[0]
+
+
+def _copy_metadata_files(root: Path, dest_dir: Path) -> None:
+    exts = {".json", ".txt", ".md", ".yaml", ".yml"}
+    for f in root.rglob("*"):
+        if not f.is_file() or _is_ignored_path(f):
+            continue
+        if f.suffix.lower() not in exts:
+            continue
+        target = dest_dir / f.name
+        if target.exists():
+            continue
+        try:
+            shutil.copy2(f, target)
+        except Exception:
+            pass
+
+
+def _download_file(url: str, dest_path: Path) -> None:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    response = requests.get(url, headers=headers, stream=True, timeout=60)
+    response.raise_for_status()
+    with open(dest_path, "wb") as handle:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                handle.write(chunk)
+
+
+def _extract_epoch_rate_from_filename(filename: str) -> tuple[int | None, int | None]:
+    logging.info(f"!!!!!!!!!! filename !!!!!!!!!!!!!!!!!! {filename}")
+
+    stem = Path(filename).stem
+    epoch: int | None = None
+    rate: int | None = None
+
+    # --- epoch patterns ---
+    # matches: "..._12e_..." or "..._12e" (end)
+    m = re.search(r'_(\d+)e(?=_|$)', stem, re.IGNORECASE)
+    if m:
+        epoch = int(m.group(1))
+    else:
+        # matches: "..._e260_..." like "em-tes_e260_s7020"
+        m2 = re.search(r'_e(\d+)(?=_|$)', stem, re.IGNORECASE)
+        if m2:
+            epoch = int(m2.group(1))
+
+    # --- rate patterns ---
+    # matches: "..._48200", "..._48200s", "..._48200hz", "..._48k"
+    rm = re.search(r'_(\d+)(s|hz|k)?$', stem, re.IGNORECASE)
+    if rm:
+        value = int(rm.group(1))
+        unit = rm.group(2)
+        rate = value * 1000 if unit and unit.lower() == "k" else value
+
+    logging.info(f"!!!!!!!!!! epoch/rate parsed !!!!!!!!!!!!!!!!!! epoch={epoch}, rate={rate} (stem={stem!r})")
+    return epoch, rate
+
+
+def _install_model_files(model_dir: Path, pth: Path, index_path: Path | None, model_info: dict, metadata_root: Path | None) -> dict:
+    model_dir.mkdir(parents=True, exist_ok=True)
+    for existing in model_dir.glob("*.pth"):
+        existing.unlink(missing_ok=True)
+    for existing in model_dir.glob("*.index"):
+        existing.unlink(missing_ok=True)
+
+    dest_pth = model_dir / "model.pth"
+    shutil.copy2(pth, dest_pth)
+
+    dest_index = None
+    if index_path:
+        dest_index = model_dir / "model.index"
+        shutil.copy2(index_path, dest_index)
+
+    if metadata_root:
+        _copy_metadata_files(metadata_root, model_dir)
+
+    info_path = model_dir / "model_info.json"
+    with info_path.open("w", encoding="utf-8") as handle:
+        json.dump(model_info, handle, indent=2, sort_keys=True)
+
+    size_bytes = dest_pth.stat().st_size + (dest_index.stat().st_size if dest_index else 0)
+    return {
+        "model_dir": model_dir,
+        "pth": dest_pth,
+        "index": dest_index,
+        "size_mb": round(size_bytes / (1024 ** 2), 2),
+    }
+
+
+def _download_and_install_model(payload: dict) -> dict:
+    model_url = payload.get("model_url") or ""
+    model_name = payload.get("model_name") or ""
+    user_query = payload.get("user_query") or ""
+    files_info = payload.get("files_info") or {}
+    model_id = payload.get("model_id") or _extract_hf_model_id(model_url)
+    dir_name = payload.get("dir_name") or _safe_model_dir_name(user_query, model_name, model_id)
+
+    model_dir = paths.APPLIO_MODELS_DIR / dir_name
+    if model_dir.exists() and any(model_dir.glob("*.pth")):
+        raise Exception(f"Model '{dir_name}' already exists")
+
+    temp_root = Path(tempfile.mkdtemp(prefix="model_download_"))
+    extracted_root = None
+    pths: list[Path] = []
+    indexes: list[Path] = []
+    source_url = model_url or ""
+
+    try:
+        if files_info.get("zip") and model_id:
+            zip_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['zip']}"
+            zip_path = temp_root / "model.zip"
+            _download_file(zip_url, zip_path)
+            extracted_root = temp_root / "extracted"
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(extracted_root)
+            pths, indexes = _find_model_artifacts(extracted_root)
+            source_url = zip_url
+        elif (files_info.get("pth") or files_info.get("index")) and model_id:
+            if files_info.get("pth"):
+                pth_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['pth']}"
+                pth_path = temp_root / Path(files_info['pth']).name
+                _download_file(pth_url, pth_path)
+                pths = [pth_path]
+                source_url = pth_url
+            if files_info.get("index"):
+                index_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['index']}"
+                index_path = temp_root / Path(files_info['index']).name
+                _download_file(index_url, index_path)
+                indexes = [index_path]
+        elif model_url.lower().endswith(".zip"):
+            zip_path = temp_root / "model.zip"
+            _download_file(model_url, zip_path)
+            extracted_root = temp_root / "extracted"
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(extracted_root)
+            pths, indexes = _find_model_artifacts(extracted_root)
+        elif model_url.lower().endswith(".pth"):
+            filename = Path(urllib.parse.urlparse(model_url).path).name or "model.pth"
+            pth_path = temp_root / filename
+            _download_file(model_url, pth_path)
+            pths = [pth_path]
+            source_url = model_url
+        elif model_url.lower().endswith(".index"):
+            filename = Path(urllib.parse.urlparse(model_url).path).name or "model.index"
+            index_path = temp_root / filename
+            _download_file(model_url, index_path)
+            indexes = [index_path]
+        else:
+            raise Exception("Unable to determine how to download the model")
+
+        selected_pth = _select_best_pth(pths)
+        if not selected_pth:
+            raise Exception("No .pth file found")
+        selected_index = _select_index(indexes, selected_pth)
+
+        epochs, rate = _extract_epoch_rate_from_filename(selected_pth.name)
+        model_info = {
+            "model_id": model_id or dir_name,
+            "model_name": model_name or dir_name,
+            "source_url": source_url,
+            "installed_at": datetime.now().isoformat(),
+            "original_pth": selected_pth.name,
+            "original_index": selected_index.name if selected_index else None,
+            "epochs": epochs,
+            "rate": rate,
+        }
+
+        install_result = _install_model_files(
+            model_dir=model_dir,
+            pth=selected_pth,
+            index_path=selected_index,
+            model_info=model_info,
+            metadata_root=extracted_root or temp_root,
+        )
+        install_result.update({
+            "model_id": model_info["model_id"],
+            "model_name": model_info["model_name"],
+            "dir_name": dir_name,
+        })
+        return install_result
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+
 @app.route('/api/download-model', methods=['POST'])
 def download_model():
-    """Download an RVC model from Hugging Face - ensures both .pth and .index files are present"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "No data provided"}), 400
-        
-        model_url = data.get('url')
-        model_name = data.get('modelName', 'downloaded_model')
-        model_id = data.get('modelId', '')
-        files_info = data.get('files', {})
-        user_query = data.get('userQuery', '')  # User's search query for filename
-        
-        if not model_url:
-            return jsonify({"error": "No URL provided"}), 400
-        
-        # Use user query as base filename, fallback to model name
-        # Clean and sanitize the query for use as filename
-        if user_query:
-            base_name = re.sub(r'[^a-zA-Z0-9\s]', '', user_query)
-            base_name = re.sub(r'\s+', '', base_name)  # Remove spaces
-        else:
-            # Fallback to model name if no query
-            base_name = re.sub(r'[^a-zA-Z0-9\s]', '', model_name)
-            base_name = re.sub(r'\s+', '', base_name)
-        
-        if not base_name:
-            base_name = "downloaded_model"
-        
-        # Secure the model name for directory
-        secure_name = secure_filename(base_name)
-        if not secure_name:
-            secure_name = "downloaded_model"
-        
-        # Create model directory
-        model_dir = paths.APPLIO_MODELS_DIR / secure_name
-        model_dir.mkdir(parents=True, exist_ok=True)
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        downloaded_files = []
-        
-        # If we have a zip file, download and extract it
-        if files_info.get('zip'):
-            zip_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['zip']}"
-            zip_filename = f"{secure_name}.zip"
-            zip_path = model_dir / zip_filename
-            
-            logging.info(f"Downloading zip file from {zip_url}")
-            response = requests.get(zip_url, headers=headers, stream=True, timeout=60)
-            response.raise_for_status()
-            
-            with open(zip_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            
-            # Extract zip file
-            try:
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(model_dir)
-                # Remove zip file after extraction
-                zip_path.unlink()
-                downloaded_files.append("zip (extracted)")
-                
-                # Verify .pth and .index files exist after extraction
-                pth_files = list(model_dir.glob("*.pth"))
-                index_files = list(model_dir.glob("*.index"))
-                
-                if not pth_files:
-                    return jsonify({"error": "Model zip file does not contain a .pth file"}), 400
-                if not index_files:
-                    return jsonify({"error": "Model zip file does not contain an .index file"}), 400
-                
-                # Rename files according to naming convention
-                # .pth file: extract epochs and rate, rename to {userQuery}_{epochs}e_{rate}.pth
-                # .index file: rename to {userQuery}.index
-                # Defaults: epoch=666, rate=48200 if not found
-                
-                # Process .pth file
-                pth_file = pth_files[0]  # Use first .pth file found
-                pth_original_name = pth_file.stem  # Name without extension
-                
-                # Try to extract epochs and rate from filename
-                # Pattern: modelname_500e_48200s.pth or modelname_500e_48200.pth or similar
-                epochs_match = re.search(r'_(\d+)e', pth_original_name, re.IGNORECASE)
-                rate_match = re.search(r'_(\d+)(?:s|\.)', pth_original_name, re.IGNORECASE)
-                
-                # Extract epoch and rate, use defaults if not found
-                epochs = int(epochs_match.group(1)) if epochs_match else 666
-                rate = int(rate_match.group(1)) if rate_match else 48200
-                
-                # Build new .pth filename: {userQuery}_{epochs}e_{rate}.pth
-                new_pth_name = f"{secure_name}_{epochs}e_{rate}.pth"
-                
-                new_pth_path = model_dir / new_pth_name
-                if pth_file.name != new_pth_name:
-                    pth_file.rename(new_pth_path)
-                    logging.info(f"Renamed .pth file from {pth_file.name} to {new_pth_name} (epochs: {epochs}, rate: {rate})")
-                    pth_files = [new_pth_path]
-                
-                # Process .index file - rename to {userQuery}.index
-                index_file = index_files[0]  # Use first .index file found
-                expected_index_name = f"{secure_name}.index"
-                new_index_path = model_dir / expected_index_name
-                if index_file.name != expected_index_name:
-                    index_file.rename(new_index_path)
-                    logging.info(f"Renamed index file from {index_file.name} to {expected_index_name}")
-                    index_files = [new_index_path]
-                    
-            except zipfile.BadZipFile:
-                return jsonify({"error": "Downloaded file is not a valid zip file"}), 400
-        
-        # If we have individual .pth and .index files, download them separately
-        elif files_info.get('pth') or files_info.get('index'):
-            # Download .pth file
-            if files_info.get('pth'):
-                pth_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['pth']}"
-                # Extract original filename from path (may include epochs/steps like "edSheeran_500e_48200s.pth")
-                original_pth_filename = files_info['pth'].split('/')[-1]
-                
-                # Check if the filename already contains the base name
-                # If it does, keep it as is; otherwise, prepend base name
-                if secure_name.lower() in original_pth_filename.lower():
-                    pth_filename = original_pth_filename
-                else:
-                    # Extract base from original filename (remove extension and any suffix)
-                    # Example: "model_500e_48200s.pth" -> "model_500e_48200s.pth" (keep as is)
-                    pth_filename = original_pth_filename
-                
-                pth_path = model_dir / pth_filename
-                
-                logging.info(f"Downloading .pth file from {pth_url}")
-                response = requests.get(pth_url, headers=headers, stream=True, timeout=60)
-                response.raise_for_status()
-                
-                with open(pth_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                
-                downloaded_files.append(f".pth ({pth_filename})")
-            
-            # Download .index file
-            if files_info.get('index'):
-                index_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['index']}"
-                # .index file should use base name only (following naming convention: baseName.index)
-                # Example: "edSheeran.index" not "edSheeran_500e_48200s.index"
-                index_filename = f"{secure_name}.index"
-                index_path = model_dir / index_filename
-                
-                logging.info(f"Downloading .index file from {index_url}")
-                response = requests.get(index_url, headers=headers, stream=True, timeout=60)
-                response.raise_for_status()
-                
-                with open(index_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                
-                downloaded_files.append(f".index ({index_filename})")
-            
-            # Verify both files exist
-            pth_files = list(model_dir.glob("*.pth"))
-            index_files = list(model_dir.glob("*.index"))
-            
-            if not pth_files:
-                return jsonify({"error": "Failed to download .pth file"}), 400
-            if not index_files:
-                return jsonify({"error": "Failed to download .index file"}), 400
-            
-            # Rename files according to naming convention (same as zip extraction)
-            final_pth = pth_files[0]
-            final_index = index_files[0]
-            
-            # Extract epoch and rate from .pth filename if present
-            # Use defaults: epoch=666, rate=48200 if not found
-            epochs_match = re.search(r'_(\d+)e', final_pth.stem, re.IGNORECASE)
-            rate_match = re.search(r'_(\d+)(?:s|\.)', final_pth.stem, re.IGNORECASE)
-            
-            epochs = int(epochs_match.group(1)) if epochs_match else 666
-            rate = int(rate_match.group(1)) if rate_match else 48200
-            
-            # Rename .pth: {userQuery}_{epochs}e_{rate}.pth
-            new_pth_name = f"{secure_name}_{epochs}e_{rate}.pth"
-            
-            new_pth_path = model_dir / new_pth_name
-            if final_pth.name != new_pth_name:
-                final_pth.rename(new_pth_path)
-                logging.info(f"Renamed .pth file from {final_pth.name} to {new_pth_name} (epochs: {epochs}, rate: {rate})")
-                pth_files = [new_pth_path]
-            
-            # Rename .index to {modelName}.index
-            expected_index_name = f"{secure_name}.index"
-            new_index_path = model_dir / expected_index_name
-            if final_index.name != expected_index_name:
-                final_index.rename(new_index_path)
-                index_files = [new_index_path]
-        
-        else:
-            # Fallback: try to download from URL directly
-            logging.info(f"Downloading from URL: {model_url}")
-            response = requests.get(model_url, headers=headers, stream=True, timeout=60)
-            response.raise_for_status()
-            
-            # Try to determine file type from URL or Content-Type
-            content_type = response.headers.get('Content-Type', '')
-            if 'application/zip' in content_type or model_url.endswith('.zip'):
-                zip_filename = f"{secure_name}.zip"
-                zip_path = model_dir / zip_filename
-                
-                with open(zip_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                
-                # Extract if it's a zip
-                try:
-                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                        zip_ref.extractall(model_dir)
-                    # Remove zip file after extraction
-                    zip_path.unlink()
-                    downloaded_files.append("zip (extracted)")
-                    
-                    # Verify and rename files according to naming convention
-                    pth_files = list(model_dir.glob("*.pth"))
-                    index_files = list(model_dir.glob("*.index"))
-                    
-                    if not pth_files:
-                        return jsonify({"error": "Model zip file does not contain a .pth file"}), 400
-                    if not index_files:
-                        return jsonify({"error": "Model zip file does not contain an .index file"}), 400
-                    
-                    # Rename files (same logic as above)
-                    pth_file = pth_files[0]
-                    pth_original_name = pth_file.stem
-                    
-                    # Extract epoch and rate, use defaults if not found
-                    epochs_match = re.search(r'_(\d+)e', pth_original_name, re.IGNORECASE)
-                    rate_match = re.search(r'_(\d+)(?:s|\.)', pth_original_name, re.IGNORECASE)
-                    
-                    epochs = int(epochs_match.group(1)) if epochs_match else 666
-                    rate = int(rate_match.group(1)) if rate_match else 48200
-                    
-                    # Rename .pth: {userQuery}_{epochs}e_{rate}.pth
-                    new_pth_name = f"{secure_name}_{epochs}e_{rate}.pth"
-                    
-                    new_pth_path = model_dir / new_pth_name
-                    if pth_file.name != new_pth_name:
-                        pth_file.rename(new_pth_path)
-                        logging.info(f"Renamed .pth file from {pth_file.name} to {new_pth_name} (epochs: {epochs}, rate: {rate})")
-                        pth_files = [new_pth_path]
-                    
-                    index_file = index_files[0]
-                    expected_index_name = f"{secure_name}.index"
-                    new_index_path = model_dir / expected_index_name
-                    if index_file.name != expected_index_name:
-                        index_file.rename(new_index_path)
-                        logging.info(f"Renamed index file from {index_file.name} to {expected_index_name}")
-                        index_files = [new_index_path]
-                        
-                except zipfile.BadZipFile:
-                    return jsonify({"error": "Downloaded file is not a valid zip file"}), 400
-            else:
-                # Try to get filename from URL
-                filename = model_url.split('/')[-1].split('?')[0]
-                if not filename or '.' not in filename:
-                    return jsonify({"error": "Could not determine file type from URL"}), 400
-                
-                file_path = model_dir / filename
-                with open(file_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                downloaded_files.append(filename)
-        
-        # Final verification: check that we have both .pth and .index files
-        pth_files = list(model_dir.glob("*.pth"))
-        index_files = list(model_dir.glob("*.index"))
-        
-        if not pth_files:
-            return jsonify({"error": "Model folder does not contain a .pth file. RVC models require both .pth and .index files."}), 400
-        if not index_files:
-            return jsonify({"error": "Model folder does not contain an .index file. RVC models require both .pth and .index files."}), 400
-        
-        # Extract epoch and size information from final files
-        final_pth = pth_files[0]
-        final_index = index_files[0]
-        
-        # Extract epoch and rate from .pth filename (e.g., "eminem_500e_48200.pth" -> 500, 48200)
-        epochs_match = re.search(r'_(\d+)e', final_pth.stem, re.IGNORECASE)
-        rate_match = re.search(r'_(\d+)(?:s|\.)', final_pth.stem, re.IGNORECASE)
-        
-        epochs = int(epochs_match.group(1)) if epochs_match else None
-        rate = int(rate_match.group(1)) if rate_match else None
-        
-        # Calculate total size in MB
-        total_size = final_pth.stat().st_size + final_index.stat().st_size
-        size_mb = round(total_size / (1024 * 1024), 2)
-        
-        logging.info(f"Successfully downloaded RVC model to {model_dir}")
-        logging.info(f"  - .pth file: {final_pth.name} ({epochs} epochs)" if epochs else f"  - .pth file: {final_pth.name}")
-        logging.info(f"  - .index file: {final_index.name}")
-        logging.info(f"  - Total size: {size_mb} MB")
-        
-        return jsonify({
-            "message": f"RVC model downloaded successfully",
-            "modelName": secure_name,
-            "path": str(model_dir.relative_to(paths.APPLIO_MODELS_DIR)),
-            "files": {
-                "pth": [f.name for f in pth_files],
-                "index": [f.name for f in index_files]
-            },
-            "epochs": epochs,
-            "size": size_mb
-        })
-        
-    except requests.RequestException as e:
-        logging.error(f"Error downloading model: {e}")
-        return jsonify({"error": f"Failed to download model: {str(e)}"}), 500
-    except Exception as e:
-        logging.error(f"Error downloading model: {e}")
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    data = request.get_json() or {}
+    model_url = data.get("url", "")
+    model_name = data.get("modelName", "")
+    model_id = data.get("modelId", "")
+    files_info = data.get("files") or {}
+    user_query = data.get("userQuery", "")
+
+    resolved_id = model_id or _extract_hf_model_id(model_url) or ""
+    resolved_name = model_name or resolved_id or "downloaded_model"
+    dir_name = _safe_model_dir_name(user_query, resolved_name, resolved_id)
+
+    job_id = uuid.uuid4().hex
+    download_jobs[job_id] = {
+        "jobId": job_id,
+        "modelId": resolved_id or dir_name,
+        "modelName": resolved_name,
+        "status": "downloading",
+        "progress": 0,
+        "started_at": datetime.now().isoformat(),
+        "error": None,
+    }
+
+    payload = {
+        "model_url": model_url,
+        "model_name": resolved_name,
+        "model_id": resolved_id,
+        "user_query": user_query,
+        "files_info": files_info,
+        "dir_name": dir_name,
+    }
+
+    def _runner(job_id_inner, payload_inner):
+        try:
+            result = _download_and_install_model(payload_inner)
+            download_jobs[job_id_inner].update({
+                "status": "completed",
+                "progress": 100,
+                "completed_at": datetime.now().isoformat(),
+                "modelId": result.get("model_id") or payload_inner.get("model_id") or dir_name,
+                "modelName": result.get("model_name") or resolved_name,
+                "dirName": result.get("dir_name"),
+                "size_mb": result.get("size_mb"),
+            })
+        except Exception as exc:
+            download_jobs[job_id_inner].update({
+                "status": "failed",
+                "error": str(exc),
+                "completed_at": datetime.now().isoformat(),
+            })
+
+    threading.Thread(target=_runner, args=(job_id, payload), daemon=True).start()
+
+    return jsonify({
+        "jobId": job_id,
+        "modelId": resolved_id or dir_name,
+        "modelName": resolved_name,
+        "status": "downloading",
+        "started_at": download_jobs[job_id]["started_at"],
+    })
+
+@app.route('/api/models/download/status/<job_id>')
+def download_model_status(job_id):
+    job = download_jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify(job)
 
 @app.route('/api/start-inference', methods=['POST'])
 def start_inference():

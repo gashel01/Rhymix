@@ -1,5 +1,11 @@
 import React, { useRef, useCallback, useMemo, useEffect } from "react";
+import { Tooltip } from "@mui/material";
 import ErrorIcon from "@mui/icons-material/Error";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import StarIcon from "@mui/icons-material/Star";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
 
 // keep existing local components (NOT changing icons)
 import TextOverflow from "../TextOverflow.tsx";
@@ -35,6 +41,17 @@ const AudioTrackRow = (props) => {
     style,
     isNew = false,
     paramsSummary,
+    createdAt,
+    processing,
+    groupKey,
+    isGroupHeader = false,
+    isGroupExpanded = false,
+    isGroupedVersion = false,
+    versionCount = 0,
+    favoriteCount = 0,
+    isFavorite = false,
+    onToggleGroup,
+    onToggleFavorite,
   } = props;
 
   // inject CSS once (don’t render <style> inside <tbody>)
@@ -200,6 +217,64 @@ const AudioTrackRow = (props) => {
     </span>
   );
 
+  const ProcessingPill = ({ label, tone }) => (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "4px 8px",
+        borderRadius: 8,
+        fontSize: 10,
+        fontWeight: 800,
+        letterSpacing: 0.3,
+        color: tone?.fg || t.primary,
+        background: tone?.bg || (t.isDark ? "rgba(10,132,255,0.22)" : "rgba(0,122,255,0.12)"),
+        border: `1px solid ${t.hairline}`,
+      }}
+    >
+      {label}
+    </span>
+  );
+
+  const MetaPill = ({ children }) => (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "4px 8px",
+        borderRadius: 8,
+        fontSize: 10,
+        fontWeight: 800,
+        letterSpacing: 0.3,
+        color: t.subtext,
+        background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+        border: `1px solid ${t.hairline}`,
+        width: "fit-content",
+      }}
+    >
+      {children}
+    </span>
+  );
+
+  const processingState = processing?.state;
+  const isProcessingRow = processingState && processingState !== "ready";
+  const processingLabelMap = {
+    queued: "Queued",
+    uploading: "Uploading",
+    processing: "Processing",
+    error: "Error",
+  };
+  const processingLabel = processingLabelMap[processingState] || "Processing";
+  const processingTone =
+    processingState === "error"
+      ? { fg: t.danger, bg: t.isDark ? "rgba(255,59,48,0.2)" : "rgba(255,59,48,0.12)" }
+      : { fg: t.primary, bg: t.isDark ? "rgba(10,132,255,0.2)" : "rgba(0,122,255,0.12)" };
+  const processingParts = [];
+  if (processing?.message) processingParts.push(processing.message);
+  if (processing?.step && processing.step !== processing?.message) processingParts.push(`Step: ${processing.step}`);
+  if (typeof processing?.progress === "number") processingParts.push(`Progress: ${processing.progress}%`);
+  const processingTooltip = processingParts.length ? processingParts.join(" | ") : processingLabel;
+
   const handleInstrumentalPlayPause = useCallback(() => {
     handlePlayPauseModified("instrumental", instPath, { instrumental: iwRef.current, vocal: vwRef.current });
   }, [handlePlayPauseModified, instPath]);
@@ -260,7 +335,23 @@ const AudioTrackRow = (props) => {
     );
   };
 
-  const displayName = name || getCleanFileName(name) || `Track ${index + 1}`;
+  const displayName = name || `Track ${index + 1}`;
+  const actionsDisabled = status === "processing" || status === "failed";
+  const canToggleFavorite = Boolean(onToggleFavorite && pair?.runId);
+  const handleFavoriteClick = useCallback(() => {
+    if (!pair?.runId) return;
+    onToggleFavorite?.(pair.runId, !isFavorite);
+  }, [onToggleFavorite, pair?.runId, isFavorite]);
+
+  const handleGroupToggle = useCallback(() => {
+    if (!groupKey) return;
+    onToggleGroup?.(groupKey);
+  }, [groupKey, onToggleGroup]);
+
+  const runTimestamp =
+    isGroupedVersion && createdAt && !Number.isNaN(Date.parse(createdAt))
+      ? new Date(createdAt).toLocaleString()
+      : null;
 
   return (
     <tr style={{ ...style }}>
@@ -268,12 +359,58 @@ const AudioTrackRow = (props) => {
       {/* Waveforms + controls + bare checkbox */}
       <td style={{ borderBottom: `1px solid ${t.hairline}`, padding: "5px 10px 10px 10px", position: "relative" }}>
         {/* Name */}
-        <div style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
-          <TextOverflow
-            text={displayName}
-            style={{ fontWeight: 700, letterSpacing: -0.2, color: t.text, display: "flex", alignItems: "center" }}
-          />
+        <div style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6, paddingLeft: isGroupedVersion ? 14 : 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+            {isGroupHeader && (
+              <button
+                type="button"
+                onClick={handleGroupToggle}
+                aria-label={isGroupExpanded ? "Collapse group" : "Expand group"}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 22,
+                  height: 22,
+                  borderRadius: 6,
+                  border: `1px solid ${t.hairline}`,
+                  background: t.isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+                  color: t.text,
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                {isGroupExpanded ? <KeyboardArrowDownIcon style={{ fontSize: 18 }} /> : <KeyboardArrowRightIcon style={{ fontSize: 18 }} />}
+              </button>
+            )}
+            {isGroupedVersion && (
+              <span style={{ fontSize: 12, fontWeight: 800, color: t.subtext }}>{">"}</span>
+            )}
+            <TextOverflow
+              text={displayName}
+              style={{ fontWeight: 700, letterSpacing: -0.2, color: t.text, display: "flex", alignItems: "center" }}
+            />
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            {isGroupHeader && versionCount > 1 && <MetaPill>{versionCount} versions</MetaPill>}
+            {isGroupHeader && favoriteCount > 0 && <MetaPill>{favoriteCount} fav</MetaPill>}
+            {isProcessingRow && (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <ProcessingPill label={processingLabel} tone={processingTone} />
+                <Tooltip title={processingTooltip} placement="top">
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      color: t.subtext,
+                      cursor: "help",
+                    }}
+                  >
+                    <InfoOutlinedIcon style={{ fontSize: 16 }} />
+                  </span>
+                </Tooltip>
+              </div>
+            )}
             {isNew && (
               <span
                 style={{
@@ -293,11 +430,34 @@ const AudioTrackRow = (props) => {
               </span>
             )}
             {modelUsed && <Pill>{modelUsed}</Pill>}
+            {canToggleFavorite && (
+              <button
+                type="button"
+                onClick={handleFavoriteClick}
+                title={isFavorite ? "Unfavorite" : "Favorite"}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 26,
+                  height: 26,
+                  borderRadius: 8,
+                  border: `1px solid ${t.hairline}`,
+                  background: t.isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+                  color: isFavorite ? "#f5c542" : t.subtext,
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                {isFavorite ? <StarIcon style={{ fontSize: 16 }} /> : <StarBorderIcon style={{ fontSize: 16 }} />}
+              </button>
+            )}
           </div>
         </div>
-        {paramsSummary && (
+        {(paramsSummary || runTimestamp) && (
           <div style={{ marginTop: 4, fontSize: 11, fontWeight: 600, color: t.subtext }}>
             {paramsSummary}
+            {runTimestamp ? (paramsSummary ? ` • ${runTimestamp}` : runTimestamp) : ""}
           </div>
         )}
 
@@ -331,7 +491,7 @@ const AudioTrackRow = (props) => {
                 isPlaying={isCurrentlyPlayingBoth}
                 onPlayBoth={() => handlePlayBothModified(trackPairId)}
                 onDownloadFullSong={handleDownloadFullSong}
-                disabled={status === "processing"}
+                disabled={actionsDisabled}
               />
             </div>
 
@@ -352,18 +512,24 @@ const AudioTrackRow = (props) => {
                 type="checkbox"
                 checked={!!isSelected}
                 onChange={(e) => onRowSelect?.(pair.id, e.target.checked)}
-                title={isSelected ? "Deselect row" : "Select row"}
+                disabled={actionsDisabled}
+                title={
+                  actionsDisabled
+                    ? "Available when processing completes"
+                    : isSelected
+                      ? "Deselect row"
+                      : "Select row"
+                }
                 style={{
-
-
 
                   width: 16,
                   height: 16,
                   accentColor: t.primary,
-                  cursor: "pointer",
+                  cursor: actionsDisabled ? "not-allowed" : "pointer",
                   background: "transparent",
                   border: "none",
                   outline: "none",
+                  opacity: actionsDisabled ? 0.5 : 1,
                 }}
               />
             </div>
@@ -401,6 +567,17 @@ const areEqual = (prev, next) =>
   prev.onRowSelect === next.onRowSelect &&
   prev.style === next.style &&
   prev.isNew === next.isNew &&
-  prev.paramsSummary === next.paramsSummary;
+  prev.paramsSummary === next.paramsSummary &&
+  prev.createdAt === next.createdAt &&
+  prev.groupKey === next.groupKey &&
+  prev.isGroupHeader === next.isGroupHeader &&
+  prev.isGroupExpanded === next.isGroupExpanded &&
+  prev.isGroupedVersion === next.isGroupedVersion &&
+  prev.versionCount === next.versionCount &&
+  prev.favoriteCount === next.favoriteCount &&
+  prev.isFavorite === next.isFavorite &&
+  prev.processing === next.processing &&
+  prev.onToggleGroup === next.onToggleGroup &&
+  prev.onToggleFavorite === next.onToggleFavorite;
 
 export default React.memo(AudioTrackRow, areEqual);

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState, memo } from "react";
+import React, { useCallback, useEffect, useMemo, memo } from "react";
 import { useVolume } from "../contexts/VolumeContext";
 import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
 import AddIcon from "@mui/icons-material/Add";
@@ -24,6 +24,8 @@ function HomeView({
   onInferenceWithTracks,
   handleTrainWithDataset,
   darkMode,
+  optimisticTracks = [],
+  onOptimisticTracksChange,
 }) {
   const { volumeRef } = useVolume();
   // ---------- Theme tokens (same “new style”) ----------
@@ -32,11 +34,11 @@ function HomeView({
 
 
   // ---------- Hooks (unchanged logic) ----------
-  const { availableFiles, rawVocals, loading } = useAvailableFiles();
+  const { availableFiles, rawVocals, loading, refetch } = useAvailableFiles();
 
   const { vocalMode, handleVocalModeChange, vocalsFileType } = useVocalMode("raw");
 
-  const { trackPairs } = useAudioPlayback({ rawVocals, availableFiles, vocalMode });
+  const { trackPairs } = useAudioPlayback({ rawVocals, availableFiles, vocalMode, optimisticTracks });
 
   const handleCreateDatasetClick = () => onOpenCreateDataset?.();
 
@@ -64,14 +66,74 @@ function HomeView({
     [handleVocalModeChange]
   );
 
-  
+  const hasProcessing = useMemo(
+    () =>
+      trackPairs.some((pair) => {
+        const state = pair?.processing?.state;
+        return state && state !== "ready" && state !== "error";
+      }),
+    [trackPairs]
+  );
+
+  useEffect(() => {
+    if (!hasProcessing) return;
+    const interval = setInterval(() => {
+      refetch();
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [hasProcessing, refetch]);
+
+  useEffect(() => {
+    if (!onOptimisticTracksChange || !optimisticTracks.length) return;
+    const serverById = new Map(availableFiles.map((file) => [file.fileId, file]));
+
+    let changed = false;
+    const next = optimisticTracks
+      .map((track) => {
+        const trackId = track.trackId || track.fileId;
+        if (!trackId) return track;
+        const server = serverById.get(trackId);
+        if (!server) return track;
+        const state = server.processing?.state;
+        if (!state) return track;
+        if (state === "ready" || state === "error") {
+          changed = true;
+          return null;
+        }
+        const prevProcessing = track.processing || {};
+        const nextProcessing = server.processing || {};
+        const sameProcessing =
+          prevProcessing.state === nextProcessing.state &&
+          prevProcessing.step === nextProcessing.step &&
+          prevProcessing.message === nextProcessing.message &&
+          prevProcessing.progress === nextProcessing.progress &&
+          prevProcessing.updatedAt === nextProcessing.updatedAt;
+        if (!sameProcessing) {
+          changed = true;
+          return {
+            ...track,
+            processing: nextProcessing,
+          };
+        }
+        return track;
+      })
+      .filter(Boolean);
+
+    if (changed) {
+      onOptimisticTracksChange(next);
+    }
+  }, [availableFiles, onOptimisticTracksChange, optimisticTracks]);
+
+  const hasRows = trackPairs.length > 0;
+  const showSpinner = loading && !hasRows;
+
   // ---------- Render ----------
   return (
     <div style={{ minHeight: "100vh", }}>
       <div style={{ margin: "0 auto" }}>
         <Panel style={{ borderRadius: 0, border: "none", padding: 0, background: "transparent" }} t={t}>
           <TabPanel value={0} index={0} sx={{ p: 0, overflow: "visible", }}>
-            {loading ? (
+            {showSpinner ? (
               <div style={{ display: "grid", placeItems: "center", padding: "48px 12px", textAlign: "center" }}>
                 <Spinner size={34} t={t} />
                 <div style={{ marginTop: 12, fontSize: 14, fontWeight: 900, color: t.text }}>Loading singing data…</div>
@@ -79,7 +141,7 @@ function HomeView({
                   Please wait while we fetch your audio files.
                 </div>
               </div>
-            ) : (availableFiles?.length || 0) > 0 ? (
+            ) : hasRows ? (
               <ErrorBoundary>
                 <div
                   style={{
@@ -169,6 +231,8 @@ export default memo(HomeView, (prevProps, nextProps) => {
     prevProps.onOpenCreateDataset === nextProps.onOpenCreateDataset &&
     prevProps.onInferenceWithTracks === nextProps.onInferenceWithTracks &&
     prevProps.handleTrainWithDataset === nextProps.handleTrainWithDataset &&
-    prevProps.darkMode === nextProps.darkMode
+    prevProps.darkMode === nextProps.darkMode &&
+    prevProps.optimisticTracks === nextProps.optimisticTracks &&
+    prevProps.onOptimisticTracksChange === nextProps.onOptimisticTracksChange
   );
 });

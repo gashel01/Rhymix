@@ -1,21 +1,109 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 
 const basename = (p) => {
   if (!p) return "";
   return p.split("/").pop()?.split("\\").pop() || "";
 };
 
-const getTrackName = (track) => {
-  return track?.displayName || track?.name || "Unknown";
-};
-
 export const formatParamsSummary = (params) => {
   if (!params) return "";
-  const p = params.pitch ?? 0;
-  const f0 = (params.f0Method || "").toUpperCase();
-  const rate = Math.round((params.indexRate ?? 0) * 100);
-  return `Pitch ${p > 0 ? "+" : ""}${p}, F0 ${f0}, ${rate}%`;
+  const parts = [];
+  const p = params.pitch ?? params.transpose;
+  if (typeof p === "number") {
+    parts.push(`Pitch ${p > 0 ? "+" : ""}${p}`);
+  }
+  const f0 = params.f0Method ? String(params.f0Method).toUpperCase() : null;
+  if (f0) parts.push(`F0 ${f0}`);
+  const rateRaw = params.indexRate ?? params.index_rate;
+  if (typeof rateRaw === "number") parts.push(`${Math.round(rateRaw * 100)}%`);
+  if (typeof params.seed === "number") parts.push(`Seed ${params.seed}`);
+  if (typeof params.sid === "number") parts.push(`SID ${params.sid}`);
+  return parts.join(", ");
+};
+
+const normalizeStatus = (status) => {
+  if (!status) return "completed";
+  return String(status).toLowerCase();
+};
+
+const isLoadingStatus = (status) => {
+  const normalized = normalizeStatus(status);
+  return !["completed", "failed", "done"].includes(normalized);
+};
+
+const getTrackName = (run) => {
+  return (
+    run?.inputDisplayName ||
+    run?.inputOriginalName ||
+    run?.track?.displayName ||
+    run?.track?.name ||
+    "Unknown Track"
+  );
+};
+
+const getFileId = (run) => {
+  return run?.inputFileId || run?.fileId || run?.track?.fileId || run?.track?.id || null;
+};
+
+const getRunId = (run) => {
+  return run?.runId || run?.id || null;
+};
+
+const buildGroupKey = (run, fileId) => {
+  const modelId = run?.modelId || run?.model?.id;
+  const modelName = run?.modelName || run?.model?.name;
+  if (modelId && fileId) return `${modelId}:${fileId}`;
+  if (modelName && fileId) return `${modelName}:${fileId}`;
+  return run?.runId || run?.id || fileId || "unknown";
+};
+
+const buildTrackPairFromRun = (run, vocalMode) => {
+  const runId = getRunId(run);
+  const tempId = run?.tempId || run?.jobId || null;
+  const fileId = getFileId(run);
+  const displayName = getTrackName(run);
+  const modelName = run?.modelName || run?.model?.name || "Unknown";
+  const vocalFileType =
+    run?.vocalFileType ||
+    run?.params?.vocalsFileType ||
+    run?.track?.vocalFileType ||
+    run?.track?.vocalsFileType ||
+    "processed_vocals";
+
+  const convertedUrl =
+    run?.outputUrl || (runId ? `/api/download/inference/${encodeURIComponent(runId)}` : null);
+  const originalVocalUrl = fileId ? `/api/download/${vocalFileType}/${fileId}` : null;
+  const useConverted = vocalMode === "converted";
+  const vocalUrl = useConverted ? convertedUrl || originalVocalUrl : originalVocalUrl || convertedUrl;
+  const vocalPath = useConverted ? (runId || fileId) : fileId || runId;
+
+  const displayId = runId || tempId || fileId || displayName;
+  const createdAt = run?.createdAt || null;
+
+  return {
+    id: displayId,
+    runId,
+    fileId,
+    displayName,
+    name: displayName,
+    modelName,
+    modelId: run?.modelId || run?.model?.id,
+    instrumental: fileId,
+    vocal: vocalPath,
+    instrumentalKey: `${displayId}-instrumental`,
+    vocalKey: `${displayId}-vocal`,
+    instrumentalUrl: fileId ? `/api/download/instrumental/${fileId}` : null,
+    originalVocalUrl,
+    vocalUrl,
+    status: normalizeStatus(run?.status || "completed"),
+    result: run,
+    isNew: !!run?.isNew,
+    paramsSummary: run?.params && Object.keys(run.params).length ? formatParamsSummary(run.params) : "",
+    params: run?.params || null,
+    createdAt,
+    groupKey: buildGroupKey(run, fileId),
+    isFavorite: !!run?.isFavorite,
+  };
 };
 
 /**
@@ -28,7 +116,6 @@ export const useAudioPlayback = ({
   setError,
   setInferenceResults,
   liveResults = [],
-  liveInferenceData = null,
 }) => {
   const resultsRef = useRef([]);
   const [vocalMode, setVocalMode] = useState("converted");
@@ -59,73 +146,51 @@ export const useAudioPlayback = ({
     }
   }, []);
 
-  const pastInferenceTrackPairs = useMemo(
-    () =>
-      inferenceResults.map((result) => ({
-        id: result.runId,
-        fileId: result.inputFileId,
-        displayName: result.inputDisplayName || result.inputOriginalName || "Unknown Track",
-        name: result.inputDisplayName || result.inputOriginalName || "Unknown Track",
-        modelName: result.modelName,
-        instrumental: result.inputFileId,
-        vocal: result.inputFileId,
-        instrumentalKey: `${result.runId}-instrumental`,
-        vocalKey: `${result.runId}-vocal`,
-        instrumentalUrl: result.inputFileId ? `/api/download/instrumental/${result.inputFileId}` : null,
-        originalVocalUrl: result.inputFileId
-          ? `/api/download/${result.vocalFileType || "processed_vocals"}/${result.inputFileId}`
-          : null,
-        vocalUrl:
-          vocalMode === "converted"
-            ? result.outputUrl
-            : result.inputFileId
-              ? `/api/download/${result.vocalFileType || "raw_vocals"}/${result.inputFileId}`
-              : null,
-        status: "completed",
-        result,
-        isNew: false,
-        paramsSummary: result.params && Object.keys(result.params).length ? formatParamsSummary(result.params) : "",
-      })),
-    [inferenceResults, vocalMode]
-  );
+  const mergedRuns = useMemo(() => {
+    const serverRuns = Array.isArray(inferenceResults) ? inferenceResults : [];
+    const optimisticRuns = Array.isArray(liveResults) ? liveResults : [];
 
-  const liveTrackPairs = useMemo(() => {
-    if (!liveResults.length || !liveInferenceData) return [];
-    const params = liveInferenceData.params || {};
-    const paramsSummary = formatParamsSummary(params);
-    const modelName = liveInferenceData.model?.name || "Unknown";
-    const vocalsFileType = params.vocalsFileType || "processed_vocals";
-    return liveResults
-      .filter((r) => r?.track?.instrumental)
-      .map((r) => {
-        const fileId = r.track.fileId || r.track.id;
-        const instrumentalUrl = r.track.instrumentalUrl || (fileId ? `/api/download/instrumental/${fileId}` : null);
-        const originalVocalUrl = r.track.vocalUrl || (fileId ? `/api/download/${vocalsFileType}/${fileId}` : null);
-        const convertedVocalUrl = r.outputUrl || (r.runId ? `/api/download/inference/${encodeURIComponent(r.runId)}` : null);
-        const isOriginal = vocalMode === "original";
-        return {
-          id: r.runId || r.jobId,
-          fileId,
-          displayName: getTrackName(r.track),
-          name: getTrackName(r.track),
-          instrumental: fileId,
-          instrumentalUrl,
-          vocal: fileId,
-          vocalUrl: isOriginal ? originalVocalUrl : convertedVocalUrl || originalVocalUrl,
-          status: r.status || "processing",
-          result: r,
-          isNew: true,
-          paramsSummary,
-          modelName,
-          instrumentalKey: `${r.runId || r.jobId}-instrumental`,
-          vocalKey: `${r.runId || r.jobId}-vocal`,
-        };
-      });
-  }, [liveResults, liveInferenceData, vocalMode]);
+    const serverByRunId = new Map(
+      serverRuns
+        .map((run) => ({ runId: getRunId(run), run }))
+        .filter(({ runId }) => runId)
+        .map(({ runId, run }) => [runId, run])
+    );
+    const merged = [];
+    const seen = new Set();
+
+    optimisticRuns.forEach((opt) => {
+      const optRunId = getRunId(opt);
+      if (optRunId && serverByRunId.has(optRunId)) {
+        const server = serverByRunId.get(optRunId);
+        const keepOptimistic = isLoadingStatus(opt?.status);
+        const mergedRun = keepOptimistic
+          ? { ...server, ...opt, status: opt.status, isNew: !!opt.isNew }
+          : { ...opt, ...server, isNew: !!opt.isNew };
+        merged.push(mergedRun);
+        seen.add(optRunId);
+        return;
+      }
+      merged.push(opt);
+      if (optRunId) seen.add(optRunId);
+    });
+
+    serverRuns.forEach((run) => {
+      const runId = getRunId(run);
+      if (runId && seen.has(runId)) return;
+      merged.push(run);
+    });
+
+    return merged.sort((a, b) => {
+      const aTime = a?.createdAt ? Date.parse(a.createdAt) : 0;
+      const bTime = b?.createdAt ? Date.parse(b.createdAt) : 0;
+      return bTime - aTime;
+    });
+  }, [inferenceResults, liveResults]);
 
   const trackPairs = useMemo(
-    () => [...liveTrackPairs, ...pastInferenceTrackPairs],
-    [liveTrackPairs, pastInferenceTrackPairs]
+    () => mergedRuns.map((run) => buildTrackPairFromRun(run, vocalMode)),
+    [mergedRuns, vocalMode]
   );
 
   useEffect(() => {
@@ -159,7 +224,6 @@ export const useAudioPlayback = ({
 
   return {
     trackPairs,
-    pastInferenceTrackPairs,
     handleVocalModeChange,
     handleDownload,
     fetchInferenceResults,

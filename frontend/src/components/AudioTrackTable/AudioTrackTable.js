@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { Box, Table, TableBody, TableContainer, Paper, Alert, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Button } from "@mui/material";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import AudioTrackHeader from "./AudioTrackHeader";
@@ -9,6 +9,12 @@ import { downloadFullSong } from "../../utils/audioUtils";
 import { safeSetMuted, getCleanFileName } from "./utils";
 import { deleteFiles } from "../../utils/apiService";
 import styles from "./AudioTrackTable.module.css";
+
+const parseCreatedAt = (value) => {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
 
 
 const AudioTrackTable = (props) => {
@@ -41,6 +47,8 @@ const AudioTrackTable = (props) => {
     onClearDeleteResult,
     defaultLabel,
     header,
+    enableGrouping = false,
+    onToggleFavorite,
   } = props;
 
   const [mutes, setMutes] = useState({ instrumental: {}, vocal: {} });
@@ -48,6 +56,7 @@ const AudioTrackTable = (props) => {
   const [internalSelectedRows, setInternalSelectedRows] = useState([]);
   const [deleteState, setDeleteState] = useState({ open: false, loading: false, result: null });
   const [page, setPage] = useState(1);
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
   const lastSeekedRef = useRef({});
   const parentRef = useRef(null);
   const { instrumentalWaveforms = {}, vocalWaveforms = {} } = {};
@@ -57,7 +66,80 @@ const AudioTrackTable = (props) => {
   const setSelectedRows = onRowSelect ? () => { } : setInternalSelectedRows;
 
   const pageSize = Math.max(1, Number(pageSizeProp) || 10);
-  const totalPages = Math.max(1, Math.ceil(trackPairs.length / pageSize));
+
+  const handleToggleGroup = useCallback((groupKey) => {
+    if (!groupKey) return;
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!enableGrouping) return;
+    const keys = new Set(trackPairs.map((pair) => pair.groupKey).filter(Boolean));
+    setExpandedGroups((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set([...prev].filter((key) => keys.has(key)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [enableGrouping, trackPairs]);
+
+  const displayTrackPairs = useMemo(() => {
+    if (!enableGrouping) return trackPairs;
+    const groups = new Map();
+    const order = [];
+
+    trackPairs.forEach((pair) => {
+      const key = pair.groupKey || pair.runId || pair.id;
+      if (!groups.has(key)) {
+        groups.set(key, []);
+        order.push(key);
+      }
+      groups.get(key).push(pair);
+    });
+
+    const output = [];
+    order.forEach((key) => {
+      const versions = [...(groups.get(key) || [])].sort(
+        (a, b) => parseCreatedAt(b.createdAt) - parseCreatedAt(a.createdAt)
+      );
+      if (versions.length === 0) return;
+      const latest = versions[0];
+      const favoriteCount = versions.filter((v) => v.isFavorite).length;
+      const isExpanded = expandedGroups.has(key);
+      output.push({
+        ...latest,
+        isGroupHeader: versions.length > 1,
+        isGroupExpanded: isExpanded,
+        groupKey: key,
+        versionCount: versions.length,
+        favoriteCount,
+      });
+      if (isExpanded && versions.length > 1) {
+        versions.slice(1).forEach((version, index) => {
+          output.push({
+            ...version,
+            isGroupedVersion: true,
+            groupKey: key,
+            versionIndex: index + 1,
+            versionCount: versions.length,
+          });
+        });
+      }
+    });
+
+    return output;
+  }, [enableGrouping, expandedGroups, trackPairs]);
+
+  const selectableTrackPairs = useMemo(
+    () => displayTrackPairs.filter((pair) => pair.status !== "processing" && pair.status !== "failed"),
+    [displayTrackPairs]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(displayTrackPairs.length / pageSize));
 
   // Keep page in range if data/pageSize changes
   useEffect(() => {
@@ -73,10 +155,10 @@ const AudioTrackTable = (props) => {
   }, [page]);
 
   const paginatedTrackPairs = useMemo(() => {
-    if (!Array.isArray(trackPairs) || trackPairs.length === 0) return [];
+    if (!Array.isArray(displayTrackPairs) || displayTrackPairs.length === 0) return [];
     const start = (page - 1) * pageSize;
-    return trackPairs.slice(start, start + pageSize);
-  }, [trackPairs, page, pageSize]);
+    return displayTrackPairs.slice(start, start + pageSize);
+  }, [displayTrackPairs, page, pageSize]);
 
   const getWaveform = (type, pair) => {
     const key = type === "instrumental" ? pair.instrumentalKey : pair.vocalKey;
@@ -87,7 +169,7 @@ const AudioTrackTable = (props) => {
   const handlePlayBothInternal = (pairId) => {
     const id = pairId;
     const isPlaying = playingBoth?.id === id;
-    const pair = trackPairs.find(p => p.id === pairId);
+    const pair = displayTrackPairs.find(p => p.id === pairId);
 
     [getWaveform('instrumental', pair), getWaveform('vocal', pair)].forEach(wf => {
       if (!wf) return;
@@ -119,7 +201,7 @@ const AudioTrackTable = (props) => {
   // Sync Interval
   useEffect(() => {
     const interval = setInterval(() => {
-      trackPairs.forEach(pair => {
+      displayTrackPairs.forEach(pair => {
         const [iw, vw] = [getWaveform('instrumental', pair), getWaveform('vocal', pair)];
         if (iw && vw) {
           const [it, vt] = [iw.getCurrentTime() || 0, vw.getCurrentTime() || 0];
@@ -130,7 +212,7 @@ const AudioTrackTable = (props) => {
       });
     }, 50);
     return () => clearInterval(interval);
-  }, [trackPairs, instrumentalWaveforms, vocalWaveforms]);
+  }, [displayTrackPairs, instrumentalWaveforms, vocalWaveforms]);
 
   useWaveformSync(playingBoth, instrumentalWaveforms, vocalWaveforms, () => {
     setPlayingBoth(null);
@@ -175,8 +257,10 @@ const AudioTrackTable = (props) => {
     <Box className={styles.container} style={{ border: "none" }} >
       <AudioTableActions
         selectedRows={selectedRows}
-        trackPairs={trackPairs}
-        onSelectAll={() => (onSelectAll ? onSelectAll() : setSelectedRows(trackPairs.map((p) => p.id)))}
+        trackPairs={selectableTrackPairs}
+        onSelectAll={() =>
+          onSelectAll ? onSelectAll() : setSelectedRows(selectableTrackPairs.map((p) => p.id))
+        }
         onClear={() => (onDeselectAll ? onDeselectAll() : setSelectedRows([]))}
         onDelete={() => (onDeleteSelected ? onDeleteSelected() : setDeleteState((p) => ({ ...p, open: true })))}
         vocalMode={vocalMode}
@@ -274,6 +358,17 @@ const AudioTrackTable = (props) => {
                       onRowSelect={handleRowSelect}
                       isNew={pair.isNew}
                       paramsSummary={pair.paramsSummary}
+                      processing={pair.processing}
+                      createdAt={pair.createdAt}
+                      groupKey={pair.groupKey}
+                      isGroupHeader={pair.isGroupHeader}
+                      isGroupExpanded={pair.isGroupExpanded}
+                      isGroupedVersion={pair.isGroupedVersion}
+                      versionCount={pair.versionCount}
+                      favoriteCount={pair.favoriteCount}
+                      isFavorite={pair.isFavorite}
+                      onToggleGroup={enableGrouping ? handleToggleGroup : undefined}
+                      onToggleFavorite={onToggleFavorite}
                     />
                   );
                 })}
@@ -285,7 +380,7 @@ const AudioTrackTable = (props) => {
 
         </div>
 
-        {trackPairs.length > pageSize && (
+        {displayTrackPairs.length > pageSize && (
           <div className={styles.paginationOverlay} role="navigation" aria-label="Audio track pagination">
             <Button
               size="small"
@@ -338,7 +433,7 @@ const AudioTrackTable = (props) => {
             <Button onClick={() => setDeleteState(p => ({ ...p, open: false }))}>Cancel</Button>
             <Button onClick={async () => {
               setDeleteState(p => ({ ...p, loading: true }));
-              const files = trackPairs
+              const files = displayTrackPairs
                 .filter(p => selectedRows.includes(p.id))
                 .map(p => p.fileId || p.id)
                 .filter(Boolean);

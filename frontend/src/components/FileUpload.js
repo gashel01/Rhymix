@@ -101,7 +101,7 @@ function FileUpload({ files, setFiles, setError, loading }) {
           </List>
 
           <Alert severity="success" sx={{ mt: 2 }}>
-            Click "Next" to upload these files and begin processing
+            Click "Upload & Start" to upload these files and begin processing
           </Alert>
         </>
       )}

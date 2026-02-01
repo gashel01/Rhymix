@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { getAvailableFiles } from '../utils/apiService';
 
 /**
@@ -12,9 +12,10 @@ export const useAvailableFiles = () => {
   const [error, setError] = useState(null);
   const hasFetchedRef = useRef(false);
 
-  const fetchFiles = async () => {
+  const fetchFiles = useCallback(async (options = {}) => {
+    const silent = options?.silent ?? false;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
 
       const response = await getAvailableFiles();
@@ -24,11 +25,13 @@ export const useAvailableFiles = () => {
           const normalized = response.files.map((file) => ({
             ...file,
             id: file.fileId,
+            trackId: file.trackId || file.fileId,
             displayName: file.safeDisplayName || file.originalName,
             vocalUrl: file.vocalUrlProcessed || null,
             vocalPath: file.vocalPathProcessed || null,
             instrumentalUrl: file.instrumentalUrl || null,
             instrumentalPath: file.instrumentalPath || null,
+            processing: file.processing || null,
           }));
 
           setAvailableFiles(normalized);
@@ -36,11 +39,13 @@ export const useAvailableFiles = () => {
           const possibleRawVocals = response.files.map((file) => ({
             ...file,
             id: file.fileId,
+            trackId: file.trackId || file.fileId,
             displayName: file.safeDisplayName || file.originalName,
             vocalUrl: file.vocalUrlRaw || null,
             vocalPath: file.vocalPathRaw || null,
             instrumentalUrl: file.instrumentalUrl || null,
             instrumentalPath: file.instrumentalPath || null,
+            processing: file.processing || null,
           }));
 
           setRawVocals(possibleRawVocals);
@@ -59,9 +64,9 @@ export const useAvailableFiles = () => {
       setAvailableFiles([]);
       setRawVocals([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Only fetch once, even if component re-renders
@@ -76,6 +81,6 @@ export const useAvailableFiles = () => {
     rawVocals,
     loading,
     error,
-    refetch: fetchFiles,
+    refetch: (options) => fetchFiles({ silent: true, ...(options || {}) }),
   };
 };

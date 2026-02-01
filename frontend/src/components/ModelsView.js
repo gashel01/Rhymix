@@ -1,16 +1,24 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHeader from "./common/PageHeader";
 
 // keep your icons (unchanged)
 import {
-  CloudDownload as DownloadIcon,
+  CloudDownload as CloudDownloadIcon,
+  CloudOff as CloudOffIcon,
   Delete as DeleteIcon,
   Search as SearchIcon,
-  CloudQueue as CloudIcon,
-  CloudOff as CloudOffIcon,
   Close as CloseIcon,
 } from "@mui/icons-material";
+import {Theme} from "./Homeview/Theme.js"
+import {SearchInput} from "./ModelView/SearchInput.js"
 
+import {Glass} from "./Homeview/Glass.js"
+import {Hairline} from "./Homeview/Hairline.js"
+import IconBtn from "./Homeview/IconBtn.js"
+import {Modal} from "./Homeview/Modal.js"
+import Btn from "./Homeview/Btn.js"
+import {Pill} from "./ModelView/Pill.js"
+ 
 /**
  * ModelsView (no MUI)
  * - True responsive grid: multiple cards per row
@@ -31,53 +39,23 @@ function ModelsView({
   darkMode, // optional
 }) {
   // ---- Theme tokens ----
-  const isDark = useMemo(() => {
-    if (typeof darkMode === "boolean") return darkMode;
-    if (typeof window === "undefined") return false;
-    return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
-  }, [darkMode]);
-
-  const t = useMemo(() => {
-    return {
-      isDark,
-      text: isDark ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.90)",
-      subtext: isDark ? "rgba(255,255,255,0.62)" : "rgba(0,0,0,0.55)",
-      hairline: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)",
-      glassA: isDark ? "rgba(18,18,20,0.62)" : "rgba(255,255,255,0.72)",
-      glassB: isDark ? "rgba(26,26,28,0.56)" : "rgba(248,248,250,0.78)",
-      cardA: isDark ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.86)",
-      cardB: isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.70)",
-      hoverA: isDark ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.95)",
-      hoverB: isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.78)",
-      shadow: isDark ? "0 18px 44px rgba(0,0,0,0.55)" : "0 18px 46px rgba(0,0,0,0.14)",
-      shadowSoft: isDark ? "0 10px 24px rgba(0,0,0,0.42)" : "0 12px 26px rgba(0,0,0,0.12)",
-      primary: isDark ? "rgba(10,132,255,1)" : "rgba(0,122,255,1)",
-      primaryWash: isDark ? "rgba(10,132,255,0.20)" : "rgba(0,122,255,0.16)",
-      primaryWash2: isDark ? "rgba(10,132,255,0.10)" : "rgba(0,122,255,0.08)",
-      success: "rgba(52,199,89,1)",
-      successWash: isDark ? "rgba(52,199,89,0.18)" : "rgba(52,199,89,0.14)",
-      warning: "rgba(255,149,0,1)",
-      danger: "rgba(255,59,48,1)",
-      dangerWash: isDark ? "rgba(255,59,48,0.20)" : "rgba(255,59,48,0.14)",
-      radiusLg: 22,
-      radiusMd: 16,
-      radiusSm: 12,
-      maxW: 1180,
-      topSafe: 16,
-      headerH: 132, // sticky area height (header + toolbar); used for scroll padding
-      bottomBarH: 76, // fixed pagination bar height
-    };
-  }, [isDark]);
+  const { t } = Theme({ darkMode });
 
   // ---- Data state (same logic) ----
-  const [models, setModels] = useState([]);
-  const [onlineResults, setOnlineResults] = useState([]);
-  const [showOnline, setShowOnline] = useState(true);
+  const [localModels, setLocalModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [onlineResults, setOnlineResults] = useState([]);
+  const [onlinePage, setOnlinePage] = useState(1);
+  const [onlineTotalPages, setOnlineTotalPages] = useState(1);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isOnlineSearchEnabled, setIsOnlineSearchEnabled] = useState(true);
   const [selected, setSelected] = useState(new Set());
 
-  const [downloadingProgress, setDownloadingProgress] = useState({});
+  const [downloadJobs, setDownloadJobs] = useState({});
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [activeDownloadModel, setActiveDownloadModel] = useState(null);
@@ -88,76 +66,219 @@ function ModelsView({
   const [targetInferenceModel, setTargetInferenceModel] = useState(null);
   const [selectedCheckpoint, setSelectedCheckpoint] = useState(null);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const searchAbortRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     fetchModels();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchModels = async () => {
+  const fetchModels = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/available-models");
       const data = await res.json();
-      setModels(data.models || []);
+      setLocalModels(data.models || []);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
     const timer = setTimeout(() => {
-      if (searchQuery.trim() && showOnline) {
-        performOnlineSearch(currentPage, controller.signal);
-      } else {
-        setOnlineResults([]);
-        setTotalPages(1);
-      }
-    }, 800);
+      setDebouncedQuery(searchQuery.trim());
+    }, 320);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, currentPage, showOnline]);
-
-  const performOnlineSearch = async (page, signal) => {
+  const performOnlineSearch = useCallback(async (query, page, append = false) => {
+    if (!query) return;
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+    setIsSearching(true);
+    setSearchError("");
     try {
       const res = await fetch(
-        `/api/search-online-models?query=${encodeURIComponent(searchQuery)}&page=${page}`,
-        { signal }
+        `/api/search-online-models?query=${encodeURIComponent(query)}&page=${page}`,
+        { signal: controller.signal }
       );
       const data = await res.json();
-      setOnlineResults(data.models || []);
-      setTotalPages(data.total_pages || 1);
+      const nextModels = data.models || [];
+      setOnlineResults((prev) => (append ? [...prev, ...nextModels] : nextModels));
+      setOnlineTotalPages(data.total_pages || 1);
     } catch (err) {
-      if (err.name !== "AbortError") console.error(err);
+      if (err.name !== "AbortError") {
+        setSearchError(err.message || "Search failed");
+      }
+    } finally {
+      setIsSearching(false);
     }
-  };
+  }, []);
 
-  const displayModels = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    const local = models
-      .filter((m) => m.name.toLowerCase().includes(q))
-      .map((m) => ({ ...m, isOnline: false }));
+  useEffect(() => {
+    if (!debouncedQuery) {
+      setOnlineResults([]);
+      setOnlinePage(1);
+      setOnlineTotalPages(1);
+      setSearchError("");
+      return;
+    }
+    if (!isOnlineSearchEnabled) {
+      setOnlineResults([]);
+      setOnlinePage(1);
+      setOnlineTotalPages(1);
+      setSearchError("");
+      setIsSearching(false);
+      return;
+    }
+    setOnlinePage(1);
+    performOnlineSearch(debouncedQuery, 1, false);
+  }, [debouncedQuery, performOnlineSearch, isOnlineSearchEnabled]);
 
-    const online = showOnline
-      ? onlineResults
-          .filter(
-            (om) => !models.some((lm) => lm.name.toLowerCase() === om.name.toLowerCase())
-          )
-          .map((m) => ({ ...m, isOnline: true }))
-      : [];
+  useEffect(() => {
+    const onPointerDown = (event) => {
+      const el = event.target;
+      const dropdownEl = dropdownRef.current;
+      const inputEl = inputRef.current;
+      const clickedInDropdown = dropdownEl && dropdownEl.contains(el);
+      const clickedInInput = inputEl && inputEl.contains(el);
+      if (!clickedInDropdown && !clickedInInput) {
+        setIsDropdownOpen(false);
+      }
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setIsDropdownOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
 
-    return [...local, ...online];
-  }, [models, onlineResults, showOnline, searchQuery]);
+  const toggleOnlineSearch = useCallback(() => {
+    setIsOnlineSearchEnabled((prev) => {
+      const next = !prev;
+      if (!next) {
+        setIsDropdownOpen(false);
+        setIsSearching(false);
+        setOnlineResults([]);
+        setOnlinePage(1);
+        setOnlineTotalPages(1);
+        setSearchError("");
+      } else if (searchQuery.trim()) {
+        setIsDropdownOpen(true);
+      }
+      return next;
+    });
+  }, [searchQuery]);
+
+  const normalizeId = useCallback((value) => {
+    if (!value) return "";
+    return String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  }, []);
+
+  const installedIds = useMemo(() => {
+    const ids = new Set();
+    localModels.forEach((model) => {
+      if (model.modelId) ids.add(normalizeId(model.modelId));
+      if (model.name) ids.add(normalizeId(model.name));
+    });
+    return ids;
+  }, [localModels, normalizeId]);
+
+  const localModelsMerged = useMemo(() => {
+    const byId = new Map();
+    localModels.forEach((model) => {
+      const id = model.modelId || model.name;
+      byId.set(normalizeId(id), { ...model, isOnline: false, status: model.status || "completed" });
+    });
+
+    Object.values(downloadJobs).forEach((job) => {
+      const id = normalizeId(job.modelId || job.modelName);
+      const existing = byId.get(id);
+      if (existing) {
+        if (job.status && job.status !== "completed") {
+          byId.set(id, {
+            ...existing,
+            status: job.status,
+            downloadProgress: job.progress ?? null,
+            downloadError: job.error || existing.downloadError,
+          });
+        }
+        return;
+      }
+      byId.set(id, {
+        name: job.modelName || job.modelId || "New Model",
+        modelId: job.modelId,
+        status: job.status || "downloading",
+        downloadProgress: job.progress ?? null,
+        downloadError: job.error || null,
+        checkpoints: [],
+        size_mb: job.size_mb || null,
+        created: job.started_at || new Date().toISOString(),
+        isOnline: false,
+      });
+    });
+
+    return Array.from(byId.values()).sort((a, b) => {
+      const aTime = a.created ? Date.parse(a.created) : 0;
+      const bTime = b.created ? Date.parse(b.created) : 0;
+      return bTime - aTime;
+    });
+  }, [downloadJobs, localModels, normalizeId]);
+
+  const filteredLocalModels = useMemo(() => {
+    if (!searchQuery.trim()) return localModelsMerged;
+    const q = searchQuery.trim().toLowerCase();
+    return localModelsMerged.filter((model) => model.name?.toLowerCase().includes(q));
+  }, [localModelsMerged, searchQuery]);
+
+  const selectableLocalModels = useMemo(
+    () => filteredLocalModels.filter((model) => model.status === "completed"),
+    [filteredLocalModels]
+  );
+
+  useEffect(() => {
+    const pendingJobs = Object.values(downloadJobs).filter(
+      (job) => job.status && !["completed", "failed"].includes(job.status)
+    );
+    if (!pendingJobs.length) return;
+    const interval = setInterval(async () => {
+      await Promise.all(
+        pendingJobs.map(async (job) => {
+          try {
+            const res = await fetch(`/api/models/download/status/${encodeURIComponent(job.jobId)}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            setDownloadJobs((prev) => ({
+              ...prev,
+              [job.jobId]: {
+                ...prev[job.jobId],
+                ...data,
+              },
+            }));
+            if (data.status === "completed") {
+              fetchModels();
+            }
+          } catch (err) {
+            // ignore polling errors
+          }
+        })
+      );
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [downloadJobs, fetchModels]);
 
   const handleCardClick = (model) => {
     if (model.isOnline) return;
+    if (model.status && ["downloading", "failed"].includes(model.status)) return;
 
     if (isInferenceSelection) {
       setTargetInferenceModel(model);
@@ -179,100 +300,48 @@ function ModelsView({
     if (!url) return;
 
     setDownloadDialogOpen(false);
-    setDownloadingProgress((prev) => ({ ...prev, [url]: 0 }));
 
     try {
-      const progressTimer = setInterval(() => {
-        setDownloadingProgress((prev) => {
-          const current = prev[url] ?? 0;
-          if (current >= 95) return prev;
-          return { ...prev, [url]: current + (100 - current) * 0.2 };
-        });
-      }, 1000);
-
-      const responsedownload = await fetch("/api/download-model", {
+      const response = await fetch("/api/download-model", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, modelName: activeDownloadModel.name, userQuery: name }),
+        body: JSON.stringify({
+          url,
+          modelName: activeDownloadModel.name,
+          userQuery: name,
+          modelId: activeDownloadModel.modelId,
+          files: activeDownloadModel.files || {},
+        }),
       });
 
-      clearInterval(progressTimer);
-
-      if (responsedownload.ok) {
-        setDownloadingProgress((prev) => {
-          const n = { ...prev };
-          delete n[url];
-          return n;
-        });
-        await fetchModels();
-      } else {
-        setDownloadingProgress((prev) => {
-          const n = { ...prev };
-          delete n[url];
-          return n;
-        });
+      const data = await response.json();
+      if (!response.ok) {
+        setDownloadError(data.error || "Download failed");
+        return;
       }
+
+      const jobId = data.jobId;
+      const modelId = data.modelId || name;
+      setDownloadJobs((prev) => ({
+        ...prev,
+        [jobId]: {
+          jobId,
+          modelId,
+          modelName: data.modelName || activeDownloadModel.name || name,
+          status: data.status || "downloading",
+          progress: data.progress ?? 0,
+          started_at: data.started_at || new Date().toISOString(),
+          error: null,
+        },
+      }));
     } catch (err) {
-      setDownloadingProgress((prev) => {
-        const n = { ...prev };
-        delete n[url];
-        return n;
-      });
+      setDownloadError(err.message || "Download failed");
     }
   };
 
   // ---- UI primitives ----
-  const Glass = ({ children, style, className }) => (
-    <div
-      className={className}
-      style={{
-        borderRadius: t.radiusLg,
-        border: `1px solid ${t.hairline}`,
-        background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
-        backdropFilter: "blur(22px) saturate(140%)",
-        WebkitBackdropFilter: "blur(22px) saturate(140%)",
-        boxShadow: t.shadow,
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-
-  const Hairline = ({ style }) => <div style={{ height: 1, background: t.hairline, ...style }} />;
-
-  const Pill = ({ children, tone = "neutral", style }) => {
-    const toneMap = {
-      neutral: { bg: t.isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)", fg: t.text, bd: t.hairline },
-      primary: { bg: t.primaryWash, fg: t.primary, bd: "rgba(10,132,255,0.28)" },
-      success: { bg: t.successWash, fg: t.success, bd: "rgba(52,199,89,0.28)" },
-      danger: { bg: t.dangerWash, fg: t.danger, bd: "rgba(255,59,48,0.28)" },
-      warning: { bg: "rgba(255,149,0,0.14)", fg: t.warning, bd: "rgba(255,149,0,0.28)" },
-    }[tone];
-
-    return (
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "6px 10px",
-          borderRadius: 999,
-          fontSize: 11,
-          fontWeight: 800,
-          letterSpacing: 0.2,
-          background: toneMap.bg,
-          color: toneMap.fg,
-          border: `1px solid ${toneMap.bd}`,
-          whiteSpace: "nowrap",
-          ...style,
-        }}
-      >
-        {children}
-      </span>
-    );
-  };
-
+  
+  
   const Btn = ({ children, onClick, variant = "secondary", disabled, style, type = "button" }) => {
     const v = {
       primary: { bg: `linear-gradient(180deg, rgba(10,132,255,0.95), rgba(10,132,255,0.78))`, fg: "white", bd: "rgba(10,132,255,0.45)" },
@@ -312,67 +381,7 @@ function ModelsView({
     );
   };
 
-  const IconBtn = ({ onClick, title, children, disabled, style }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      disabled={disabled}
-      style={{
-        width: 40,
-        height: 40,
-        borderRadius: 999,
-        border: `1px solid ${t.hairline}`,
-        background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-        color: t.text,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.55 : 1,
-        boxShadow: t.shadowSoft,
-        ...style,
-      }}
-    >
-      {children}
-    </button>
-  );
-
-  const Input = ({ value, onChange, placeholder, leftIcon, rightNode, autoFocus }) => (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        height: 44,
-        padding: "0 12px",
-        borderRadius: 16,
-        border: `1px solid ${t.hairline}`,
-        background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-        boxShadow: t.shadowSoft,
-        minWidth: 260,
-        flex: "1 1 360px",
-      }}
-    >
-      <span style={{ display: "inline-flex", color: t.subtext }}>{leftIcon}</span>
-      <input
-        autoFocus={autoFocus}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{
-          width: "100%",
-          background: "transparent",
-          border: "none",
-          outline: "none",
-          color: t.text,
-          fontSize: 14,
-          fontWeight: 650,
-        }}
-      />
-      {rightNode}
-    </div>
-  );
+  
 
   const ProgressBar = ({ value }) => (
     <div style={{ height: 4, borderRadius: 999, background: t.isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)", overflow: "hidden" }}>
@@ -380,51 +389,14 @@ function ModelsView({
     </div>
   );
 
-  const Modal = ({ open, onClose, title, children, footer }) => {
-    if (!open) return null;
-    return (
-      <div
-        role="dialog"
-        aria-modal="true"
-        onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 2000,
-          background: t.isDark ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.30)",
-          display: "grid",
-          placeItems: "center",
-          padding: 16,
-        }}
-      >
-        <Glass style={{ width: "100%", maxWidth: 440, padding: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-            <div style={{ fontWeight: 950, letterSpacing: -0.3, color: t.text }}>{title}</div>
-            <IconBtn onClick={onClose} title="Close" style={{ width: 36, height: 36 }}>
-              <CloseIcon style={{ fontSize: 18 }} />
-            </IconBtn>
-          </div>
-          <Hairline style={{ margin: "10px 0 12px 0" }} />
-          <div style={{ color: t.text }}>{children}</div>
-          {footer && (
-            <>
-              <Hairline style={{ margin: "12px 0 10px 0" }} />
-              <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>{footer}</div>
-            </>
-          )}
-        </Glass>
-      </div>
-    );
-  };
-
+  
   // ---- Toolbar actions ----
   const selectedCount = selected.size;
-  const onSelectAll = () => setSelected(new Set(models.map((m) => m.name)));
+  const onSelectAll = () => setSelected(new Set(selectableLocalModels.map((m) => m.name)));
   const onClear = () => setSelected(new Set());
   const onDelete = () => setDeleteOpen(true);
 
   // ---- Layout helpers ----
-  const bottomBarRef = useRef(null);
 
   // ---- Loading view ----
   if (loading) {
@@ -471,6 +443,7 @@ function ModelsView({
         >
           <div style={{ paddingBottom: 10 }}>
           <Glass
+            t={t}
             style={{
               padding: 14,
               marginBottom: 14,
@@ -484,6 +457,7 @@ function ModelsView({
           </div>
 
           <Glass
+            t={t}
             style={{
               padding: 14,
               marginBottom: 14,
@@ -510,35 +484,193 @@ function ModelsView({
                 </div>
               )}
 
-              <Input
-                value={searchQuery}
-                onChange={(val) => {
-                   setSearchQuery(val);
-                   setCurrentPage(1);
-                
-                }}
-                placeholder="Search local and online models..."
-                leftIcon={<SearchIcon style={{ fontSize: 20 }} />}
-                rightNode={
-                  <IconBtn
-                    title={showOnline ? "Online search enabled" : "Online search disabled"}
-                    onClick={() => setShowOnline(!showOnline)}
+              <div style={{ position: "relative", flex: "1 1 360px",  }} ref={dropdownRef}>
+                <SearchInput
+                  t={t}
+                  value={searchQuery}
+                  onChange={(val) => {
+                    setSearchQuery(val);
+                    setIsDropdownOpen(true);
+                  }}
+                  placeholder="Search models..."
+                  leftIcon={<SearchIcon style={{ fontSize: 20 }} />}
+                  rightNode={
+                    <button
+                      type="button"
+                      title={isOnlineSearchEnabled ? "Disable online search" : "Enable online search"}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        toggleOnlineSearch();
+                      }}
+                      onMouseDown={(e) => e.preventDefault()}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        padding: "6px 8px",
+                        borderRadius: 12,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {isOnlineSearchEnabled ? (
+                        <CloudDownloadIcon style={{ fontSize: 20, color: t.primary }} />
+                      ) : (
+                        <CloudOffIcon style={{ fontSize: 20, color: t.subtext }} />
+                      )}
+                    </button>
+                  }
+                  onFocus={() => setIsDropdownOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowDown") {
+                      setIsDropdownOpen(true);
+                    }
+                  }}
+                  inputRef={inputRef}
+                />
+
+                {isDropdownOpen && (
+                  <div
+                    onMouseDown={(e) => e.preventDefault()}
                     style={{
-                      width: 36,
-                      height: 36,
-                      boxShadow: "none",
-                      borderColor: showOnline ? "rgba(10,132,255,0.45)" : t.hairline,
-                      color: showOnline ? t.primary : t.subtext,
+                      position: "absolute",
+                      top: 52,
+                      left: 0,
+                      right: 0,
+                      isolation: "isolate",
+                      transform: "translateZ(0)",
+                      background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
+                      backdropFilter: "blur(22px) saturate(140%)",
+                      WebkitBackdropFilter: "blur(22px) saturate(140%)",
+                      border: `1px solid ${t.hairline}`,
+                      borderRadius: 16,
+                      boxShadow: t.shadowSoft,
+                      maxHeight: 320,
+                      overflow: "hidden",
+                      zIndex: 40,
                     }}
                   >
-                    {showOnline ? <CloudIcon style={{ fontSize: 19 }} /> : <CloudOffIcon style={{ fontSize: 19 }} />}
-                  </IconBtn>
-                }
-              />
+                    <div style={{ maxHeight: 280, overflowY: "auto" }}>
+                      {!debouncedQuery && (
+                        <div style={{ padding: 12, color: t.subtext, fontSize: 12, fontWeight: 700 }}>
+                          Start typing to search online models.
+                        </div>
+                      )}
+
+                      {debouncedQuery && !isOnlineSearchEnabled && (
+                        <div style={{ padding: 12, color: t.subtext, fontSize: 12, fontWeight: 700 }}>
+                          Online search is disabled. Click the cloud icon to enable it.
+                        </div>
+                      )}
+
+                      {debouncedQuery && isOnlineSearchEnabled && isSearching && (
+                        <div style={{ padding: 12, color: t.subtext, fontSize: 12, fontWeight: 700 }}>
+                          Searching…
+                        </div>
+                      )}
+
+                      {debouncedQuery && isOnlineSearchEnabled && searchError && (
+                        <div style={{ padding: 12, color: t.danger, fontSize: 12, fontWeight: 700 }}>
+                          {searchError}
+                        </div>
+                      )}
+
+                      {debouncedQuery &&
+                        isOnlineSearchEnabled &&
+                        !isSearching &&
+                        !searchError &&
+                        onlineResults.length === 0 && (
+                          <div style={{ padding: 12, color: t.subtext, fontSize: 12, fontWeight: 700 }}>
+                            No results found.
+                          </div>
+                        )}
+
+                      {isOnlineSearchEnabled &&
+                        onlineResults.map((model) => {
+                          const modelId = model.modelId || model.name;
+                          const normalized = normalizeId(modelId);
+                          const isInstalled = installedIds.has(normalized);
+                          const job = Object.values(downloadJobs).find(
+                            (j) => normalizeId(j.modelId || j.modelName) === normalized
+                          );
+                          const isDownloading = job && job.status !== "completed" && job.status !== "failed";
+
+                          return (
+                            <div
+                              key={modelId}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 12,
+                                padding: "10px 12px",
+                                borderBottom: `1px solid ${t.hairline}`,
+                                backdropFilter: `blur(22px) saturate(140%)`,
+                                WebkitBackdropFilter: `blur(22px) saturate(140%)`,
+                              }}
+                            >
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ color: t.text, fontWeight: 800, fontSize: 13 }}>
+                                  {model.name}
+                                </div>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                                  {model.author && <Pill t={t} tone="neutral">{model.author}</Pill>}
+                                  {model.size_mb && <Pill t={t} tone="neutral">{model.size_mb} MB</Pill>}
+                                  {Array.isArray(model.tags) &&
+                                    model.tags.map((tag) => (
+                                      <Pill t={t} key={tag} tone="primary">
+                                        {tag}
+                                      </Pill>
+                                    ))}
+                                  {isInstalled && <Pill t={t} tone="success">Installed</Pill>}
+                                  {isDownloading && <Pill t={t} tone="warning">Downloading</Pill>}
+                                </div>
+                              </div>
+
+                              <Btn
+                                t={t}
+                                variant="primary"
+                                disabled={isInstalled || isDownloading}
+                                onClick={() => {
+                                  setActiveDownloadModel(model);
+                                  setCustomModelName("");
+                                  setDownloadError("");
+                                  setDownloadDialogOpen(true);
+                                }}
+                                style={{ height: 36, padding: "0 12px" }}
+                              >
+                                {isInstalled ? "Installed" : "Download"}
+                              </Btn>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    {debouncedQuery && isOnlineSearchEnabled && onlineTotalPages > onlinePage && (
+                      <div style={{ padding: 10 }}>
+                        <Btn
+                          t={t}
+                          variant="outline"
+                          onClick={() => {
+                            const nextPage = onlinePage + 1;
+                            setOnlinePage(nextPage);
+                            performOnlineSearch(debouncedQuery, nextPage, true);
+                          }}
+                          style={{ width: "100%", height: 36 }}
+                        >
+                          Load more
+                        </Btn>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {!isInferenceSelection && (
                 <div style={{ position: "relative" }}>
                   <IconBtn
+                    t={t}
                     title="Delete selected"
                     onClick={onDelete}
                     disabled={selectedCount === 0}
@@ -584,23 +716,29 @@ function ModelsView({
 
         {/* True grid: multiple per row */}
         <div className="vf-grid">
-          {displayModels.map((model, i) => {
+          {filteredLocalModels.map((model, i) => {
             const isSelected = selected.has(model.name);
-            const downloadPct = downloadingProgress[model.url];
+            const downloadPct = typeof model.downloadProgress === "number" ? model.downloadProgress : null;
 
             const statusTone = isInferenceSelection
               ? "primary"
               : model.status === "completed"
               ? "success"
+              : model.status === "failed" || model.status === "error"
+              ? "danger"
               : "warning";
 
             const statusLabel = isInferenceSelection
               ? "SELECT MODEL"
-              : model.status?.toUpperCase() || "COMPLETED";
+              : model.status === "downloading"
+              ? "DOWNLOADING"
+              : model.status === "failed" || model.status === "error"
+              ? "ERROR"
+              : "READY";
 
             return (
               <div
-                key={model.url || model.name || i}
+                key={model.modelId || model.name || i}
                 className="vf-card"
                 role="button"
                 tabIndex={0}
@@ -610,11 +748,9 @@ function ModelsView({
                   borderRadius: t.radiusLg,
                   border: `1px solid ${isSelected ? "rgba(10,132,255,0.45)" : t.hairline}`,
                   background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                  // backdropFilter: "blur(18px) saturate(140%)",
-                  // WebkitBackdropFilter: "blur(18px) saturate(140%)",
                   boxShadow: t.shadowSoft,
                   padding: 16,
-                  cursor: model.isOnline ? "default" : "pointer",
+                  cursor: model.status === "downloading" ? "default" : "pointer",
                   position: "relative",
                   minHeight: 204,
                   display: "flex",
@@ -624,18 +760,9 @@ function ModelsView({
                 }}
               >
                 {/* Progress overlay */}
-                {downloadPct !== undefined && (
+                {downloadPct !== null && model.status === "downloading" && (
                   <div style={{ position: "absolute", top: 10, left: 12, right: 12 }}>
                     <ProgressBar value={downloadPct} />
-                  </div>
-                )}
-
-                {/* Online badge */}
-                {model.isOnline && (
-                  <div style={{ position: "absolute", top: 12, right: 12 }}>
-                    <Pill tone="primary" style={{ fontSize: 10, padding: "5px 9px" }}>
-                      ONLINE
-                    </Pill>
                   </div>
                 )}
 
@@ -656,11 +783,7 @@ function ModelsView({
                   </div>
 
                   <div style={{ color: t.subtext, fontSize: 12, fontWeight: 700 }}>
-                    {model.isOnline
-                      ? "From Cloud Search"
-                      : model.created
-                      ? new Date(model.created).toLocaleDateString()
-                      : "Local"}
+                    {model.created ? new Date(model.created).toLocaleDateString() : "Local"}
                   </div>
                 </div>
 
@@ -668,13 +791,13 @@ function ModelsView({
                 <div style={{ marginTop: "auto" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12, marginBottom: 12 }}>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {model.checkpoints?.length > 0 && <Pill tone="primary">{model.checkpoints.length} CP</Pill>}
-                      {model.sampleRate && <Pill tone="neutral">{model.sampleRate}hz</Pill>}
-                    </div>
-                    <Pill tone="neutral">{model.size_mb || "N/A"} MB</Pill>
-                  </div>
+                  {model.checkpoints?.length > 0 && <Pill t={t} tone="primary">{model.checkpoints.length} CP</Pill>}
+                  {model.sampleRate && <Pill t={t} tone="neutral">{model.sampleRate}hz</Pill>}
+                </div>
+                <Pill t={t} tone="neutral">{model.size_mb || "N/A"} MB</Pill>
+              </div>
 
-                  {!model.isOnline && model.checkpoints?.length > 0 && (
+                  {model.checkpoints?.length > 0 && (
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ color: t.subtext, fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
                         Latest Checkpoints:
@@ -682,7 +805,7 @@ function ModelsView({
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {model.checkpoints.slice(0, 3).map((cp, idx) => (
                           <Pill
-                            key={idx}
+                            key={idx} t={t}
                             tone="neutral"
                             style={{
                               background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
@@ -695,114 +818,32 @@ function ModelsView({
                     </div>
                   )}
 
-                  {/* Action area */}
-                  {model.isOnline ? (
-                    <Btn
-                      variant="primary"
-                      disabled={downloadPct !== undefined}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveDownloadModel(model);
-                        setCustomModelName("");
-                        setDownloadError("");
-                        setDownloadDialogOpen(true);
+                  <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 8 }}>
+                    <Pill
+                      tone={statusTone}
+                      t={t}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 14,
                       }}
-                      style={{ width: "100%", height: 44 }}
                     >
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                        {downloadPct !== undefined ? (
-                          <>
-                            <span
-                              style={{
-                                width: 14,
-                                height: 14,
-                                borderRadius: 999,
-                                border: "2px solid rgba(255,255,255,0.35)",
-                                borderTopColor: "white",
-                                animation: "spin 0.9s linear infinite",
-                              }}
-                            />
-                            Downloading {Math.round(downloadPct)}%
-                          </>
-                        ) : (
-                          <>
-                            <DownloadIcon style={{ fontSize: 18 }} />
-                            Download
-                          </>
-                        )}
-                      </span>
-                    </Btn>
-                  ) : (
-                    <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                      <Pill
-                        tone={statusTone}
-                        style={{
-                          padding: "10px 14px",
-                          borderRadius: 14,
-                        }}
-                      >
-                        {statusLabel}
-                      </Pill>
-                    </div>
-                  )}
+                      {statusLabel}
+                    </Pill>
+                    {model.status === "failed" && model.downloadError && (
+                      <span style={{ fontSize: 11, color: t.danger }}>{model.downloadError}</span>
+                    )}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Fixed pagination bar (bottom) */}
-        {showOnline && totalPages > 1 && (
-          <div
-            ref={bottomBarRef}
-            style={{
-              position: "fixed",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 60,
-              padding: "10px 12px",
-              display: "flex",
-              justifyContent: "center",
-              pointerEvents: "none",
-            }}
-          >
-            <Glass
-              style={{
-                width: "min(720px, calc(100% - 24px))",
-                padding: 12,
-                pointerEvents: "auto",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                <Btn
-                  variant="outline"
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  style={{ minWidth: 110 }}
-                >
-                  Prev
-                </Btn>
-
-                <Pill tone="neutral" style={{ padding: "10px 12px", fontSize: 12 }}>
-                  Page {currentPage} / {totalPages}
-                </Pill>
-
-                <Btn
-                  variant="outline"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  style={{ minWidth: 110 }}
-                >
-                  Next
-                </Btn>
-              </div>
-            </Glass>
-          </div>
-        )}
+        {/* Online results pagination is handled inside the dropdown */}
 
         {/* Checkpoint modal */}
         <Modal
+          t={t}
           open={checkpointDialogOpen}
           onClose={() => setCheckpointDialogOpen(false)}
           title="Choose Checkpoint"
@@ -853,7 +894,7 @@ function ModelsView({
                       {cp.epochs} Epochs
                     </div>
                     {cp.isBest && (
-                      <Pill tone="success" style={{ fontSize: 10, padding: "5px 9px" }}>
+                      <Pill t={t} tone="success" style={{ fontSize: 10, padding: "5px 9px" }}>
                         BEST
                       </Pill>
                     )}
@@ -866,15 +907,16 @@ function ModelsView({
 
         {/* Download modal */}
         <Modal
+          t={t}
           open={downloadDialogOpen}
           onClose={() => setDownloadDialogOpen(false)}
           title="Name your model"
           footer={
             <>
-              <Btn variant="outline" onClick={() => setDownloadDialogOpen(false)}>
+              <Btn t={t} variant="outline" onClick={() => setDownloadDialogOpen(false)}>
                 Cancel
               </Btn>
-              <Btn variant="primary" onClick={executeDownload} style={{ padding: "10px 18px" }}>
+              <Btn t={t} variant="primary" onClick={executeDownload} style={{ padding: "10px 18px" }}>
                 Confirm
               </Btn>
             </>
@@ -923,16 +965,18 @@ function ModelsView({
 
         {/* Delete modal */}
         <Modal
+          t={t}
           open={deleteOpen}
           onClose={() => setDeleteOpen(false)}
           title="Confirm Deletion"
           footer={
             <>
-              <Btn variant="outline" onClick={() => setDeleteOpen(false)}>
+              <Btn t={t} variant="outline" onClick={() => setDeleteOpen(false)}>
                 Cancel
               </Btn>
               <Btn
                 variant="danger"
+                t={t}
                 onClick={async () => {
                   await Promise.all(
                     Array.from(selected).map((n) =>

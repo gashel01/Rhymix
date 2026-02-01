@@ -16,10 +16,10 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
   const { volumeRef } = useVolume();
   const t = Theme({ darkMode }).t;
 
-  const [inferenceResults, setInferenceResults] = useState([]);
+  const [serverRuns, setServerRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [liveResults, setLiveResults] = useState([]);
+  const [optimisticRuns, setOptimisticRuns] = useState([]);
   const [liveLoading, setLiveLoading] = useState(false);
   const pollingJobsRef = useRef(null);
   const liveStartedRef = useRef(false);
@@ -31,12 +31,11 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
     handleVocalModeChange,
     handleDownload,
   } = useAudioPlayback({
-    inferenceResults,
+    inferenceResults: serverRuns,
     setLoading,
     setError,
-    setInferenceResults,
-    liveResults,
-    liveInferenceData,
+    setInferenceResults: setServerRuns,
+    liveResults: optimisticRuns,
   });
 
   const {
@@ -44,7 +43,38 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
     handleSelectAllRows,
     handleDeselectAllRows,
     selectedRows,
-  } = useTableActions({ inferenceResults, trackPairs });
+  } = useTableActions({ inferenceResults: serverRuns, trackPairs });
+
+  const updateFavoriteLocal = useCallback((runId, isFavorite) => {
+    if (!runId) return;
+    setServerRuns((prev) =>
+      prev.map((run) => (run.runId === runId ? { ...run, isFavorite } : run))
+    );
+    setOptimisticRuns((prev) =>
+      prev.map((run) => (run.runId === runId ? { ...run, isFavorite } : run))
+    );
+  }, []);
+
+  const handleToggleFavorite = useCallback(
+    async (runId, isFavorite) => {
+      if (!runId) return;
+      updateFavoriteLocal(runId, isFavorite);
+      try {
+        const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/favorite`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isFavorite }),
+        });
+        if (!response.ok) throw new Error("Failed to update favorite");
+        const data = await response.json();
+        updateFavoriteLocal(runId, !!data.isFavorite);
+      } catch (err) {
+        updateFavoriteLocal(runId, !isFavorite);
+        setError(err?.message || "Failed to update favorite");
+      }
+    },
+    [updateFavoriteLocal]
+  );
 
   // Start live inference when liveInferenceData is set
   useEffect(() => {
@@ -57,6 +87,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
         setLiveLoading(true);
         setError(null);
         const tracks = liveInferenceData.tracks;
+        const startedAt = new Date().toISOString();
         const jobs = await Promise.all(
           tracks.map(async (track) => {
             const response = await fetch("/api/start-inference", {
@@ -70,10 +101,28 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
             });
             if (!response.ok) throw new Error(`Failed to start inference for track ${track?.id ?? "unknown"}`);
             const result = await response.json();
-            return { track, jobId: result.jobId, runId: result.runId, status: "processing" };
+            const fileId = track?.fileId || track?.id || null;
+            return {
+              jobId: result.jobId,
+              tempId: result.jobId,
+              runId: result.runId,
+              status: "processing",
+              track,
+              model: liveInferenceData.model,
+              modelId: liveInferenceData.model?.id,
+              modelName: liveInferenceData.model?.name,
+              params: liveInferenceData.params || {},
+              inputFileId: fileId,
+              inputDisplayName: track?.displayName || track?.name || null,
+              inputOriginalName: track?.originalName || null,
+              vocalFileType: track?.vocalFileType || track?.vocalsFileType || liveInferenceData.params?.vocalsFileType,
+              createdAt: startedAt,
+              isNew: true,
+              isFavorite: false,
+            };
           })
         );
-        setLiveResults(jobs);
+        setOptimisticRuns(jobs);
         pollingJobsRef.current = jobs;
         setPollingCount(jobs.length);
       } catch (err) {
@@ -98,18 +147,36 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
             const response = await fetch(`/api/inference-status/${job.jobId}`, { signal: abortController.signal });
             if (!response.ok) return job;
             const data = await response.json();
-            return { ...job, ...data };
+            return {
+              ...job,
+              ...data,
+              runId: data.runId || job.runId,
+              status: data.status || job.status,
+              outputUrl: data.outputUrl || job.outputUrl,
+              track: data.track || job.track,
+            };
           })
         );
-        setLiveResults((prev) => {
+        setOptimisticRuns((prev) => {
           const byId = new Map(prev.map((p) => [p.jobId, p]));
           return updated.map((n) => {
             const p = byId.get(n.jobId);
-            const same = p && p.status === n.status && p.outputFile === n.outputFile;
-            return same ? p : { ...(p || n), ...n };
+            if (!p) return n;
+            const same = p.status === n.status && p.outputFile === n.outputFile && p.outputUrl === n.outputUrl;
+            if (same) return p;
+            return {
+              ...p,
+              ...n,
+              runId: n.runId || p.runId,
+              modelName: p.modelName || n.model_name || n.modelName,
+              modelId: p.modelId || n.modelId,
+            };
           });
         });
-        const allDone = updated.every((j) => j.status === "completed" || j.status === "failed");
+        const allDone = updated.every((j) => {
+          const status = String(j.status || "").toLowerCase();
+          return status === "completed" || status === "failed" || status === "done";
+        });
         if (allDone) {
           clearInterval(intervalId);
           pollingJobsRef.current = null;
@@ -220,6 +287,8 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
               onRowSelect={handleRowSelect} // important
               onSelectAll={handleSelectAllRows} // important
               onDeselectAll={handleDeselectAllRows} // important
+              enableGrouping
+              onToggleFavorite={handleToggleFavorite}
               defaultLabel=" "
               volume={volumeRef.current}
               header={<div style={{ padding: 14 }}>
