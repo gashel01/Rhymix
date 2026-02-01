@@ -36,10 +36,17 @@ function ModelsView({
   selectedTracks = [],
   onBack,
   onModelSelected,
+  navContext,
+  onNavigate,
   darkMode, // optional
 }) {
   // ---- Theme tokens ----
   const { t } = Theme({ darkMode });
+  const [ctx, setCtx] = useState(navContext || null);
+
+  useEffect(() => {
+    if (navContext) setCtx(navContext);
+  }, [navContext]);
 
   // ---- Data state (same logic) ----
   const [localModels, setLocalModels] = useState([]);
@@ -183,6 +190,39 @@ function ModelsView({
     if (!value) return "";
     return String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
   }, []);
+
+  const selectionNames = useMemo(() => {
+    return (selectedTracks || [])
+      .map((track) => track?.displayName || track?.safeDisplayName || track?.originalName || track?.name || track?.fileId || track?.id)
+      .filter(Boolean);
+  }, [selectedTracks]);
+
+  const selectionPreview = useMemo(() => {
+    const list = selectionNames.slice(0, 3);
+    const extra = selectionNames.length - list.length;
+    const base = list.join(", ");
+    return extra > 0 ? `${base} +${extra} more` : base;
+  }, [selectionNames]);
+
+  const handleBack = useCallback(() => {
+    if (ctx?.source === "home") {
+      if (onNavigate) {
+        onNavigate("home");
+        return;
+      }
+      onBack?.();
+      return;
+    }
+    if (ctx?.source === "inference") {
+      if (onNavigate) {
+        onNavigate("inference");
+        return;
+      }
+      onBack?.();
+      return;
+    }
+    onBack?.();
+  }, [ctx?.source, onBack, onNavigate]);
 
   const installedIds = useMemo(() => {
     const ids = new Set();
@@ -451,10 +491,38 @@ function ModelsView({
           >
             <PageHeader
               title={isInferenceSelection ? "Select Model for Inference" : "TRAINED VOICE MODELS"}
-              onBack={isInferenceSelection ? onBack : null}
+              onBack={isInferenceSelection ? handleBack : null}
             />
             </Glass>
           </div>
+
+          {isInferenceSelection && (
+            <Glass
+              t={t}
+              style={{
+                padding: 16,
+                marginBottom: 14,
+              }}
+            >
+              <div style={{ fontWeight: 900, color: t.text, marginBottom: 6 }}>Selection Summary</div>
+              {selectionNames.length === 0 ? (
+                <div style={{ color: t.subtext, fontSize: 13, fontWeight: 650, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span>No selection found. Go back to select tracks.</span>
+                  <Btn variant="outline" onClick={handleBack} style={{ height: 32, padding: "0 10px" }}>
+                    Go Back
+                  </Btn>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                  <Pill t={t} tone="primary">{selectionNames.length} track{selectionNames.length !== 1 ? "s" : ""}</Pill>
+                  <div style={{ color: t.subtext, fontSize: 12, fontWeight: 700 }}>{selectionPreview}</div>
+                  {ctx?.selectedModelName && (
+                    <Pill t={t} tone="success">Model: {ctx.selectedModelName}</Pill>
+                  )}
+                </div>
+              )}
+            </Glass>
+          )}
 
           <Glass
             t={t}

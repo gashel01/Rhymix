@@ -253,13 +253,27 @@ const DEFAULT_PARAMS = {
   sid: 0,
 };
 
-export default function InferenceParams({ selectedModel, selectedTracks, onBack, onStartInference }) {
+export default function InferenceParams({ selectedModel, selectedTracks, onBack, onStartInference, navContext, onGoToModelSelection }) {
   const theme = useTheme();
   const [params, setParams] = useState(DEFAULT_PARAMS);
 
   const trackCount = Array.isArray(selectedTracks) ? selectedTracks.length : 0;
   const modelName = typeof selectedModel?.name === "string" ? selectedModel.name.split("_")[0] : "Model";
   const modelEpoch = selectedModel?.selectedCheckpoint?.epochs ?? "Unknown";
+  const selectionNames = useMemo(
+    () =>
+      (selectedTracks || [])
+        .map((track) => track?.displayName || track?.safeDisplayName || track?.originalName || track?.name || track?.fileId || track?.id)
+        .filter(Boolean),
+    [selectedTracks]
+  );
+  const selectionPreview = useMemo(() => {
+    const list = selectionNames.slice(0, 4);
+    const extra = selectionNames.length - list.length;
+    const base = list.join(", ");
+    return extra > 0 ? `${base} +${extra} more` : base;
+  }, [selectionNames]);
+  const hasModel = Boolean(selectedModel?.name || selectedModel?.modelName || selectedModel?.id || selectedModel?.modelId);
 
   const setField = useCallback((field, value) => {
     setParams((prev) => ({ ...prev, [field]: value }));
@@ -276,7 +290,7 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
   }, []);
 
   const handleStartInference = () => {
-    if (!onStartInference) return;
+    if (!onStartInference || !hasModel || trackCount === 0) return;
 
     // If your backend expects Applio numeric fields, map here:
     const payloadParams = {
@@ -299,6 +313,49 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
         subtitle="Fine-tune voice conversion parameters for optimal results"
         onBack={onBack}
       />
+
+      {trackCount === 0 && (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            mb: 4,
+            backgroundColor: theme.palette.mode === "dark" ? "rgba(255, 193, 7, 0.08)" : "rgba(255, 193, 7, 0.06)",
+            border: `1px solid ${theme.palette.mode === "dark" ? "rgba(255, 193, 7, 0.4)" : "rgba(255, 193, 7, 0.3)"}`,
+            borderRadius: 3,
+          }}
+        >
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+            No selection found
+          </Typography>
+          <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+            Go back to select one or more tracks.
+          </Typography>
+        </Paper>
+      )}
+
+      {!hasModel && (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            mb: 4,
+            backgroundColor: theme.palette.mode === "dark" ? "rgba(255, 59, 48, 0.08)" : "rgba(255, 59, 48, 0.06)",
+            border: `1px solid ${theme.palette.mode === "dark" ? "rgba(255, 59, 48, 0.4)" : "rgba(255, 59, 48, 0.3)"}`,
+            borderRadius: 3,
+          }}
+        >
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+            No model selected
+          </Typography>
+          <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 2 }}>
+            Please select a model before running inference.
+          </Typography>
+          <Button variant="contained" onClick={onGoToModelSelection} disabled={!onGoToModelSelection}>
+            Choose Model
+          </Button>
+        </Paper>
+      )}
 
       {/* Model & Track Overview */}
       <Paper
@@ -364,6 +421,11 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
                   <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
                     Track{trackCount !== 1 ? "s" : ""} Selected
                   </Typography>
+                  {trackCount > 0 && (
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, mt: 1, display: "block" }}>
+                      {selectionPreview}
+                    </Typography>
+                  )}
                 </Box>
               </Grid>
 
@@ -382,6 +444,11 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
                   <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
                     Epoch {modelEpoch}
                   </Typography>
+                  {navContext?.source && (
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, mt: 1, display: "block" }}>
+                      Source: {navContext.source}
+                    </Typography>
+                  )}
                 </Box>
               </Grid>
             </Grid>
@@ -758,6 +825,7 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
           variant="contained"
           color="primary"
           onClick={handleStartInference}
+          disabled={!hasModel || trackCount === 0}
           size="large"
           startIcon={<TuneIcon />}
           sx={{

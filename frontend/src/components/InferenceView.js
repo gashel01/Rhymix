@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo, useEffect, useRef } from "react";
+import React, { useState, useCallback, memo, useEffect, useRef, useMemo } from "react";
 import { useVolume } from "../contexts/VolumeContext";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
 import PsychologyIcon from "@mui/icons-material/Psychology";
@@ -12,7 +12,7 @@ import { Theme } from './Homeview/Theme.js';
 import Panel from './Homeview/Panel.js';
 import Btn from './Homeview/Btn.js';
 
-function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
+function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToParams, onSelectionToModelSelection }) {
   const { volumeRef } = useVolume();
   const t = Theme({ darkMode }).t;
 
@@ -196,8 +196,73 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
     };
   }, [pollingCount]);
 
-  const handleReturnToModelSelection = useCallback(() => onNavigate?.("inference-model-selection"), [onNavigate]);
-  const handleReturnToInferenceParams = useCallback(() => onNavigate?.("inference-params"), [onNavigate]);
+  const selectedPairs = useMemo(() => {
+    if (!selectedRows.length) return [];
+    return trackPairs.filter((pair) => selectedRows.includes(pair.id));
+  }, [selectedRows, trackPairs]);
+
+  const uniqueModels = useMemo(() => {
+    const models = new Map();
+    selectedPairs.forEach((pair) => {
+      const key = pair.modelId || pair.modelName;
+      if (!key) return;
+      if (!models.has(key)) {
+        models.set(key, {
+          modelId: pair.modelId || null,
+          modelName: pair.modelName || null,
+        });
+      }
+    });
+    return models;
+  }, [selectedPairs]);
+
+  const selectionModel = useMemo(() => {
+    if (uniqueModels.size !== 1) return null;
+    return Array.from(uniqueModels.values())[0];
+  }, [uniqueModels]);
+
+  const selectedTracks = useMemo(() => {
+    return selectedPairs
+      .map((pair) => {
+        if (pair?.result?.track) return pair.result.track;
+        if (pair?.track) return pair.track;
+        const fileId = pair?.fileId || null;
+        if (!fileId) return null;
+        return {
+          fileId,
+          id: fileId,
+          displayName: pair?.displayName || pair?.name || null,
+          originalName: pair?.originalName || null,
+          vocalFileType: pair?.vocalFileType || pair?.result?.vocalFileType || pair?.result?.params?.vocalsFileType,
+        };
+      })
+      .filter(Boolean);
+  }, [selectedPairs]);
+
+  const handleReturnToModelSelection = useCallback(() => {
+    if (!onSelectionToModelSelection) {
+      onNavigate?.("inference-model-selection");
+      return;
+    }
+    onSelectionToModelSelection({
+      source: "inference",
+      selectedTracks,
+    });
+  }, [onNavigate, onSelectionToModelSelection, selectedTracks]);
+
+  const handleReturnToInferenceParams = useCallback(() => {
+    if (!selectionModel || !onSelectionToParams) return;
+    onSelectionToParams({
+      source: "inference",
+      selectedTracks,
+      selectedModel: {
+        id: selectionModel.modelId || null,
+        name: selectionModel.modelName || null,
+      },
+    });
+  }, [onSelectionToParams, selectionModel, selectedTracks]);
+
+  const showSelectionButton = Boolean(selectionModel);
 
   const hasRows = trackPairs.length > 0;
   const showSpinner = loading && !hasRows;
@@ -275,7 +340,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
             <AudioTrackTable
               trackPairs={trackPairs}
               vocalModeType="inference"
-             vocalMode={vocalMode}
+              vocalMode={vocalMode}
               handleVocalModeChange={handleVocalModeChange}
               handleDownload={handleDownload}
               showVocalToggle={true}
@@ -284,7 +349,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
               showInferenceButton={false}
               showInferenceResultsActions={true}
               onReturnToModelSelection={handleReturnToModelSelection}
-              onReturnToInferenceParams={handleReturnToInferenceParams}
+              onReturnToInferenceParams={showSelectionButton ? handleReturnToInferenceParams : null}
               externalSelectedRows={selectedRows} // important
               onRowSelect={handleRowSelect} // important
               onSelectAll={handleSelectAllRows} // important
@@ -353,6 +418,8 @@ export default memo(InferenceView, (prevProps, nextProps) => {
   return (
     prevProps.onNavigate === nextProps.onNavigate &&
     prevProps.darkMode === nextProps.darkMode &&
-    prevProps.liveInferenceData === nextProps.liveInferenceData
+    prevProps.liveInferenceData === nextProps.liveInferenceData &&
+    prevProps.onSelectionToParams === nextProps.onSelectionToParams &&
+    prevProps.onSelectionToModelSelection === nextProps.onSelectionToModelSelection
   );
 });

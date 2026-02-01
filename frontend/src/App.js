@@ -278,6 +278,8 @@ function App() {
   const [inferenceParams, setInferenceParams] = useState(null);
   const [inferenceData, setInferenceData] = useState(null);
   const [liveInferenceData, setLiveInferenceData] = useState(null);
+  const [navContext, setNavContext] = useState(null);
+  const [inferenceParamsOrigin, setInferenceParamsOrigin] = useState(null);
 
   const theme = createAppTheme(darkMode ? 'dark' : 'light');
 
@@ -385,6 +387,8 @@ function App() {
     setSelectedModelForInference(null);
     setInferenceParams(null);
     setInferenceData(null);
+    setNavContext(null);
+    setInferenceParamsOrigin(null);
     if (view !== "inference") setLiveInferenceData(null);
     setDrawerOpen(false);
     // Update URL hash for navigation persistence
@@ -394,6 +398,55 @@ function App() {
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, []);
+
+  const getTrackId = useCallback((track) => {
+    return track?.fileId || track?.trackId || track?.id || track?.runId || track?.tempId || null;
+  }, []);
+
+  const buildNavContext = useCallback(
+    ({ source, selectedTracks = [], selectedModel = null }) => {
+      const ids = (selectedTracks || []).map(getTrackId).filter(Boolean);
+      const uniqueIds = Array.from(new Set(ids));
+      return {
+        source,
+        selectedTrackIds: uniqueIds,
+        selectedModelId: selectedModel?.id || selectedModel?.modelId || null,
+        selectedModelName: selectedModel?.name || selectedModel?.modelName || null,
+      };
+    },
+    [getTrackId]
+  );
+
+  const updateInferenceContext = useCallback(
+    ({ source, selectedTracks = [], selectedModel = null }) => {
+      setSelectedTracksForInference(selectedTracks);
+      setSelectedModelForInference(selectedModel);
+      setNavContext(buildNavContext({ source, selectedTracks, selectedModel }));
+    },
+    [buildNavContext]
+  );
+
+  const openInferenceModelSelection = useCallback(
+    ({ source, selectedTracks }) => {
+      updateInferenceContext({ source, selectedTracks, selectedModel: null });
+      setInferenceParamsOrigin(null);
+      setCurrentView("inference-model-selection");
+      setShowHomeView(false);
+      window.history.replaceState(null, "", "#inference-model-selection");
+    },
+    [updateInferenceContext]
+  );
+
+  const openInferenceParams = useCallback(
+    ({ source, selectedTracks, selectedModel, from }) => {
+      updateInferenceContext({ source, selectedTracks, selectedModel });
+      setInferenceParamsOrigin(from || null);
+      setCurrentView("inference-params");
+      setShowHomeView(false);
+      window.history.replaceState(null, "", "#inference-params");
+    },
+    [updateInferenceContext]
+  );
 
   // Handle URL hash routing for navigation persistence
   useEffect(() => {
@@ -559,17 +612,20 @@ function App() {
 
 
   // Global function for components to trigger view changes
-  const handleInferenceWithTracks = useCallback((tracks) => {
-    setSelectedTracksForInference(tracks);
-    setCurrentView("inference-model-selection");
-  }, []);
+  const handleInferenceWithTracks = useCallback(
+    (tracks) => {
+      openInferenceModelSelection({ source: "home", selectedTracks: tracks || [] });
+    },
+    [openInferenceModelSelection]
+  );
 
   // Make function available globally
   window.appSetView = (view, data) => {
-    setCurrentView(view);
-    if (view === "inference-model-selection" && data) {
-      setSelectedTracksForInference(data);
+    if (view === "inference-model-selection") {
+      openInferenceModelSelection({ source: "home", selectedTracks: data || [] });
+      return;
     }
+    setCurrentView(view);
   };
 
   const handleCreateTalkingDataset = useCallback(() => {
@@ -703,7 +759,26 @@ function App() {
         return <ModelsView />;
 
       case "inference":
-        return <InferenceView onNavigate={handleNavigation} liveInferenceData={liveInferenceData} />;
+        return (
+          <InferenceView
+            onNavigate={handleNavigation}
+            liveInferenceData={liveInferenceData}
+            onSelectionToParams={({ source, selectedTracks, selectedModel }) => {
+              openInferenceParams({
+                source: source || "inference",
+                selectedTracks: selectedTracks || [],
+                selectedModel,
+                from: "inference",
+              });
+            }}
+            onSelectionToModelSelection={({ source, selectedTracks }) => {
+              openInferenceModelSelection({
+                source: source || "inference",
+                selectedTracks: selectedTracks || [],
+              });
+            }}
+          />
+        );
 
       case "talking-workflow":
         return (
@@ -718,11 +793,23 @@ function App() {
           <ModelsView 
             isInferenceSelection={true} 
             selectedTracks={selectedTracksForInference}
-            onBack={() => handleNavigation("home")} 
+            navContext={navContext}
+            onNavigate={handleNavigation}
+            onBack={() => {
+              const source = navContext?.source;
+              if (source === "inference") {
+                handleNavigation("inference");
+                return;
+              }
+              handleNavigation("home");
+            }}
             onModelSelected={(model, tracks) => {
-              setSelectedModelForInference(model);
-              setSelectedTracksForInference(tracks);
-              setCurrentView("inference-params");
+              openInferenceParams({
+                source: navContext?.source || "home",
+                selectedTracks: tracks || selectedTracksForInference || [],
+                selectedModel: model,
+                from: "model",
+              });
             }} 
           />
         );
@@ -732,7 +819,26 @@ function App() {
           <InferenceParams
             selectedModel={selectedModelForInference}
             selectedTracks={selectedTracksForInference}
-            onBack={() => setCurrentView("inference-model-selection")}
+            navContext={navContext}
+            onBack={() => {
+              if (inferenceParamsOrigin === "model") {
+                setCurrentView("inference-model-selection");
+                window.history.replaceState(null, "", "#inference-model-selection");
+                return;
+              }
+              const source = navContext?.source;
+              if (source === "inference") {
+                handleNavigation("inference");
+                return;
+              }
+              handleNavigation("home");
+            }}
+            onGoToModelSelection={() => {
+              openInferenceModelSelection({
+                source: navContext?.source || "home",
+                selectedTracks: selectedTracksForInference || [],
+              });
+            }}
             onStartInference={(data) => {
               setLiveInferenceData(data);
               setCurrentView("inference");
