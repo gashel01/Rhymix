@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useMemo, useEffect } from "react";
+import React, { useRef, useCallback, useMemo, useEffect, useState } from "react";
 import { Tooltip } from "@mui/material";
 import ErrorIcon from "@mui/icons-material/Error";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
@@ -12,6 +12,7 @@ import TextOverflow from "../TextOverflow.tsx";
 import WaveformCell from "./WaveformCell";
 import TrackControls from "./TrackControls";
 import { getFileNameFromPath } from "./utils";
+import { getBaseNameAndExt, makeDownloadName } from "../../utils/audioUtils";
 
 const STYLE_ID = "vf-audiotrackrow-css-v2";
 
@@ -20,6 +21,7 @@ const AudioTrackRow = (props) => {
     pair,
     index,
     vocalMode,
+    vocalModeType,
     vocalsFileType,
     isInstrumentalPlaying,
     isVocalPlaying,
@@ -284,12 +286,84 @@ const AudioTrackRow = (props) => {
   }, [handlePlayPauseModified, vocalPath, vocalsFileType]);
 
   const handleInstrumentalDownload = useCallback(() => {
-            handleDownload("instrumental", instPath, pair?.displayName || name);
-  }, [handleDownload, instPath]);
+    const { baseName, ext } = getBaseNameAndExt({
+      originalName: pair?.originalName,
+      displayName: pair?.displayName || name,
+    });
+    const downloadName = makeDownloadName({ baseName, type: "instrumental", ext });
+    handleDownload("instrumental", instPath, downloadName);
+  }, [handleDownload, instPath, name, pair?.displayName, pair?.originalName]);
 
   const handleVocalDownload = useCallback(() => {
-            handleDownload(vocalsFileType, vocalPath, pair?.displayName || name);
-  }, [handleDownload, vocalPath, vocalsFileType]);
+    const { baseName, ext } = getBaseNameAndExt({
+      originalName: pair?.originalName,
+      displayName: pair?.displayName || name,
+    });
+    const isConverted = vocalMode === "converted";
+    const namingType = vocalModeType === "inference" ? "raw_vocal" : pair?.vocalFileType || vocalsFileType || "processed_vocals";
+    const vocalType = isConverted ? "converted" : namingType;
+    const downloadName = makeDownloadName({
+      baseName,
+      type: vocalType,
+      modelName: pair?.modelName || modelUsed,
+      ext,
+    });
+    const fileType = isConverted ? "inference" : pair?.vocalFileType || vocalsFileType;
+    handleDownload(fileType, vocalPath, downloadName);
+  }, [handleDownload, modelUsed, name, pair?.displayName, pair?.modelName, pair?.originalName, pair?.vocalFileType, vocalMode, vocalModeType, vocalPath, vocalsFileType]);
+
+  const [isMerging, setIsMerging] = useState(false);
+  const canMerge = Boolean(instPath && vocalPath);
+  const downloadDisabledReason = !instPath
+    ? "Instrumental missing"
+    : !vocalPath
+    ? "Vocal missing"
+    : null;
+
+  const handleDownloadMerged = useCallback(async () => {
+    if (!handleDownloadFullSong || isMerging || !canMerge) return;
+    const { baseName, ext } = getBaseNameAndExt({
+      originalName: pair?.originalName,
+      displayName: pair?.displayName || name,
+    });
+    const isConverted = vocalMode === "converted";
+    const mergedModelName = isConverted ? (pair?.modelName || modelUsed || "model") : "original";
+    const downloadName = makeDownloadName({
+      baseName,
+      type: "merged",
+      modelName: mergedModelName,
+      ext,
+    });
+    const vocalType = isConverted ? "inference" : pair?.vocalFileType || vocalsFileType || "raw_vocals";
+    const instrumentalPayload = { type: "instrumental", id: instPath };
+    const vocalPayload = { type: vocalType, id: vocalPath };
+
+    setIsMerging(true);
+    try {
+      await handleDownloadFullSong({
+        instrumental: instrumentalPayload,
+        vocal: vocalPayload,
+        downloadName,
+        format: ext,
+      });
+    } finally {
+      setIsMerging(false);
+    }
+  }, [
+    canMerge,
+    handleDownloadFullSong,
+    instPath,
+    isMerging,
+    modelUsed,
+    name,
+    pair?.displayName,
+    pair?.modelName,
+    pair?.originalName,
+    pair?.vocalFileType,
+    vocalMode,
+    vocalPath,
+    vocalsFileType,
+  ]);
 
   const handleInstrumentalSeek = useCallback((time) => {
     vwRef.current?.setCurrentTime?.(time);
@@ -490,8 +564,10 @@ const AudioTrackRow = (props) => {
                 vocal={vocalPath}
                 isPlaying={isCurrentlyPlayingBoth}
                 onPlayBoth={() => handlePlayBothModified(trackPairId)}
-                onDownloadFullSong={handleDownloadFullSong}
+                onDownloadFullSong={handleDownloadMerged}
                 disabled={actionsDisabled}
+                downloadDisabledReason={downloadDisabledReason}
+                downloading={isMerging}
               />
             </div>
 
@@ -547,6 +623,7 @@ const areEqual = (prev, next) =>
   prev.pair === next.pair &&
   prev.index === next.index &&
   prev.vocalMode === next.vocalMode &&
+  prev.vocalModeType === next.vocalModeType &&
   prev.vocalsFileType === next.vocalsFileType &&
   prev.isInstrumentalPlaying === next.isInstrumentalPlaying &&
   prev.isVocalPlaying === next.isVocalPlaying &&

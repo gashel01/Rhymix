@@ -1,9 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 
-const basename = (p) => {
-  if (!p) return "";
-  return p.split("/").pop()?.split("\\").pop() || "";
-};
+import { downloadFile } from "../../utils/audioUtils";
 
 export const formatParamsSummary = (params) => {
   if (!params) return "";
@@ -62,6 +59,7 @@ const buildTrackPairFromRun = (run, vocalMode) => {
   const tempId = run?.tempId || run?.jobId || null;
   const fileId = getFileId(run);
   const displayName = getTrackName(run);
+  const originalName = run?.inputOriginalName || run?.track?.originalName || null;
   const modelName = run?.modelName || run?.model?.name || "Unknown";
   const vocalFileType =
     run?.vocalFileType ||
@@ -85,9 +83,11 @@ const buildTrackPairFromRun = (run, vocalMode) => {
     runId,
     fileId,
     displayName,
+    originalName,
     name: displayName,
     modelName,
     modelId: run?.modelId || run?.model?.id,
+    vocalFileType,
     instrumental: fileId,
     vocal: vocalPath,
     instrumentalKey: `${displayId}-instrumental`,
@@ -115,7 +115,7 @@ export const useAudioPlayback = ({
   setLoading,
   setError,
   setInferenceResults,
-  liveResults = [],
+  liveResults = [], 
 }) => {
   const resultsRef = useRef([]);
   const [vocalMode, setVocalMode] = useState("converted");
@@ -125,22 +125,10 @@ export const useAudioPlayback = ({
     setVocalMode(newMode);
   }, []);
 
-  const handleDownload = useCallback(async (type, path, displayName) => {
+  const handleDownload = useCallback(async (type, path, downloadName) => {
     try {
       if (!path) return;
-      const param = encodeURIComponent(path);
-      const response = await fetch(`/api/download/${type}/${param}`);
-      if (!response.ok) throw new Error("Failed to download file");
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const fallbackName = basename(path) || "download.wav";
-      a.download = displayName ? `${displayName}.wav` : fallbackName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      await downloadFile(type, path, "processed", downloadName);
     } catch (e) {
       if (e.name !== "AbortError") console.error("Error downloading file:", e);
     }
@@ -226,6 +214,7 @@ export const useAudioPlayback = ({
     trackPairs,
     handleVocalModeChange,
     handleDownload,
+    vocalMode,
     fetchInferenceResults,
   };
 };

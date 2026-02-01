@@ -30,6 +30,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
     fetchInferenceResults,
     handleVocalModeChange,
     handleDownload,
+    vocalMode,
   } = useAudioPlayback({
     inferenceResults: serverRuns,
     setLoading,
@@ -274,6 +275,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
             <AudioTrackTable
               trackPairs={trackPairs}
               vocalModeType="inference"
+             vocalMode={vocalMode}
               handleVocalModeChange={handleVocalModeChange}
               handleDownload={handleDownload}
               showVocalToggle={true}

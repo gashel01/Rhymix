@@ -5,7 +5,7 @@ import AudioTrackHeader from "./AudioTrackHeader";
 import AudioTrackRow from "./AudioTrackRow";
 import AudioTableActions from "./AudioTableActions";
 import { useWaveformSync } from "../../hooks/useWaveformSync";
-import { downloadFullSong } from "../../utils/audioUtils";
+import { downloadMergedAudio } from "../../utils/audioUtils";
 import { safeSetMuted, getCleanFileName } from "./utils";
 import { deleteFiles } from "../../utils/apiService";
 import styles from "./AudioTrackTable.module.css";
@@ -344,6 +344,7 @@ const AudioTrackTable = (props) => {
                       vocalUrl={pair.vocalUrl || (pair.fileId ? `/api/download/${vocalsFileType}/${pair.fileId}` : undefined)}
                       playingBoth={playingBoth}
                       vocalMode={vocalMode}
+                      vocalModeType={vocalModeType}
                       vocalsFileType={vocalsFileType}
                       isInstrumentalPlaying={isPlaying || playingFile?.name === pair.instrumentalKey}
                       isVocalPlaying={isPlaying || playingFile?.name === pair.vocalKey}
@@ -353,7 +354,7 @@ const AudioTrackTable = (props) => {
                       handlePlayPauseModified={handlePlayPauseModified}
                       handlePlayBothModified={handlePlayBothInternal}
                       handleDownload={handleDownload}
-                      handleDownloadFullSong={ downloadFullSong}
+                      handleDownloadFullSong={downloadMergedAudio}
                       isSelected={selectedRows.includes(pair.id)}
                       onRowSelect={handleRowSelect}
                       isNew={pair.isNew}

@@ -4,15 +4,86 @@
 
 import { extractFilename } from './fileUtils';
 
+const INVALID_FILENAME_CHARS = /[\\/:*?"<>|]+/g;
+
+export const sanitizeModelName = (value, maxLength = 40) => {
+  if (!value) return "";
+  const normalized = value
+    .toString()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(INVALID_FILENAME_CHARS, "_")
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (!normalized) return "";
+  return normalized.length > maxLength ? normalized.slice(0, maxLength) : normalized;
+};
+
+export const sanitizeBaseName = (value) => {
+  if (!value) return "";
+  const cleaned = value
+    .toString()
+    .replace(INVALID_FILENAME_CHARS, "_")
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return cleaned;
+};
+
+export const getBaseNameAndExt = ({ originalName, displayName, fallbackExt = "wav" } = {}) => {
+  const rawName = originalName || displayName || "";
+  const parts = rawName.split(".");
+  let ext = "";
+  let base = rawName;
+  if (parts.length > 1) {
+    ext = parts.pop();
+    base = parts.join(".");
+  }
+  const safeBase = sanitizeBaseName(base) || sanitizeBaseName(displayName) || "track";
+  const safeExt = ext ? ext.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() : fallbackExt;
+  return { baseName: safeBase, ext: safeExt || fallbackExt };
+};
+
+export const makeDownloadName = ({ baseName, type, modelName, ext = "wav" }) => {
+  const safeBase = sanitizeBaseName(baseName) || "track";
+  const safeExt = ext ? ext.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() : "wav";
+  const safeModel = sanitizeModelName(modelName);
+  const kind = (type || "").toLowerCase();
+
+  if (["instrumental"].includes(kind)) {
+    return `${safeBase}_instrumental.${safeExt}`;
+  }
+  if (["raw_vocals", "raw_vocal", "original"].includes(kind)) {
+    return `${safeBase}_raw_vocal.${safeExt}`;
+  }
+  if (["processed_vocals", "processed_vocal"].includes(kind)) {
+    return `${safeBase}_processed_vocal.${safeExt}`;
+  }
+  if (["converted", "converted_vocal"].includes(kind)) {
+    const model = safeModel || "model";
+    return `${safeBase}_converted_${model}_vocal.${safeExt}`;
+  }
+  if (["merged", "full"].includes(kind)) {
+    const model = safeModel || "original";
+    return `${safeBase}_${model}_full.${safeExt}`;
+  }
+  return `${safeBase}.${safeExt}`;
+};
+
 /**
  * Construct download URL for a file
  * @param {string} fileType - Type of file ('instrumental', 'raw_vocals', 'processed_vocals', etc.)
  * @param {string} filename - Filename to download
  * @returns {string} - Download URL
  */
-export const getDownloadUrl = (fileType, fileId) => {
+export const getDownloadUrl = (fileType, fileId, downloadName = null) => {
   if (!fileType || !fileId) return null;
-  return `/api/download/${fileType}/${fileId}`;
+  const base = `/api/download/${fileType}/${fileId}`;
+  if (!downloadName) return base;
+  return `${base}?downloadName=${encodeURIComponent(downloadName)}`;
 };
 
 /**
@@ -29,7 +100,7 @@ export const downloadFile = async (fileType, filePath, vocalMode = 'processed', 
 
     const fileName = extractFilename(filePath) || filePath;
     const actualFileType = fileType;
-    const url = getDownloadUrl(actualFileType, fileName);
+    const url = getDownloadUrl(actualFileType, fileName, customFilename);
 
     const response = await fetch(url, {
       signal: abortSignal
@@ -85,14 +156,25 @@ export const downloadFile = async (fileType, filePath, vocalMode = 'processed', 
  * @param {string} vocalFileName - Vocal filename
  * @returns {Promise<void>}
  */
-export const downloadFullSong = async (instrumentalFileName, vocalFileName, abortSignal = null) => {
+export const downloadMergedAudio = async ({
+  instrumental,
+  vocal,
+  downloadName,
+  format = "wav",
+  abortSignal = null,
+} = {}) => {
   try {
-    const url = `/api/download/full-song?instrumental=${encodeURIComponent(
-      instrumentalFileName
-    )}&vocal=${encodeURIComponent(vocalFileName)}`;
-
-    const response = await fetch(url, {
-      signal: abortSignal
+    if (!instrumental || !vocal) return;
+    const response = await fetch("/api/audio/merge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
+      body: JSON.stringify({
+        instrumental,
+        vocal,
+        downloadName,
+        format,
+      }),
     });
 
     if (!response.ok) {
@@ -110,8 +192,8 @@ export const downloadFullSong = async (instrumentalFileName, vocalFileName, abor
     const a = document.createElement('a');
     a.href = urlObj;
 
-    const baseFileName = instrumentalFileName.replace('_instrumental.wav', '');
-    a.download = `${baseFileName}_full_song.wav`;
+    const fallbackName = downloadName || "merged.wav";
+    a.download = fallbackName;
 
     document.body.appendChild(a);
     a.click();
@@ -123,8 +205,8 @@ export const downloadFullSong = async (instrumentalFileName, vocalFileName, abor
   } catch (error) {
     // Don't log AbortError as it's expected when component unmounts
     if (error.name !== 'AbortError') {
-      console.error('Error downloading full song:', error);
-      alert(`Failed to download full song: ${error.message}`);
+      console.error('Error downloading merged audio:', error);
+      alert(`Failed to download merged audio: ${error.message}`);
       throw error;
     }
     // Silently ignore AbortError - this is expected when navigating away
