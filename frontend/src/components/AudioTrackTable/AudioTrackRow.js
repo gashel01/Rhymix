@@ -5,7 +5,7 @@ import ErrorIcon from "@mui/icons-material/Error";
 import TextOverflow from "../TextOverflow.tsx";
 import WaveformCell from "./WaveformCell";
 import TrackControls from "./TrackControls";
-import { getCleanFileName, getFileNameFromPath } from "./utils";
+import { getFileNameFromPath } from "./utils";
 
 const STYLE_ID = "vf-audiotrackrow-css-v2";
 
@@ -103,26 +103,27 @@ const AudioTrackRow = (props) => {
   // Compatibility: Handle different schemas
   const instPath = pair?.instrumental || pair?.original || "";
   const vocalPath = pair?.vocal || pair?.converted || "";
-
-  const trackPairId = `${getFileNameFromPath(instPath)}-${getFileNameFromPath(vocalPath)}`;
+  const trackPairId = pair?.id || `${getFileNameFromPath(instPath)}-${getFileNameFromPath(vocalPath)}`;
+  const instrumentalKey = pair?.instrumentalKey || `${trackPairId}-instrumental`;
+  const vocalKey = pair?.vocalKey || `${trackPairId}-vocal`;
   const isCurrentlyPlayingBoth = Boolean(playingBoth && playingBoth.id === trackPairId);
 
   // Sync vocal position with instrumental when vocal ready
   const handleVocalReady = useCallback((wf) => {
     vwRef.current = wf;
-    const key = getFileNameFromPath(vocalPath) || vocalPath;
+    const key = vocalKey;
     handleVocalWaveformReady?.(key, wf);
     if (iwRef.current?.getCurrentTime) {
       const instTime = iwRef.current.getCurrentTime();
       if (instTime > 0 && wf?.setCurrentTime) wf.setCurrentTime(instTime);
     }
-  }, [vocalPath, handleVocalWaveformReady]);
+  }, [vocalKey, handleVocalWaveformReady]);
 
   const handleInstReady = useCallback((wf) => {
     iwRef.current = wf;
-    const key = getFileNameFromPath(instPath) || instPath;
+    const key = instrumentalKey;
     handleInstrumentalWaveformReady?.(key, wf);
-  }, [instPath, handleInstrumentalWaveformReady]);
+  }, [instrumentalKey, handleInstrumentalWaveformReady]);
 
   // ---------- UI bits ----------
   const SpinnerBar = ({ color = "#1976d2" }) => (
@@ -208,11 +209,11 @@ const AudioTrackRow = (props) => {
   }, [handlePlayPauseModified, vocalPath, vocalsFileType]);
 
   const handleInstrumentalDownload = useCallback(() => {
-    handleDownload("instrumental", instPath);
+            handleDownload("instrumental", instPath, pair?.displayName || name);
   }, [handleDownload, instPath]);
 
   const handleVocalDownload = useCallback(() => {
-    handleDownload(vocalsFileType, vocalPath);
+            handleDownload(vocalsFileType, vocalPath, pair?.displayName || name);
   }, [handleDownload, vocalPath, vocalsFileType]);
 
   const handleInstrumentalSeek = useCallback((time) => {
@@ -328,7 +329,7 @@ const AudioTrackRow = (props) => {
                 instrumental={instPath}
                 vocal={vocalPath}
                 isPlaying={isCurrentlyPlayingBoth}
-                onPlayBoth={() => handlePlayBothModified(instPath, vocalPath, vocalsFileType)}
+                onPlayBoth={() => handlePlayBothModified(trackPairId)}
                 onDownloadFullSong={handleDownloadFullSong}
                 disabled={status === "processing"}
               />

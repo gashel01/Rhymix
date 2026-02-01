@@ -177,8 +177,7 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
           mb: 1
         }}>
           {selectedTracks.map((track) => {
-            const trackName = track.instrumental.split('/').pop().split('\\').pop().replace('_instrumental.wav', '') ||
-                            track.vocal.split('/').pop().split('\\').pop().replace('_vocals.wav', '');
+            const trackName = track.displayName || track.name || "Untitled track";
             return (
               <Box
                 key={track.id}

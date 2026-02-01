@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useRef, useCallback, useMemo } from "react";
 
 
 export const useAudioPlayback = ({ results, vocalMode }) => {
@@ -6,32 +6,9 @@ export const useAudioPlayback = ({ results, vocalMode }) => {
 
     
   const trackPairCacheRef = useRef(new Map());
-    const basename = useCallback(
-        (p) => {
-          const s = p;
-          // supports windows + unix paths
-          if (!s) return "";
-          return s.split("/").pop()?.split("\\").pop() || "";
-        },
-        []
-      );
-    
-    
-  const getTrackName = useCallback(
-    (track) => {
-      const inst = track?.instrumental;
-      const voc = track?.vocal;
-
-      const instName = inst ? basename(inst) : "";
-      const vocName = voc ? basename(voc) : "";
-
-      const cleanedInst = instName.replace("_instrumental.wav", "");
-      const cleanedVoc = vocName.replace("_vocals.wav", "");
-
-      return cleanedInst || cleanedVoc || instName || vocName || "Unknown";
-    },
-    [basename]
-  );
+  const getTrackName = useCallback((track) => {
+    return track?.displayName || track?.name || "Unknown";
+  }, []);
   
     const inferenceTrackPairs = useMemo(() => {
         const stableIdFor = (r) => {
@@ -54,30 +31,28 @@ export const useAudioPlayback = ({ results, vocalMode }) => {
             const id = stableIdFor(r);
             const name = getTrackName(r.track);
       
-            const instrumental = r?.track?.instrumental;
-            const instrumentalUrl = r?.track?.instrumentalUrl || undefined;
-      
-            const originalVocalFile = basename(r?.track?.vocal);
-            const originalVocalUrl = r?.track?.vocalUrl || undefined;
-      
-            const outputFileName = basename(r?.outputFile);
-            const convertedVocalUrl = outputFileName
-              ? `/api/download/inference/${encodeURIComponent(outputFileName)}`
-              : undefined;
+            const fileId = r?.track?.fileId || r?.track?.id;
+            const instrumentalUrl = r?.track?.instrumentalUrl || (fileId ? `/api/download/instrumental/${fileId}` : undefined);
+            const originalVocalUrl = r?.track?.vocalUrl || (fileId ? `/api/download/${vocalMode === "original" ? "raw_vocals" : "processed_vocals"}/${fileId}` : undefined);
+            const convertedVocalUrl = r?.outputUrl || (r?.runId ? `/api/download/inference/${encodeURIComponent(r.runId)}` : undefined);
       
             const isOriginal = vocalMode === "original";
       
             const next = {
               id,
               name,
-              instrumental,
+              displayName: name,
+              fileId,
+              instrumental: fileId,
               instrumentalUrl,
-              vocal: isOriginal ? originalVocalFile : outputFileName,
+              vocal: fileId,
               vocalUrl: isOriginal ? originalVocalUrl : convertedVocalUrl,
               status: r?.status || "unknown",
               result: r,
               originalVocalUrl,
               convertedVocalUrl,
+              instrumentalKey: `${id}-instrumental`,
+              vocalKey: `${id}-vocal`,
             };
       
             const cached = trackPairCacheRef.current.get(id);
@@ -105,15 +80,13 @@ export const useAudioPlayback = ({ results, vocalMode }) => {
         }
       
         return nextPairs;
-      }, [results, vocalMode, basename, getTrackName]);
+      }, [results, vocalMode, getTrackName]);
 
    
 
   return {
     inferenceTrackPairs,
     getTrackName,
-    basename,
-
   };
   
 };

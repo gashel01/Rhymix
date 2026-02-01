@@ -79,6 +79,7 @@ class PathManager:
         # Base directories
         self.BASE_DIR = Path(__file__).parent
         self.APPLIO_DIR = self.BASE_DIR / "applio"
+        self.METADATA_DIR = self.BASE_DIR / "data" / "metadata"
 
         # Import paths from Config
         self.INPUT_DIR = Path(Config.INPUT_DIR)
@@ -109,6 +110,7 @@ class PathManager:
 
         # Inference-specific directories
         self.INFERENCE_DIR = self.BASE_DIR / "data" / "singing" / "inference"
+        self.INFERENCE_RUNS_DIR = self.INFERENCE_DIR / "runs"
 
     def ensure_directories_exist(self):
         """Ensure all required directories exist"""
@@ -131,6 +133,8 @@ class PathManager:
             self.APPLIO_MODELS_DIR,
             self.APPLIO_DATASET_DIR,
             self.INFERENCE_DIR,
+            self.INFERENCE_RUNS_DIR,
+            self.METADATA_DIR,
         ]
 
         for directory in directories:
@@ -170,6 +174,109 @@ class PathManager:
 # Initialize path manager
 paths = PathManager()
 paths.ensure_directories_exist()
+
+# ===============================
+# FILENAME + METADATA HELPERS
+# ===============================
+
+UPLOAD_METADATA_PATH = paths.METADATA_DIR / "uploads.json"
+
+def sanitize_filename_for_display(filename: str) -> str:
+    """Sanitize filename for UI display without breaking unicode."""
+    if not filename:
+        return "unnamed_file"
+    base = Path(filename).name
+    cleaned = re.sub(r"[\x00-\x1f\x7f]", "", base).strip()
+    return cleaned or "unnamed_file"
+
+def make_storage_name(original_name: str, file_id: str = None) -> tuple[str, str]:
+    """Create a safe storage name using a UUID plus the original extension."""
+    file_id = file_id or uuid.uuid4().hex
+    ext = Path(original_name).suffix.lower()
+    if not re.match(r"^\.[a-z0-9]{1,10}$", ext):
+        ext = ""
+    return f"{file_id}{ext}", file_id
+
+def make_run_id() -> str:
+    return uuid.uuid4().hex
+
+def _load_metadata_file(path: Path) -> dict:
+    if not path.exists():
+        return {"files": {}}
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if isinstance(data, dict) and "files" in data:
+            return data
+    except Exception:
+        pass
+    return {"files": {}}
+
+def _save_metadata_file(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(".tmp")
+    with tmp_path.open("w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2, sort_keys=True)
+    tmp_path.replace(path)
+
+def register_upload_metadata(original_name: str, stored_name: str, file_id: str) -> dict:
+    display_name = sanitize_filename_for_display(original_name)
+    created_at = datetime.now().isoformat()
+    record = {
+        "fileId": file_id,
+        "originalName": Path(original_name).name,
+        "storedName": stored_name,
+        "safeDisplayName": display_name,
+        "createdAt": created_at,
+    }
+    data = _load_metadata_file(UPLOAD_METADATA_PATH)
+    data.setdefault("files", {})[file_id] = record
+    _save_metadata_file(UPLOAD_METADATA_PATH, data)
+    return record
+
+def get_upload_metadata(file_id: str):
+    data = _load_metadata_file(UPLOAD_METADATA_PATH)
+    return data.get("files", {}).get(file_id)
+
+def list_upload_metadata() -> list[dict]:
+    data = _load_metadata_file(UPLOAD_METADATA_PATH)
+    return list(data.get("files", {}).values())
+
+def get_upload_base_name(file_id: str):
+    record = get_upload_metadata(file_id)
+    if not record:
+        return None
+    return Path(record["storedName"]).stem
+
+def save_inference_run_metadata(run_id: str, payload: dict) -> None:
+    run_dir = paths.INFERENCE_RUNS_DIR / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    run_file = run_dir / "run.json"
+    with run_file.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+
+def load_inference_run_metadata(run_id: str):
+    run_file = paths.INFERENCE_RUNS_DIR / run_id / "run.json"
+    if not run_file.exists():
+        return None
+    try:
+        with run_file.open("r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except Exception:
+        return None
+
+def list_inference_runs() -> list[dict]:
+    results = []
+    if not paths.INFERENCE_RUNS_DIR.exists():
+        return results
+    for run_dir in sorted(paths.INFERENCE_RUNS_DIR.glob("*")):
+        if not run_dir.is_dir():
+            continue
+        run_id = run_dir.name
+        run_meta = load_inference_run_metadata(run_id)
+        if run_meta:
+            results.append(run_meta)
+    return results
 
 # Now try importing the core functions
 try:
@@ -241,15 +348,19 @@ def upload_files():
         if not files:
             return jsonify({"error": "No files provided"}), 400
 
-        names = []
+        records = []
         for f in files:
-            name = secure_filename(f.filename)
-            path = paths.INPUT_DIR / name
+            stored_name, file_id = make_storage_name(f.filename)
+            path = paths.INPUT_DIR / stored_name
             f.save(path)
-            names.append(name)
+            record = register_upload_metadata(f.filename, stored_name, file_id)
+            records.append(record)
             print(f"Saved file: {path}")
 
-        return jsonify({"message": f"Successfully uploaded {len(names)} files", "files": names})
+        return jsonify({
+            "message": f"Successfully uploaded {len(records)} files",
+            "files": records,
+        })
 
     except Exception as e:
         print(f"Upload error: {e}")
@@ -295,8 +406,10 @@ def download_file(file_type, filename):
         print(f"Sanitized filename: {filename}")
 
         dir_map = {
-            'raw_vocals': paths.UVR_RAW_DIR, 'processed_vocals': paths.UVR_PROCESSED_DIR,
-            'exports': paths.EXPORT_DIR, 'instrumental': paths.INSTRUMENTAL_DIR
+            'raw_vocals': paths.UVR_RAW_DIR,
+            'processed_vocals': paths.UVR_PROCESSED_DIR,
+            'exports': paths.EXPORT_DIR,
+            'instrumental': paths.INSTRUMENTAL_DIR
         }
         if file_type not in dir_map:
             print(f"Invalid file type: {file_type}")
@@ -313,6 +426,17 @@ def download_file(file_type, filename):
         print(f"Files in directory ({len(existing)}): {existing[:5]}...")
 
         file_path = target_dir / filename
+        file_id = filename
+        if file_type in {'raw_vocals', 'processed_vocals', 'instrumental'}:
+            base_name = get_upload_base_name(file_id)
+            if not base_name:
+                return jsonify({'error': f'Unknown fileId: {file_id}'}), 404
+            if file_type == 'instrumental':
+                filename = f"{base_name}_instrumental.wav"
+            else:
+                filename = f"{base_name}_vocals.wav"
+            file_path = target_dir / filename
+
         print(f"Full file path: {file_path}")
 
         if not file_path.exists():
@@ -399,16 +523,34 @@ def get_available_files():
 
         paths.INSTRUMENTAL_DIR.mkdir(parents=True, exist_ok=True)
         pairs = []
-        for v in paths.UVR_PROCESSED_DIR.glob('*_vocals.wav'):
-            base = v.stem.replace('_vocals', '')
-            inst = paths.INSTRUMENTAL_DIR / f"{base}_instrumental.wav"
+        for record in list_upload_metadata():
+            base_name = Path(record["storedName"]).stem
+            processed_vocals = paths.UVR_PROCESSED_DIR / f"{base_name}_vocals.wav"
+            raw_vocals = paths.UVR_RAW_DIR / f"{base_name}_vocals.wav"
+            instrumental = paths.INSTRUMENTAL_DIR / f"{base_name}_instrumental.wav"
+
+            if not (processed_vocals.exists() or raw_vocals.exists() or instrumental.exists()):
+                continue
+
             pairs.append({
-                'name': base,
-                'vocalUrl': f"/api/download/processed_vocals/{v.name}",
-                'vocalPath': v.name,
-                'dateProcessed': datetime.fromtimestamp(v.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                'instrumentalUrl': f"/api/download/instrumental/{inst.name}" if inst.exists() else None,
-                'instrumentalPath': inst.name if inst.exists() else None
+                "fileId": record["fileId"],
+                "originalName": record["originalName"],
+                "safeDisplayName": record["safeDisplayName"],
+                "storedName": record["storedName"],
+                "createdAt": record["createdAt"],
+                "vocalUrlProcessed": f"/api/download/processed_vocals/{record['fileId']}" if processed_vocals.exists() else None,
+                "vocalUrlRaw": f"/api/download/raw_vocals/{record['fileId']}" if raw_vocals.exists() else None,
+                "instrumentalUrl": f"/api/download/instrumental/{record['fileId']}" if instrumental.exists() else None,
+                "vocalPathProcessed": processed_vocals.name if processed_vocals.exists() else None,
+                "vocalPathRaw": raw_vocals.name if raw_vocals.exists() else None,
+                "instrumentalPath": instrumental.name if instrumental.exists() else None,
+                "dateProcessed": datetime.fromtimestamp(
+                    max(
+                        (processed_vocals.stat().st_mtime if processed_vocals.exists() else 0),
+                        (raw_vocals.stat().st_mtime if raw_vocals.exists() else 0),
+                        (instrumental.stat().st_mtime if instrumental.exists() else 0),
+                    )
+                ).strftime('%Y-%m-%d %H:%M:%S'),
             })
 
         return jsonify({'files': pairs, 'message': f'Found {len(pairs)} processed files'})
@@ -427,11 +569,12 @@ def delete_files():
 
         results = []
         print(f"Deleting files for {len(fns)} tracks...")
+        data = _load_metadata_file(UPLOAD_METADATA_PATH)
 
         for fn in fns:
-            base = fn[:-11] if fn.endswith('_vocals.wav') else fn[:-17] if fn.endswith('_instrumental.wav') else fn.replace('.wav','')
+            base = get_upload_base_name(fn)
             if not base:
-                results.append({"track": None, "deleted": [], "failed": [{"filename": fn, "error": "Could not determine base name"}]})
+                results.append({"track": None, "deleted": [], "failed": [{"filename": fn, "error": "Unknown fileId"}]})
                 continue
 
             print(f"Processing track: {base}")
@@ -451,6 +594,10 @@ def delete_files():
 
             if deleted or failed:
                 results.append({"track": base, "deleted": deleted, "failed": failed})
+                if fn in data.get("files", {}):
+                    data["files"].pop(fn, None)
+
+        _save_metadata_file(UPLOAD_METADATA_PATH, data)
 
         return jsonify({
             "message": f"Processed {len(fns)} tracks",
@@ -540,10 +687,17 @@ def download_dataset():
         name = f"vocals_dataset_{ts}.zip"
         zpath = paths.TEMP_WAV_DIR / name
 
+        def resolve_vocal_name(ref):
+            base = get_upload_base_name(ref)
+            if base:
+                return f"{base}_vocals.wav"
+            return os.path.basename(ref)
+
         with zipfile.ZipFile(zpath, 'w') as z:
             for files, srcdir, tag in [(proc, paths.UVR_PROCESSED_DIR, "PROCESSED"), (raw, paths.UVR_RAW_DIR, "RAW")]:
                 for f in files:
-                    fn = os.path.basename(f); p = srcdir / fn
+                    fn = resolve_vocal_name(f)
+                    p = srcdir / fn
                     if p.exists():
                         z.write(p, f"{fn.replace('_vocals.wav','')}_{tag}.wav")
 
@@ -1834,6 +1988,7 @@ def start_inference():
 
         # Create a unique job ID
         job_id = str(uuid.uuid4())
+        run_id = make_run_id()
 
         # Initialize job
         active_jobs[job_id] = {
@@ -1842,6 +1997,7 @@ def start_inference():
             "model_name": model["name"],
             "track": track,
             "params": params,
+            "run_id": run_id,
             "status": "starting",
             "progress": 0,
             "logs": ["Starting inference..."],
@@ -1852,19 +2008,19 @@ def start_inference():
         import threading
         thread = threading.Thread(
             target=run_inference_job,
-            args=(job_id, model, track, params)
+            args=(job_id, run_id, model, track, params)
         )
         thread.daemon = True
         thread.start()
 
-        return jsonify({"jobId": job_id})
+        return jsonify({"jobId": job_id, "runId": run_id})
 
     except Exception as e:
         logging.error(f"Error starting inference: {e}")
         return jsonify({"error": str(e)}), 500
 
 
-def run_inference_job(job_id, model, track, params):
+def run_inference_job(job_id, run_id, model, track, params):
     """Run inference job in isolated process"""
     # Process-level exception handler to prevent any crashes from affecting Flask
     try:
@@ -1953,24 +2109,49 @@ def run_inference_job(job_id, model, track, params):
             return
 
         # Get input audio path (use vocal file)
-        vocal_filename = track.get("vocal", "").split("/").pop().split("\\").pop()
-        use_processed = track.get("processed", True)  # Default to processed for normal flow
-        input_path = str(paths.get_vocal_file_path(vocal_filename, processed=use_processed))
-        
+        file_id = track.get("fileId") or track.get("id")
+        vocals_file_type = track.get("vocalFileType") or track.get("vocalsFileType")
+        use_processed = track.get("processed", True)
+        if vocals_file_type in {"raw_vocals", "processed_vocals"}:
+            use_processed = vocals_file_type == "processed_vocals"
+
+        input_path = None
+        if file_id:
+            base_name = get_upload_base_name(file_id)
+            if not base_name:
+                active_jobs[job_id].update({
+                    'status': 'failed',
+                    'error': f"Unknown fileId: {file_id}"
+                })
+                return
+            input_path = str(paths.get_vocal_file_path(f"{base_name}_vocals.wav", processed=use_processed))
+        else:
+            vocal_filename = track.get("vocal", "").split("/").pop().split("\\").pop()
+            input_path = str(paths.get_vocal_file_path(vocal_filename, processed=use_processed))
+
         # Fallback: if file doesn't exist in processed dir, try raw dir
-        if not os.path.exists(input_path):
-            alt_path = str(paths.get_vocal_file_path(vocal_filename, processed=not use_processed))
+        if input_path and not os.path.exists(input_path):
+            fallback_name = None
+            if file_id:
+                base_name = get_upload_base_name(file_id)
+                if base_name:
+                    fallback_name = f"{base_name}_vocals.wav"
+            if not fallback_name:
+                vocal_filename = track.get("vocal", "").split("/").pop().split("\\").pop()
+                fallback_name = vocal_filename
+            alt_path = str(paths.get_vocal_file_path(fallback_name, processed=not use_processed))
             if os.path.exists(alt_path):
                 input_path = alt_path
                 print(f"[Inference] Using {'raw' if not use_processed else 'processed'} vocals: {input_path}")
 
         # Create output directory
-        paths.INFERENCE_DIR.mkdir(exist_ok=True, parents=True)
-        logging.info(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: {model['name']}_{track.get('instrumental', '') + '-' + track.get('vocal', '')}_inferred.wav")
-        logging.info(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: {track}")
+        run_dir = paths.INFERENCE_RUNS_DIR / run_id
+        run_dir.mkdir(exist_ok=True, parents=True)
+        logging.info(f"Starting inference run {run_id}")
+        logging.info(f"Track payload: {track}")
         # Generate output filename
-        output_filename = f"{model['name']}_{track.get('instrumental', '') + '-' + track.get('vocal', '')}_inferred.wav"
-        output_path = str(paths.get_inference_file_path(output_filename))
+        output_filename = "inferred.wav"
+        output_path = str(run_dir / output_filename)
 
         # Update status
         active_jobs[job_id].update({
@@ -2027,11 +2208,30 @@ def run_inference_job(job_id, model, track, params):
             message, output_file_path = result
             # Check if output file was actually created
             if os.path.exists(output_file_path):
+                file_record = get_upload_metadata(file_id) if file_id else None
+                run_payload = {
+                    "id": run_id,
+                    "runId": run_id,
+                    "modelName": model.get("name"),
+                    "modelId": model.get("id"),
+                    "inputFileId": file_id,
+                    "inputStoredName": file_record.get("storedName") if file_record else None,
+                    "inputOriginalName": file_record.get("originalName") if file_record else None,
+                    "inputDisplayName": file_record.get("safeDisplayName") if file_record else None,
+                    "outputFileName": output_filename,
+                    "outputUrl": f"/api/download/inference/{run_id}",
+                    "params": params,
+                    "vocalFileType": vocals_file_type or ("processed_vocals" if use_processed else "raw_vocals"),
+                    "createdAt": datetime.now().isoformat(),
+                }
+                save_inference_run_metadata(run_id, run_payload)
                 active_jobs[job_id].update({
                     'status': 'completed',
                     'progress': 100,
                     'logs': active_jobs[job_id].get('logs', []) + ["Inference completed successfully!"],
-                    'outputFile': output_filename
+                    'outputFile': output_filename,
+                    'runId': run_id,
+                    'outputUrl': run_payload["outputUrl"]
                 })
             else:
                 active_jobs[job_id].update({
@@ -2116,7 +2316,9 @@ def inference_status(job_id):
             "started_at": job["started_at"],
             "completed_at": job.get("completed_at"),
             "error": job.get("error"),
-            "outputFile": job.get("outputFile")
+            "outputFile": job.get("outputFile"),
+            "runId": job.get("runId") or job.get("run_id"),
+            "outputUrl": job.get("outputUrl")
         })
 
     # Check if there's a status file for a completed job
@@ -2148,97 +2350,8 @@ def inference_status(job_id):
 def get_past_inference_results():
     """Get list of past inference results by scanning inference directory"""
     try:
-        results = []
-        inference_dir = Path("data/singing/inference")
-
-        if not inference_dir.exists():
-            return jsonify({"results": []})
-
-        # Scan all .wav files in inference directory
-        for wav_file in inference_dir.glob("*.wav"):
-            if "_inferred.wav" in wav_file.name:
-                try:
-                    # Extract information from filename
-                    filename = wav_file.name
-                    base_name = filename.replace("_inferred.wav", "")
-
-                    # Parse filename to extract model and track info
-                    # Format: {model_name}_{track_id}_inferred.wav
-                    # The challenge: model names can contain spaces/underscores, track_id can be complex
-
-                    model_name = "Unknown Model"
-                    track_name = "Unknown Track"
-
-                    # Parse filename: {model_name}_{track_id}_inferred.wav
-                    # Challenge: model names can contain spaces/underscores
-
-                    # Known model patterns (from logs directory and inference results)
-                    known_models = [
-                        'anne', 'bruno', 'dua', 'EdSheeran', 'vianney', 'mute', 'vald', 'testingtrain',
-                        'dua3test', 'bruno 2', 'edSheeran', 'vianneynew', 'DuaLipa', 'bruno import'
-                    ]
-
-                    # Sort by length (longest first) to ensure longest matches are found first
-                    known_models.sort(key=len, reverse=True)
-
-                    # First, try to match known model patterns from the start
-                    best_match = ""
-                    for model in known_models:
-                        if base_name.startswith(model):
-                            if len(model) > len(best_match):
-                                best_match = model
-
-                    if best_match:
-                        model_name = best_match
-                        track_part = base_name[len(best_match):].strip().lstrip('_')
-                        track_name = track_part if track_part else "unknown"
-                    else:
-                        # Fallback: split on first underscore
-                        parts = base_name.split('_', 1)
-                        if len(parts) >= 2:
-                            potential_model = parts[0]
-                            potential_track = parts[1]
-
-                            # Check if it looks like a reasonable model name
-                            if (len(potential_model) >= 2 and
-                                not potential_model.endswith('.wav') and
-                                not potential_model.replace(' ', '').replace('import', '').isdigit()):
-                                model_name = potential_model
-                                track_name = potential_track
-                            else:
-                                model_name = "Unknown Model"
-                                track_name = base_name
-                        else:
-                            model_name = "Unknown Model"
-                            track_name = base_name
-
-                    # Get file metadata
-                    file_stat = wav_file.stat()
-                    created_timestamp = file_stat.st_ctime
-                    file_size_mb = file_stat.st_size / (1024 * 1024)
-
-                    # Generate a unique ID based on filename
-                    file_id = f"{filename}_{int(created_timestamp)}"
-
-                    results.append({
-                        'id': file_id,
-                        'trackName': track_name,
-                        'modelName': model_name,
-                        'status': 'completed',
-                        'created': datetime.fromtimestamp(created_timestamp).isoformat(),
-                        'params': {},  # Parameters not stored in files
-                        'outputFile': filename,
-                        'fileSize': round(file_size_mb, 2),
-                        'originalTracks': []  # Original tracks not stored
-                    })
-
-                except Exception as e:
-                    print(f"Error processing inference file {wav_file}: {e}")
-                    continue
-
-        # Sort by creation date (newest first)
-        results.sort(key=lambda x: x['created'], reverse=True)
-
+        results = list_inference_runs()
+        results.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
         return jsonify({"results": results})
 
     except Exception as e:
@@ -2247,22 +2360,25 @@ def get_past_inference_results():
         print(traceback.format_exc())
         return jsonify({"error": f"Failed to get results: {str(e)}"}), 500
 
-@app.route('/api/download/inference/<path:filename>', methods=['GET'])
-def download_inference(filename):
+@app.route('/api/download/inference/<path:run_id>', methods=['GET'])
+def download_inference(run_id):
     """Download inference result file"""
     try:
-        # URL decode the filename
-        filename = urllib.parse.unquote(filename)
+        run_id = urllib.parse.unquote(run_id)
+        run_meta = load_inference_run_metadata(run_id)
 
-        # Get the file path using path manager
-        file_path = paths.get_inference_file_path(filename)
+        if run_meta:
+            output_name = run_meta.get("outputFileName", "inferred.wav")
+            file_path = paths.INFERENCE_RUNS_DIR / run_id / output_name
+            if not file_path.exists():
+                return jsonify({"error": "File not found"}), 404
+            return send_file(file_path, as_attachment=True, download_name=output_name)
 
-        # Check if file exists
+        # Legacy fallback
+        file_path = paths.get_inference_file_path(run_id)
         if not file_path.exists():
             return jsonify({"error": "File not found"}), 404
-
-        # Send the file
-        return send_file(file_path, as_attachment=True, download_name=filename)
+        return send_file(file_path, as_attachment=True, download_name=file_path.name)
 
     except Exception as e:
         logging.error(f"Error downloading inference file: {e}")
@@ -2610,14 +2726,15 @@ else:
         job['status_message'] = 'Preparing for vocal separation...'
         
         try:
-            # Create clean filename (title.wav without timestamp)
-            title_safe = re.sub(r'[^\w\-_]', '_', params.get('title', 'untitled'))
-            clean_filename = f"{title_safe}.wav"
-            input_path = paths.INPUT_DIR / clean_filename
-            
-            # Copy to input directory with clean name
+            # Register generated audio as a unique upload
+            title_safe = sanitize_filename_for_display(params.get('title', 'untitled'))
+            stored_name, file_id = make_storage_name(title_safe)
+            input_path = paths.INPUT_DIR / stored_name
+
+            # Copy to input directory with unique name
             print(f"[ACE-Step] Copying generated song to input: {input_path}", flush=True)
             shutil.copy(str(output_path), str(input_path))
+            register_upload_metadata(title_safe, stored_name, file_id)
             
             job['progress'] = 94
             job['status_message'] = 'Starting vocal separation...'
@@ -2647,17 +2764,18 @@ else:
                 job['process_job_id'] = process_job_id
                 
                 # Store paths to the processed files
-                vocals_file = paths.UVR_RAW_DIR / f"{title_safe}_vocals.wav"
-                instrumental_file = paths.INSTRUMENTAL_DIR / f"{title_safe}_instrumental.wav"
+                base_name = Path(stored_name).stem
+                vocals_file = paths.UVR_RAW_DIR / f"{base_name}_vocals.wav"
+                instrumental_file = paths.INSTRUMENTAL_DIR / f"{base_name}_instrumental.wav"
                 
                 if vocals_file.exists():
                     job['vocals_file'] = str(vocals_file)
-                    job['vocals_url'] = f"/api/download/raw_vocals/{title_safe}_vocals.wav"
+                    job['vocals_url'] = f"/api/download/raw_vocals/{file_id}"
                     print(f"[ACE-Step] Vocals file: {vocals_file}", flush=True)
                 
                 if instrumental_file.exists():
                     job['instrumental_file'] = str(instrumental_file)
-                    job['instrumental_url'] = f"/api/download/instrumental/{title_safe}_instrumental.wav"
+                    job['instrumental_url'] = f"/api/download/instrumental/{file_id}"
                     print(f"[ACE-Step] Instrumental file: {instrumental_file}", flush=True)
                 
                 # Run voice conversion (inference) if a model was selected
@@ -2732,19 +2850,21 @@ else:
                         # Track object for inference
                         track_obj = {
                             "name": title_safe,
-                            "vocal": f"{title_safe}_vocals.wav",
-                            "instrumental": f"{title_safe}_instrumental.wav",
+                            "fileId": file_id,
+                            "vocalFileType": "raw_vocals",
                             "processed": False,  # ACE-Step vocals are in raw directory
                         }
                         
                         # Create inference job
                         inference_job_id = str(uuid.uuid4())
+                        inference_run_id = make_run_id()
                         active_jobs[inference_job_id] = {
                             "id": inference_job_id,
                             "type": "inference",
                             "model_name": model_name,
                             "track": track_obj,
                             "params": inference_params,
+                            "run_id": inference_run_id,
                             "status": "starting",
                             "progress": 0,
                             "logs": ["Starting inference..."],
@@ -2754,7 +2874,7 @@ else:
                         # Run inference synchronously (we're already in a background thread)
                         print(f"[ACE-Step] Running inference job: {inference_job_id}", flush=True)
                         print(f"[ACE-Step] Model object: {model_obj}", flush=True)
-                        run_inference_job(inference_job_id, model_obj, track_obj, inference_params)
+                        run_inference_job(inference_job_id, inference_run_id, model_obj, track_obj, inference_params)
                         
                         # Check result
                         inference_result = active_jobs.get(inference_job_id, {})
@@ -2762,12 +2882,9 @@ else:
                             job['inference_completed'] = True
                             job['inference_job_id'] = inference_job_id
                             
-                            # Update vocals URL to point to converted vocals
-                            converted_vocals = paths.INFERENCE_DIR / f"{title_safe}_vocals.wav"
-                            if converted_vocals.exists():
-                                job['vocals_file'] = str(converted_vocals)
-                                job['vocals_url'] = f"/api/download/inference/{title_safe}_vocals.wav"
-                                print(f"[ACE-Step] Converted vocals: {converted_vocals}", flush=True)
+                            output_url = inference_result.get("outputUrl")
+                            if output_url:
+                                job['vocals_url'] = output_url
                         else:
                             print(f"[ACE-Step] Voice conversion failed: {inference_result.get('error')}", flush=True)
                             job['inference_completed'] = False

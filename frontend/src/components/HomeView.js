@@ -41,8 +41,16 @@ function HomeView({
   const handleCreateDatasetClick = () => onOpenCreateDataset?.();
 
   const handleDownload = useCallback(
-    async (fileType, filePath) => {
-      await downloadFile(fileType, filePath, vocalMode);
+    async (fileType, filePath, displayName) => {
+      const safeName = displayName || "download";
+      const suffix =
+        fileType === "instrumental"
+          ? "_instrumental.wav"
+          : fileType.includes("vocals")
+            ? "_vocals.wav"
+            : "";
+      const filename = suffix ? `${safeName}${suffix}` : safeName;
+      await downloadFile(fileType, filePath, vocalMode, filename);
     },
     [vocalMode]
   );

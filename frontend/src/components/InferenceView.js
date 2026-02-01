@@ -70,7 +70,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData }) {
             });
             if (!response.ok) throw new Error(`Failed to start inference for track ${track?.id ?? "unknown"}`);
             const result = await response.json();
-            return { track, jobId: result.jobId, status: "processing" };
+            return { track, jobId: result.jobId, runId: result.runId, status: "processing" };
           })
         );
         setLiveResults(jobs);

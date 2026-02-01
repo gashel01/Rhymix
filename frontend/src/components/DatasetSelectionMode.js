@@ -32,9 +32,10 @@ function DatasetSelectionMode({
     selectedProcessedVocals.length + selectedRawVocals.length;
 
   const handleDownload = async () => {
+    const normalize = (item) => (typeof item === "string" ? item : item?.fileId || item?.id);
     const selectedDataset = {
-      processed: selectedProcessedVocals,
-      raw: selectedRawVocals,
+      processed: selectedProcessedVocals.map(normalize).filter(Boolean),
+      raw: selectedRawVocals.map(normalize).filter(Boolean),
     };
 
     try {
@@ -86,9 +87,10 @@ function DatasetSelectionMode({
                 startIcon={<SchoolIcon />}
                 onClick={() => {
                   if (onTrainWithDataset) {
+                    const normalize = (item) => (typeof item === "string" ? item : item?.fileId || item?.id);
                     onTrainWithDataset({
-                      processed: selectedProcessedVocals,
-                      raw: selectedRawVocals,
+                      processed: selectedProcessedVocals.map(normalize).filter(Boolean),
+                      raw: selectedRawVocals.map(normalize).filter(Boolean),
                     });
                   }
                 }}
@@ -109,28 +111,36 @@ function DatasetSelectionMode({
             </Typography>
           ) : (
             <>
-              {selectedProcessedVocals.map((vocal) => (
+              {selectedProcessedVocals.map((vocal) => {
+                const label = typeof vocal === "string" ? vocal : vocal?.displayName || vocal?.originalName || "Track";
+                const key = typeof vocal === "string" ? vocal : vocal?.fileId || vocal?.id || label;
+                return (
                 <Chip
-                  key={`processed-${vocal}`}
-                  label={`${vocal.split('/').pop().replace('_vocals.wav', '')} (processed)`}
+                  key={`processed-${key}`}
+                  label={`${label} (processed)`}
                   color="secondary"
                   variant="outlined"
                   onDelete={() => onRemoveFromSelection(vocal, true)}
                   deleteIcon={<DeleteIcon fontSize="small" />}
                   size="small"
                 />
-              ))}
-              {selectedRawVocals.map((vocal) => (
+              );
+            })}
+              {selectedRawVocals.map((vocal) => {
+                const label = typeof vocal === "string" ? vocal : vocal?.displayName || vocal?.originalName || "Track";
+                const key = typeof vocal === "string" ? vocal : vocal?.fileId || vocal?.id || label;
+                return (
                 <Chip
-                  key={`raw-${vocal}`}
-                  label={`${vocal.split('/').pop().replace('_vocals.wav', '')} (raw)`}
+                  key={`raw-${key}`}
+                  label={`${label} (raw)`}
                   color="primary"
                   variant="outlined"
                   onDelete={() => onRemoveFromSelection(vocal, false)}
                   deleteIcon={<DeleteIcon fontSize="small" />}
                   size="small"
                 />
-              ))}
+              );
+            })}
             </>
           )}
         </Box>

@@ -6,7 +6,7 @@ import AudioTrackRow from "./AudioTrackRow";
 import AudioTableActions from "./AudioTableActions";
 import { useWaveformSync } from "../../hooks/useWaveformSync";
 import { downloadFullSong } from "../../utils/audioUtils";
-import { safeSetMuted, getFileNameFromPath, getCleanFileName, getCleanFileNameAndModelForInference } from "./utils";
+import { safeSetMuted, getCleanFileName } from "./utils";
 import { deleteFiles } from "../../utils/apiService";
 import styles from "./AudioTrackTable.module.css";
 
@@ -79,16 +79,15 @@ const AudioTrackTable = (props) => {
   }, [trackPairs, page, pageSize]);
 
   const getWaveform = (type, pair) => {
-    const key = pair[type];
+    const key = type === "instrumental" ? pair.instrumentalKey : pair.vocalKey;
     const waveforms = type === "instrumental" ? instrumentalWaveforms : vocalWaveforms;
-    return waveforms[key] || waveforms[getFileNameFromPath(key)];
+    return waveforms[key];
   };
 
-  const handlePlayBothInternal = (inst, vocal) => {
-    const instKey = getFileNameFromPath(inst), vocalKey = getFileNameFromPath(vocal);
-    const id = `${instKey}-${vocalKey}`;
+  const handlePlayBothInternal = (pairId) => {
+    const id = pairId;
     const isPlaying = playingBoth?.id === id;
-    const pair = trackPairs.find(p => getFileNameFromPath(p.instrumental) === instKey);
+    const pair = trackPairs.find(p => p.id === pairId);
 
     [getWaveform('instrumental', pair), getWaveform('vocal', pair)].forEach(wf => {
       if (!wf) return;
@@ -125,7 +124,7 @@ const AudioTrackTable = (props) => {
         if (iw && vw) {
           const [it, vt] = [iw.getCurrentTime() || 0, vw.getCurrentTime() || 0];
           if (Math.abs(it - vt) > 0.05) {
-            lastSeekedRef.current[`${pair.instrumental}-${pair.vocal}`] === 'vocal' ? iw.setCurrentTime(vt) : vw.setCurrentTime(it);
+            lastSeekedRef.current[pair.id] === 'vocal' ? iw.setCurrentTime(vt) : vw.setCurrentTime(it);
           }
         }
       });
@@ -247,7 +246,7 @@ const AudioTrackTable = (props) => {
                   const pair = paginatedTrackPairs[virtualRow.index];
                   if (!pair) return null;
                   const globalIndex = (page - 1) * pageSize + virtualRow.index;
-                  const pairId = `${getFileNameFromPath(pair.instrumental)}-${getFileNameFromPath(pair.vocal)}`;
+                  const pairId = pair.id;
                   const isPlaying = playingBoth?.id === pairId;
                   return (
                     <AudioTrackRow
@@ -255,15 +254,15 @@ const AudioTrackTable = (props) => {
                       pair={pair}
                       index={globalIndex}
                       status={pair.status || "completed"}
-                      name={vocalModeType === "inference" ? (pair.name ?? getCleanFileNameAndModelForInference(pair.instrumental).name) : getCleanFileName(pair.instrumental)}
-                      modelUsed={vocalModeType === "inference" ? (pair.modelName ?? getCleanFileNameAndModelForInference(pair.instrumental).model) : null}
-                      instrumentalUrl={pair.instrumentalUrl || `/api/download/instrumental/${pair.instrumental}`}
-                      vocalUrl={pair.vocalUrl || `/api/download/${vocalsFileType}/${pair.vocal}`}
+                      name={pair.displayName || pair.name || (vocalModeType === "inference" ? "Unknown Track" : getCleanFileName(pair.instrumental))}
+                      modelUsed={vocalModeType === "inference" ? (pair.modelName ?? null) : null}
+                      instrumentalUrl={pair.instrumentalUrl || (pair.fileId ? `/api/download/instrumental/${pair.fileId}` : undefined)}
+                      vocalUrl={pair.vocalUrl || (pair.fileId ? `/api/download/${vocalsFileType}/${pair.fileId}` : undefined)}
                       playingBoth={playingBoth}
                       vocalMode={vocalMode}
                       vocalsFileType={vocalsFileType}
-                      isInstrumentalPlaying={isPlaying || getFileNameFromPath(playingFile?.name) === getFileNameFromPath(pair.instrumental)}
-                      isVocalPlaying={isPlaying || getFileNameFromPath(playingFile?.name) === getFileNameFromPath(pair.vocal)}
+                      isInstrumentalPlaying={isPlaying || playingFile?.name === pair.instrumentalKey}
+                      isVocalPlaying={isPlaying || playingFile?.name === pair.vocalKey}
                       internalMutedInstrumentals={mutes.instrumental}
                       internalMutedVocals={ mutes.vocal}
                       volume={volume}
@@ -339,7 +338,10 @@ const AudioTrackTable = (props) => {
             <Button onClick={() => setDeleteState(p => ({ ...p, open: false }))}>Cancel</Button>
             <Button onClick={async () => {
               setDeleteState(p => ({ ...p, loading: true }));
-              const files = trackPairs.filter(p => selectedRows.includes(p.id)).flatMap(p => [p.vocal, p.instrumental]);
+              const files = trackPairs
+                .filter(p => selectedRows.includes(p.id))
+                .map(p => p.fileId || p.id)
+                .filter(Boolean);
               const res = await deleteFiles(files);
               setDeleteState({ open: false, loading: false, result: res });
               setSelectedRows([]);

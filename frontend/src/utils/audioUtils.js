@@ -2,7 +2,7 @@
  * Audio utility functions for download logic and URL construction
  */
 
-import { extractFilename, getFileType, formatDownloadFilename } from './fileUtils';
+import { extractFilename } from './fileUtils';
 
 /**
  * Construct download URL for a file
@@ -10,9 +10,9 @@ import { extractFilename, getFileType, formatDownloadFilename } from './fileUtil
  * @param {string} filename - Filename to download
  * @returns {string} - Download URL
  */
-export const getDownloadUrl = (fileType, filename) => {
-  if (!fileType || !filename) return null;
-  return `/api/download/${fileType}/${filename}`;
+export const getDownloadUrl = (fileType, fileId) => {
+  if (!fileType || !fileId) return null;
+  return `/api/download/${fileType}/${fileId}`;
 };
 
 /**
@@ -27,17 +27,8 @@ export const downloadFile = async (fileType, filePath, vocalMode = 'processed', 
   try {
     if (!filePath) return;
 
-    const fileName = extractFilename(filePath);
-    if (!fileName) return;
-
-    // Determine actual file type
-    let actualFileType = fileType;
-    if (fileName.includes('_instrumental')) {
-      actualFileType = 'instrumental';
-    } else if (fileName.includes('_vocals')) {
-      actualFileType = vocalMode === 'raw' ? 'raw_vocals' : 'processed_vocals';
-    }
-
+    const fileName = extractFilename(filePath) || filePath;
+    const actualFileType = fileType;
     const url = getDownloadUrl(actualFileType, fileName);
 
     const response = await fetch(url, {
@@ -68,7 +59,7 @@ export const downloadFile = async (fileType, filePath, vocalMode = 'processed', 
     link.href = downloadUrl;
 
     // Use custom filename or format the filename
-    const downloadFileName = customFilename || formatDownloadFilename(fileName, vocalMode);
+    const downloadFileName = customFilename || fileName;
     link.setAttribute('download', downloadFileName);
     
     document.body.appendChild(link);

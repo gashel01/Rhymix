@@ -21,19 +21,27 @@ export const useAvailableFiles = () => {
 
       if (response && response.files) {
         if (response.files.length > 0) {
-          setAvailableFiles(response.files);
+          const normalized = response.files.map((file) => ({
+            ...file,
+            id: file.fileId,
+            displayName: file.safeDisplayName || file.originalName,
+            vocalUrl: file.vocalUrlProcessed || null,
+            vocalPath: file.vocalPathProcessed || null,
+            instrumentalUrl: file.instrumentalUrl || null,
+            instrumentalPath: file.instrumentalPath || null,
+          }));
 
-          // Create raw vocals versions by modifying URLs
-          const possibleRawVocals = response.files.map((file) => {
-            const rawVersion = { ...file };
-            if (rawVersion.vocalUrl) {
-              rawVersion.vocalUrl = rawVersion.vocalUrl.replace(
-                '/api/download/processed_vocals/',
-                '/api/download/raw_vocals/'
-              );
-            }
-            return rawVersion;
-          });
+          setAvailableFiles(normalized);
+
+          const possibleRawVocals = response.files.map((file) => ({
+            ...file,
+            id: file.fileId,
+            displayName: file.safeDisplayName || file.originalName,
+            vocalUrl: file.vocalUrlRaw || null,
+            vocalPath: file.vocalPathRaw || null,
+            instrumentalUrl: file.instrumentalUrl || null,
+            instrumentalPath: file.instrumentalPath || null,
+          }));
 
           setRawVocals(possibleRawVocals);
         } else {

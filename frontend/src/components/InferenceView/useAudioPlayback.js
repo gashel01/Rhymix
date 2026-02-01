@@ -7,13 +7,7 @@ const basename = (p) => {
 };
 
 const getTrackName = (track) => {
-  const inst = track?.instrumental;
-  const voc = track?.vocal;
-  const instName = inst ? basename(inst) : "";
-  const vocName = voc ? basename(voc) : "";
-  const cleanedInst = instName.replace("_instrumental.wav", "").replace("_instrumental", "");
-  const cleanedVoc = vocName.replace("_vocals.wav", "").replace("_vocals", "");
-  return cleanedInst || cleanedVoc || instName || vocName || "Unknown";
+  return track?.displayName || track?.name || "Unknown";
 };
 
 export const formatParamsSummary = (params) => {
@@ -44,17 +38,18 @@ export const useAudioPlayback = ({
     setVocalMode(newMode);
   }, []);
 
-  const handleDownload = useCallback(async (type, path) => {
+  const handleDownload = useCallback(async (type, path, displayName) => {
     try {
       if (!path) return;
-      const param = encodeURIComponent(basename(path) || path);
+      const param = encodeURIComponent(path);
       const response = await fetch(`/api/download/${type}/${param}`);
       if (!response.ok) throw new Error("Failed to download file");
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = basename(path) || "download.wav";
+      const fallbackName = basename(path) || "download.wav";
+      a.download = displayName ? `${displayName}.wav` : fallbackName;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -67,26 +62,26 @@ export const useAudioPlayback = ({
   const pastInferenceTrackPairs = useMemo(
     () =>
       inferenceResults.map((result) => ({
-        instrumental: result.outputFile,
-        vocal: result.outputFile,
-        name: result.trackName?.split("_instrumental")[0] || "Unknown Track",
+        id: result.runId,
+        fileId: result.inputFileId,
+        displayName: result.inputDisplayName || result.inputOriginalName || "Unknown Track",
+        name: result.inputDisplayName || result.inputOriginalName || "Unknown Track",
         modelName: result.modelName,
-        instrumentalUrl: `/api/download/instrumental/${result.outputFile.split("_").slice(1).join("_").split("-")[0]}`,
-        originalVocalUrl: `/api/download/${result.params?.vocalsFileType || "processed_vocals"}/${result.outputFile
-          .split("_")
-          .slice(1)
-          .join("_")
-          .split("-")[1]}`,
+        instrumental: result.inputFileId,
+        vocal: result.inputFileId,
+        instrumentalKey: `${result.runId}-instrumental`,
+        vocalKey: `${result.runId}-vocal`,
+        instrumentalUrl: result.inputFileId ? `/api/download/instrumental/${result.inputFileId}` : null,
+        originalVocalUrl: result.inputFileId
+          ? `/api/download/${result.vocalFileType || "processed_vocals"}/${result.inputFileId}`
+          : null,
         vocalUrl:
           vocalMode === "converted"
-            ? `/api/download/inference/${result.outputFile}`
-            : `/api/download/${result.params?.vocalsFileType || "raw_vocals"}/${result.outputFile
-              .split("-")
-              .slice(1)
-              .join("_")
-              .split("_inferred")[0]}`,
+            ? result.outputUrl
+            : result.inputFileId
+              ? `/api/download/${result.vocalFileType || "raw_vocals"}/${result.inputFileId}`
+              : null,
         status: "completed",
-        id: result.id,
         result,
         isNew: false,
         paramsSummary: result.params && Object.keys(result.params).length ? formatParamsSummary(result.params) : "",
@@ -103,27 +98,27 @@ export const useAudioPlayback = ({
     return liveResults
       .filter((r) => r?.track?.instrumental)
       .map((r) => {
-        const instrumental = r.track.instrumental;
-        const instrumentalUrl = r.track.instrumentalUrl || `/api/download/instrumental/${basename(instrumental)}`;
-        const originalVocalFile = basename(r.track.vocal);
-        const originalVocalUrl = r.track.vocalUrl || `/api/download/${vocalsFileType}/${originalVocalFile}`;
-        const outputFileName = r.outputFile ? basename(r.outputFile) : null;
-        const convertedVocalUrl = outputFileName
-          ? `/api/download/inference/${encodeURIComponent(outputFileName)}`
-          : null;
+        const fileId = r.track.fileId || r.track.id;
+        const instrumentalUrl = r.track.instrumentalUrl || (fileId ? `/api/download/instrumental/${fileId}` : null);
+        const originalVocalUrl = r.track.vocalUrl || (fileId ? `/api/download/${vocalsFileType}/${fileId}` : null);
+        const convertedVocalUrl = r.outputUrl || (r.runId ? `/api/download/inference/${encodeURIComponent(r.runId)}` : null);
         const isOriginal = vocalMode === "original";
         return {
-          id: r.jobId,
+          id: r.runId || r.jobId,
+          fileId,
+          displayName: getTrackName(r.track),
           name: getTrackName(r.track),
-          instrumental,
+          instrumental: fileId,
           instrumentalUrl,
-          vocal: isOriginal ? originalVocalFile : outputFileName || originalVocalFile,
+          vocal: fileId,
           vocalUrl: isOriginal ? originalVocalUrl : convertedVocalUrl || originalVocalUrl,
           status: r.status || "processing",
           result: r,
           isNew: true,
           paramsSummary,
           modelName,
+          instrumentalKey: `${r.runId || r.jobId}-instrumental`,
+          vocalKey: `${r.runId || r.jobId}-vocal`,
         };
       });
   }, [liveResults, liveInferenceData, vocalMode]);
