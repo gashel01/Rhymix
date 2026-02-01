@@ -6,7 +6,6 @@ import AddIcon from "@mui/icons-material/Add";
 import AudioTrackTable from "./AudioTrackTable";
 import ErrorBoundary from "./ErrorBoundary";
 import TabPanel from "./common/TabPanel";
-import { useAudioPlayback } from "../hooks/useAudioPlayback";
 import { useVocalMode } from "../hooks/useVocalMode";
 import { useAvailableFiles } from "../hooks/useAvailableFiles";
 import { downloadFile } from "../utils/audioUtils";
@@ -16,6 +15,9 @@ import Btn from "./Homeview/Btn.js";
 import MainHeader from "./Homeview/MainHeader.js";
 import IconButton from "./Homeview/IconButton.js";
 
+import { Theme  } from "./Homeview/Theme.js";
+
+import { useAudioPlayback  }  from "./Homeview/useAudioPlayback";
 
 function HomeView({
   onOpenCreateDataset,
@@ -25,39 +27,8 @@ function HomeView({
 }) {
   const { volumeRef } = useVolume();
   // ---------- Theme tokens (same “new style”) ----------
-  const isDark = useMemo(() => {
-    if (typeof darkMode === "boolean") return darkMode;
-    if (typeof window === "undefined") return false;
-    return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
-  }, [darkMode]);
-
-  const t = useMemo(() => {
-    return {
-      isDark,
-      pageBg: isDark ? "#0B0B0F" : "#F4F5F7",
-      text: isDark ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.90)",
-      subtext: isDark ? "rgba(255,255,255,0.62)" : "rgba(0,0,0,0.55)",
-      hairline: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)",
-      glassA: isDark ? "rgba(18,18,20,0.62)" : "rgba(255,255,255,0.72)",
-      glassB: isDark ? "rgba(26,26,28,0.56)" : "rgba(248,248,250,0.78)",
-      cardA: isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.86)",
-      cardB: isDark ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.72)",
-      shadow: isDark ? "0 18px 44px rgba(0,0,0,0.60)" : "0 18px 46px rgba(0,0,0,0.12)",
-      shadowSoft: isDark ? "0 10px 24px rgba(0,0,0,0.45)" : "0 12px 26px rgba(0,0,0,0.10)",
-      primary: isDark ? "rgba(10,132,255,1)" : "rgba(0,122,255,1)",
-      primaryWash: isDark ? "rgba(10,132,255,0.20)" : "rgba(0,122,255,0.16)",
-      primaryWash2: isDark ? "rgba(10,132,255,0.10)" : "rgba(0,122,255,0.08)",
-      success: "rgba(52,199,89,1)",
-      successWash: isDark ? "rgba(52,199,89,0.18)" : "rgba(52,199,89,0.14)",
-      radiusLg: 22,
-      radiusMd: 16,
-      maxW: 1400,
-      stickyTop: 12,
-    };
-  }, [isDark]);
-
-
-
+ const t = Theme({ darkMode }).t;
+ 
 
 
   // ---------- Hooks (unchanged logic) ----------
@@ -65,24 +36,8 @@ function HomeView({
 
   const { vocalMode, handleVocalModeChange, vocalsFileType } = useVocalMode("raw");
 
-  const {
-    playingFile,
-    playingBoth,
-    instrumentalWaveforms,
-    rawVocalWaveforms,
-    processedVocalWaveforms,
-    handlePlayPause,
-    handlePlayBoth,
-    handleInstrumentalWaveformReady,
-    handleRawVocalWaveformReady,
-    handleProcessedVocalWaveformReady,
-    stopAllAudio,
-  } = useAudioPlayback();
+  const { trackPairs } = useAudioPlayback({ rawVocals, availableFiles, vocalMode });
 
-  const vocalWaveforms = vocalMode === "processed" ? processedVocalWaveforms : rawVocalWaveforms;
-  const handleVocalWaveformReady = vocalMode === "processed" ? handleProcessedVocalWaveformReady : handleRawVocalWaveformReady;
-
-  // ---------- Handlers ----------
   const handleCreateDatasetClick = () => onOpenCreateDataset?.();
 
   const handleDownload = useCallback(
@@ -95,51 +50,13 @@ function HomeView({
   const handleVocalModeChangeWithCleanup = useCallback(
     (event, newMode) => {
       if (newMode !== null) {
-        // Do NOT stopAllAudio – switching vocal variant should be seamless (match InferenceView)
         handleVocalModeChange(event, newMode);
       }
     },
     [handleVocalModeChange]
   );
 
-  // Stable join by instrumental filename (not index) + stable row id so toggling vocal mode never remounts instrumentals.
-  const trackPairs = useMemo(() => {
-    const getFile = (p) => (p || "").split("/").pop() || "";
-    const norm = (s) => (s || "").toLowerCase();
-
-    const raw = Array.isArray(rawVocals) ? rawVocals : [];
-    const proc = Array.isArray(availableFiles) ? availableFiles : [];
-
-    const procByInst = new Map(
-      proc.map((p) => [norm(getFile(p.instrumentalPath)), p])
-    );
-
-    return raw.map((r, index) => {
-      const instPath = r.instrumentalPath || "";
-      const instFile = getFile(instPath);
-      const match = procByInst.get(norm(instFile));
-
-      const chosenVocalPath =
-        vocalMode === "processed" ? match?.vocalPath : r.vocalPath;
-      const vocalFile = getFile(chosenVocalPath);
-
-      // Row id MUST be stable across raw/processed toggle (like InferenceView's result.id).
-      // Use only instFile/index so it never changes when match exists or not – otherwise row remounts and both waveforms reload.
-      return {
-        id: instFile || `row-${index}`,
-        name: r.name || match?.name || instFile || `Track ${index + 1}`,
-        instrumental: instFile,
-        vocal: vocalFile,
-        vocalMode,
-        isProcessed: vocalMode === "processed",
-        instrumentalUrl: instFile ? `/api/download/instrumental/${instFile}` : (r.instrumentalUrl || undefined),
-        vocalUrl: vocalMode === "processed" ? match?.vocalUrl : r.vocalUrl,
-      };
-    });
-  }, [rawVocals, availableFiles, vocalMode]);
-
-
-
+  
   // ---------- Render ----------
   return (
     <div style={{ minHeight: "100vh", }}>
@@ -172,21 +89,10 @@ function HomeView({
                     trackPairs={trackPairs}
                     vocalMode={vocalMode}
                     handleVocalModeChange={handleVocalModeChangeWithCleanup}
-                    handlePlayPause={handlePlayPause}
                     handleDownload={handleDownload}
-                    handlePlayBoth={handlePlayBoth}
-                    handleInstrumentalWaveformReady={handleInstrumentalWaveformReady}
-                    handleVocalWaveformReady={handleVocalWaveformReady}
-                    playingFile={playingFile}
-                    playingBoth={playingBoth}
-                    instrumentalWaveforms={instrumentalWaveforms}
-                    vocalWaveforms={vocalWaveforms}
                     showVocalToggle={true}
-                    enablePlayBoth={true}
                     vocalsFileType={vocalsFileType}
                     showDatasetButton={false}
-                    hasExports={(availableFiles?.length || 0) > 0}
-                    stopAllAudio={stopAllAudio}
                     handleTrainWithDataset={handleTrainWithDataset}
                     showInferenceButton={true}
                     handleInferenceWithTracks={onInferenceWithTracks}

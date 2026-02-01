@@ -48,14 +48,18 @@ const AudioTrackHeader = ({
               </Typography>
              
               {showVocalToggle && handleVocalModeChange && (
-                <Box sx={{ flexShrink: 0, mr: 1 }}>
-                  <VocalModeToggle
-                    value={vocalMode}
-                    onChange={handleVocalModeChange}
-                    mode={vocalModeType} // 'inference' or 'dataset'
-                  />
-                </Box>
-              )}
+  <Box 
+    sx={{ flexShrink: 0, mr: 1 }} 
+    onClick={(e) => e.stopPropagation()} // Prevents the click from bubbling to the table
+    onMouseDown={(e) => e.stopPropagation()}
+  >
+    <VocalModeToggle
+      value={vocalMode}
+      onChange={handleVocalModeChange}
+      mode={vocalModeType} 
+    />
+  </Box>
+)}
             </Grid>
           </Grid>
         </div>

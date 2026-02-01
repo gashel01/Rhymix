@@ -61,7 +61,7 @@ export const useWaveformSync = (
       const vocalEnded =
         vocalDuration > 0 && Math.abs(vocalTime - vocalDuration) < 0.5;
 
-      if (instrumentalEnded || vocalEnded) {
+      if (instrumentalEnded && vocalEnded) {
         // Pause both waveforms
         if (instrumentalWaveform?.pause) {
           instrumentalWaveform.pause();

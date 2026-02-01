@@ -33,6 +33,8 @@ const AudioTrackRow = (props) => {
     playingBoth,
     status = "completed",
     style,
+    isNew = false,
+    paramsSummary,
   } = props;
 
   // inject CSS once (don’t render <style> inside <tbody>)
@@ -265,13 +267,38 @@ const AudioTrackRow = (props) => {
       {/* Waveforms + controls + bare checkbox */}
       <td style={{ borderBottom: `1px solid ${t.hairline}`, padding: "5px 10px 10px 10px", position: "relative" }}>
         {/* Name */}
-        <div style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
           <TextOverflow
             text={displayName}
             style={{ fontWeight: 700, letterSpacing: -0.2, color: t.text, display: "flex", alignItems: "center" }}
           />
-          {modelUsed && <Pill>{modelUsed}</Pill>}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            {isNew && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "4px 8px",
+                  borderRadius: 8,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: 0.3,
+                  color: t.primary,
+                  background: t.isDark ? "rgba(0,122,255,0.2)" : "rgba(0,122,255,0.12)",
+                  border: `1px solid ${t.hairline}`,
+                }}
+              >
+                New
+              </span>
+            )}
+            {modelUsed && <Pill>{modelUsed}</Pill>}
+          </div>
         </div>
+        {paramsSummary && (
+          <div style={{ marginTop: 4, fontSize: 11, fontWeight: 600, color: t.subtext }}>
+            {paramsSummary}
+          </div>
+        )}
 
         <div >
           <div className="atr-grid" style={{ marginTop: "10px" }}>
@@ -371,6 +398,8 @@ const areEqual = (prev, next) =>
   prev.playingBoth === next.playingBoth &&
   prev.status === next.status &&
   prev.onRowSelect === next.onRowSelect &&
-  prev.style === next.style;
+  prev.style === next.style &&
+  prev.isNew === next.isNew &&
+  prev.paramsSummary === next.paramsSummary;
 
 export default React.memo(AudioTrackRow, areEqual);

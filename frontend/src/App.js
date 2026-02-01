@@ -26,14 +26,13 @@ import AudioFileIcon from "@mui/icons-material/AudioFile";
 import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
 import FileUpload from "./components/FileUpload";
 import ProcessingStatus from "./components/ProcessingStatus";
-import DownloadResults from "./components/DownloadResults";
+// import DownloadResults from "./components/DownloadResults";
 import HomeView from "./components/HomeView";
 import TrainingView from "./components/TrainingView";
 import TalkingDatasetUpload from "./components/TalkingDatasetUpload";
 import TalkWorkflowPage from "./talk_frontend/TalkWorkflowPage";
 import InferenceView from "./components/InferenceView";
 import InferenceParams from "./components/InferenceParams";
-import InferenceResults from "./components/InferenceResults";
 import ModelsView from "./components/ModelsView";
 import CreateSongView from "./components/CreateSongView";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
@@ -278,6 +277,7 @@ function App() {
   const [selectedModelForInference, setSelectedModelForInference] = useState(null);
   const [inferenceParams, setInferenceParams] = useState(null);
   const [inferenceData, setInferenceData] = useState(null);
+  const [liveInferenceData, setLiveInferenceData] = useState(null);
 
   const theme = createAppTheme(darkMode ? 'dark' : 'light');
 
@@ -385,6 +385,7 @@ function App() {
     setSelectedModelForInference(null);
     setInferenceParams(null);
     setInferenceData(null);
+    if (view !== "inference") setLiveInferenceData(null);
     setDrawerOpen(false);
     // Update URL hash for navigation persistence
     if (view !== "home") {
@@ -399,7 +400,7 @@ function App() {
     const hash = window.location.hash.substring(1); // Remove the '#'
     if (hash && hash !== 'home') {
       // Only set the view if it's a valid navigation hash
-      const validViews = ['datasets', 'training', 'talking-workflow', 'inference-model-selection', 'inference-params', 'inference-results'];
+      const validViews = ['datasets', 'training', 'talking-workflow', 'inference-model-selection', 'inference-params', 'inference'];
       if (validViews.includes(hash)) {
         setCurrentView(hash);
         setShowHomeView(false);
@@ -617,13 +618,13 @@ function App() {
                 <ProcessingStatus jobStatus={jobStatus} />
               )}
 
-              {activeStep === 2 && (
+              {/* {activeStep === 2 && (
                 <DownloadResults
                   jobStatus={jobStatus}
                   handleReset={handleReset}
                   volume={volume}
                 />
-              )}
+              )} */}
             </Box>
 
             <Box sx={{
@@ -687,7 +688,7 @@ function App() {
         return <ModelsView />;
 
       case "inference":
-        return <InferenceView onNavigate={handleNavigation} />;
+        return <InferenceView onNavigate={handleNavigation} liveInferenceData={liveInferenceData} />;
 
       case "talking-workflow":
         return (
@@ -718,43 +719,10 @@ function App() {
             selectedTracks={selectedTracksForInference}
             onBack={() => setCurrentView("inference-model-selection")}
             onStartInference={(data) => {
-              setInferenceData(data);
-              setCurrentView("inference-results");
-            }}
-          />
-        );
-
-      case "inference-results":
-        return (
-          <InferenceResults
-            inferenceData={inferenceData}
-            volume={volume}
-            onBack={(actionData) => {
-              console.log('App received onBack actionData:', actionData);
-              if (actionData && typeof actionData === 'object') {
-                // Handle specific navigation actions from InferenceResults
-                if (actionData.action === 'model_selection' && actionData.tracks) {
-                  console.log('Setting selectedTracksForInference for model_selection:', actionData.tracks);
-                  // Return to model selection with selected tracks
-                  setSelectedTracksForInference(actionData.tracks);
-                  setCurrentView("inference-model-selection");
-                  setShowHomeView(false);
-                  window.history.replaceState(null, '', '#inference-model-selection');
-                } else if (actionData.action === 'inference_params' && actionData.tracks) {
-                  console.log('Setting selectedTracksForInference for inference_params:', actionData.tracks);
-                  // Return to inference parameters with selected tracks
-                  setSelectedTracksForInference(actionData.tracks);
-                  setCurrentView("inference-params");
-                  setShowHomeView(false);
-                  window.history.replaceState(null, '', '#inference-params');
-                } else {
-                  console.log('Action data missing tracks or unrecognized action:', actionData);
-                }
-              } else {
-                console.log('Default back behavior triggered');
-                // Default back behavior
-                handleNavigation("home");
-              }
+              setLiveInferenceData(data);
+              setCurrentView("inference");
+              setShowHomeView(false);
+              window.history.replaceState(null, '', '#inference');
             }}
           />
         );
@@ -906,9 +874,9 @@ function App() {
                     <FileUpload files={files} setFiles={setFiles} setError={setError} loading={loading} setLoading={setLoading} />
                   )}
                   {activeStep === 1 && <ProcessingStatus jobStatus={jobStatus} />}
-                  {activeStep === 2 && (
+                  {/* {activeStep === 2 && (
                     <DownloadResults jobStatus={jobStatus} handleReset={handleReset} />
-                  )}
+                  )} */}
                 </Box>
                 <Box sx={{ display: "flex", flexDirection: "row", pt: 4, gap: 2, justifyContent: 'center' }}>
                   <Button disabled={activeStep === 0 || loading || activeStep === 1} onClick={handleBack} variant="outlined" sx={{ minWidth: 120, borderRadius: 2 }}>

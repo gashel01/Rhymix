@@ -16,24 +16,16 @@ const AudioTrackTable = (props) => {
     trackPairs = [],
     pageSize: pageSizeProp = 10,
     vocalMode = "raw",
-    instrumentalWaveforms = {},
-    vocalWaveforms = {},
+    
     vocalsFileType = "processed_vocals",
-    stopAllAudio,
     volume,
-    playingFile,
     playingBoth: playingBothProp,
     handleVocalModeChange,
     vocalModeType,
     handleDownload,
-    handleDownloadFullSong,
-    handleInstrumentalWaveformReady,
-    handleVocalWaveformReady,
     showVocalToggle,
-    enablePlayBoth,
     showDatasetButton,
     showInferenceButton,
-    hasExports,
     handleTrainWithDataset,
     handleInferenceWithTracks,
     showInferenceResultsActions,
@@ -48,8 +40,6 @@ const AudioTrackTable = (props) => {
     externalDeleteResult,
     onClearDeleteResult,
     defaultLabel,
-    mutedInstrumentals,
-    mutedVocals,
     header,
   } = props;
 
@@ -60,6 +50,8 @@ const AudioTrackTable = (props) => {
   const [page, setPage] = useState(1);
   const lastSeekedRef = useRef({});
   const parentRef = useRef(null);
+  const { instrumentalWaveforms = {}, vocalWaveforms = {} } = {};
+  const { playingFile } = {}
 
   const selectedRows = externalSelectedRows ?? internalSelectedRows;
   const setSelectedRows = onRowSelect ? () => { } : setInternalSelectedRows;
@@ -143,7 +135,6 @@ const AudioTrackTable = (props) => {
 
   useWaveformSync(playingBoth, instrumentalWaveforms, vocalWaveforms, () => {
     setPlayingBoth(null);
-    stopAllAudio?.();
   });
 
   useEffect(() => {
@@ -196,7 +187,6 @@ const AudioTrackTable = (props) => {
         showDatasetButton={showDatasetButton}
         showInferenceButton={showInferenceButton}
         handleDownloadDataset={handleDownloadDataset}
-        hasExports={hasExports}
         handleTrainWithDataset={handleTrainWithDataset}
         handleInferenceWithTracks={handleInferenceWithTracks}
         showInferenceResultsActions={showInferenceResultsActions}
@@ -265,8 +255,8 @@ const AudioTrackTable = (props) => {
                       pair={pair}
                       index={globalIndex}
                       status={pair.status || "completed"}
-                      name={vocalModeType === "inference" ? getCleanFileNameAndModelForInference(pair.instrumental).name : getCleanFileName(pair.instrumental)}
-                      modelUsed={vocalModeType === "inference" ? getCleanFileNameAndModelForInference(pair.instrumental).model : null}
+                      name={vocalModeType === "inference" ? (pair.name ?? getCleanFileNameAndModelForInference(pair.instrumental).name) : getCleanFileName(pair.instrumental)}
+                      modelUsed={vocalModeType === "inference" ? (pair.modelName ?? getCleanFileNameAndModelForInference(pair.instrumental).model) : null}
                       instrumentalUrl={pair.instrumentalUrl || `/api/download/instrumental/${pair.instrumental}`}
                       vocalUrl={pair.vocalUrl || `/api/download/${vocalsFileType}/${pair.vocal}`}
                       playingBoth={playingBoth}
@@ -274,18 +264,17 @@ const AudioTrackTable = (props) => {
                       vocalsFileType={vocalsFileType}
                       isInstrumentalPlaying={isPlaying || getFileNameFromPath(playingFile?.name) === getFileNameFromPath(pair.instrumental)}
                       isVocalPlaying={isPlaying || getFileNameFromPath(playingFile?.name) === getFileNameFromPath(pair.vocal)}
-                      internalMutedInstrumentals={mutedInstrumentals || mutes.instrumental}
-                      internalMutedVocals={mutedVocals || mutes.vocal}
+                      internalMutedInstrumentals={mutes.instrumental}
+                      internalMutedVocals={ mutes.vocal}
                       volume={volume}
                       handlePlayPauseModified={handlePlayPauseModified}
                       handlePlayBothModified={handlePlayBothInternal}
                       handleDownload={handleDownload}
-                      handleInstrumentalWaveformReady={handleInstrumentalWaveformReady}
-                      handleVocalWaveformReady={handleVocalWaveformReady}
-                      handleDownloadFullSong={handleDownloadFullSong || downloadFullSong}
+                      handleDownloadFullSong={ downloadFullSong}
                       isSelected={selectedRows.includes(pair.id)}
                       onRowSelect={handleRowSelect}
-
+                      isNew={pair.isNew}
+                      paramsSummary={pair.paramsSummary}
                     />
                   );
                 })}
