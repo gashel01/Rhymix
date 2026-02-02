@@ -468,6 +468,42 @@ function App() {
         try {
           const data = await getJobStatus(jobId);
           setJobStatus(data);
+          setOptimisticTracks((prev) => {
+            if (!prev.length) return prev;
+            const nowIso = new Date().toISOString();
+            const normalizedState =
+              data.status === "completed"
+                ? "ready"
+                : data.status === "failed"
+                ? "error"
+                : data.status === "starting"
+                ? "processing"
+                : data.status || "processing";
+            const progressValue =
+              typeof data.file_progress === "number"
+                ? data.file_progress
+                : typeof data.progress === "number"
+                ? data.progress
+                : 0;
+            const message = data.status_message || data.status || "Processing...";
+
+            return prev.map((track) => {
+              const current = track.processing || {};
+              const currentState = current.state || "processing";
+              if (currentState === "ready" || currentState === "error") return track;
+              return {
+                ...track,
+                processing: {
+                  ...current,
+                  state: normalizedState,
+                  step: normalizedState,
+                  message,
+                  progress: progressValue,
+                  updatedAt: nowIso,
+                },
+              };
+            });
+          });
 
           if (data.status === "completed") {
             clearInterval(interval);

@@ -262,6 +262,32 @@ def list_upload_metadata() -> list[dict]:
     data = _load_metadata_file(UPLOAD_METADATA_PATH)
     return list(data.get("files", {}).values())
 
+def _collect_processing_file_ids() -> list[str]:
+    ids = []
+    for record in list_upload_metadata():
+        stored = record.get("storedName")
+        file_id = record.get("fileId")
+        if not stored or not file_id:
+            continue
+        if (paths.INPUT_DIR / stored).exists():
+            ids.append(file_id)
+    return ids
+
+def _get_active_processing_job():
+    candidates = []
+    for job in active_jobs.values():
+        cfg = job.get("config")
+        if not isinstance(cfg, dict):
+            continue
+        if not all(k in cfg for k in ("segment", "process", "export", "clean")):
+            continue
+        status = job.get("status")
+        if status in {"starting", "processing"}:
+            candidates.append(job)
+    if not candidates:
+        return None
+    return max(candidates, key=lambda j: j.get("started_at", 0))
+
 def get_upload_base_name(file_id: str):
     record = get_upload_metadata(file_id)
     if not record:
@@ -402,7 +428,8 @@ def process_files():
     job_id = str(uuid.uuid4())
     active_jobs[job_id] = {
         'id': job_id, 'status': 'starting', 'progress': 0,
-        'config': cfg, 'started_at': time.time()
+        'config': cfg, 'started_at': time.time(),
+        'fileIds': _collect_processing_file_ids(),
     }
 
     time.sleep(1.0)
@@ -556,6 +583,28 @@ def get_available_files():
         if not paths.UVR_PROCESSED_DIR.exists():
             return jsonify({'files': [], 'message': 'No processed files available'})
 
+        active_job = _get_active_processing_job()
+        active_file_ids = set(active_job.get("fileIds", [])) if active_job else set()
+        processing_payload = None
+        if active_job:
+            status = active_job.get("status") or "processing"
+            state = "processing" if status in {"starting", "processing"} else "error" if status == "failed" else "ready"
+            progress_value = active_job.get("file_progress")
+            if progress_value is None:
+                progress_value = active_job.get("progress")
+            if isinstance(progress_value, float) and 0 <= progress_value <= 1:
+                progress_value = int(progress_value * 100)
+            message = active_job.get("status_message") or status
+            processing_payload = {
+                "state": state,
+                "step": state,
+                "message": message,
+                "progress": progress_value if isinstance(progress_value, (int, float)) else 0,
+                "updatedAt": datetime.now().isoformat(),
+                "currentFile": active_job.get("current_file"),
+                "totalFiles": active_job.get("total_files"),
+            }
+
         paths.INSTRUMENTAL_DIR.mkdir(parents=True, exist_ok=True)
         pairs = []
         for record in list_upload_metadata():
@@ -586,6 +635,7 @@ def get_available_files():
                         (instrumental.stat().st_mtime if instrumental.exists() else 0),
                     )
                 ).strftime('%Y-%m-%d %H:%M:%S'),
+                "processing": processing_payload if processing_payload and record.get("fileId") in active_file_ids else None,
             })
 
         return jsonify({'files': pairs, 'message': f'Found {len(pairs)} processed files'})
