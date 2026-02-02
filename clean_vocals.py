@@ -618,15 +618,15 @@ class ProgressCallback:
             file_progress=progress  # Add explicit file progress
         )
 
-def process_all(segment_audio=True, process_audio=True, export_data=False, clean_after=False):
+def process_all(segment_audio=True, process_audio=True, export_data=False, clean_after=False, input_files=None):
     """
-    Process all audio files in the input_dir
+    Process audio files. If input_files is given, process only those paths; else process all in INPUT_DIR.
     """
-    # Force segment_audio to False regardless of what was passed
     segment_audio = False  # Disable segmentation completely
-    
-    # Count total files for progress reporting
-    input_files = list(INPUT_DIR.glob("*.*"))
+    if input_files is not None:
+        input_files = [Path(p) for p in input_files]
+    else:
+        input_files = list(INPUT_DIR.glob("*.*"))
     total_files = len(input_files)
     
     if total_files == 0:
@@ -644,11 +644,6 @@ def process_all(segment_audio=True, process_audio=True, export_data=False, clean
             logger.error(f"Error processing {file_path}: {str(e)}")
             logger.error(traceback.format_exc())
             update_progress(f"[ERROR] {file_path.name}: {str(e)}", (i-1)/total_files, i, total_files)
-    
-    # Create dataset export if requested
-    if export_data:
-        update_progress("Creating dataset export...", 0.95, total_files, total_files)
-        create_dataset_exports(segment_audio, process_audio, clean_after)
     
     # Clean up if requested
     if clean_after:

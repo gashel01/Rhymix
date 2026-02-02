@@ -7,10 +7,8 @@ import {
   Chip,
   Checkbox,
 } from '@mui/material';
-import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import DeleteIcon from '@mui/icons-material/Close';
 import SchoolIcon from '@mui/icons-material/School';
-import { downloadDataset } from '../utils/audioUtils';
 import styles from './DatasetSelectionMode.module.css';
 
 /**
@@ -26,27 +24,9 @@ function DatasetSelectionMode({
   onSelectAllRaw,
   onRemoveFromSelection,
   onTrainWithDataset,
-  onDownloadDataset,
 }) {
   const totalSelectedVocals =
     selectedProcessedVocals.length + selectedRawVocals.length;
-
-  const handleDownload = async () => {
-    const normalize = (item) => (typeof item === "string" ? item : item?.fileId || item?.id);
-    const selectedDataset = {
-      processed: selectedProcessedVocals.map(normalize).filter(Boolean),
-      raw: selectedRawVocals.map(normalize).filter(Boolean),
-    };
-
-    try {
-      await downloadDataset(selectedDataset);
-      if (onDownloadDataset) {
-        onDownloadDataset(selectedDataset);
-      }
-    } catch (error) {
-      // Error is already handled in downloadDataset
-    }
-  };
 
   return (
     <Collapse in={true} timeout={800} sx={{ mt: 0, transform: 'translateY(-1px)' }}>
@@ -72,15 +52,6 @@ function DatasetSelectionMode({
 
           {totalSelectedVocals > 0 && (
             <>
-              <Button
-                variant="contained"
-                color="secondary"
-                startIcon={<CloudDownloadIcon />}
-                onClick={handleDownload}
-                sx={{ ml: 'auto' }}
-              >
-                Download selected ({totalSelectedVocals})
-              </Button>
               <Button
                 variant="contained"
                 color="primary"

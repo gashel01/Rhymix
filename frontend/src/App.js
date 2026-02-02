@@ -247,7 +247,7 @@ function App() {
   const [files, setFiles] = useState([]);
   const config = {
     process: true,
-    export: true,
+    export: false,
     clean: true,
   };
   const [jobId, setJobId] = useState(null);
@@ -527,9 +527,12 @@ function App() {
   }, [jobId, activeStep]);
 
   const handleProcessFiles = async () => {
+    const filesToUpload = files;
+    setFiles([]);
+    setCreateDatasetModalOpen(false);
     setLoading(true);
     const nowIso = new Date().toISOString();
-    const pendingUploads = files.map((file, index) => ({
+    const pendingUploads = filesToUpload.map((file, index) => ({
       tempId: `upload-${Date.now()}-${index}`,
       originalName: file.name,
       displayName: file.name,
@@ -545,10 +548,9 @@ function App() {
     if (pendingUploads.length) {
       setOptimisticTracks((prev) => [...pendingUploads, ...prev]);
     }
-    setCreateDatasetModalOpen(false);
     try {
       // Step 1: Upload files
-      const uploadResponse = await uploadFiles(files);
+      const uploadResponse = await uploadFiles(filesToUpload);
       const uploadedRecords = uploadResponse?.files || [];
       const processingStamp = new Date().toISOString();
       if (uploadedRecords.length) {
@@ -577,11 +579,13 @@ function App() {
         );
       }
 
-      // Step 2: Start processing
-      const response = await startProcessing(config);
+      // Step 2: Start processing only the files we just uploaded
+      const response = await startProcessing({
+        ...config,
+        fileIds: uploadedRecords.map((r) => r.fileId),
+      });
       setJobId(response.job_id);
       setActiveStep(0);
-      setFiles([]);
     } catch (err) {
       console.error("Error:", err);
       setError(`Failed to process: ${err.message}`);
@@ -1007,7 +1011,10 @@ function App() {
           {/* Create Dataset Modal - rendered in App so HomeView doesn't re-render on jobStatus/polling */}
           <Dialog
             open={createDatasetModalOpen}
-            onClose={() => setCreateDatasetModalOpen(false)}
+            onClose={() => {
+              setCreateDatasetModalOpen(false);
+              setFiles([]);
+            }}
             maxWidth="md"
             fullWidth
             PaperProps={{ sx: { borderRadius: 3 } }}
@@ -1028,7 +1035,14 @@ function App() {
                 </Stepper>
                 <Box sx={{ mt: 4, mb: 4 }}>
                   {activeStep === 0 && (
-                    <FileUpload files={files} setFiles={setFiles} setError={setError} loading={loading} setLoading={setLoading} />
+                    <FileUpload
+                      key={createDatasetModalOpen ? "open" : "closed"}
+                      files={files}
+                      setFiles={setFiles}
+                      setError={setError}
+                      loading={loading}
+                      setLoading={setLoading}
+                    />
                   )}
                   {/* {activeStep === 2 && (
                     <DownloadResults jobStatus={jobStatus} handleReset={handleReset} />

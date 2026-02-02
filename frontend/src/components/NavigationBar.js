@@ -426,32 +426,7 @@ function NavigationBar({
                 <>
                    <Hairline style={{ margin: "12px 16px" }} />
                 <div style={{ display:"flex",  justifyContent:"center", alignItems:"center"}}>
-                  {/* <button
-                    type="button"
-                    onClick={() => handleCleanDirectories(true)}
-                    disabled={loading}
-                    title="Clean All Data"
-                    style={{
-                      width: "100%",
-                      height: 40,
-                      borderRadius: tokens.radiusMd,
-                      border: `1px solid ${tokens.hairline}`,
-                      background: `linear-gradient(180deg, ${tokens.itemA}, ${tokens.itemB})`,
-                      color: tokens.text,
-                      padding: "12px ",
-                      display: "flex",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      boxShadow: tokens.shadowSoft,
-                      opacity: loading ? 0.6 : 1,
-                      justifyContent: "center",
-                      alignItems: "center",
-                    }}
-                  >
-                    <BrushCleaning size={16}  fill={t.flatIconActive}/>
-                  </button> */}
-                  {/* <IconCircleButton onClick={() => handleCleanDirectories(true)} title="Clean All Data" ariaLabel="Clean All Data">
-                    <BrushCleaning size={16}  fill={t.flatIconActive}/>
-                  </IconCircleButton> */}
+                  
                
                   <NavItem style={{ justifyContent:"center", display:"flex",  height: 40 , alignSelf:"center", JustifySelf:"center"}} onClick={() => handleCleanDirectories(true)} item={{ id: "clean-all-data", label: "Clean All Data", icon: <BrushCleaning size={16}  fill={t.flatIconActive}/> }} />
 

@@ -59,32 +59,7 @@ function ConfigOptions({ config, setConfig }) {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, height: "100%" }}>
-            <Typography variant="h6" gutterBottom>
-              Output Options
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-
-            <FormGroup>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={config.export}
-                    onChange={handleChange}
-                    name="export"
-                    color="primary"
-                  />
-                }
-                label="Create dataset export (ZIP archives)"
-              />
-              <FormHelperText>
-                When enabled, the tool will generate ZIP files containing the
-                processed vocals.
-              </FormHelperText>
-            </FormGroup>
-          </Paper>
-        </Grid>
+        {/* Dataset export removed */}
       </Grid>
     </Box>
   );

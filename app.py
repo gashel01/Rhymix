@@ -422,14 +422,18 @@ def upload_files():
 @app.route('/api/process', methods=['POST'])
 def process_files():
     d = request.json or {}
-    cfg = {k: d.get(k, v) for k, v in 
-          {'segment':False,'process':True,'export':False,'clean':False}.items()}
+    cfg = {k: d.get(k, v) for k, v in
+          {'segment': False, 'process': True, 'export': False, 'clean': False}.items()}
+    cfg["export"] = False
+    # When client sends fileIds, only process those (e.g. the batch just uploaded). Otherwise process all.
+    requested_ids = d.get("fileIds")
+    file_ids = requested_ids if requested_ids is not None else _collect_processing_file_ids()
 
     job_id = str(uuid.uuid4())
     active_jobs[job_id] = {
         'id': job_id, 'status': 'starting', 'progress': 0,
         'config': cfg, 'started_at': time.time(),
-        'fileIds': _collect_processing_file_ids(),
+        'fileIds': file_ids,
     }
 
     time.sleep(1.0)
@@ -445,7 +449,6 @@ def collect_output_files(segment_audio, process_audio):
     return {
         'raw_vocals': [f.name for f in paths.UVR_RAW_DIR.glob("*_vocals.wav")],
         'processed_vocals': [f.name for f in paths.UVR_PROCESSED_DIR.glob("*_vocals.wav")] if process_audio else [],
-        'exports': [f.name for f in paths.EXPORT_DIR.glob("*.zip")]
     }
 
 
@@ -742,54 +745,24 @@ def process_audio_files_thread(job_id, segment, process, export, clean):
     threading.Thread(target=monitor, daemon=True).start()
 
     try:
-        logger.info("Clearing old input files before processing...")
-        inp = paths.INPUT_DIR
-        if inp.exists():
-            now = time.time()
-            for f in inp.glob("*"):
-                if f.is_file() and now - f.stat().st_mtime > 300:
-                    try: f.unlink(); logger.info(f"Removed old input file: {f.name}")
-                    except Exception as e: logger.warning(f"Could not remove {f.name}: {e}")
-
-        process_all(segment_audio=segment, process_audio=process, export_data=export, clean_after=False)
+        file_ids = job.get("fileIds") or []
+        seen = set()
+        input_paths = []
+        for fid in file_ids:
+            rec = get_upload_metadata(fid)
+            if not rec or not rec.get("storedName"):
+                continue
+            p = paths.INPUT_DIR / rec["storedName"]
+            if p.exists() and p not in seen:
+                seen.add(p)
+                input_paths.append(p)
+        process_all(segment_audio=segment, process_audio=process, export_data=export, clean_after=False, input_files=input_paths)
 
         job.update(status='completed', progress=100, completed_at=time.time(),
                    output_files=collect_output_files(segment, process))
     except Exception as e:
         job.update(status='failed', error=str(e), progress=0)
         print(f"Error in processing thread: {e}"); traceback.print_exc()
-
-
-@app.route('/api/download/dataset', methods=['POST'])
-def download_dataset():
-    try:
-        d = request.json or {}
-        proc, raw = d.get('processed', []), d.get('raw', [])
-        if not d: return jsonify({"error":"No data provided"}), 400
-        if not (proc or raw): return jsonify({"error":"No files selected for download"}), 400
-
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        name = f"vocals_dataset_{ts}.zip"
-        zpath = paths.TEMP_WAV_DIR / name
-
-        def resolve_vocal_name(ref):
-            base = get_upload_base_name(ref)
-            if base:
-                return f"{base}_vocals.wav"
-            return os.path.basename(ref)
-
-        with zipfile.ZipFile(zpath, 'w') as z:
-            for files, srcdir, tag in [(proc, paths.UVR_PROCESSED_DIR, "PROCESSED"), (raw, paths.UVR_RAW_DIR, "RAW")]:
-                for f in files:
-                    fn = resolve_vocal_name(f)
-                    p = srcdir / fn
-                    if p.exists():
-                        z.write(p, f"{fn.replace('_vocals.wav','')}_{tag}.wav")
-
-        return send_file(zpath, mimetype="application/zip", as_attachment=True, download_name=name)
-    except Exception as e:
-        print(f"Error creating dataset zip: {e}"); traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
 
 
 
