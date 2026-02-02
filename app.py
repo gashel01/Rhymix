@@ -280,7 +280,10 @@ def load_inference_run_metadata(run_id: str):
         return None
     try:
         with run_file.open("r", encoding="utf-8") as handle:
-            return json.load(handle)
+            data = json.load(handle)
+            if isinstance(data, dict):
+                data.setdefault("modelCheckpoint", None)
+            return data
     except Exception:
         return None
 
@@ -2267,11 +2270,42 @@ def run_inference_job(job_id, run_id, model, track, params):
             # Check if output file was actually created
             if os.path.exists(output_file_path):
                 file_record = get_upload_metadata(file_id) if file_id else None
+                model_name = model.get("name") or model.get("modelName")
+                model_id = model.get("id") or model.get("modelId") or model.get("model_id") or model_name
+                checkpoint_epoch = selected_checkpoint.get("epochs") or selected_checkpoint.get("epoch")
+                if isinstance(checkpoint_epoch, str):
+                    try:
+                        checkpoint_epoch = int(checkpoint_epoch)
+                    except ValueError:
+                        checkpoint_epoch = None
+                elif isinstance(checkpoint_epoch, (int, float)):
+                    checkpoint_epoch = int(checkpoint_epoch)
+                else:
+                    checkpoint_epoch = None
+                checkpoint_filename = selected_checkpoint.get("filename") or selected_checkpoint.get("pthFile")
+                if checkpoint_filename:
+                    checkpoint_filename = Path(checkpoint_filename).name
+                else:
+                    checkpoint_path = selected_checkpoint.get("path") or model_path
+                    checkpoint_filename = Path(checkpoint_path).name if checkpoint_path else None
+                checkpoint_id = selected_checkpoint.get("checkpointId") or selected_checkpoint.get("id")
+                if not checkpoint_id and checkpoint_filename:
+                    checkpoint_id = Path(checkpoint_filename).stem
+                index_file = Path(index_path).name if index_path else None
+                model_checkpoint = {
+                    "epoch": checkpoint_epoch,
+                    "checkpointId": checkpoint_id,
+                    "pthFile": checkpoint_filename,
+                    "indexFile": index_file,
+                }
+                if not any(model_checkpoint.values()):
+                    model_checkpoint = None
                 run_payload = {
                     "id": run_id,
                     "runId": run_id,
-                    "modelName": model.get("name"),
-                    "modelId": model.get("id"),
+                    "modelName": model_name,
+                    "modelId": model_id,
+                    "modelCheckpoint": model_checkpoint,
                     "inputFileId": file_id,
                     "inputStoredName": file_record.get("storedName") if file_record else None,
                     "inputOriginalName": file_record.get("originalName") if file_record else None,

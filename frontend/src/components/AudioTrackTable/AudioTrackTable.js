@@ -49,6 +49,7 @@ const AudioTrackTable = (props) => {
     header,
     enableGrouping = false,
     onToggleFavorite,
+    darkMode,
   } = props;
 
   const [mutes, setMutes] = useState({ instrumental: {}, vocal: {} });
@@ -370,6 +371,7 @@ const AudioTrackTable = (props) => {
                       isFavorite={pair.isFavorite}
                       onToggleGroup={enableGrouping ? handleToggleGroup : undefined}
                       onToggleFavorite={onToggleFavorite}
+                      darkMode={darkMode}
                     />
                   );
                 })}

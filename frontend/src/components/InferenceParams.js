@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -256,10 +256,22 @@ const DEFAULT_PARAMS = {
 export default function InferenceParams({ selectedModel, selectedTracks, onBack, onStartInference, navContext, onGoToModelSelection }) {
   const theme = useTheme();
   const [params, setParams] = useState(DEFAULT_PARAMS);
+  const [resolvedModel, setResolvedModel] = useState(selectedModel);
 
   const trackCount = Array.isArray(selectedTracks) ? selectedTracks.length : 0;
-  const modelName = typeof selectedModel?.name === "string" ? selectedModel.name.split("_")[0] : "Model";
-  const modelEpoch = selectedModel?.selectedCheckpoint?.epochs ?? "Unknown";
+  const effectiveModel = resolvedModel || selectedModel;
+  const displayBaseName =
+    typeof effectiveModel?.name === "string"
+      ? effectiveModel.name
+      : typeof effectiveModel?.modelName === "string"
+        ? effectiveModel.modelName
+        : "Model";
+  const modelName = displayBaseName.split("_")[0];
+  const modelEpoch =
+    effectiveModel?.selectedCheckpoint?.epochs ??
+    effectiveModel?.selectedCheckpoint?.epoch ??
+    effectiveModel?.modelCheckpoint?.epoch ??
+    "Unknown";
   const selectionNames = useMemo(
     () =>
       (selectedTracks || [])
@@ -273,7 +285,91 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
     const base = list.join(", ");
     return extra > 0 ? `${base} +${extra} more` : base;
   }, [selectionNames]);
-  const hasModel = Boolean(selectedModel?.name || selectedModel?.modelName || selectedModel?.id || selectedModel?.modelId);
+  const hasModel = Boolean(
+    effectiveModel?.name || effectiveModel?.modelName || effectiveModel?.id || effectiveModel?.modelId
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const selectCheckpoint = (checkpoints, hint) => {
+      if (!Array.isArray(checkpoints) || !checkpoints.length) return null;
+      const hintEpochRaw = hint?.epoch ?? hint?.epochs;
+      const hintEpoch = hintEpochRaw == null ? null : Number(hintEpochRaw);
+      const hasHintEpoch = Number.isFinite(hintEpoch);
+      const hintFile = hint?.pthFile || hint?.filename || null;
+      if (hintFile) {
+        const byFile = checkpoints.find(
+          (cp) => cp?.filename === hintFile || (cp?.path && cp.path.endsWith(hintFile))
+        );
+        if (byFile) return byFile;
+      }
+      if (hasHintEpoch) {
+        const byEpoch = checkpoints.find((cp) => Number(cp?.epochs) === hintEpoch);
+        if (byEpoch) return byEpoch;
+      }
+      const best = checkpoints.find((cp) => cp?.isBest);
+      return best || checkpoints[0];
+    };
+
+    const resolveModel = async () => {
+      if (!selectedModel) {
+        if (!cancelled) setResolvedModel(selectedModel);
+        return;
+      }
+
+      const existingCheckpoint =
+        selectedModel.selectedCheckpoint ||
+        selectedModel.modelCheckpoint ||
+        selectedModel.bestCheckpoint ||
+        null;
+
+      if (existingCheckpoint?.path) {
+        if (!cancelled) setResolvedModel(selectedModel);
+        return;
+      }
+
+      if (Array.isArray(selectedModel?.checkpoints) && selectedModel.checkpoints.length) {
+        const picked = selectCheckpoint(selectedModel.checkpoints, existingCheckpoint);
+        if (picked?.path) {
+          if (!cancelled) setResolvedModel({ ...selectedModel, selectedCheckpoint: picked });
+          return;
+        }
+      }
+
+      try {
+        const response = await fetch("/api/available-models");
+        if (!response.ok) throw new Error("Failed to fetch available models");
+        const data = await response.json();
+        const models = data?.models || [];
+        const targetId = selectedModel.id || selectedModel.modelId || null;
+        const targetName = selectedModel.name || selectedModel.modelName || null;
+        const matched = models.find((model) => {
+          if (targetId && (model.modelId === targetId || model.name === targetId)) return true;
+          if (targetName && (model.name === targetName || model.modelId === targetName)) return true;
+          return false;
+        });
+        if (!matched) {
+          if (!cancelled) setResolvedModel(selectedModel);
+          return;
+        }
+        const picked = selectCheckpoint(matched.checkpoints, existingCheckpoint);
+        const merged = {
+          ...matched,
+          ...selectedModel,
+          selectedCheckpoint: picked || matched.bestCheckpoint || matched.checkpoints?.[0] || null,
+        };
+        if (!cancelled) setResolvedModel(merged);
+      } catch (err) {
+        if (!cancelled) setResolvedModel(selectedModel);
+      }
+    };
+
+    resolveModel();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedModel]);
 
   const setField = useCallback((field, value) => {
     setParams((prev) => ({ ...prev, [field]: value }));
@@ -300,7 +396,7 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
     };
 
     onStartInference({
-      model: selectedModel,
+      model: effectiveModel,
       tracks: Array.isArray(selectedTracks) ? selectedTracks : [],
       params: payloadParams,
     });

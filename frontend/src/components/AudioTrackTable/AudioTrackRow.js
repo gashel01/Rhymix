@@ -4,16 +4,16 @@ import ErrorIcon from "@mui/icons-material/Error";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import StarIcon from "@mui/icons-material/Star";
-import StarBorderIcon from "@mui/icons-material/StarBorder";
 
+import {FavBtn} from "../Homeview/FavBtn";
 // keep existing local components (NOT changing icons)
 import TextOverflow from "../TextOverflow.tsx";
 import WaveformCell from "./WaveformCell";
 import TrackControls from "./TrackControls";
 import { getFileNameFromPath } from "./utils";
 import { getBaseNameAndExt, makeDownloadName } from "../../utils/audioUtils";
-
+import {Theme} from "../Homeview/Theme";
+import {Pill} from "../ModelView/Pill";
 const STYLE_ID = "vf-audiotrackrow-css-v2";
 
 const AudioTrackRow = (props) => {
@@ -54,8 +54,10 @@ const AudioTrackRow = (props) => {
     isFavorite = false,
     onToggleGroup,
     onToggleFavorite,
+    darkMode,
   } = props;
-
+// ---------- Theme tokens ----------
+const {t} = Theme({darkMode});
   // inject CSS once (don’t render <style> inside <tbody>)
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -91,29 +93,7 @@ const AudioTrackRow = (props) => {
     document.head.appendChild(style);
   }, []);
 
-  // ---------- Theme tokens ----------
-  const t = useMemo(() => {
-    const isDark =
-      typeof window !== "undefined"
-        ? window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false
-        : false;
-
-    return {
-      isDark,
-      waveColor: isDark ? "rgba(255,255,255,0.92)" : "#1C1C1E",
-      text: isDark ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.90)",
-      subtext: isDark ? "rgba(255,255,255,0.62)" : "rgba(0,0,0,0.55)",
-      hairline: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)",
-      cardA: isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.86)",
-      cardB: isDark ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.72)",
-      shadowSoft: isDark ? "0 10px 24px rgba(0,0,0,0.35)" : "0 12px 26px rgba(0,0,0,0.08)",
-      primary: isDark ? "rgba(10,132,255,1)" : "rgba(0,122,255,1)",
-      success: "rgba(52,199,89,1)",
-      successWash: isDark ? "rgba(52,199,89,0.18)" : "rgba(52,199,89,0.14)",
-      danger: "rgba(255,59,48,1)",
-      radiusLg: 18,
-    };
-  }, []);
+  
 
   // ---------- Refs ----------
   const iwRef = useRef(null);
@@ -198,65 +178,7 @@ const AudioTrackRow = (props) => {
     </div>
   );
 
-  const Pill = ({ children }) => (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        padding: "6px 9px",
-        borderRadius: 10,
-        fontSize: 11,
-        fontWeight: 900,
-        letterSpacing: 0.2,
-        color: t.success,
-        background: t.successWash,
-        border: `1px solid ${t.hairline}`,
-        width: "fit-content",
-        marginTop: 8,
-      }}
-    >
-      {children}
-    </span>
-  );
-
-  const ProcessingPill = ({ label, tone }) => (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        padding: "4px 8px",
-        borderRadius: 8,
-        fontSize: 10,
-        fontWeight: 800,
-        letterSpacing: 0.3,
-        color: tone?.fg || t.primary,
-        background: tone?.bg || (t.isDark ? "rgba(10,132,255,0.22)" : "rgba(0,122,255,0.12)"),
-        border: `1px solid ${t.hairline}`,
-      }}
-    >
-      {label}
-    </span>
-  );
-
-  const MetaPill = ({ children }) => (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        padding: "4px 8px",
-        borderRadius: 8,
-        fontSize: 10,
-        fontWeight: 800,
-        letterSpacing: 0.3,
-        color: t.subtext,
-        background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
-        border: `1px solid ${t.hairline}`,
-        width: "fit-content",
-      }}
-    >
-      {children}
-    </span>
-  );
+  
 
   const processingState = processing?.state;
   const isProcessingRow = processingState && processingState !== "ready";
@@ -466,11 +388,11 @@ const AudioTrackRow = (props) => {
             />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            {isGroupHeader && versionCount > 1 && <MetaPill>{versionCount} versions</MetaPill>}
-            {isGroupHeader && favoriteCount > 0 && <MetaPill>{favoriteCount} fav</MetaPill>}
+            {isGroupHeader && versionCount > 1 && <Pill tone="version" t={t} style={{ borderRadius: "6px" }}>{versionCount} versions</Pill>}
+            {isGroupHeader && favoriteCount > 0 && <Pill tone="favorite" t={t} style={{ borderRadius: "6px" }}>{favoriteCount} fav</Pill>}
             {isProcessingRow && (
               <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <ProcessingPill label={processingLabel} tone={processingTone} />
+                <Pill t={t} tone="processing" style={{ borderRadius: "6px" }}>{processingLabel}</Pill>
                 <Tooltip title={processingTooltip} placement="top">
                   <span
                     style={{
@@ -503,28 +425,29 @@ const AudioTrackRow = (props) => {
                 New
               </span>
             )}
-            {modelUsed && <Pill>{modelUsed}</Pill>}
+            {modelUsed && <Pill t={t} tone="meta" style={{ borderRadius: "6px" }}>{modelUsed}</Pill>}
             {canToggleFavorite && (
-              <button
-                type="button"
-                onClick={handleFavoriteClick}
-                title={isFavorite ? "Unfavorite" : "Favorite"}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 26,
-                  height: 26,
-                  borderRadius: 8,
-                  border: `1px solid ${t.hairline}`,
-                  background: t.isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
-                  color: isFavorite ? "#f5c542" : t.subtext,
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              >
-                {isFavorite ? <StarIcon style={{ fontSize: 16 }} /> : <StarBorderIcon style={{ fontSize: 16 }} />}
-              </button>
+              <FavBtn isFavorite={isFavorite} handleFavoriteClick={handleFavoriteClick} t={t} />
+              // <button
+              //   type="button"
+              //   onClick={handleFavoriteClick}
+              //   title={isFavorite ? "Unfavorite" : "Favorite"}
+              //   style={{
+              //     display: "inline-flex",
+              //     alignItems: "center",
+              //     justifyContent: "center",
+              //     width: 26,
+              //     height: 26,
+              //     borderRadius: 8,
+              //     border: `1px solid ${t.hairline}`,
+              //     background: t.isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+              //     color: isFavorite ? "#f5c542" : t.subtext,
+              //     cursor: "pointer",
+              //     padding: 0,
+              //   }}
+              // >
+              //   {isFavorite ? <StarIcon style={{ fontSize: 16 }} /> : <StarBorderIcon style={{ fontSize: 16 }} />}
+              // </button>
             )}
           </div>
         </div>

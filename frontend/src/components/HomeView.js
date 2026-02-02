@@ -148,6 +148,7 @@ function HomeView({
 
 
                   <AudioTrackTable
+                  darkMode={darkMode}
                     trackPairs={trackPairs}
                     vocalMode={vocalMode}
                     handleVocalModeChange={handleVocalModeChangeWithCleanup}

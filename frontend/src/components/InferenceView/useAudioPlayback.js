@@ -61,6 +61,11 @@ const buildTrackPairFromRun = (run, vocalMode) => {
   const displayName = getTrackName(run);
   const originalName = run?.inputOriginalName || run?.track?.originalName || null;
   const modelName = run?.modelName || run?.model?.name || "Unknown";
+  const modelCheckpoint =
+    run?.modelCheckpoint ||
+    run?.model?.modelCheckpoint ||
+    run?.model?.selectedCheckpoint ||
+    null;
   const vocalFileType =
     run?.vocalFileType ||
     run?.params?.vocalsFileType ||
@@ -87,6 +92,7 @@ const buildTrackPairFromRun = (run, vocalMode) => {
     name: displayName,
     modelName,
     modelId: run?.modelId || run?.model?.id,
+    modelCheckpoint,
     vocalFileType,
     instrumental: fileId,
     vocal: vocalPath,

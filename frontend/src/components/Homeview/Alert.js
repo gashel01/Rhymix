@@ -3,6 +3,7 @@ import IconBtn from "./IconBtn";
 import CloseIcon from "@mui/icons-material/Close";
 export const Alert = ({ kind = "error", children, onClose, t }) => {
     const isErr = kind === "error";
+   
     return (
       <div
         style={{
@@ -21,6 +22,7 @@ export const Alert = ({ kind = "error", children, onClose, t }) => {
         <div style={{ color: isErr ? t.danger : t.primary }}>{children}</div>
         {onClose && (
           <IconBtn
+          t={t}
             onClick={onClose}
             title="Dismiss"
             style={{ width: 34, height: 34, boxShadow: "none" }}

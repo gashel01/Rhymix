@@ -239,6 +239,41 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
       .filter(Boolean);
   }, [selectedPairs]);
 
+  const getPairTimestamp = useCallback((pair) => {
+    const stamp = pair?.createdAt || pair?.result?.createdAt;
+    if (!stamp) return 0;
+    const parsed = Date.parse(stamp);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }, []);
+
+  const getPairCheckpoint = useCallback((pair) => {
+    return (
+      pair?.modelCheckpoint ||
+      pair?.result?.modelCheckpoint ||
+      pair?.result?.model?.selectedCheckpoint ||
+      pair?.result?.model?.modelCheckpoint ||
+      null
+    );
+  }, []);
+
+  const normalizeModelCheckpoint = useCallback((checkpoint) => {
+    if (!checkpoint) return null;
+    const epochRaw = checkpoint.epoch ?? checkpoint.epochs;
+    const epoch = typeof epochRaw === "number" ? epochRaw : Number(epochRaw);
+    const pthFile = checkpoint.pthFile || checkpoint.filename || null;
+    const checkpointId =
+      checkpoint.checkpointId ||
+      checkpoint.id ||
+      (pthFile ? pthFile.replace(/\.[^/.]+$/, "") : null);
+    const indexFile = checkpoint.indexFile || null;
+    return {
+      epoch: Number.isFinite(epoch) ? epoch : null,
+      checkpointId,
+      pthFile,
+      indexFile,
+    };
+  }, []);
+
   const handleReturnToModelSelection = useCallback(() => {
     if (!onSelectionToModelSelection) {
       onNavigate?.("inference-model-selection");
@@ -252,15 +287,38 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
 
   const handleReturnToInferenceParams = useCallback(() => {
     if (!selectionModel || !onSelectionToParams) return;
+    const latestPair = selectedPairs.reduce((latest, pair) => {
+      if (!latest) return pair;
+      return getPairTimestamp(pair) >= getPairTimestamp(latest) ? pair : latest;
+    }, null);
+    const checkpointCandidate = getPairCheckpoint(latestPair);
+    const modelPayload = {
+      id: selectionModel.modelId || null,
+      name: selectionModel.modelName || null,
+      modelId: selectionModel.modelId || null,
+      modelName: selectionModel.modelName || null,
+    };
+    if (checkpointCandidate) {
+      if (checkpointCandidate.path) {
+        modelPayload.selectedCheckpoint = checkpointCandidate;
+      } else {
+        modelPayload.modelCheckpoint = normalizeModelCheckpoint(checkpointCandidate);
+      }
+    }
     onSelectionToParams({
       source: "inference",
       selectedTracks,
-      selectedModel: {
-        id: selectionModel.modelId || null,
-        name: selectionModel.modelName || null,
-      },
+      selectedModel: modelPayload,
     });
-  }, [onSelectionToParams, selectionModel, selectedTracks]);
+  }, [
+    getPairCheckpoint,
+    getPairTimestamp,
+    normalizeModelCheckpoint,
+    onSelectionToParams,
+    selectedPairs,
+    selectionModel,
+    selectedTracks,
+  ]);
 
   const showSelectionButton = Boolean(selectionModel);
 
@@ -338,6 +396,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
         ) : (
           <ErrorBoundary>
             <AudioTrackTable
+              darkMode={darkMode}
               trackPairs={trackPairs}
               vocalModeType="inference"
               vocalMode={vocalMode}
