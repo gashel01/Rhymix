@@ -87,8 +87,7 @@ function HomeView({
         const server = serverById.get(trackId);
         if (!server) return track;
         const state = server.processing?.state;
-        if (!state) return track;
-        if (state === "ready" || state === "error") {
+        if (!state || state === "ready" || state === "error") {
           changed = true;
           return null;
         }

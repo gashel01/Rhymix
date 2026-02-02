@@ -26,6 +26,8 @@ import VolumeOff from "@mui/icons-material/VolumeOff";
 import MenuIcon from "@mui/icons-material/Menu";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { BrushCleaning } from "lucide-react";
+import  Theme  from "./Homeview/Theme.js";
 
 /**
  * NavigationBar (no MUI)
@@ -84,9 +86,10 @@ function NavigationBar({
     };
   }, [open, setOpen]);
 
+  const { t } = Theme({ darkMode });
   const tokens = useMemo(() => {
     const isDark = !!darkMode;
-
+   
     // iOS-ish frosted tokens
     return {
       isDark,
@@ -212,7 +215,7 @@ function NavigationBar({
     />
   );
 
-  const NavItem = ({ item, mobile }) => {
+  const NavItem = ({ item, mobile, style }) => {
     const selected = currentView === item.id;
 
     return (
@@ -241,6 +244,7 @@ function NavigationBar({
           minHeight: mobile ? 64 : 60,
           textAlign: "left",
           transition: "transform 140ms ease, background 160ms ease, box-shadow 160ms ease",
+          ...style,
         }}
         onMouseEnter={(e) => {
           if (sidebarCollapsed && !mobile) return;
@@ -419,27 +423,41 @@ function NavigationBar({
               )}
 
               {sidebarCollapsed && (
-                <div style={{ padding: "12px 6px 0 6px" }}>
-                  <button
+                <>
+                   <Hairline style={{ margin: "12px 16px" }} />
+                <div style={{ display:"flex",  justifyContent:"center", alignItems:"center"}}>
+                  {/* <button
                     type="button"
                     onClick={() => handleCleanDirectories(true)}
                     disabled={loading}
                     title="Clean All Data"
                     style={{
                       width: "100%",
+                      height: 40,
                       borderRadius: tokens.radiusMd,
                       border: `1px solid ${tokens.hairline}`,
                       background: `linear-gradient(180deg, ${tokens.itemA}, ${tokens.itemB})`,
                       color: tokens.text,
-                      padding: "12px 0",
+                      padding: "12px ",
+                      display: "flex",
                       cursor: loading ? "not-allowed" : "pointer",
                       boxShadow: tokens.shadowSoft,
                       opacity: loading ? 0.6 : 1,
+                      justifyContent: "center",
+                      alignItems: "center",
                     }}
                   >
-                    🧹
-                  </button>
+                    <BrushCleaning size={16}  fill={t.flatIconActive}/>
+                  </button> */}
+                  {/* <IconCircleButton onClick={() => handleCleanDirectories(true)} title="Clean All Data" ariaLabel="Clean All Data">
+                    <BrushCleaning size={16}  fill={t.flatIconActive}/>
+                  </IconCircleButton> */}
+               
+                  <NavItem style={{ justifyContent:"center", display:"flex",  height: 40 , alignSelf:"center", JustifySelf:"center"}} onClick={() => handleCleanDirectories(true)} item={{ id: "clean-all-data", label: "Clean All Data", icon: <BrushCleaning size={16}  fill={t.flatIconActive}/> }} />
+
                 </div>
+
+                </>
               )}
 
               {/* bottom settings (click-away supported) */}
