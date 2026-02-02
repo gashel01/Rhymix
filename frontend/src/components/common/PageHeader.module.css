@@ -12,6 +12,8 @@
 .title {
   align-items: center;
   display: flex;
+  font-family: "Rubik";
+  font-weight: 300;
 }
 
 .actions {

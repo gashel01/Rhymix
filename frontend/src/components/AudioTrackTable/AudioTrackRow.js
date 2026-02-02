@@ -1,11 +1,10 @@
-import React, { useRef, useCallback, useMemo, useEffect, useState } from "react";
+import React, { useRef, useCallback, useEffect, useState } from "react";
 import { Tooltip } from "@mui/material";
 import ErrorIcon from "@mui/icons-material/Error";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
-import {FavBtn} from "../Homeview/FavBtn";
 // keep existing local components (NOT changing icons)
 import TextOverflow from "../TextOverflow.tsx";
 import WaveformCell from "./WaveformCell";
@@ -14,8 +13,9 @@ import { getFileNameFromPath } from "./utils";
 import { getBaseNameAndExt, makeDownloadName } from "../../utils/audioUtils";
 import {Theme} from "../Homeview/Theme";
 import {Pill} from "../ModelView/Pill";
-const STYLE_ID = "vf-audiotrackrow-css-v2";
+import {ThumbsUpIcon, ThumbsDownIcon, StarIcon, CornerDownRightIcon} from "lucide-react";
 
+const STYLE_ID = "vf-audiotrackrow-css-v2";
 const AudioTrackRow = (props) => {
   const {
     pair,
@@ -51,9 +51,10 @@ const AudioTrackRow = (props) => {
     isGroupedVersion = false,
     versionCount = 0,
     favoriteCount = 0,
-    isFavorite = false,
+    reaction = "none",
+    reactionPending = false,
     onToggleGroup,
-    onToggleFavorite,
+    onSetReaction,
     darkMode,
   } = props;
 // ---------- Theme tokens ----------
@@ -287,6 +288,22 @@ const {t} = Theme({darkMode});
     vocalsFileType,
   ]);
 
+  const normaliseTitle = (title) => {
+
+    // remove all special characters and replace with space . start with uppercase . remove file extension .mp3 .mp4 .wav etc.
+    let normalisedTitle = title.replace(/[^a-zA-Z0-9]/g, " ").toLowerCase();
+    normalisedTitle = normalisedTitle.charAt(0).toUpperCase() + normalisedTitle.slice(1);
+    normalisedTitle = normalisedTitle.replace(/.mp3$/, "");
+    normalisedTitle = normalisedTitle.replace(/.mp4$/, "");
+    normalisedTitle = normalisedTitle.replace(/.wav$/, "");
+    normalisedTitle = normalisedTitle.replace(/.m4a$/, "");
+    normalisedTitle = normalisedTitle.replace(/.ogg$/, "");
+    normalisedTitle = normalisedTitle.replace(/.flac$/, "");
+    normalisedTitle = normalisedTitle.replace(/.aac$/, "");
+    normalisedTitle = normalisedTitle.replace(/.wma$/, "");
+    return normalisedTitle;
+  };
+
   const handleInstrumentalSeek = useCallback((time) => {
     vwRef.current?.setCurrentTime?.(time);
   }, []);
@@ -333,11 +350,61 @@ const {t} = Theme({darkMode});
 
   const displayName = name || `Track ${index + 1}`;
   const actionsDisabled = status === "processing" || status === "failed";
-  const canToggleFavorite = Boolean(onToggleFavorite && pair?.runId);
-  const handleFavoriteClick = useCallback(() => {
-    if (!pair?.runId) return;
-    onToggleFavorite?.(pair.runId, !isFavorite);
-  }, [onToggleFavorite, pair?.runId, isFavorite]);
+  const canSetReaction = Boolean(onSetReaction && pair?.runId);
+  const currentReaction = reaction || "none";
+  const reactionDisabled = actionsDisabled || reactionPending || !canSetReaction;
+  const handleReactionClick = useCallback(
+    (value) => {
+      if (!pair?.runId) return;
+      const next = currentReaction === value ? "none" : value;
+      onSetReaction?.(pair.runId, next, currentReaction);
+    },
+    [currentReaction, onSetReaction, pair?.runId]
+  );
+
+  const ReactionButton = ({ value, label, icon }) => {
+    const active = currentReaction === value;
+    const iconColor = active ? t.flatIconActive : t.flatIconInactive;
+    if (icon) {
+      icon = React.cloneElement(icon, {stroke:iconColor,  fill: iconColor , color: iconColor});
+    }
+    return (
+      <Tooltip title={active ? `Clear ${label}` : `Set ${label}`} placement="top">
+        <span>
+          <button
+            type="button"
+            onClick={() => handleReactionClick(value)}
+            disabled={reactionDisabled}
+            aria-pressed={active}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "6px",
+              borderRadius: "6px",
+              border: active ? `1px solid ${t.hairline}` : "none",
+              background: active
+                ? t.isDark
+                  ? "rgba(255,255,255,0.12)"
+                  : "rgba(0,0,0,0.08)"
+                : t.isDark
+                  ? "rgba(255,255,255,0.04)"
+                  : "rgba(0,0,0,0.03)",
+              // background: "transparent",
+              // border: "none",
+              color: active ? t.text : t.subtext,
+              cursor: reactionDisabled ? "not-allowed" : "pointer",
+             
+              opacity: reactionDisabled ? 0.4 : 1,
+              fontSize: 14,
+            }}
+          >
+            {icon}
+          </button>
+        </span>
+      </Tooltip>
+    );
+  };
 
   const handleGroupToggle = useCallback(() => {
     if (!groupKey) return;
@@ -350,12 +417,12 @@ const {t} = Theme({darkMode});
       : null;
 
   return (
-    <tr style={{ ...style }}>
+    <tr style={{  ...style }}>
 
       {/* Waveforms + controls + bare checkbox */}
-      <td style={{ borderBottom: `1px solid ${t.hairline}`, padding: "5px 10px 10px 10px", position: "relative" }}>
+      <td style={{   borderBottom: `1px solid ${t.hairline}`, padding: "5px 10px 10px 10px", position: "relative" }}>
         {/* Name */}
-        <div style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6, paddingLeft: isGroupedVersion ? 14 : 0 }}>
+        <div style={{ display: "flex",marginTop: 5, width: "100%", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6, paddingLeft: isGroupedVersion ? 14 : 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
             {isGroupHeader && (
               <button
@@ -366,8 +433,8 @@ const {t} = Theme({darkMode});
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: 22,
-                  height: 22,
+                  width: 20,
+                  height: 20,
                   borderRadius: 6,
                   border: `1px solid ${t.hairline}`,
                   background: t.isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
@@ -380,19 +447,23 @@ const {t} = Theme({darkMode});
               </button>
             )}
             {isGroupedVersion && (
-              <span style={{ fontSize: 12, fontWeight: 800, color: t.subtext }}>{">"}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: t.subtext }}><CornerDownRightIcon size={16}  /></span>
             )}
+           
             <TextOverflow
-              text={displayName}
-              style={{ fontWeight: 700, letterSpacing: -0.2, color: t.text, display: "flex", alignItems: "center" }}
+              text={normaliseTitle(displayName)}
+              style={{ fontFamily: "Poppins", fontWeight: 500, letterSpacing: -0.2, color: t.text, display: "flex", alignItems: "center" }}
             />
+            
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            {isGroupHeader && versionCount > 1 && <Pill tone="version" t={t} style={{ borderRadius: "6px" }}>{versionCount} versions</Pill>}
-            {isGroupHeader && favoriteCount > 0 && <Pill tone="favorite" t={t} style={{ borderRadius: "6px" }}>{favoriteCount} fav</Pill>}
+          
+            
+            {isGroupHeader && versionCount > 1 && <Pill tone="version" t={t} style={{ fontFamily: "Rubik", fontWeight: 500, borderRadius: "6px" }}>{versionCount} versions</Pill>}
+            {isGroupHeader && favoriteCount > 0 && <Pill tone="favorite" t={t} style={{fontFamily: "Rubik", fontWeight: 500, borderRadius: "6px" }}>{favoriteCount} fav</Pill>}
             {isProcessingRow && (
               <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <Pill t={t} tone="processing" style={{ borderRadius: "6px" }}>{processingLabel}</Pill>
+                <Pill t={t} tone="processing" style={{ fontFamily: "Rubik", fontWeight: 500, borderRadius: "6px" }}>{processingLabel}</Pill>
                 <Tooltip title={processingTooltip} placement="top">
                   <span
                     style={{
@@ -407,54 +478,26 @@ const {t} = Theme({darkMode});
                 </Tooltip>
               </div>
             )}
+            
             {isNew && (
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  padding: "4px 8px",
-                  borderRadius: 8,
-                  fontSize: 10,
-                  fontWeight: 800,
-                  letterSpacing: 0.3,
-                  color: t.primary,
-                  background: t.isDark ? "rgba(0,122,255,0.2)" : "rgba(0,122,255,0.12)",
-                  border: `1px solid ${t.hairline}`,
-                }}
-              >
-                New
-              </span>
+             
+              <Pill t={t} tone="new" style={{ borderRadius: "6px" }}>NEW</Pill>
             )}
-            {modelUsed && <Pill t={t} tone="meta" style={{ borderRadius: "6px" }}>{modelUsed}</Pill>}
-            {canToggleFavorite && (
-              <FavBtn isFavorite={isFavorite} handleFavoriteClick={handleFavoriteClick} t={t} />
-              // <button
-              //   type="button"
-              //   onClick={handleFavoriteClick}
-              //   title={isFavorite ? "Unfavorite" : "Favorite"}
-              //   style={{
-              //     display: "inline-flex",
-              //     alignItems: "center",
-              //     justifyContent: "center",
-              //     width: 26,
-              //     height: 26,
-              //     borderRadius: 8,
-              //     border: `1px solid ${t.hairline}`,
-              //     background: t.isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
-              //     color: isFavorite ? "#f5c542" : t.subtext,
-              //     cursor: "pointer",
-              //     padding: 0,
-              //   }}
-              // >
-              //   {isFavorite ? <StarIcon style={{ fontSize: 16 }} /> : <StarBorderIcon style={{ fontSize: 16 }} />}
-              // </button>
-            )}
+            {modelUsed && <Pill t={t} tone="meta" style={{ fontFamily: "Rubik", fontWeight: 500, borderRadius: "6px" }}>{modelUsed}</Pill>}
+           
           </div>
         </div>
         {(paramsSummary || runTimestamp) && (
-          <div style={{ marginTop: 4, fontSize: 11, fontWeight: 600, color: t.subtext }}>
+          <div style={{ fontFamily:"Rubik", fontWeight: 500, fontSize: 11, color: t.subtext }}>
             {paramsSummary}
-            {runTimestamp ? (paramsSummary ? ` • ${runTimestamp}` : runTimestamp) : ""}
+            {runTimestamp ? (paramsSummary ? ` • ${runTimestamp}` : runTimestamp) : ""} 
+            {canSetReaction && (
+              <div style={{ display: "inline-flex", justifyContent: "flex-end", alignItems: "center", gap: 4 , marginLeft:  "15px"}}>
+                <ReactionButton value="like" label="Like" icon={<ThumbsUpIcon  size={10} fill={t.flatIconActive}/>} />
+                <ReactionButton value="dislike" label="Dislike" icon={<ThumbsDownIcon  size={10} fill={t.flatIconActive}/>} />
+                <ReactionButton value="favorite" label="Favorite" icon={<StarIcon  size={10} fill={t.flatIconActive}/>} />
+              </div>
+            )}
           </div>
         )}
 
@@ -535,8 +578,9 @@ const {t} = Theme({darkMode});
 
           </div>
           {/* Bare checkbox (no container styling) */}
-
+         
         </div>
+        
       </td>
     </tr>
   );
@@ -575,9 +619,10 @@ const areEqual = (prev, next) =>
   prev.isGroupedVersion === next.isGroupedVersion &&
   prev.versionCount === next.versionCount &&
   prev.favoriteCount === next.favoriteCount &&
-  prev.isFavorite === next.isFavorite &&
+  prev.reaction === next.reaction &&
+  prev.reactionPending === next.reactionPending &&
   prev.processing === next.processing &&
   prev.onToggleGroup === next.onToggleGroup &&
-  prev.onToggleFavorite === next.onToggleFavorite;
+  prev.onSetReaction === next.onSetReaction;
 
 export default React.memo(AudioTrackRow, areEqual);

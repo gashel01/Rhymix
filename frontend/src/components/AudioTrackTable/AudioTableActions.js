@@ -153,7 +153,7 @@ const AudioTableActions = ({
   return (
     <>
       {/* ✅ NEW: sentinel placed just before sticky header */}
-      <div ref={sentinelRef} style={{ height: 1  }} />
+      <div ref={sentinelRef} />
 
       <div
         style={{

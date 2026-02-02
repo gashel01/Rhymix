@@ -199,6 +199,7 @@ paths.ensure_directories_exist()
 # ===============================
 
 UPLOAD_METADATA_PATH = paths.METADATA_DIR / "uploads.json"
+ALLOWED_RUN_REACTIONS = {"none", "like", "dislike", "favorite"}
 
 def sanitize_filename_for_display(filename: str) -> str:
     """Sanitize filename for UI display without breaking unicode."""
@@ -282,6 +283,8 @@ def load_inference_run_metadata(run_id: str):
         with run_file.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
             if isinstance(data, dict):
+                data.pop("isFavorite", None)
+                data.setdefault("reaction", "none")
                 data.setdefault("modelCheckpoint", None)
             return data
     except Exception:
@@ -2306,6 +2309,7 @@ def run_inference_job(job_id, run_id, model, track, params):
                     "modelName": model_name,
                     "modelId": model_id,
                     "modelCheckpoint": model_checkpoint,
+                    "reaction": "none",
                     "inputFileId": file_id,
                     "inputStoredName": file_record.get("storedName") if file_record else None,
                     "inputOriginalName": file_record.get("originalName") if file_record else None,
@@ -2451,6 +2455,23 @@ def get_past_inference_results():
         import traceback
         print(traceback.format_exc())
         return jsonify({"error": f"Failed to get results: {str(e)}"}), 500
+
+@app.route('/api/runs/<path:run_id>/reaction', methods=['PATCH'])
+def update_run_reaction(run_id):
+    data = request.get_json(silent=True) or {}
+    reaction = data.get("reaction")
+    if reaction not in ALLOWED_RUN_REACTIONS:
+        return jsonify({"error": "Invalid reaction"}), 400
+
+    run_id = urllib.parse.unquote(run_id)
+    run_meta = load_inference_run_metadata(run_id)
+    if not run_meta:
+        return jsonify({"error": "Run not found"}), 404
+
+    run_meta.pop("isFavorite", None)
+    run_meta["reaction"] = reaction
+    save_inference_run_metadata(run_id, run_meta)
+    return jsonify(run_meta)
 
 @app.route('/api/download/inference/<path:run_id>', methods=['GET'])
 def download_inference(run_id):

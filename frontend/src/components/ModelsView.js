@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHeader from "./common/PageHeader";
 
+
 // keep your icons (unchanged)
 import {
   CloudDownload as CloudDownloadIcon,
@@ -76,7 +77,6 @@ function ModelsView({
   const searchAbortRef = useRef(null);
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
-
   useEffect(() => {
     fetchModels();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -382,45 +382,7 @@ function ModelsView({
   // ---- UI primitives ----
   
   
-  const Btn = ({ children, onClick, variant = "secondary", disabled, style, type = "button" }) => {
-    const v = {
-      primary: { bg: `linear-gradient(180deg, rgba(10,132,255,0.95), rgba(10,132,255,0.78))`, fg: "white", bd: "rgba(10,132,255,0.45)" },
-      secondary: { bg: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`, fg: t.text, bd: t.hairline },
-      outline: { bg: "transparent", fg: t.text, bd: t.hairline },
-      danger: { bg: `linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))`, fg: "white", bd: "rgba(255,59,48,0.45)" },
-    }[variant];
-
-    return (
-      <button
-        type={type}
-        onClick={onClick}
-        disabled={disabled}
-        style={{
-          borderRadius: 14,
-          border: `1px solid ${v.bd}`,
-          background: v.bg,
-          color: v.fg,
-          padding: "10px 12px",
-          fontWeight: 800,
-          letterSpacing: -0.1,
-          cursor: disabled ? "not-allowed" : "pointer",
-          opacity: disabled ? 0.55 : 1,
-          boxShadow: disabled ? "none" : t.shadowSoft,
-          transition: "transform 120ms ease, opacity 160ms ease",
-          ...style,
-        }}
-        onMouseDown={(e) => {
-          if (disabled) return;
-          e.currentTarget.style.transform = "scale(0.985)";
-        }}
-        onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-      >
-        {children}
-      </button>
-    );
-  };
-
+  
   
 
   const ProgressBar = ({ value }) => (
@@ -436,50 +398,64 @@ function ModelsView({
   const onClear = () => setSelected(new Set());
   const onDelete = () => setDeleteOpen(true);
 
+  const normaliseModelName = (name) => {
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+    return name.replace(/[^a-zA-Z0-9]/g, " ");
+  };
+
+
+
+  const sentinelRef = useRef(null);
+  const [isStuck, setIsStuck] = useState(false);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        // when sentinel is NOT visible, sticky header has reached the top
+        setIsStuck(!entry.isIntersecting);
+      },
+      { threshold: 1 }
+    );
+
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+
+
   // ---- Layout helpers ----
 
-  // ---- Loading view ----
-  if (loading) {
-    return (
-      <div style={{ padding: "90px 16px", textAlign: "center", color: t.text }}>
-        <div style={{ display: "inline-flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
-          <div
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: 999,
-              border: `3px solid ${t.isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.18)"}`,
-              borderTopColor: t.primary,
-              animation: "spin 0.9s linear infinite",
-            }}
-          />
-          <div style={{ color: t.subtext, fontWeight: 750 }}>Loading models...</div>
-        </div>
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      </div>
-    );
-  }
-
+  
   return (
-    <div style={{ display: "flex", justifyContent: "center", padding: "0 16px" }}>
-      <div
-        style={{
-          width: "100%",
-          maxWidth: t.maxW,
-          paddingTop: t.topSafe,
-          paddingBottom: t.bottomBarH + 18, // make room for fixed pagination
-        }}
-      >
+   <>
+        <div ref={sentinelRef} height={1}> </div>
         {/* Sticky header area */}
         <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 50,
-            paddingTop: t.topSafe,
-            marginTop: -t.topSafe,
-            background: "transparent",
-          }}
+       
+         style={{
+          backdropFilter: isStuck ? "blur(20px)" : "none",
+
+          // ✅ TRANSITION between “floating card” and “stuck bar”
+          padding:  "12px 0 0 0" ,           // no left/right padding when stuck
+          borderRadius: isStuck ? 0 : t.radiusLg,     // square corners when stuck
+          border:  ` 1px solid ${t.hairline}`,
+         
+          margin: isStuck ? 0 : "24px 24px 24px 24px",
+
+          background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
+          boxShadow: isStuck ? t.shadowSoft : t.shadow,
+          overflow: "visible",
+
+          // ✅ smooth animation
+          transition:
+            "padding 180ms ease, border-radius 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
+        }}
         >
           <div style={{ paddingBottom: 10 }}>
           <Glass
@@ -487,13 +463,22 @@ function ModelsView({
             style={{
               padding: 14,
               marginBottom: 14,
+              border:"none", 
+              boxShadow:"none",
+              background:"transparent",
+              backgroundColor:"transparent",
+              borderRadius:0,
+              backdropFilter:"none",
             }}
           >
             <PageHeader
               title={isInferenceSelection ? "Select Model for Inference" : "TRAINED VOICE MODELS"}
               onBack={isInferenceSelection ? handleBack : null}
+            
             />
             </Glass>
+
+
           </div>
 
           {isInferenceSelection && (
@@ -502,13 +487,19 @@ function ModelsView({
               style={{
                 padding: 16,
                 marginBottom: 14,
+                border:"none", 
+                boxShadow:"none",
+                background:"transparent",
+                backgroundColor:"transparent",
+                borderRadius:0,
+                backdropFilter:"none",
               }}
             >
               <div style={{ fontWeight: 900, color: t.text, marginBottom: 6 }}>Selection Summary</div>
               {selectionNames.length === 0 ? (
                 <div style={{ color: t.subtext, fontSize: 13, fontWeight: 650, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <span>No selection found. Go back to select tracks.</span>
-                  <Btn variant="outline" onClick={handleBack} style={{ height: 32, padding: "0 10px" }}>
+                  <Btn  t={t} variant="outline" onClick={handleBack} style={{ height: 32, padding: "0 10px" }}>
                     Go Back
                   </Btn>
                 </div>
@@ -529,12 +520,18 @@ function ModelsView({
             style={{
               padding: 14,
               marginBottom: 14,
+              border:"none", 
+              boxShadow:"none",
+              background:"transparent",
+              backgroundColor:"transparent",
+              borderRadius:0,
+              backdropFilter:"none",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               {!isInferenceSelection && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Btn variant="outline" onClick={onSelectAll} style={{ height: 44, padding: "0 14px" }}>
+                  <Btn t={t} variant="outline" onClick={onSelectAll} style={{ height: 44, padding: "0 14px" }}>
                     Select All
                   </Btn>
                   <div
@@ -545,7 +542,7 @@ function ModelsView({
                       transition: "all 180ms ease",
                     }}
                   >
-                    <Btn variant="outline" onClick={onClear} style={{ height: 44, padding: "0 14px" }}>
+                    <Btn t={t} variant="outline" onClick={onClear} style={{ height: 44, padding: "0 14px" }}>
                       Clear
                     </Btn>
                   </div>
@@ -716,7 +713,7 @@ function ModelsView({
                     </div>
 
                     {debouncedQuery && isOnlineSearchEnabled && onlineTotalPages > onlinePage && (
-                      <div style={{ padding: 10 }}>
+                      <div>
                         <Btn
                           t={t}
                           variant="outline"
@@ -725,7 +722,7 @@ function ModelsView({
                             setOnlinePage(nextPage);
                             performOnlineSearch(debouncedQuery, nextPage, true);
                           }}
-                          style={{ width: "100%", height: 36 }}
+                          style={{ width: "100%", borderRadius:0 }}
                         >
                           Load more
                         </Btn>
@@ -783,130 +780,154 @@ function ModelsView({
         </div>
 
         {/* True grid: multiple per row */}
-        <div className="vf-grid">
-          {filteredLocalModels.map((model, i) => {
-            const isSelected = selected.has(model.name);
-            const downloadPct = typeof model.downloadProgress === "number" ? model.downloadProgress : null;
 
-            const statusTone = isInferenceSelection
-              ? "primary"
-              : model.status === "completed"
-              ? "success"
-              : model.status === "failed" || model.status === "error"
-              ? "danger"
-              : "warning";
+        {loading ? (
 
-            const statusLabel = isInferenceSelection
-              ? "SELECT MODEL"
-              : model.status === "downloading"
-              ? "DOWNLOADING"
-              : model.status === "failed" || model.status === "error"
-              ? "ERROR"
-              : "READY";
 
-            return (
-              <div
-                key={model.modelId || model.name || i}
-                className="vf-card"
-                role="button"
-                tabIndex={0}
-                onClick={() => handleCardClick(model)}
-                onKeyDown={(e) => e.key === "Enter" && handleCardClick(model)}
-                style={{
-                  borderRadius: t.radiusLg,
-                  border: `1px solid ${isSelected ? "rgba(10,132,255,0.45)" : t.hairline}`,
-                  background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                  boxShadow: t.shadowSoft,
-                  padding: 16,
-                  cursor: model.status === "downloading" ? "default" : "pointer",
-                  position: "relative",
-                  minHeight: 204,
-                  display: "flex",
-                  flexDirection: "column",
-                  transition: "transform 160ms ease, box-shadow 160ms ease, background 160ms ease",
-                  outline: "none",
-                }}
-              >
-                {/* Progress overlay */}
-                {downloadPct !== null && model.status === "downloading" && (
-                  <div style={{ position: "absolute", top: 10, left: 12, right: 12 }}>
-                    <ProgressBar value={downloadPct} />
-                  </div>
-                )}
 
-                {/* Title */}
-                <div style={{ paddingRight: model.isOnline ? 64 : 0 }}>
-                  <div
-                    style={{
-                      color: t.text,
-                      fontWeight: 950,
-                      letterSpacing: -0.35,
-                      fontSize: 16,
-                      lineHeight: 1.15,
-                      marginBottom: 6,
-                    }}
-                    title={model.name}
-                  >
-                    {model.name}
-                  </div>
-
-                  <div style={{ color: t.subtext, fontSize: 12, fontWeight: 700 }}>
-                    {model.created ? new Date(model.created).toLocaleDateString() : "Local"}
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div style={{ marginTop: "auto" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12, marginBottom: 12 }}>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {model.checkpoints?.length > 0 && <Pill t={t} tone="primary">{model.checkpoints.length} CP</Pill>}
-                  {model.sampleRate && <Pill t={t} tone="neutral">{model.sampleRate}hz</Pill>}
-                </div>
-                <Pill t={t} tone="neutral">{model.size_mb || "N/A"} MB</Pill>
-              </div>
-
-                  {model.checkpoints?.length > 0 && (
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ color: t.subtext, fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
-                        Latest Checkpoints:
-                      </div>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {model.checkpoints.slice(0, 3).map((cp, idx) => (
-                          <Pill
-                            key={idx} t={t}
-                            tone="neutral"
-                            style={{
-                              background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
-                            }}
-                          >
-                            {cp.epochs}e
-                          </Pill>
-                        ))}
-                      </div>
+      <div style={{ padding: "90px 16px", textAlign: "center", color: t.text }}>
+        <div style={{ display: "inline-flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+          <div
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 999,
+              border: `3px solid ${t.isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.18)"}`,
+              borderTopColor: t.primary,
+              animation: "spin 0.9s linear infinite",
+            }}
+          />
+          <div style={{ color: t.subtext, fontWeight: 750 }}>Loading models...</div>
+        </div>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </div>
+        ):
+        (
+          <div className="vf-grid" style={{ padding: "0 24px" }}>
+            {filteredLocalModels.map((model, i) => {
+              const isSelected = selected.has(model.name);
+              const downloadPct = typeof model.downloadProgress === "number" ? model.downloadProgress : null;
+  
+              const statusTone = isInferenceSelection
+                ? "primary"
+                : model.status === "completed"
+                ? "success"
+                : model.status === "failed" || model.status === "error"
+                ? "danger"
+                : "warning";
+  
+              const statusLabel = isInferenceSelection
+                ? "SELECT MODEL"
+                : model.status === "downloading"
+                ? "DOWNLOADING"
+                : model.status === "failed" || model.status === "error"
+                ? "ERROR"
+                : "READY";
+  
+              return (
+                <div
+                  key={model.modelId || model.name || i}
+                  className="vf-card"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleCardClick(model)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCardClick(model)}
+                  style={{
+                    borderRadius: t.radiusLg,
+                    border: `1px solid ${isSelected ? "rgba(10,132,255,0.45)" : t.hairline}`,
+                    background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+                    boxShadow: t.shadowSoft,
+                    padding: 16,
+                    cursor: model.status === "downloading" ? "default" : "pointer",
+                    position: "relative",
+                    minHeight: 204,
+                    display: "flex",
+                    flexDirection: "column",
+                    transition: "transform 160ms ease, box-shadow 160ms ease, background 160ms ease",
+                    outline: "none",
+                  }}
+                >
+                  {/* Progress overlay */}
+                  {downloadPct !== null && model.status === "downloading" && (
+                    <div style={{ position: "absolute", top: 10, left: 12, right: 12 }}>
+                      <ProgressBar value={downloadPct} />
                     </div>
                   )}
-
-                  <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 8 }}>
-                    <Pill
-                      tone={statusTone}
-                      t={t}
+  
+                  {/* Title */}
+                  <div style={{ paddingRight: model.isOnline ? 64 : 0 }}>
+                    <div
                       style={{
-                        padding: "10px 14px",
-                        borderRadius: 14,
+                        color: t.text,
+                        fontWeight: 950,
+                        letterSpacing: -0.35,
+                        fontSize: 16,
+                        lineHeight: 1.15,
+                        marginBottom: 6,
                       }}
+                      title={model.name}
                     >
-                      {statusLabel}
-                    </Pill>
-                    {model.status === "failed" && model.downloadError && (
-                      <span style={{ fontSize: 11, color: t.danger }}>{model.downloadError}</span>
+                      {normaliseModelName(model.name)}
+                    </div>
+  
+                    <div style={{ color: t.subtext, fontSize: 12, fontWeight: 700 }}>
+                      {model.created ? new Date(model.created).toLocaleDateString() : "Local"}
+                    </div>
+                  </div>
+  
+                  {/* Stats */}
+                  <div style={{ marginTop: "auto" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12, marginBottom: 12 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {model.checkpoints?.length > 0 && <Pill t={t} tone="primary">{model.checkpoints.length} CP</Pill>}
+                    {model.sampleRate && <Pill t={t} tone="neutral">{model.sampleRate}hz</Pill>}
+                  </div>
+                  <Pill t={t} tone="neutral">{model.size_mb || "N/A"} MB</Pill>
+                </div>
+  
+                    {model.checkpoints?.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ color: t.subtext, fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
+                          Latest Checkpoints:
+                        </div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {model.checkpoints.slice(0, 3).map((cp, idx) => (
+                            <Pill
+                              key={idx} t={t}
+                              tone="neutral"
+                              style={{
+                                background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+                              }}
+                            >
+                              {cp.epochs}e
+                            </Pill>
+                          ))}
+                        </div>
+                      </div>
                     )}
+  
+                    <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 8 }}>
+                      <Pill
+                        tone={statusTone}
+                        t={t}
+                        style={{
+                          padding: "10px 14px",
+                          borderRadius: 14,
+                        }}
+                      >
+                        {statusLabel}
+                      </Pill>
+                      {model.status === "failed" && model.downloadError && (
+                        <span style={{ fontSize: 11, color: t.danger }}>{model.downloadError}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-
+              );
+            })}
+          </div>
+          ) }
+    
         {/* Online results pagination is handled inside the dropdown */}
 
         {/* Checkpoint modal */}
@@ -917,10 +938,11 @@ function ModelsView({
           title="Choose Checkpoint"
           footer={
             <>
-              <Btn variant="outline" onClick={() => setCheckpointDialogOpen(false)}>
+              <Btn t={t} variant="outline" onClick={() => setCheckpointDialogOpen(false)}>
                 Cancel
               </Btn>
               <Btn
+                t={t}
                 variant="primary"
                 disabled={!selectedCheckpoint}
                 onClick={() => onModelSelected({ ...targetInferenceModel, selectedCheckpoint }, selectedTracks)}
@@ -1100,8 +1122,8 @@ function ModelsView({
             outline-offset: 2px;
           }
         `}</style>
-      </div>
-    </div>
+    </>
+   
   );
 }
 

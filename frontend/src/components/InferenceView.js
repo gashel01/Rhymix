@@ -21,6 +21,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
   const [error, setError] = useState(null);
   const [optimisticRuns, setOptimisticRuns] = useState([]);
   const [liveLoading, setLiveLoading] = useState(false);
+  const [reactionPendingByRunId, setReactionPendingByRunId] = useState({});
   const pollingJobsRef = useRef(null);
   const liveStartedRef = useRef(false);
   const [pollingCount, setPollingCount] = useState(0);
@@ -46,35 +47,43 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
     selectedRows,
   } = useTableActions({ inferenceResults: serverRuns, trackPairs });
 
-  const updateFavoriteLocal = useCallback((runId, isFavorite) => {
+  const updateReactionLocal = useCallback((runId, reaction) => {
     if (!runId) return;
     setServerRuns((prev) =>
-      prev.map((run) => (run.runId === runId ? { ...run, isFavorite } : run))
+      prev.map((run) => (run.runId === runId ? { ...run, reaction } : run))
     );
     setOptimisticRuns((prev) =>
-      prev.map((run) => (run.runId === runId ? { ...run, isFavorite } : run))
+      prev.map((run) => (run.runId === runId ? { ...run, reaction } : run))
     );
   }, []);
 
-  const handleToggleFavorite = useCallback(
-    async (runId, isFavorite) => {
+  const handleSetReaction = useCallback(
+    async (runId, nextReaction, previousReaction = "none") => {
       if (!runId) return;
-      updateFavoriteLocal(runId, isFavorite);
+      updateReactionLocal(runId, nextReaction);
+      setReactionPendingByRunId((prev) => ({ ...prev, [runId]: true }));
       try {
-        const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/favorite`, {
+        const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/reaction`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isFavorite }),
+          body: JSON.stringify({ reaction: nextReaction }),
         });
-        if (!response.ok) throw new Error("Failed to update favorite");
+        if (!response.ok) throw new Error("Failed to update reaction");
         const data = await response.json();
-        updateFavoriteLocal(runId, !!data.isFavorite);
+        updateReactionLocal(runId, data?.reaction ?? nextReaction);
       } catch (err) {
-        updateFavoriteLocal(runId, !isFavorite);
-        setError(err?.message || "Failed to update favorite");
+        updateReactionLocal(runId, previousReaction);
+        setError(err?.message || "Failed to update reaction");
+      } finally {
+        setReactionPendingByRunId((prev) => {
+          if (!prev[runId]) return prev;
+          const next = { ...prev };
+          delete next[runId];
+          return next;
+        });
       }
     },
-    [updateFavoriteLocal]
+    [updateReactionLocal]
   );
 
   // Start live inference when liveInferenceData is set
@@ -119,7 +128,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
               vocalFileType: track?.vocalFileType || track?.vocalsFileType || liveInferenceData.params?.vocalsFileType,
               createdAt: startedAt,
               isNew: true,
-              isFavorite: false,
+              reaction: "none",
             };
           })
         );
@@ -345,7 +354,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
   }
 
   return (
-    <div style={{ minHeight: "100vh", padding: "18px 0 32px 0" }}>
+  <>
       <div style={{ marginTop: 16 }}>
         {error && (
           <div style={{ marginBottom: 12 }}>
@@ -414,7 +423,8 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
               onSelectAll={handleSelectAllRows} // important
               onDeselectAll={handleDeselectAllRows} // important
               enableGrouping
-              onToggleFavorite={handleToggleFavorite}
+              onSetReaction={handleSetReaction}
+              reactionPendingByRunId={reactionPendingByRunId}
               defaultLabel=" "
               volume={volumeRef.current}
               header={<div style={{ padding: 14 }}>
@@ -467,7 +477,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
           @keyframes spin{to{transform:rotate(360deg)}}
         `}</style>
 
-    </div>
+</>
   );
 }
 

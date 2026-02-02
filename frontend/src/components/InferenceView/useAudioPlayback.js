@@ -66,6 +66,7 @@ const buildTrackPairFromRun = (run, vocalMode) => {
     run?.model?.modelCheckpoint ||
     run?.model?.selectedCheckpoint ||
     null;
+  const reaction = run?.reaction || "none";
   const vocalFileType =
     run?.vocalFileType ||
     run?.params?.vocalsFileType ||
@@ -108,7 +109,7 @@ const buildTrackPairFromRun = (run, vocalMode) => {
     params: run?.params || null,
     createdAt,
     groupKey: buildGroupKey(run, fileId),
-    isFavorite: !!run?.isFavorite,
+    reaction,
   };
 };
 

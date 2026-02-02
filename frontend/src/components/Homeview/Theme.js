@@ -32,6 +32,9 @@ import React, { useMemo } from "react";
           radiusMd: 16,
           maxW: 1400,
           stickyTop: 12,
+          flatIconActive: isDark ? "#ffffff" : "#000000",
+          //light gray
+          flatIconInactive: isDark ? "#3d3d3d" : "#888",
         };
       }, [isDark]);
 

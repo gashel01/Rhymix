@@ -48,7 +48,8 @@ const AudioTrackTable = (props) => {
     defaultLabel,
     header,
     enableGrouping = false,
-    onToggleFavorite,
+    onSetReaction,
+    reactionPendingByRunId,
     darkMode,
   } = props;
 
@@ -109,7 +110,7 @@ const AudioTrackTable = (props) => {
       );
       if (versions.length === 0) return;
       const latest = versions[0];
-      const favoriteCount = versions.filter((v) => v.isFavorite).length;
+      const favoriteCount = versions.filter((v) => (v.reaction || "none") === "favorite").length;
       const isExpanded = expandedGroups.has(key);
       output.push({
         ...latest,
@@ -368,9 +369,10 @@ const AudioTrackTable = (props) => {
                       isGroupedVersion={pair.isGroupedVersion}
                       versionCount={pair.versionCount}
                       favoriteCount={pair.favoriteCount}
-                      isFavorite={pair.isFavorite}
+                      reaction={pair.reaction || "none"}
+                      reactionPending={Boolean(reactionPendingByRunId?.[pair.runId])}
                       onToggleGroup={enableGrouping ? handleToggleGroup : undefined}
-                      onToggleFavorite={onToggleFavorite}
+                      onSetReaction={onSetReaction}
                       darkMode={darkMode}
                     />
                   );

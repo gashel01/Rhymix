@@ -626,16 +626,16 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
             prev.map((s) =>
               s.id === jobId
                 ? {
-                    ...s,
-                    status: "completed",
-                    audioUrl: data.audio_url,
-                    vocalsUrl: data.vocals_url,
-                    instrumentalUrl: data.instrumental_url,
-                    processed: data.processed,
-                    inferenceCompleted: data.inference_completed,
-                    modelName: data.model_name,
-                    progress: 100,
-                  }
+                  ...s,
+                  status: "completed",
+                  audioUrl: data.audio_url,
+                  vocalsUrl: data.vocals_url,
+                  instrumentalUrl: data.instrumental_url,
+                  processed: data.processed,
+                  inferenceCompleted: data.inference_completed,
+                  modelName: data.model_name,
+                  progress: 100,
+                }
                 : s
             )
           );
@@ -806,12 +806,54 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     }
   };
 
+  const sentinelRef = useRef(null);
+  const [isStuck, setIsStuck] = useState(false);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        // when sentinel is NOT visible, sticky header has reached the top
+        setIsStuck(!entry.isIntersecting);
+      },
+      { threshold: 1 }
+    );
+
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   return (
-    <div style={{ minHeight: "100vh", padding: "18px 0 32px 0" }}>
-      <div style={{ padding: "0 16px", maxWidth: t.maxW, margin: "0 auto" }}>
-        {/* Sticky header */}
-        <div style={{ position: "sticky", top: t.stickyTop, zIndex: 50 }}>
-          <Glass style={{ padding: 14 }}>
+    <>
+      <div style={{  maxWidth: t.maxW, margin: "0 auto" }}>
+        <div ref={sentinelRef} />
+
+        <div
+          style={{
+            backdropFilter: isStuck ? "blur(20px)" : "none",
+
+            // ✅ TRANSITION between “floating card” and “stuck bar”
+                    // no left/right padding when stuck
+            borderRadius: isStuck ? 0 : t.radiusLg,     // square corners when stuck
+            border: ` 1px solid ${t.hairline}`,
+
+            margin: isStuck ? 0 : "24px 24px 0 24px",
+
+            background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
+            position: "sticky",
+            top: 0,
+            zIndex: 1000,
+            boxShadow: isStuck ? t.shadowSoft : t.shadow,
+            overflow: "hidden",
+
+            // ✅ smooth animation
+            transition:
+              "padding 180ms ease, border-radius 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
+          }}
+        >
+          <Glass style={{border:"none", boxShadow:"none", background:"transparent", backgroundColor:"transparent", borderRadius:0, backdropFilter:"none" , padding:14}}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div
                 style={{
@@ -837,12 +879,12 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                 </div>
               </div>
 
-            
+
             </div>
           </Glass>
         </div>
 
-        <div className="cs-grid" style={{ marginTop: 16 }}>
+        <div className="cs-grid" style={{ margin: "16px 24px 0 24px" }}>
           {/* LEFT */}
           <div>
             <Panel style={{ marginBottom: 14 }}>
@@ -1135,9 +1177,8 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                         style={{
                           borderRadius: t.radiusLg,
                           border: `1px solid ${isFailed ? "rgba(255,59,48,0.45)" : t.hairline}`,
-                          background: `linear-gradient(180deg, ${t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"}, ${
-                            t.isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)"
-                          })`,
+                          background: `linear-gradient(180deg, ${t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"}, ${t.isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)"
+                            })`,
                           padding: 14,
                           boxShadow: "none",
                           opacity: isFailed ? 0.72 : 1,
@@ -1327,7 +1368,11 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
           }
         `}</style>
       </div>
-    </div>
+
+
+
+      <div style={{ height: "300px", width: "100%", background: "red" }} />
+    </>
   );
 }
 
