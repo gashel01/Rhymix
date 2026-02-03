@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { getAvailableFiles } from '../utils/apiService';
 
 /**
@@ -10,29 +10,43 @@ export const useAvailableFiles = () => {
   const [rawVocals, setRawVocals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const hasFetchedRef = useRef(false);
 
-  const fetchFiles = async () => {
+  const fetchFiles = useCallback(async (options = {}) => {
+    const silent = options?.silent ?? false;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
 
       const response = await getAvailableFiles();
 
       if (response && response.files) {
         if (response.files.length > 0) {
-          setAvailableFiles(response.files);
+          const normalized = response.files.map((file) => ({
+            ...file,
+            id: file.fileId,
+            trackId: file.trackId || file.fileId,
+            displayName: file.safeDisplayName || file.originalName,
+            vocalUrl: file.vocalUrlProcessed || null,
+            vocalPath: file.vocalPathProcessed || null,
+            instrumentalUrl: file.instrumentalUrl || null,
+            instrumentalPath: file.instrumentalPath || null,
+            processing: file.processing || null,
+          }));
 
-          // Create raw vocals versions by modifying URLs
-          const possibleRawVocals = response.files.map((file) => {
-            const rawVersion = { ...file };
-            if (rawVersion.vocalUrl) {
-              rawVersion.vocalUrl = rawVersion.vocalUrl.replace(
-                '/api/download/processed_vocals/',
-                '/api/download/raw_vocals/'
-              );
-            }
-            return rawVersion;
-          });
+          setAvailableFiles(normalized);
+
+          const possibleRawVocals = response.files.map((file) => ({
+            ...file,
+            id: file.fileId,
+            trackId: file.trackId || file.fileId,
+            displayName: file.safeDisplayName || file.originalName,
+            vocalUrl: file.vocalUrlRaw || null,
+            vocalPath: file.vocalPathRaw || null,
+            instrumentalUrl: file.instrumentalUrl || null,
+            instrumentalPath: file.instrumentalPath || null,
+            processing: file.processing || null,
+          }));
 
           setRawVocals(possibleRawVocals);
         } else {
@@ -50,12 +64,16 @@ export const useAvailableFiles = () => {
       setAvailableFiles([]);
       setRawVocals([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchFiles();
+    // Only fetch once, even if component re-renders
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchFiles();
+    }
   }, []);
 
   return {
@@ -63,6 +81,6 @@ export const useAvailableFiles = () => {
     rawVocals,
     loading,
     error,
-    refetch: fetchFiles,
+    refetch: (options) => fetchFiles({ silent: true, ...(options || {}) }),
   };
 };

@@ -1,189 +1,331 @@
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  Box, Typography, Grid, Chip, Button, CircularProgress, IconButton, 
-  Container, Dialog, DialogTitle, DialogContent, DialogActions, Fade, 
-  TextField, InputAdornment, Stack, Pagination, LinearProgress, Drawer,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
-} from "@mui/material";
-import { useTheme, alpha } from "@mui/material/styles";
-import { 
-  CloudDownload as DownloadIcon, 
-  Delete as DeleteIcon, 
-  Search as SearchIcon,
-  CloudQueue as CloudIcon,
-  CloudOff as CloudOffIcon,
-  CompareArrows as CompareIcon,
-  Close as CloseIcon,
-  AccessTime as AccessTimeIcon
-} from "@mui/icons-material";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHeader from "./common/PageHeader";
 
-// --- Original Sub-components (Design Preserved) ---
 
-const StatPill = ({ label, color, theme, style }) => (
-  <Box sx={{
-    px: 1.5, py: 0.5, borderRadius: 2, display: 'flex', alignItems: 'center',
-    backgroundColor: alpha(color || theme.palette.text.primary, theme.palette.mode === 'dark' ? 0.1 : 0.06),
-    whiteSpace: 'nowrap', ...style
-  }}>
-    <Typography variant="caption" sx={{ fontWeight: 600, color: color || 'text.primary', fontSize: '0.75rem' }}>
-      {label}
-    </Typography>
-  </Box>
-);
+// keep your icons (unchanged)
+import {
+  CloudDownload as CloudDownloadIcon,
+  CloudOff as CloudOffIcon,
+  Delete as DeleteIcon,
+  Search as SearchIcon,
+  Close as CloseIcon,
+} from "@mui/icons-material";
+import {Theme} from "./Homeview/Theme.js"
+import {SearchInput} from "./ModelView/SearchInput.js"
 
-const ActionToolbar = ({ 
-  searchQuery, setSearchQuery, showOnline, setShowOnline, 
-  selectedCount, onClear, onDelete, onSelectAll, theme, isInferenceSelection 
-}) => (
-  <Box sx={{ 
-    p: 2, mb: 3, borderRadius: 2, border: `1px solid ${theme.palette.divider}`,
-    background: theme.palette.mode === 'dark' 
-      ? `linear-gradient(135deg, ${theme.palette.background.paper}, ${theme.palette.background.default})`
-      : `linear-gradient(135deg, #ffffff, #f8fafc)`,
-    display: 'flex', alignItems: 'center', gap: 2, minHeight: 64,
-    transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)', 
-  }}>
-    {/* Bulk Selection (Hidden in Inference Mode to keep it clean) */}
-    {!isInferenceSelection && (
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Button variant="outlined" size="small" onClick={onSelectAll} sx={{ borderRadius: 2, height: 40, whiteSpace: 'nowrap' }}>
-          Select All
-        </Button>
-        <Fade in={selectedCount > 0} unmountOnExit>
-          <Button variant="outlined" size="small" onClick={onClear} sx={{ borderRadius: 2, height: 40 }}>
-            Clear
-          </Button>
-        </Fade>
-      </Stack>
-    )}
-
-    {/* Search & Cloud Toggle (Identical to Original Design) */}
-    <TextField 
-      fullWidth size="small"
-      placeholder="Search local and online models..." 
-      value={searchQuery} 
-      onChange={e => setSearchQuery(e.target.value)}
-      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: alpha(theme.palette.text.primary, 0.02) } }}
-      InputProps={{ 
-        startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment>,
-        endAdornment: (
-          <InputAdornment position="end">
-            <IconButton onClick={() => setShowOnline(!showOnline)} color={showOnline ? "primary" : "default"} size="small">
-              {showOnline ? <CloudIcon /> : <CloudOffIcon />}
-            </IconButton>
-          </InputAdornment>
-        )
-      }} 
-    />
-
-    {/* Delete Action (Hidden in Inference Mode) */}
-    {!isInferenceSelection && (
-      <Box sx={{ position: 'relative', flexShrink: 0 }}>
-        <IconButton 
-          onClick={onDelete} disabled={selectedCount === 0}
-          sx={{ 
-            width: 40, height: 40, 
-            bgcolor: selectedCount > 0 ? 'error.main' : alpha(theme.palette.error.main, 0.1), 
-            color: selectedCount > 0 ? 'white' : theme.palette.text.disabled, 
-            borderRadius: '50%', '&:hover': { bgcolor: 'error.dark' },
-            transition: 'all 0.3s ease'
-          }}
-        >
-          <DeleteIcon sx={{ fontSize: '1.25rem' }} /> 
-        </IconButton>
-        <Fade in={selectedCount > 0}>
-          <Box sx={{
-            position: 'absolute', top: -5, right: -5, width: 22, height: 22, bgcolor: 'error.light',
-            color: 'white', borderRadius: '50%', display: 'grid', placeItems: 'center', 
-            fontSize: '0.75rem', fontWeight: 700, border: `2px solid ${theme.palette.background.paper}`, boxShadow: 2
-          }}>
-            {selectedCount}
-          </Box>
-        </Fade>
-      </Box>
-    )}
-  </Box>
-);
-
-// --- Main View ---
-
-function ModelsView({ 
-  isInferenceSelection = false, 
-  selectedTracks = [], 
-  onBack, 
-  onModelSelected 
+import {Glass} from "./Homeview/Glass.js"
+import {Hairline} from "./Homeview/Hairline.js"
+import IconBtn from "./Homeview/IconBtn.js"
+import {Modal} from "./Homeview/Modal.js"
+import Btn from "./Homeview/Btn.js"
+import {Pill} from "./ModelView/Pill.js"
+ 
+/**
+ * ModelsView (no MUI)
+ * - True responsive grid: multiple cards per row
+ * - Dark + Light theme support via `darkMode` boolean OR CSS variables fallback
+ * - Sticky header + search toolbar
+ * - Fixed pagination bar (bottom)
+ *
+ * Props:
+ *  - isInferenceSelection, selectedTracks, onBack, onModelSelected (same)
+ * Optional:
+ *  - darkMode (boolean) -> recommended; if omitted we infer from prefers-color-scheme
+ */
+function ModelsView({
+  isInferenceSelection = false,
+  selectedTracks = [],
+  onBack,
+  onModelSelected,
+  navContext,
+  onNavigate,
+  darkMode, // optional
 }) {
-  const theme = useTheme();
-  
-  // State: Management & Display
-  const [models, setModels] = useState([]);
-  const [onlineResults, setOnlineResults] = useState([]);
-  const [showOnline, setShowOnline] = useState(true);
+  // ---- Theme tokens ----
+  const { t } = Theme({ darkMode });
+  const [ctx, setCtx] = useState(navContext || null);
+
+  useEffect(() => {
+    if (navContext) setCtx(navContext);
+  }, [navContext]);
+
+  // ---- Data state (same logic) ----
+  const [localModels, setLocalModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [onlineResults, setOnlineResults] = useState([]);
+  const [onlinePage, setOnlinePage] = useState(1);
+  const [onlineTotalPages, setOnlineTotalPages] = useState(1);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isOnlineSearchEnabled, setIsOnlineSearchEnabled] = useState(true);
   const [selected, setSelected] = useState(new Set());
-  
-  // State: Downloads & Progress
-  const [downloadingProgress, setDownloadingProgress] = useState({}); // { [url]: progress_number }
+
+  const [downloadJobs, setDownloadJobs] = useState({});
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [activeDownloadModel, setActiveDownloadModel] = useState(null);
   const [customModelName, setCustomModelName] = useState("");
   const [downloadError, setDownloadError] = useState("");
 
-  // State: Inference Selection
   const [checkpointDialogOpen, setCheckpointDialogOpen] = useState(false);
   const [targetInferenceModel, setTargetInferenceModel] = useState(null);
   const [selectedCheckpoint, setSelectedCheckpoint] = useState(null);
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const searchAbortRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
+  useEffect(() => {
+    fetchModels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // --- Logic ---
-
-  useEffect(() => { fetchModels(); }, []);
-
-  const fetchModels = async () => {
+  const fetchModels = useCallback(async () => {
     try {
-      const res = await fetch('/api/available-models');
+      setLoading(true);
+      const res = await fetch("/api/available-models");
       const data = await res.json();
-      setModels(data.models || []);
-    } finally { setLoading(false); }
-  };
+      setLocalModels(data.models || []);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
     const timer = setTimeout(() => {
-      if (searchQuery.trim() && showOnline) {
-        performOnlineSearch(currentPage, controller.signal);
-      } else {
-        setOnlineResults([]);
-        setTotalPages(1);
-      }
-    }, 800);
-    return () => { clearTimeout(timer); controller.abort(); };
-  }, [searchQuery, currentPage, showOnline]);
+      setDebouncedQuery(searchQuery.trim());
+    }, 320);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  const performOnlineSearch = async (page, signal) => {
+  const performOnlineSearch = useCallback(async (query, page, append = false) => {
+    if (!query) return;
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+    setIsSearching(true);
+    setSearchError("");
     try {
-      const res = await fetch(`/api/search-online-models?query=${encodeURIComponent(searchQuery)}&page=${page}`, { signal });
+      const res = await fetch(
+        `/api/search-online-models?query=${encodeURIComponent(query)}&page=${page}`,
+        { signal: controller.signal }
+      );
       const data = await res.json();
-      setOnlineResults(data.models || []);
-      setTotalPages(data.total_pages || 1);
-    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
-  };
+      const nextModels = data.models || [];
+      setOnlineResults((prev) => (append ? [...prev, ...nextModels] : nextModels));
+      setOnlineTotalPages(data.total_pages || 1);
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        setSearchError(err.message || "Search failed");
+      }
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!debouncedQuery) {
+      setOnlineResults([]);
+      setOnlinePage(1);
+      setOnlineTotalPages(1);
+      setSearchError("");
+      return;
+    }
+    if (!isOnlineSearchEnabled) {
+      setOnlineResults([]);
+      setOnlinePage(1);
+      setOnlineTotalPages(1);
+      setSearchError("");
+      setIsSearching(false);
+      return;
+    }
+    setOnlinePage(1);
+    performOnlineSearch(debouncedQuery, 1, false);
+  }, [debouncedQuery, performOnlineSearch, isOnlineSearchEnabled]);
+
+  useEffect(() => {
+    const onPointerDown = (event) => {
+      const el = event.target;
+      const dropdownEl = dropdownRef.current;
+      const inputEl = inputRef.current;
+      const clickedInDropdown = dropdownEl && dropdownEl.contains(el);
+      const clickedInInput = inputEl && inputEl.contains(el);
+      if (!clickedInDropdown && !clickedInInput) {
+        setIsDropdownOpen(false);
+      }
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setIsDropdownOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
+  const toggleOnlineSearch = useCallback(() => {
+    setIsOnlineSearchEnabled((prev) => {
+      const next = !prev;
+      if (!next) {
+        setIsDropdownOpen(false);
+        setIsSearching(false);
+        setOnlineResults([]);
+        setOnlinePage(1);
+        setOnlineTotalPages(1);
+        setSearchError("");
+      } else if (searchQuery.trim()) {
+        setIsDropdownOpen(true);
+      }
+      return next;
+    });
+  }, [searchQuery]);
+
+  const normalizeId = useCallback((value) => {
+    if (!value) return "";
+    return String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  }, []);
+
+  const selectionNames = useMemo(() => {
+    return (selectedTracks || [])
+      .map((track) => track?.displayName || track?.safeDisplayName || track?.originalName || track?.name || track?.fileId || track?.id)
+      .filter(Boolean);
+  }, [selectedTracks]);
+
+  const selectionPreview = useMemo(() => {
+    const list = selectionNames.slice(0, 3);
+    const extra = selectionNames.length - list.length;
+    const base = list.join(", ");
+    return extra > 0 ? `${base} +${extra} more` : base;
+  }, [selectionNames]);
+
+  const handleBack = useCallback(() => {
+    if (ctx?.source === "home") {
+      if (onNavigate) {
+        onNavigate("home");
+        return;
+      }
+      onBack?.();
+      return;
+    }
+    if (ctx?.source === "inference") {
+      if (onNavigate) {
+        onNavigate("inference");
+        return;
+      }
+      onBack?.();
+      return;
+    }
+    onBack?.();
+  }, [ctx?.source, onBack, onNavigate]);
+
+  const installedIds = useMemo(() => {
+    const ids = new Set();
+    localModels.forEach((model) => {
+      if (model.modelId) ids.add(normalizeId(model.modelId));
+      if (model.name) ids.add(normalizeId(model.name));
+    });
+    return ids;
+  }, [localModels, normalizeId]);
+
+  const localModelsMerged = useMemo(() => {
+    const byId = new Map();
+    localModels.forEach((model) => {
+      const id = model.modelId || model.name;
+      byId.set(normalizeId(id), { ...model, isOnline: false, status: model.status || "completed" });
+    });
+
+    Object.values(downloadJobs).forEach((job) => {
+      const id = normalizeId(job.modelId || job.modelName);
+      const existing = byId.get(id);
+      if (existing) {
+        if (job.status && job.status !== "completed") {
+          byId.set(id, {
+            ...existing,
+            status: job.status,
+            downloadProgress: job.progress ?? null,
+            downloadError: job.error || existing.downloadError,
+          });
+        }
+        return;
+      }
+      byId.set(id, {
+        name: job.modelName || job.modelId || "New Model",
+        modelId: job.modelId,
+        status: job.status || "downloading",
+        downloadProgress: job.progress ?? null,
+        downloadError: job.error || null,
+        checkpoints: [],
+        size_mb: job.size_mb || null,
+        created: job.started_at || new Date().toISOString(),
+        isOnline: false,
+      });
+    });
+
+    return Array.from(byId.values()).sort((a, b) => {
+      const aTime = a.created ? Date.parse(a.created) : 0;
+      const bTime = b.created ? Date.parse(b.created) : 0;
+      return bTime - aTime;
+    });
+  }, [downloadJobs, localModels, normalizeId]);
+
+  const filteredLocalModels = useMemo(() => {
+    if (!searchQuery.trim()) return localModelsMerged;
+    const q = searchQuery.trim().toLowerCase();
+    return localModelsMerged.filter((model) => model.name?.toLowerCase().includes(q));
+  }, [localModelsMerged, searchQuery]);
+
+  const selectableLocalModels = useMemo(
+    () => filteredLocalModels.filter((model) => model.status === "completed"),
+    [filteredLocalModels]
+  );
+
+  useEffect(() => {
+    const pendingJobs = Object.values(downloadJobs).filter(
+      (job) => job.status && !["completed", "failed"].includes(job.status)
+    );
+    if (!pendingJobs.length) return;
+    const interval = setInterval(async () => {
+      await Promise.all(
+        pendingJobs.map(async (job) => {
+          try {
+            const res = await fetch(`/api/models/download/status/${encodeURIComponent(job.jobId)}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            setDownloadJobs((prev) => ({
+              ...prev,
+              [job.jobId]: {
+                ...prev[job.jobId],
+                ...data,
+              },
+            }));
+            if (data.status === "completed") {
+              fetchModels();
+            }
+          } catch (err) {
+            // ignore polling errors
+          }
+        })
+      );
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [downloadJobs, fetchModels]);
 
   const handleCardClick = (model) => {
-    if (model.isOnline) return; // Must use download button
+    if (model.isOnline) return;
+    if (model.status && ["downloading", "failed"].includes(model.status)) return;
 
     if (isInferenceSelection) {
       setTargetInferenceModel(model);
       setSelectedCheckpoint(model.bestCheckpoint || (model.checkpoints ? model.checkpoints[0] : null));
       setCheckpointDialogOpen(true);
     } else {
-      setSelected(prev => {
+      setSelected((prev) => {
         const n = new Set(prev);
         n.has(model.name) ? n.delete(model.name) : n.add(model.name);
         return n;
@@ -192,226 +334,796 @@ function ModelsView({
   };
 
   const executeDownload = async () => {
-    const name = customModelName.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-    const url = activeDownloadModel.url;
+    const name = customModelName.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+    const url = activeDownloadModel?.url;
     if (!name) return setDownloadError("Please enter a name.");
-    
+    if (!url) return;
+
     setDownloadDialogOpen(false);
-    setDownloadingProgress(prev => ({ ...prev, [url]: 0 }));
 
     try {
-      // Simulate real-time progress increments while the fetch handles the stream
-      const progressTimer = setInterval(() => {
-        setDownloadingProgress(prev => {
-          const current = prev[url] ?? 0;
-          if (current >= 95) return prev;
-          return { ...prev, [url]: current + (100 - current) * 0.2 };
-        });
-      }, 1000);
-
-      const responsedownload =  await fetch('/api/download-model', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, modelName: activeDownloadModel.name, userQuery: name })
+      const response = await fetch("/api/download-model", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url,
+          modelName: activeDownloadModel.name,
+          userQuery: name,
+          modelId: activeDownloadModel.modelId,
+          files: activeDownloadModel.files || {},
+        }),
       });
 
-      if(responsedownload.ok){
-
-        setDownloadingProgress(prev => {
-          const newState = { ...prev };
-          delete newState[url];
-          return newState;
-        });
-  
-        // 2. TRIGGER REFRESH: This brings the new model into the 'local' list
-        await fetchModels();
+      const data = await response.json();
+      if (!response.ok) {
+        setDownloadError(data.error || "Download failed");
+        return;
       }
+
+      const jobId = data.jobId;
+      const modelId = data.modelId || name;
+      setDownloadJobs((prev) => ({
+        ...prev,
+        [jobId]: {
+          jobId,
+          modelId,
+          modelName: data.modelName || activeDownloadModel.name || name,
+          status: data.status || "downloading",
+          progress: data.progress ?? 0,
+          started_at: data.started_at || new Date().toISOString(),
+          error: null,
+        },
+      }));
     } catch (err) {
-      setDownloadingProgress(prev => { const n = { ...prev }; delete n[url]; return n; });
+      setDownloadError(err.message || "Download failed");
     }
   };
 
-  const displayModels = useMemo(() => {
-    const local = models
-      .filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
-      .map(m => ({ ...m, isOnline: false }));
-    
-    const online = showOnline 
-      ? onlineResults
-          // Filter out online models that already exist in your local list
-          .filter(om => !models.some(lm => lm.name.toLowerCase() === om.name.toLowerCase()))
-          .map(m => ({ ...m, isOnline: true })) 
-      : [];
-      
-    return [...local, ...online];
-  }, [models, onlineResults, showOnline, searchQuery]);
+  // ---- UI primitives ----
+  
+  
+  
+  
 
-  if (loading) return <Box sx={{ py: 10, textAlign: 'center' }}><CircularProgress /><Typography mt={2}>Loading models...</Typography></Box>;
+  const ProgressBar = ({ value }) => (
+    <div style={{ height: 4, borderRadius: 999, background: t.isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)", overflow: "hidden" }}>
+      <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, value || 0))}%`, background: t.primary, transition: "width 220ms ease" }} />
+    </div>
+  );
 
+  
+  // ---- Toolbar actions ----
+  const selectedCount = selected.size;
+  const onSelectAll = () => setSelected(new Set(selectableLocalModels.map((m) => m.name)));
+  const onClear = () => setSelected(new Set());
+  const onDelete = () => setDeleteOpen(true);
+
+  const normaliseModelName = (name) => {
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+    return name.replace(/[^a-zA-Z0-9]/g, " ");
+  };
+
+
+
+  const sentinelRef = useRef(null);
+  const [isStuck, setIsStuck] = useState(false);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        // when sentinel is NOT visible, sticky header has reached the top
+        setIsStuck(!entry.isIntersecting);
+      },
+      { threshold: 1 }
+    );
+
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+
+
+  // ---- Layout helpers ----
+
+  
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <PageHeader 
-        title={isInferenceSelection ? "Select Model for Inference" : "Trained Voice Models"} 
-        onBack={isInferenceSelection ? onBack : null}
-      />
+   <>
+        <div ref={sentinelRef} height={1}> </div>
+        {/* Sticky header area */}
+        <div
+       
+         style={{
+          backdropFilter: isStuck ? "blur(20px)" : "none",
 
-      <ActionToolbar 
-        searchQuery={searchQuery} setSearchQuery={(val) => { setSearchQuery(val); setCurrentPage(1); }}
-        showOnline={showOnline} setShowOnline={setShowOnline}
-        selectedCount={selected.size} 
-        onSelectAll={() => setSelected(new Set(models.map(m => m.name)))}
-        onClear={() => setSelected(new Set())}
-        onDelete={() => setDeleteOpen(true)}
-        theme={theme}
-        isInferenceSelection={isInferenceSelection}
-      />
+          // ✅ TRANSITION between “floating card” and “stuck bar”
+          padding:  "12px 0 0 0" ,           // no left/right padding when stuck
+          borderRadius: isStuck ? 0 : t.radiusLg,     // square corners when stuck
+          border:  ` 1px solid ${t.hairline}`,
+         
+          margin: isStuck ? 0 : "24px 24px 24px 24px",
 
-      <Grid container spacing={2}>
-        {displayModels.map((model, i) => {
-          const isSelected = selected.has(model.name);
-          const downloadPct = downloadingProgress[model.url];
+          background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
+          boxShadow: isStuck ? t.shadowSoft : t.shadow,
+          overflow: "visible",
 
-          return (
-            <Grid item xs={12} sm={6} md={4} key={model.url || model.name || i}>
-              <Box 
-                onClick={() => handleCardClick(model)} 
-                sx={{
-                  p: 2.5, borderRadius: 2, transition: '0.3s', cursor: model.isOnline ? 'default' : 'pointer',
-                  border: `1px solid ${isSelected ? theme.palette.primary.main : 'rgba(255, 255, 255, 0.08)'}`,
-                  backgroundColor: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.2 : 0.8),
-                  position: 'relative', height: '100%', display: 'flex', flexDirection: 'column',
-                  '&:hover': { transform: 'translateY(-2px)', boxShadow: theme.shadows[4] }
-                }}
-              >
-                {/* Download Progress Bar Overlay */}
-                {downloadPct !== undefined && (
-                  <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', px: 1 }}>
-                    <LinearProgress variant="determinate" value={downloadPct} sx={{ height: 4, borderRadius: 2 }} />
-                  </Box>
-                )}
-
-                {model.isOnline && (
-                  <Chip label="Online" size="small" sx={{ position: 'absolute', top: 12, right: 12, height: 18, fontSize: '0.6rem', bgcolor: 'primary.main', color: 'white', fontWeight: 700 }} />
-                )}
-
-                <Box sx={{ mb: 1 }}>
-                  <Typography variant="h6" fontWeight={600} sx={{ pr: model.isOnline ? 5 : 0, lineHeight: 1.2, mb: 0.5 }}>{model.name}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {model.isOnline ? "From Cloud Search" : (model.created ? new Date(model.created).toLocaleDateString() : 'Local')}
-                  </Typography>
-                </Box>
-
-                <Stack direction="row" justifyContent="space-between" spacing={1} mb={2} mt="auto">
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
-                    {model.checkpoints?.length > 0 && <StatPill label={`${model.checkpoints.length} CP`} color={theme.palette.primary.main} theme={theme} />}
-                    {model.sampleRate && <StatPill label={`${model.sampleRate}hz`} theme={theme} />}
-                  </Stack>
-                  <StatPill label={`${model.size_mb || 'N/A'} MB`} theme={theme} />
-                </Stack>
-          
-                {!model.isOnline && model.checkpoints && model.checkpoints.length > 0 && (
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>Latest Checkpoints:</Typography>
-                    <Stack direction="row" spacing={1}>
-                      {model.checkpoints.slice(0, 3).map((cp, idx) => (
-                        <StatPill key={idx} label={`${cp.epochs}e`} color={'#fff'} theme={theme} style={{ bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '9px' }} />
-                      ))}
-                    </Stack>
-                  </Box>
-                )}
-
-                {model.isOnline ? (
-                  <Button 
-                    fullWidth variant="contained" 
-                    disabled={downloadPct !== undefined} 
-                    onClick={(e) => { e.stopPropagation(); setActiveDownloadModel(model); setDownloadDialogOpen(true); }}
-                    startIcon={downloadPct !== undefined ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
-                  >
-                    {downloadPct !== undefined ? `Downloading ${Math.round(downloadPct)}%` : 'Download'}
-                  </Button>
-                ) : (
-                  <Chip
-                    label={isInferenceSelection ? "SELECT MODEL" : (model.status?.toUpperCase() || "COMPLETED")}
-                    sx={{
-                      height: 'auto', borderRadius: '12px', bgcolor: isInferenceSelection ? 'primary.main' : 'rgba(76, 175, 80, 0.15)',
-                      color: isInferenceSelection ? '#fff' : (model.status === 'completed' ? '#34C759' : '#FF9500'),
-                      fontWeight: 600, '& .MuiChip-label': { px: 2, py: 0.8, fontSize: '0.65rem' },
-                    }}
-                  />
-                )}
-              </Box>
-            </Grid>
-          );
-        })}
-      </Grid>
-
-      {/* Pagination */}
-      {showOnline && totalPages > 1 && (
-        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
-          <Pagination count={totalPages} page={currentPage} onChange={(e, val) => setCurrentPage(val)} color="primary" />
-        </Box>
-      )}
-
-      {/* --- Checkpoint Dialog (Inference Mode) --- */}
-      <Dialog open={checkpointDialogOpen} onClose={() => setCheckpointDialogOpen(false)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Choose Checkpoint</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" mb={3}>Select training epoch for <b>{targetInferenceModel?.name}</b></Typography>
-          <Stack spacing={1.5}>
-            {targetInferenceModel?.checkpoints?.map((cp) => (
-              <Box 
-                key={cp.filename}
-                onClick={() => setSelectedCheckpoint(cp)}
-                sx={{
-                  p: 2, borderRadius: 2, cursor: 'pointer',
-                  border: `2px solid ${selectedCheckpoint?.filename === cp.filename ? theme.palette.primary.main : alpha(theme.palette.divider, 0.1)}`,
-                  bgcolor: selectedCheckpoint?.filename === cp.filename ? alpha(theme.palette.primary.main, 0.05) : 'transparent',
-                }}
-              >
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body2" fontWeight={600}>{cp.epochs} Epochs</Typography>
-                  {cp.isBest && <Chip label="BEST" size="small" color="success" sx={{ height: 20, fontSize: '0.6rem' }} />}
-                </Stack>
-              </Box>
-            ))}
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ p: 2.5 }}>
-          <Button onClick={() => setCheckpointDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled={!selectedCheckpoint} onClick={() => onModelSelected({ ...targetInferenceModel, selectedCheckpoint }, selectedTracks)}>
-            Use for Inference
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* --- Download & Delete Dialogs --- */}
-      <Dialog open={downloadDialogOpen} onClose={() => setDownloadDialogOpen(false)} PaperProps={{ sx: { borderRadius: 3, width: '100%', maxWidth: 400 } }}>
-        <DialogTitle sx={{ textAlign: 'center' }}>Name your model</DialogTitle>
-        <DialogContent>
-            <TextField
-                fullWidth autoFocus placeholder="e.g. My_Voice_V1" value={customModelName}
-                onChange={(e) => { setCustomModelName(e.target.value); setDownloadError(""); }}
-                error={!!downloadError} helperText={downloadError} variant="outlined"
+          // ✅ smooth animation
+          transition:
+            "padding 180ms ease, border-radius 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
+        }}
+        >
+          <div style={{ paddingBottom: 10 }}>
+          <Glass
+            t={t}
+            style={{
+              padding: 14,
+              marginBottom: 14,
+              border:"none", 
+              boxShadow:"none",
+              background:"transparent",
+              backgroundColor:"transparent",
+              borderRadius:0,
+              backdropFilter:"none",
+            }}
+          >
+            <PageHeader
+              title={isInferenceSelection ? "Select Model for Inference" : "TRAINED VOICE MODELS"}
+              onBack={isInferenceSelection ? handleBack : null}
+            
             />
-        </DialogContent>
-        <DialogActions sx={{ p: 2, justifyContent: 'center', gap: 1 }}>
-          <Button onClick={() => setDownloadDialogOpen(false)}>Cancel</Button>
-          <Button onClick={executeDownload} variant="contained" sx={{ px: 4 }}>Confirm</Button>
-        </DialogActions>
-      </Dialog>
+            </Glass>
 
-      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle>Confirm Deletion</DialogTitle>
-        <DialogContent><Typography>Delete {selected.size} models? This cannot be undone.</Typography></DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setDeleteOpen(false)}>Cancel</Button>
-          <Button onClick={async () => {
-            await Promise.all(Array.from(selected).map(n => fetch(`/api/models/${encodeURIComponent(n)}`, { method: 'DELETE' })));
-            setSelected(new Set()); setDeleteOpen(false); fetchModels();
-          }} variant="contained" color="error">Delete</Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+
+          </div>
+
+          {isInferenceSelection && (
+            <Glass
+              t={t}
+              style={{
+                padding: 16,
+                marginBottom: 14,
+                border:"none", 
+                boxShadow:"none",
+                background:"transparent",
+                backgroundColor:"transparent",
+                borderRadius:0,
+                backdropFilter:"none",
+              }}
+            >
+              <div style={{ fontWeight: 900, color: t.text, marginBottom: 6 }}>Selection Summary</div>
+              {selectionNames.length === 0 ? (
+                <div style={{ color: t.subtext, fontSize: 13, fontWeight: 650, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span>No selection found. Go back to select tracks.</span>
+                  <Btn  t={t} variant="outline" onClick={handleBack} style={{ height: 32, padding: "0 10px" }}>
+                    Go Back
+                  </Btn>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                  <Pill t={t} tone="primary">{selectionNames.length} track{selectionNames.length !== 1 ? "s" : ""}</Pill>
+                  <div style={{ color: t.subtext, fontSize: 12, fontWeight: 700 }}>{selectionPreview}</div>
+                  {ctx?.selectedModelName && (
+                    <Pill t={t} tone="success">Model: {ctx.selectedModelName}</Pill>
+                  )}
+                </div>
+              )}
+            </Glass>
+          )}
+
+          <Glass
+            t={t}
+            style={{
+              padding: 14,
+              marginBottom: 14,
+              border:"none", 
+              boxShadow:"none",
+              background:"transparent",
+              backgroundColor:"transparent",
+              borderRadius:0,
+              backdropFilter:"none",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              {!isInferenceSelection && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Btn t={t} variant="outline" onClick={onSelectAll} style={{ height: 44, padding: "0 14px" }}>
+                    Select All
+                  </Btn>
+                  <div
+                    style={{
+                      maxWidth: selectedCount > 0 ? 200 : 0,
+                      opacity: selectedCount > 0 ? 1 : 0,
+                      overflow: "hidden",
+                      transition: "all 180ms ease",
+                    }}
+                  >
+                    <Btn t={t} variant="outline" onClick={onClear} style={{ height: 44, padding: "0 14px" }}>
+                      Clear
+                    </Btn>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ position: "relative", flex: "1 1 360px",  }} ref={dropdownRef}>
+                <SearchInput
+                  t={t}
+                  value={searchQuery}
+                  onChange={(val) => {
+                    setSearchQuery(val);
+                    setIsDropdownOpen(true);
+                  }}
+                  placeholder="Search models..."
+                  leftIcon={<SearchIcon style={{ fontSize: 20 }} />}
+                  rightNode={
+                    <button
+                      type="button"
+                      title={isOnlineSearchEnabled ? "Disable online search" : "Enable online search"}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        toggleOnlineSearch();
+                      }}
+                      onMouseDown={(e) => e.preventDefault()}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        padding: "6px 8px",
+                        borderRadius: 12,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {isOnlineSearchEnabled ? (
+                        <CloudDownloadIcon style={{ fontSize: 20, color: t.primary }} />
+                      ) : (
+                        <CloudOffIcon style={{ fontSize: 20, color: t.subtext }} />
+                      )}
+                    </button>
+                  }
+                  onFocus={() => setIsDropdownOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowDown") {
+                      setIsDropdownOpen(true);
+                    }
+                  }}
+                  inputRef={inputRef}
+                />
+
+                {isDropdownOpen && (
+                  <div
+                    onMouseDown={(e) => e.preventDefault()}
+                    style={{
+                      position: "absolute",
+                      top: 52,
+                      left: 0,
+                      right: 0,
+                      isolation: "isolate",
+                      transform: "translateZ(0)",
+                      background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
+                      backdropFilter: "blur(22px) saturate(140%)",
+                      WebkitBackdropFilter: "blur(22px) saturate(140%)",
+                      border: `1px solid ${t.hairline}`,
+                      borderRadius: 16,
+                      boxShadow: t.shadowSoft,
+                      maxHeight: 320,
+                      overflow: "hidden",
+                      zIndex: 40,
+                    }}
+                  >
+                    <div style={{ maxHeight: 280, overflowY: "auto" }}>
+                      {!debouncedQuery && (
+                        <div style={{ padding: 12, color: t.subtext, fontSize: 12, fontWeight: 700 }}>
+                          Start typing to search online models.
+                        </div>
+                      )}
+
+                      {debouncedQuery && !isOnlineSearchEnabled && (
+                        <div style={{ padding: 12, color: t.subtext, fontSize: 12, fontWeight: 700 }}>
+                          Online search is disabled. Click the cloud icon to enable it.
+                        </div>
+                      )}
+
+                      {debouncedQuery && isOnlineSearchEnabled && isSearching && (
+                        <div style={{ padding: 12, color: t.subtext, fontSize: 12, fontWeight: 700 }}>
+                          Searching…
+                        </div>
+                      )}
+
+                      {debouncedQuery && isOnlineSearchEnabled && searchError && (
+                        <div style={{ padding: 12, color: t.danger, fontSize: 12, fontWeight: 700 }}>
+                          {searchError}
+                        </div>
+                      )}
+
+                      {debouncedQuery &&
+                        isOnlineSearchEnabled &&
+                        !isSearching &&
+                        !searchError &&
+                        onlineResults.length === 0 && (
+                          <div style={{ padding: 12, color: t.subtext, fontSize: 12, fontWeight: 700 }}>
+                            No results found.
+                          </div>
+                        )}
+
+                      {isOnlineSearchEnabled &&
+                        onlineResults.map((model) => {
+                          const modelId = model.modelId || model.name;
+                          const normalized = normalizeId(modelId);
+                          const isInstalled = installedIds.has(normalized);
+                          const job = Object.values(downloadJobs).find(
+                            (j) => normalizeId(j.modelId || j.modelName) === normalized
+                          );
+                          const isDownloading = job && job.status !== "completed" && job.status !== "failed";
+
+                          return (
+                            <div
+                              key={modelId}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 12,
+                                padding: "10px 12px",
+                                borderBottom: `1px solid ${t.hairline}`,
+                                backdropFilter: `blur(22px) saturate(140%)`,
+                                WebkitBackdropFilter: `blur(22px) saturate(140%)`,
+                              }}
+                            >
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ color: t.text, fontWeight: 800, fontSize: 13 }}>
+                                  {model.name}
+                                </div>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                                  {model.author && <Pill t={t} tone="neutral">{model.author}</Pill>}
+                                  {model.size_mb && <Pill t={t} tone="neutral">{model.size_mb} MB</Pill>}
+                                  {Array.isArray(model.tags) &&
+                                    model.tags.map((tag) => (
+                                      <Pill t={t} key={tag} tone="primary">
+                                        {tag}
+                                      </Pill>
+                                    ))}
+                                  {isInstalled && <Pill t={t} tone="success">Installed</Pill>}
+                                  {isDownloading && <Pill t={t} tone="warning">Downloading</Pill>}
+                                </div>
+                              </div>
+
+                              <Btn
+                                t={t}
+                                variant="primary"
+                                disabled={isInstalled || isDownloading}
+                                onClick={() => {
+                                  setActiveDownloadModel(model);
+                                  setCustomModelName("");
+                                  setDownloadError("");
+                                  setDownloadDialogOpen(true);
+                                }}
+                                style={{ height: 36, padding: "0 12px" }}
+                              >
+                                {isInstalled ? "Installed" : "Download"}
+                              </Btn>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    {debouncedQuery && isOnlineSearchEnabled && onlineTotalPages > onlinePage && (
+                      <div>
+                        <Btn
+                          t={t}
+                          variant="outline"
+                          onClick={() => {
+                            const nextPage = onlinePage + 1;
+                            setOnlinePage(nextPage);
+                            performOnlineSearch(debouncedQuery, nextPage, true);
+                          }}
+                          style={{ width: "100%", borderRadius:0 }}
+                        >
+                          Load more
+                        </Btn>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {!isInferenceSelection && (
+                <div style={{ position: "relative" }}>
+                  <IconBtn
+                    t={t}
+                    title="Delete selected"
+                    onClick={onDelete}
+                    disabled={selectedCount === 0}
+                    style={{
+                      borderColor: selectedCount > 0 ? "rgba(255,59,48,0.45)" : t.hairline,
+                      background:
+                        selectedCount > 0
+                          ? `linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))`
+                          : `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+                      color: selectedCount > 0 ? "white" : t.subtext,
+                    }}
+                  >
+                    <DeleteIcon style={{ fontSize: 20 }} />
+                  </IconBtn>
+
+                  {selectedCount > 0 && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: -6,
+                        right: -6,
+                        width: 22,
+                        height: 22,
+                        borderRadius: 999,
+                        background: t.danger,
+                        color: "white",
+                        display: "grid",
+                        placeItems: "center",
+                        fontSize: 12,
+                        fontWeight: 950,
+                        border: `2px solid ${t.isDark ? "rgba(18,18,20,0.8)" : "rgba(255,255,255,0.85)"}`,
+                        boxShadow: t.shadowSoft,
+                      }}
+                    >
+                      {selectedCount}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </Glass>
+        </div>
+
+        {/* True grid: multiple per row */}
+
+        {loading ? (
+
+
+
+      <div style={{ padding: "90px 16px", textAlign: "center", color: t.text }}>
+        <div style={{ display: "inline-flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+          <div
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 999,
+              border: `3px solid ${t.isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.18)"}`,
+              borderTopColor: t.primary,
+              animation: "spin 0.9s linear infinite",
+            }}
+          />
+          <div style={{ color: t.subtext, fontWeight: 750 }}>Loading models...</div>
+        </div>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </div>
+        ):
+        (
+          <div className="vf-grid" style={{ padding: "0 24px" }}>
+            {filteredLocalModels.map((model, i) => {
+              const isSelected = selected.has(model.name);
+              const downloadPct = typeof model.downloadProgress === "number" ? model.downloadProgress : null;
+  
+              const statusTone = isInferenceSelection
+                ? "primary"
+                : model.status === "completed"
+                ? "success"
+                : model.status === "failed" || model.status === "error"
+                ? "danger"
+                : "warning";
+  
+              const statusLabel = isInferenceSelection
+                ? "SELECT MODEL"
+                : model.status === "downloading"
+                ? "DOWNLOADING"
+                : model.status === "failed" || model.status === "error"
+                ? "ERROR"
+                : "READY";
+  
+              return (
+                <div
+                  key={model.modelId || model.name || i}
+                  className="vf-card"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleCardClick(model)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCardClick(model)}
+                  style={{
+                    borderRadius: t.radiusLg,
+                    border: `1px solid ${isSelected ? "rgba(10,132,255,0.45)" : t.hairline}`,
+                    background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+                    boxShadow: t.shadowSoft,
+                    padding: 16,
+                    cursor: model.status === "downloading" ? "default" : "pointer",
+                    position: "relative",
+                    minHeight: 204,
+                    display: "flex",
+                    flexDirection: "column",
+                    transition: "transform 160ms ease, box-shadow 160ms ease, background 160ms ease",
+                    outline: "none",
+                  }}
+                >
+                  {/* Progress overlay */}
+                  {downloadPct !== null && model.status === "downloading" && (
+                    <div style={{ position: "absolute", top: 10, left: 12, right: 12 }}>
+                      <ProgressBar value={downloadPct} />
+                    </div>
+                  )}
+  
+                  {/* Title */}
+                  <div style={{ paddingRight: model.isOnline ? 64 : 0 }}>
+                    <div
+                      style={{
+                        color: t.text,
+                        fontWeight: 950,
+                        letterSpacing: -0.35,
+                        fontSize: 16,
+                        lineHeight: 1.15,
+                        marginBottom: 6,
+                      }}
+                      title={model.name}
+                    >
+                      {normaliseModelName(model.name)}
+                    </div>
+  
+                    <div style={{ color: t.subtext, fontSize: 12, fontWeight: 700 }}>
+                      {model.created ? new Date(model.created).toLocaleDateString() : "Local"}
+                    </div>
+                  </div>
+  
+                  {/* Stats */}
+                  <div style={{ marginTop: "auto" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12, marginBottom: 12 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {model.checkpoints?.length > 0 && <Pill t={t} tone="primary">{model.checkpoints.length} CP</Pill>}
+                    {model.sampleRate && <Pill t={t} tone="neutral">{model.sampleRate}hz</Pill>}
+                  </div>
+                  <Pill t={t} tone="neutral">{model.size_mb || "N/A"} MB</Pill>
+                </div>
+  
+                    {model.checkpoints?.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ color: t.subtext, fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
+                          Latest Checkpoints:
+                        </div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {model.checkpoints.slice(0, 3).map((cp, idx) => (
+                            <Pill
+                              key={idx} t={t}
+                              tone="neutral"
+                              style={{
+                                background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+                              }}
+                            >
+                              {cp.epochs}e
+                            </Pill>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+  
+                    <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 8 }}>
+                      <Pill
+                        tone={statusTone}
+                        t={t}
+                        style={{
+                          padding: "10px 14px",
+                          borderRadius: 14,
+                        }}
+                      >
+                        {statusLabel}
+                      </Pill>
+                      {model.status === "failed" && model.downloadError && (
+                        <span style={{ fontSize: 11, color: t.danger }}>{model.downloadError}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          ) }
+    
+        {/* Online results pagination is handled inside the dropdown */}
+
+        {/* Checkpoint modal */}
+        <Modal
+          t={t}
+          open={checkpointDialogOpen}
+          onClose={() => setCheckpointDialogOpen(false)}
+          title="Choose Checkpoint"
+          footer={
+            <>
+              <Btn t={t} variant="outline" onClick={() => setCheckpointDialogOpen(false)}>
+                Cancel
+              </Btn>
+              <Btn
+                t={t}
+                variant="primary"
+                disabled={!selectedCheckpoint}
+                onClick={() => onModelSelected({ ...targetInferenceModel, selectedCheckpoint }, selectedTracks)}
+              >
+                Use for Inference
+              </Btn>
+            </>
+          }
+        >
+          <div style={{ color: t.subtext, fontSize: 13, fontWeight: 700, marginBottom: 14 }}>
+            Select training epoch for{" "}
+            <span style={{ color: t.text, fontWeight: 950 }}>{targetInferenceModel?.name}</span>
+          </div>
+
+          <div style={{ display: "grid", gap: 10 }}>
+            {targetInferenceModel?.checkpoints?.map((cp) => {
+              const active = selectedCheckpoint?.filename === cp.filename;
+              return (
+                <button
+                  key={cp.filename}
+                  type="button"
+                  onClick={() => setSelectedCheckpoint(cp)}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    borderRadius: t.radiusMd,
+                    border: `1px solid ${active ? "rgba(10,132,255,0.50)" : t.hairline}`,
+                    background: active
+                      ? `linear-gradient(135deg, ${t.primaryWash}, ${t.primaryWash2})`
+                      : `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+                    padding: 12,
+                    cursor: "pointer",
+                    color: t.text,
+                    boxShadow: active ? t.shadowSoft : "none",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ fontWeight: 950, letterSpacing: -0.2, fontSize: 14 }}>
+                      {cp.epochs} Epochs
+                    </div>
+                    {cp.isBest && (
+                      <Pill t={t} tone="success" style={{ fontSize: 10, padding: "5px 9px" }}>
+                        BEST
+                      </Pill>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </Modal>
+
+        {/* Download modal */}
+        <Modal
+          t={t}
+          open={downloadDialogOpen}
+          onClose={() => setDownloadDialogOpen(false)}
+          title="Name your model"
+          footer={
+            <>
+              <Btn t={t} variant="outline" onClick={() => setDownloadDialogOpen(false)}>
+                Cancel
+              </Btn>
+              <Btn t={t} variant="primary" onClick={executeDownload} style={{ padding: "10px 18px" }}>
+                Confirm
+              </Btn>
+            </>
+          }
+        >
+          <div style={{ display: "grid", gap: 10 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                height: 44,
+                padding: "0 12px",
+                borderRadius: 16,
+                border: `1px solid ${downloadError ? "rgba(255,59,48,0.55)" : t.hairline}`,
+                background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+                boxShadow: t.shadowSoft,
+              }}
+            >
+              <span style={{ fontWeight: 950, color: t.subtext }}>Aa</span>
+              <input
+                autoFocus
+                value={customModelName}
+                onChange={(e) => {
+                  setCustomModelName(e.target.value);
+                  setDownloadError("");
+                }}
+                placeholder="e.g. My_Voice_V1"
+                style={{
+                  width: "100%",
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                  color: t.text,
+                  fontSize: 14,
+                  fontWeight: 650,
+                }}
+              />
+            </div>
+
+            {downloadError && (
+              <div style={{ color: t.danger, fontWeight: 850, fontSize: 12 }}>{downloadError}</div>
+            )}
+          </div>
+        </Modal>
+
+        {/* Delete modal */}
+        <Modal
+          t={t}
+          open={deleteOpen}
+          onClose={() => setDeleteOpen(false)}
+          title="Confirm Deletion"
+          footer={
+            <>
+              <Btn t={t} variant="outline" onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </Btn>
+              <Btn
+                variant="danger"
+                t={t}
+                onClick={async () => {
+                  await Promise.all(
+                    Array.from(selected).map((n) =>
+                      fetch(`/api/models/${encodeURIComponent(n)}`, { method: "DELETE" })
+                    )
+                  );
+                  setSelected(new Set());
+                  setDeleteOpen(false);
+                  fetchModels();
+                }}
+              >
+                Delete
+              </Btn>
+            </>
+          }
+        >
+          <div style={{ color: t.text, fontWeight: 800 }}>
+            Delete {selected.size} models?{" "}
+            <span style={{ color: t.subtext, fontWeight: 700 }}>This cannot be undone.</span>
+          </div>
+        </Modal>
+
+        <style>{`
+          @keyframes spin{to{transform:rotate(360deg)}}
+
+          /* True grid (multiple per row) */
+          .vf-grid{
+            display:grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap:14px;
+          }
+          .vf-card{
+            grid-column: span 12;
+          }
+          @media (min-width: 600px){
+            .vf-card{ grid-column: span 6; }
+          }
+          @media (min-width: 900px){
+            .vf-card{ grid-column: span 4; }
+          }
+          @media (min-width: 1200px){
+            .vf-card{ grid-column: span 3; }
+          }
+
+          /* Hover + focus */
+          .vf-card:hover{
+            transform: translateY(-2px);
+            box-shadow: ${t.shadow};
+            background: linear-gradient(180deg, ${t.hoverA}, ${t.hoverB});
+          }
+          .vf-card:focus-visible{
+            outline: 2px solid rgba(10,132,255,0.55);
+            outline-offset: 2px;
+          }
+        `}</style>
+    </>
+   
   );
 }
 

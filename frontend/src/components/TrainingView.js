@@ -244,8 +244,14 @@ function TrainingView({ selectedVocals, onBack }) {
       setTrainingLogs((prev) => [...prev, "Downloading audio files..."]);
 
       // Extract vocal files from selected tracks
+      const toSafeName = (name) =>
+        (name || "track")
+          .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+          .replace(/\s+/g, "_")
+          .slice(0, 80);
+
       const allVocalFiles = selectedVocals.map(track => {
-        const baseFilename = track.vocal;
+        const baseFilename = track.displayName || track.originalName || track.vocal;
         return {
           filename: baseFilename,
           url: track.vocalUrl,
@@ -275,7 +281,7 @@ function TrainingView({ selectedVocals, onBack }) {
             const blob = await response.blob();
 
             // Create a unique filename with speaker prefix
-            const baseFilename = vocalFile.filename.replace('_vocals.wav', '');
+            const baseFilename = toSafeName(vocalFile.filename);
             const filename = `speaker01_${index + 1}_${baseFilename}_${vocalFile.type}.wav`;
 
             return new File([blob], filename, { type: "audio/wav" });

@@ -30,7 +30,7 @@ import json
 import requests
 from bs4 import BeautifulSoup
 from pathlib import Path
-from flask import Flask, request, jsonify, send_file, send_from_directory, Response, render_template, redirect, url_for
+from flask import Flask, request, jsonify, send_file, send_from_directory, Response, render_template, redirect, url_for, after_this_request
 from flask_cors import CORS
 from clean_vocals import (
     clean_directories,
@@ -68,6 +68,25 @@ sys.path.append(applio_path)
 rvc_path = os.path.join(applio_path, "rvc")
 sys.path.append(rvc_path)
 
+def _extract_hf_model_id(url: str) -> str:
+    if not url:
+        return ""
+    match = re.search(r'huggingface\.co/([^/\s?#]+/[^/\s?#]+)', url)
+    return match.group(1) if match else ""
+
+def _normalize_tag_list(title: str) -> list[str]:
+    tags = []
+    if not title:
+        return tags
+    t = title.lower()
+    if "rmvpe" in t:
+        tags.append("rmvpe")
+    if "v2" in t:
+        tags.append("v2")
+    if "v1" in t and "v2" not in t:
+        tags.append("v1")
+    return tags
+
 # ===============================
 # CENTRALIZED PATH MANAGEMENT
 # ===============================
@@ -79,6 +98,7 @@ class PathManager:
         # Base directories
         self.BASE_DIR = Path(__file__).parent
         self.APPLIO_DIR = self.BASE_DIR / "applio"
+        self.METADATA_DIR = self.BASE_DIR / "data" / "metadata"
 
         # Import paths from Config
         self.INPUT_DIR = Path(Config.INPUT_DIR)
@@ -109,6 +129,7 @@ class PathManager:
 
         # Inference-specific directories
         self.INFERENCE_DIR = self.BASE_DIR / "data" / "singing" / "inference"
+        self.INFERENCE_RUNS_DIR = self.INFERENCE_DIR / "runs"
 
     def ensure_directories_exist(self):
         """Ensure all required directories exist"""
@@ -131,6 +152,8 @@ class PathManager:
             self.APPLIO_MODELS_DIR,
             self.APPLIO_DATASET_DIR,
             self.INFERENCE_DIR,
+            self.INFERENCE_RUNS_DIR,
+            self.METADATA_DIR,
         ]
 
         for directory in directories:
@@ -170,6 +193,237 @@ class PathManager:
 # Initialize path manager
 paths = PathManager()
 paths.ensure_directories_exist()
+
+# ===============================
+# FILENAME + METADATA HELPERS
+# ===============================
+
+UPLOAD_METADATA_PATH = paths.METADATA_DIR / "uploads.json"
+ALLOWED_RUN_REACTIONS = {"none", "like", "dislike", "favorite"}
+
+def sanitize_filename_for_display(filename: str) -> str:
+    """Sanitize filename for UI display without breaking unicode."""
+    if not filename:
+        return "unnamed_file"
+    base = Path(filename).name
+    cleaned = re.sub(r"[\x00-\x1f\x7f]", "", base).strip()
+    return cleaned or "unnamed_file"
+
+def make_storage_name(original_name: str, file_id: str = None) -> tuple[str, str]:
+    """Create a safe storage name using a UUID plus the original extension."""
+    file_id = file_id or uuid.uuid4().hex
+    ext = Path(original_name).suffix.lower()
+    if not re.match(r"^\.[a-z0-9]{1,10}$", ext):
+        ext = ""
+    return f"{file_id}{ext}", file_id
+
+def make_run_id() -> str:
+    return uuid.uuid4().hex
+
+def _load_metadata_file(path: Path) -> dict:
+    if not path.exists():
+        return {"files": {}}
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if isinstance(data, dict) and "files" in data:
+            return data
+    except Exception:
+        pass
+    return {"files": {}}
+
+def _save_metadata_file(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(".tmp")
+    with tmp_path.open("w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2, sort_keys=True)
+    tmp_path.replace(path)
+
+def register_upload_metadata(original_name: str, stored_name: str, file_id: str) -> dict:
+    display_name = sanitize_filename_for_display(original_name)
+    created_at = datetime.now().isoformat()
+    record = {
+        "fileId": file_id,
+        "originalName": Path(original_name).name,
+        "storedName": stored_name,
+        "safeDisplayName": display_name,
+        "createdAt": created_at,
+    }
+    with processing_metadata_lock:
+        data = _load_metadata_file(UPLOAD_METADATA_PATH)
+        data.setdefault("files", {})[file_id] = record
+        _save_metadata_file(UPLOAD_METADATA_PATH, data)
+    return record
+
+def get_upload_metadata(file_id: str):
+    data = _load_metadata_file(UPLOAD_METADATA_PATH)
+    return data.get("files", {}).get(file_id)
+
+def list_upload_metadata() -> list[dict]:
+    data = _load_metadata_file(UPLOAD_METADATA_PATH)
+    return list(data.get("files", {}).values())
+
+processing_metadata_lock = threading.Lock()
+
+def _processing_state_rank(state: str | None) -> int:
+    ranks = {
+        "queued": 0,
+        "uploading": 1,
+        "processing": 2,
+        "ready": 3,
+        "error": 3,
+    }
+    return ranks.get(str(state or "").lower(), 2)
+
+def _parse_iso_timestamp(value: str | None) -> float | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value).timestamp()
+    except Exception:
+        return None
+
+def _should_apply_processing_update(current: dict | None, incoming: dict) -> bool:
+    if not current:
+        return True
+    curr_state = (current.get("state") or "ready").lower()
+    next_state = (incoming.get("state") or curr_state).lower()
+
+    # Do not allow regression from terminal states
+    if curr_state in {"ready", "error"} and next_state != curr_state:
+        return False
+
+    curr_rank = _processing_state_rank(curr_state)
+    next_rank = _processing_state_rank(next_state)
+    if next_rank < curr_rank:
+        return False
+
+    if next_rank == curr_rank:
+        curr_ts = _parse_iso_timestamp(current.get("updatedAt"))
+        next_ts = _parse_iso_timestamp(incoming.get("updatedAt"))
+        if curr_ts is not None and next_ts is not None and next_ts <= curr_ts:
+            return False
+
+    return True
+
+def _normalize_progress_value(progress):
+    if isinstance(progress, float):
+        if 0 <= progress <= 1:
+            return int(progress * 100)
+        return int(progress)
+    if isinstance(progress, int):
+        return progress
+    if isinstance(progress, str) and progress.isdigit():
+        return int(progress)
+    return None
+
+def update_track_processing(file_id: str, *, state: str | None = None, step: str | None = None,
+                            message: str | None = None, progress=None, extra: dict | None = None) -> dict | None:
+    now_iso = datetime.now().isoformat()
+    with processing_metadata_lock:
+        data = _load_metadata_file(UPLOAD_METADATA_PATH)
+        record = data.get("files", {}).get(file_id)
+        if not record:
+            return None
+        current = record.get("processing") if isinstance(record.get("processing"), dict) else {}
+        next_processing = dict(current)
+
+        if state:
+            next_processing["state"] = state
+        if step is not None:
+            next_processing["step"] = step
+        if message is not None:
+            next_processing["message"] = message
+        if progress is not None:
+            normalized = _normalize_progress_value(progress)
+            if normalized is not None:
+                next_processing["progress"] = normalized
+        if extra:
+            next_processing.update(extra)
+
+        if "state" in next_processing and not next_processing.get("step"):
+            next_processing["step"] = next_processing["state"]
+        if "state" in next_processing and next_processing.get("message") is None:
+            next_processing["message"] = next_processing.get("step") or next_processing["state"]
+
+        next_processing["updatedAt"] = now_iso
+
+        if next_processing == current:
+            return current
+        if not _should_apply_processing_update(current, next_processing):
+            return current
+
+        record["processing"] = next_processing
+        data.setdefault("files", {})[file_id] = record
+        _save_metadata_file(UPLOAD_METADATA_PATH, data)
+        return next_processing
+
+def _collect_processing_file_ids() -> list[str]:
+    ids = []
+    for record in list_upload_metadata():
+        stored = record.get("storedName")
+        file_id = record.get("fileId")
+        if not stored or not file_id:
+            continue
+        if (paths.INPUT_DIR / stored).exists():
+            ids.append(file_id)
+    return ids
+
+def _get_active_processing_job():
+    candidates = []
+    for job in active_jobs.values():
+        cfg = job.get("config")
+        if not isinstance(cfg, dict):
+            continue
+        if not all(k in cfg for k in ("segment", "process", "export", "clean")):
+            continue
+        status = job.get("status")
+        if status in {"starting", "processing"}:
+            candidates.append(job)
+    if not candidates:
+        return None
+    return max(candidates, key=lambda j: j.get("started_at", 0))
+
+def get_upload_base_name(file_id: str):
+    record = get_upload_metadata(file_id)
+    if not record:
+        return None
+    return Path(record["storedName"]).stem
+
+def save_inference_run_metadata(run_id: str, payload: dict) -> None:
+    run_dir = paths.INFERENCE_RUNS_DIR / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    run_file = run_dir / "run.json"
+    with run_file.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+
+def load_inference_run_metadata(run_id: str):
+    run_file = paths.INFERENCE_RUNS_DIR / run_id / "run.json"
+    if not run_file.exists():
+        return None
+    try:
+        with run_file.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+            if isinstance(data, dict):
+                data.pop("isFavorite", None)
+                data.setdefault("reaction", "none")
+                data.setdefault("modelCheckpoint", None)
+            return data
+    except Exception:
+        return None
+
+def list_inference_runs() -> list[dict]:
+    results = []
+    if not paths.INFERENCE_RUNS_DIR.exists():
+        return results
+    for run_dir in sorted(paths.INFERENCE_RUNS_DIR.glob("*")):
+        if not run_dir.is_dir():
+            continue
+        run_id = run_dir.name
+        run_meta = load_inference_run_metadata(run_id)
+        if run_meta:
+            results.append(run_meta)
+    return results
 
 # Now try importing the core functions
 try:
@@ -222,6 +476,7 @@ logger = logging.getLogger(__name__)
 
 # Store active jobs
 active_jobs = {}
+download_jobs = {}
 
 # Paths are now managed by PathManager (paths object above)
 
@@ -241,15 +496,19 @@ def upload_files():
         if not files:
             return jsonify({"error": "No files provided"}), 400
 
-        names = []
+        records = []
         for f in files:
-            name = secure_filename(f.filename)
-            path = paths.INPUT_DIR / name
+            stored_name, file_id = make_storage_name(f.filename)
+            path = paths.INPUT_DIR / stored_name
             f.save(path)
-            names.append(name)
+            record = register_upload_metadata(f.filename, stored_name, file_id)
+            records.append(record)
             print(f"Saved file: {path}")
 
-        return jsonify({"message": f"Successfully uploaded {len(names)} files", "files": names})
+        return jsonify({
+            "message": f"Successfully uploaded {len(records)} files",
+            "files": records,
+        })
 
     except Exception as e:
         print(f"Upload error: {e}")
@@ -259,14 +518,27 @@ def upload_files():
 @app.route('/api/process', methods=['POST'])
 def process_files():
     d = request.json or {}
-    cfg = {k: d.get(k, v) for k, v in 
-          {'segment':False,'process':True,'export':False,'clean':False}.items()}
+    cfg = {k: d.get(k, v) for k, v in
+          {'segment': False, 'process': True, 'export': False, 'clean': False}.items()}
+    cfg["export"] = False
+    # When client sends fileIds, only process those (e.g. the batch just uploaded). Otherwise process all.
+    requested_ids = d.get("fileIds")
+    file_ids = requested_ids if requested_ids is not None else _collect_processing_file_ids()
 
     job_id = str(uuid.uuid4())
     active_jobs[job_id] = {
         'id': job_id, 'status': 'starting', 'progress': 0,
-        'config': cfg, 'started_at': time.time()
+        'config': cfg, 'started_at': time.time(),
+        'fileIds': file_ids,
     }
+    for fid in file_ids or []:
+        update_track_processing(
+            fid,
+            state="queued",
+            step="queued",
+            message="Queued for processing",
+            progress=0,
+        )
 
     time.sleep(1.0)
     threading.Thread(
@@ -281,8 +553,14 @@ def collect_output_files(segment_audio, process_audio):
     return {
         'raw_vocals': [f.name for f in paths.UVR_RAW_DIR.glob("*_vocals.wav")],
         'processed_vocals': [f.name for f in paths.UVR_PROCESSED_DIR.glob("*_vocals.wav")] if process_audio else [],
-        'exports': [f.name for f in paths.EXPORT_DIR.glob("*.zip")]
     }
+
+
+def _sanitize_download_name(value, fallback):
+    name = os.path.basename(str(value or ""))
+    name = re.sub(r'[\\/:*?"<>|]+', "_", name)
+    name = re.sub(r'_+', "_", name).strip("._ ")
+    return name or fallback
 @app.route('/api/job/<job_id>')
 def get_job_status(job_id):
     return (jsonify(active_jobs[job_id]), 200) if job_id in active_jobs else (jsonify({'error':'Job not found'}), 404)
@@ -293,10 +571,13 @@ def download_file(file_type, filename):
         print(f"Download request - Type: {file_type}, Filename: {filename}")
         filename = os.path.basename(urllib.parse.unquote(filename))
         print(f"Sanitized filename: {filename}")
+        requested_download_name = request.args.get("downloadName")
 
         dir_map = {
-            'raw_vocals': paths.UVR_RAW_DIR, 'processed_vocals': paths.UVR_PROCESSED_DIR,
-            'exports': paths.EXPORT_DIR, 'instrumental': paths.INSTRUMENTAL_DIR
+            'raw_vocals': paths.UVR_RAW_DIR,
+            'processed_vocals': paths.UVR_PROCESSED_DIR,
+            'exports': paths.EXPORT_DIR,
+            'instrumental': paths.INSTRUMENTAL_DIR
         }
         if file_type not in dir_map:
             print(f"Invalid file type: {file_type}")
@@ -313,6 +594,17 @@ def download_file(file_type, filename):
         print(f"Files in directory ({len(existing)}): {existing[:5]}...")
 
         file_path = target_dir / filename
+        file_id = filename
+        if file_type in {'raw_vocals', 'processed_vocals', 'instrumental'}:
+            base_name = get_upload_base_name(file_id)
+            if not base_name:
+                return jsonify({'error': f'Unknown fileId: {file_id}'}), 404
+            if file_type == 'instrumental':
+                filename = f"{base_name}_instrumental.wav"
+            else:
+                filename = f"{base_name}_vocals.wav"
+            file_path = target_dir / filename
+
         print(f"Full file path: {file_path}")
 
         if not file_path.exists():
@@ -325,7 +617,8 @@ def download_file(file_type, filename):
             }), 404
 
         print(f"File found, sending: {file_path}")
-        return send_file(file_path, mimetype="audio/wav", as_attachment=True, download_name=filename)
+        download_name = _sanitize_download_name(requested_download_name, filename)
+        return send_file(file_path, mimetype="audio/wav", as_attachment=True, download_name=download_name)
 
     except Exception as e:
         print(f"Error in download_file: {e}")
@@ -395,26 +688,70 @@ def clean_all():
 def get_available_files():
     try:
         if not paths.UVR_PROCESSED_DIR.exists():
-            return jsonify({'files': [], 'message': 'No processed files available'})
+            paths.UVR_PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
         paths.INSTRUMENTAL_DIR.mkdir(parents=True, exist_ok=True)
         pairs = []
-        for v in paths.UVR_PROCESSED_DIR.glob('*_vocals.wav'):
-            base = v.stem.replace('_vocals', '')
-            inst = paths.INSTRUMENTAL_DIR / f"{base}_instrumental.wav"
+        for record in list_upload_metadata():
+            base_name = Path(record["storedName"]).stem
+            processed_vocals = paths.UVR_PROCESSED_DIR / f"{base_name}_vocals.wav"
+            raw_vocals = paths.UVR_RAW_DIR / f"{base_name}_vocals.wav"
+            instrumental = paths.INSTRUMENTAL_DIR / f"{base_name}_instrumental.wav"
+
+            processing = record.get("processing") if isinstance(record.get("processing"), dict) else None
+            has_outputs = processed_vocals.exists() or raw_vocals.exists() or instrumental.exists()
+            processing_state = (processing or {}).get("state")
+            is_processing = processing_state not in (None, "ready", "error")
+            if not has_outputs and not is_processing:
+                continue
+            processed_timestamp = None
+            if has_outputs:
+                processed_timestamp = datetime.fromtimestamp(
+                    max(
+                        (processed_vocals.stat().st_mtime if processed_vocals.exists() else 0),
+                        (raw_vocals.stat().st_mtime if raw_vocals.exists() else 0),
+                        (instrumental.stat().st_mtime if instrumental.exists() else 0),
+                    )
+                ).strftime('%Y-%m-%d %H:%M:%S')
+
             pairs.append({
-                'name': base,
-                'vocalUrl': f"/api/download/processed_vocals/{v.name}",
-                'vocalPath': v.name,
-                'dateProcessed': datetime.fromtimestamp(v.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                'instrumentalUrl': f"/api/download/instrumental/{inst.name}" if inst.exists() else None,
-                'instrumentalPath': inst.name if inst.exists() else None
+                "fileId": record["fileId"],
+                "originalName": record["originalName"],
+                "safeDisplayName": record["safeDisplayName"],
+                "storedName": record["storedName"],
+                "createdAt": record["createdAt"],
+                "vocalUrlProcessed": f"/api/download/processed_vocals/{record['fileId']}" if processed_vocals.exists() else None,
+                "vocalUrlRaw": f"/api/download/raw_vocals/{record['fileId']}" if raw_vocals.exists() else None,
+                "instrumentalUrl": f"/api/download/instrumental/{record['fileId']}" if instrumental.exists() else None,
+                "vocalPathProcessed": processed_vocals.name if processed_vocals.exists() else None,
+                "vocalPathRaw": raw_vocals.name if raw_vocals.exists() else None,
+                "instrumentalPath": instrumental.name if instrumental.exists() else None,
+                "dateProcessed": processed_timestamp,
+                "processing": processing,
             })
 
         return jsonify({'files': pairs, 'message': f'Found {len(pairs)} processed files'})
     except Exception as e:
         print(f"Error getting available files: {e}"); traceback.print_exc()
         return jsonify({'files': [], 'error': str(e)})
+
+
+@app.route('/api/tracks/status', methods=['GET'])
+def get_track_statuses():
+    try:
+        raw_ids = request.args.get("ids", "")
+        ids = [v.strip() for v in raw_ids.split(",") if v.strip()]
+        data = _load_metadata_file(UPLOAD_METADATA_PATH)
+        files = data.get("files", {})
+        results = []
+        for track_id in ids:
+            record = files.get(track_id)
+            processing = record.get("processing") if isinstance(record, dict) else None
+            results.append({"trackId": track_id, "processing": processing})
+        return jsonify(results)
+    except Exception as e:
+        print(f"Error getting track statuses: {e}"); traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/delete-files', methods=['POST'])
@@ -427,11 +764,12 @@ def delete_files():
 
         results = []
         print(f"Deleting files for {len(fns)} tracks...")
+        to_remove = []
 
         for fn in fns:
-            base = fn[:-11] if fn.endswith('_vocals.wav') else fn[:-17] if fn.endswith('_instrumental.wav') else fn.replace('.wav','')
+            base = get_upload_base_name(fn)
             if not base:
-                results.append({"track": None, "deleted": [], "failed": [{"filename": fn, "error": "Could not determine base name"}]})
+                results.append({"track": None, "deleted": [], "failed": [{"filename": fn, "error": "Unknown fileId"}]})
                 continue
 
             print(f"Processing track: {base}")
@@ -451,6 +789,14 @@ def delete_files():
 
             if deleted or failed:
                 results.append({"track": base, "deleted": deleted, "failed": failed})
+                to_remove.append(fn)
+
+        if to_remove:
+            with processing_metadata_lock:
+                data = _load_metadata_file(UPLOAD_METADATA_PATH)
+                for fn in to_remove:
+                    data.get("files", {}).pop(fn, None)
+                _save_metadata_file(UPLOAD_METADATA_PATH, data)
 
         return jsonify({
             "message": f"Processed {len(fns)} tracks",
@@ -473,84 +819,125 @@ def prepare_processing():
         print(f"Error preparing for processing: {e}")
         return jsonify({"error": str(e)}), 500
 
-def get_progress():
-    last = None
+def get_progress_events():
+    events = []
     try:
-        while True: last = progress_queue.get_nowait()
+        while True:
+            events.append(progress_queue.get_nowait())
     except queue.Empty:
-        return last
+        return events
 
 def process_audio_files_thread(job_id, segment, process, export, clean):
-    job = active_jobs[job_id]; job.update(status='processing', steps=[])
+    job = active_jobs[job_id]
+    job.update(status='processing', steps=[])
+    ordered_file_ids = []
+
     def monitor():
-        while job['status'] == 'processing':
-            p = get_progress()
-            if p:
-                if isinstance(p, dict):
-                    fp = p.get('file_progress', job.get('file_progress', 0))
-                    fp = int(fp * 100) if isinstance(fp, float) and 0 <= fp <= 1 else fp
-                    job.update(
-                        progress=p.get('progress', job.get('progress', 0)),
-                        file_progress=fp,
-                        current_file=p.get('current_file', job.get('current_file', 0)),
-                        total_files=p.get('total_files', job.get('total_files', 0)),
-                        status_message=p.get('message', job.get('status_message', ''))
+        def handle_progress_event(p):
+            if isinstance(p, dict):
+                fp = p.get('file_progress', job.get('file_progress', 0))
+                fp = int(fp * 100) if isinstance(fp, float) and 0 <= fp <= 1 else fp
+                current_file = p.get('current_file', job.get('current_file', 0))
+                total_files = p.get('total_files', job.get('total_files', 0))
+                job.update(
+                    progress=p.get('progress', job.get('progress', 0)),
+                    file_progress=fp,
+                    current_file=current_file,
+                    total_files=total_files,
+                    status_message=p.get('message', job.get('status_message', ''))
+                )
+                print(f"Job progress: {job['progress']}%, File progress: {fp}%, File: {job['current_file']}/{job['total_files']}")
+                msg = p.get('message')
+                if msg and (not job['steps'] or job['steps'][-1]['message'] != msg):
+                    if p.get('file_progress') is not None and not str(msg).endswith('%'):
+                        sp = int(p['file_progress'] * 100) if isinstance(p['file_progress'], float) else p['file_progress']
+                        msg = f"{msg} ({sp}%)"
+                    job['steps'].append({'message': msg, 'progress': fp, 'time': time.time()})
+
+                file_id = p.get("file_id")
+                file_index = current_file
+                if not file_id:
+                    if isinstance(file_index, str) and file_index.isdigit():
+                        file_index = int(file_index)
+                    if isinstance(file_index, int) and 1 <= file_index <= len(ordered_file_ids):
+                        file_id = ordered_file_ids[file_index - 1]
+                if file_id:
+                    message = p.get('message') or job.get('status_message') or "Processing..."
+                    raw_progress = p.get('file_progress', p.get('progress', 0))
+                    progress_pct = _normalize_progress_value(raw_progress)
+                    normalized_message = str(message)
+                    msg_lower = normalized_message.lower()
+                    if normalized_message.startswith("[ERROR]"):
+                        state = "error"
+                    elif (progress_pct is not None and progress_pct >= 100) or msg_lower.startswith("completed") or msg_lower.startswith("processing complete"):
+                        state = "ready"
+                    else:
+                        state = "processing"
+
+                    update_track_processing(
+                        file_id,
+                        state=state,
+                        step=state,
+                        message=normalized_message,
+                        progress=progress_pct,
                     )
-                    print(f"Job progress: {job['progress']}%, File progress: {fp}%, File: {job['current_file']}/{job['total_files']}")
-                    msg = p.get('message')
-                    if msg and (not job['steps'] or job['steps'][-1]['message'] != msg):
-                        if p.get('file_progress') is not None and not str(msg).endswith('%'):
-                            sp = int(p['file_progress'] * 100) if isinstance(p['file_progress'], float) else p['file_progress']
-                            msg = f"{msg} ({sp}%)"
-                        job['steps'].append({'message': msg, 'progress': fp, 'time': time.time()})
-                else:
-                    job['progress'] = p
+            else:
+                job['progress'] = p
+
+        while job['status'] == 'processing':
+            events = get_progress_events()
+            for p in events:
+                handle_progress_event(p)
             time.sleep(0.5)
+
+        # Drain any remaining progress updates after processing completes
+        for p in get_progress_events():
+            handle_progress_event(p)
 
     threading.Thread(target=monitor, daemon=True).start()
 
     try:
-        logger.info("Clearing old input files before processing...")
-        inp = paths.INPUT_DIR
-        if inp.exists():
-            now = time.time()
-            for f in inp.glob("*"):
-                if f.is_file() and now - f.stat().st_mtime > 300:
-                    try: f.unlink(); logger.info(f"Removed old input file: {f.name}")
-                    except Exception as e: logger.warning(f"Could not remove {f.name}: {e}")
+        file_ids = job.get("fileIds") or []
+        seen = set()
+        input_paths = []
+        for fid in file_ids:
+            rec = get_upload_metadata(fid)
+            if not rec or not rec.get("storedName"):
+                continue
+            p = paths.INPUT_DIR / rec["storedName"]
+            if p.exists() and p not in seen:
+                seen.add(p)
+                input_paths.append(p)
+                ordered_file_ids.append(fid)
 
-        process_all(segment_audio=segment, process_audio=process, export_data=export, clean_after=False)
+        if not ordered_file_ids:
+            job.update(status='failed', error="No valid files to process", progress=0)
+            return
+
+        for fid in ordered_file_ids:
+            update_track_processing(
+                fid,
+                state="queued",
+                step="queued",
+                message="Queued for processing",
+                progress=0,
+            )
+
+        process_all(segment_audio=segment, process_audio=process, export_data=export, clean_after=False, input_files=input_paths)
 
         job.update(status='completed', progress=100, completed_at=time.time(),
                    output_files=collect_output_files(segment, process))
     except Exception as e:
         job.update(status='failed', error=str(e), progress=0)
+        for fid in ordered_file_ids:
+            update_track_processing(
+                fid,
+                state="error",
+                step="error",
+                message=f"Processing failed: {e}",
+                progress=0,
+            )
         print(f"Error in processing thread: {e}"); traceback.print_exc()
-
-
-@app.route('/api/download/dataset', methods=['POST'])
-def download_dataset():
-    try:
-        d = request.json or {}
-        proc, raw = d.get('processed', []), d.get('raw', [])
-        if not d: return jsonify({"error":"No data provided"}), 400
-        if not (proc or raw): return jsonify({"error":"No files selected for download"}), 400
-
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        name = f"vocals_dataset_{ts}.zip"
-        zpath = paths.TEMP_WAV_DIR / name
-
-        with zipfile.ZipFile(zpath, 'w') as z:
-            for files, srcdir, tag in [(proc, paths.UVR_PROCESSED_DIR, "PROCESSED"), (raw, paths.UVR_RAW_DIR, "RAW")]:
-                for f in files:
-                    fn = os.path.basename(f); p = srcdir / fn
-                    if p.exists():
-                        z.write(p, f"{fn.replace('_vocals.wav','')}_{tag}.wav")
-
-        return send_file(zpath, mimetype="application/zip", as_attachment=True, download_name=name)
-    except Exception as e:
-        print(f"Error creating dataset zip: {e}"); traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
 
 
 
@@ -1378,35 +1765,77 @@ def training_status(job_id):
 def available_models():
     try:
         root = Path(paths.APPLIO_MODELS_DIR)
-        if not root.exists(): return jsonify({"models": []})
+        if not root.exists():
+            return jsonify({"models": []})
 
         models = []
         for d in (p for p in root.iterdir() if p.is_dir()):
-            pths = [f for f in d.glob("*.pth") if not f.name.startswith(("D_","G_")) and "e_" in f.name]
-            if not pths: continue
+            pths = [f for f in d.glob("*.pth")]
+            if not pths:
+                continue
+            info_path = d / "model_info.json"
+            info = json.loads(info_path.read_text()) if info_path.exists() else {}
+
+            # split model name to find the correct number of epoch in the string ex: 'Cardi B (RVCv2, RMVPE, 400 Epochs)'
+            
 
             idx = next(d.glob("*.index"), None)
-            info = json.loads((d/"model_info.json").read_text()) if (d/"model_info.json").exists() else {}
+            model_id = info.get("model_id") or info.get("modelId") or d.name
+            model_name = info.get("model_name") or info.get("name") or d.name
+            folder_name = d.name
+            installed_at = info.get("installed_at")
+            info_epochs = info.get("epochs")
+            epochs = None
+            if info_epochs is None or info_epochs == 0:
+                findepoch = info.get("model_name")
 
-            cps = sorted(({
-                "filename": f.name,
-                "epochs": int(m.group(1)) if (m := re.search(r'_(\d+)e_', f.name)) else 0,
-                "isBest": "best" in f.name.lower(),
-                "created": datetime.fromtimestamp(f.stat().st_ctime).isoformat(),
-                "path": str(f.relative_to(root)),
-                "size_mb": round(f.stat().st_size / (1024**2), 2)
-            } for f in pths), key=lambda x: x["epochs"], reverse=True)
+                # make regex safe
+                if not isinstance(findepoch, (str, bytes)):
+                    findepoch = "" if findepoch is None else str(findepoch)
 
+                match = re.search(r'(\d+)\s*Epochs?', findepoch, flags=re.IGNORECASE)
+                epochs = int(match.group(1)) if match else None
+            else:
+                epochs = int(info_epochs)
+
+            
+
+
+            info_rate = info.get("rate")
+
+            def _checkpoint_entry(f: Path) -> dict:
+                epoch, rate = _extract_epoch_rate_from_filename(f.name)
+                logging.info(f"!!!!!!!!!! epoch  rate : {f.name}!!!!!!!!!!!!!!!!!! {epoch}, {rate}")
+                if epoch is None:
+                    epoch = info_epochs or 0
+                if rate is None:
+                    rate = info_rate
+                created_time = installed_at or datetime.fromtimestamp(f.stat().st_ctime).isoformat()
+                return {
+                    "filename": f.name,
+                    "epochs": epochs if epochs is not None else epoch if epoch is not None else 0,
+                    "rate": rate,
+                    "isBest": "best" in f.name.lower(),
+                    "created": created_time,
+                    "path": str(f.relative_to(root)),
+                    "size_mb": round(f.stat().st_size / (1024 ** 2), 2),
+                }
+
+            cps = sorted((_checkpoint_entry(f) for f in pths), key=lambda x: x["epochs"], reverse=True)
+            latest_created = cps[0]["created"] if cps else datetime.now().isoformat()
             size = sum(f.stat().st_size for f in pths) + (idx.stat().st_size if idx else 0)
+
             models.append({
-                "name": d.name,
-                "created": max(cps, key=lambda x: x["created"])["created"],
-                "epochs": cps[0]["epochs"],
-                "size_mb": round(size / (1024**2), 2),
+                "name": folder_name,
+                "modelId": model_id,
+                "created": latest_created,
+                "installed_at": installed_at,
+                "epochs": cps[0]["epochs"] if cps else 0,
+                "size_mb": round(size / (1024 ** 2), 2),
                 "sampleRate": info.get("sample_rate", 48000),
                 "status": "completed",
                 "checkpoints": cps,
-                "indexPath": str(idx.relative_to(root)) if idx else None
+                "indexPath": str(idx.relative_to(root)) if idx else None,
             })
 
         return jsonify({"models": sorted(models, key=lambda x: x["created"], reverse=True)})
@@ -1443,13 +1872,17 @@ from flask import request, jsonify
 
 @app.route('/api/search-online-models')
 def search_online_models():
-    q = request.args.get('query', '')
-    page = request.args.get('page', 1)
-    if not q: return jsonify({"models": [], "total_pages": 1})
+    q = request.args.get("query", "")
+    page = request.args.get("page", 1)
+    if not q:
+        return jsonify({"models": [], "total_pages": 1})
 
     try:
-        raw = requests.post("https://voice-models.com/fetch_data.php",
-                            data={'page': page, 'search': q}, timeout=10).json()
+        raw = requests.post(
+            "https://voice-models.com/fetch_data.php",
+            data={"page": page, "search": q},
+            timeout=10,
+        ).json()
 
         models = []
         html = (raw.get("table") or "").strip()
@@ -1457,20 +1890,29 @@ def search_online_models():
             soup = BeautifulSoup(html, "html.parser")
             for tr in soup.select("tr"):
                 tds = tr.find_all("td")
-                if len(tds) < 2: continue
+                if len(tds) < 2:
+                    continue
                 a = tds[0].find("a", class_="fs-5")
                 b = tds[1].find("button", class_="copy-btn")
-                if not (a and b): continue
+                if not (a and b):
+                    continue
                 title = a.get_text(strip=True)
-                m = re.search(r'(\d+)\s?(?:epochs|epoch|e)\b', title, re.I)
+                model_url = b.get("data-clipboard-text")
+                model_id = _extract_hf_model_id(model_url)
+                author = model_id.split("/")[0] if model_id else None
+                tags = _normalize_tag_list(title)
                 badge = tds[0].find("span", class_="badge")
+                # logging.info(f"!!!!!!!!!!   {re}")
+                m = re.search(r"(\d+)\s?(?:epochs|epoch|e)\b", title, re.I)
+                size_text = badge.get_text(strip=True).replace(" MB", "") if badge else None
                 models.append({
                     "name": title,
-                    "url": b.get("data-clipboard-text"),
+                    "url": model_url,
+                    "modelId": model_id,
+                    "author": author,
+                    "tags": tags,
                     "epochs": int(m.group(1)) if m else None,
-                    "size_mb": badge.get_text(strip=True).replace(" MB", "") if badge else None,
-                    "is_rmvpe": "rmvpe" in title.lower(),
-                    "is_v2": "v2" in title.lower()
+                    "size_mb": size_text,
                 })
 
         total_pages = 1
@@ -1478,8 +1920,9 @@ def search_online_models():
         if pg:
             last = BeautifulSoup(pg, "html.parser").find("li", class_="last")
             onclick = last.find("a").get("onclick") if last and last.find("a") else ""
-            m = re.search(r'\((\d+)', onclick)
-            if m: total_pages = int(m.group(1))
+            m = re.search(r"\((\d+)", onclick)
+            if m:
+                total_pages = int(m.group(1))
 
         return jsonify({"models": models, "total_pages": total_pages, "current_page": int(page)})
 
@@ -1487,327 +1930,300 @@ def search_online_models():
         return jsonify({"error": str(e), "models": []}), 500
 
 
+def _safe_model_dir_name(user_query: str, model_name: str, model_id: str) -> str:
+    base = user_query or model_name or model_id or "downloaded_model"
+    base = base.replace("/", "_")
+    safe = secure_filename(base)
+    return safe or "downloaded_model"
+
+
+def _is_ignored_path(path: Path) -> bool:
+    for part in path.parts:
+        if part.startswith(".") or part == "__MACOSX":
+            return True
+    return False
+
+
+def _find_model_artifacts(root: Path) -> tuple[list[Path], list[Path]]:
+    pths = [p for p in root.rglob("*.pth") if p.is_file() and not _is_ignored_path(p)]
+    indexes = [p for p in root.rglob("*.index") if p.is_file() and not _is_ignored_path(p)]
+    return pths, indexes
+
+
+def _select_best_pth(pths: list[Path]) -> Path | None:
+    if not pths:
+        return None
+
+    def score(p: Path) -> tuple[int, int]:
+        name = p.stem.lower()
+        pattern = bool(re.search(r'(?:^|[_-])(g|final|best|latest)(?:[_-]|$)', name))
+        return (1 if pattern else 0, p.stat().st_size)
+
+    return max(pths, key=score)
+
+
+def _select_index(indexes: list[Path], pth: Path | None) -> Path | None:
+    if not indexes:
+        return None
+    if pth:
+        base = pth.stem.lower()
+        for idx in indexes:
+            if idx.stem.lower() == base:
+                return idx
+    return indexes[0]
+
+
+def _copy_metadata_files(root: Path, dest_dir: Path) -> None:
+    exts = {".json", ".txt", ".md", ".yaml", ".yml"}
+    for f in root.rglob("*"):
+        if not f.is_file() or _is_ignored_path(f):
+            continue
+        if f.suffix.lower() not in exts:
+            continue
+        target = dest_dir / f.name
+        if target.exists():
+            continue
+        try:
+            shutil.copy2(f, target)
+        except Exception:
+            pass
+
+
+def _download_file(url: str, dest_path: Path) -> None:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    response = requests.get(url, headers=headers, stream=True, timeout=60)
+    response.raise_for_status()
+    with open(dest_path, "wb") as handle:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                handle.write(chunk)
+
+
+def _extract_epoch_rate_from_filename(filename: str) -> tuple[int | None, int | None]:
+    logging.info(f"!!!!!!!!!! filename !!!!!!!!!!!!!!!!!! {filename}")
+
+    stem = Path(filename).stem
+    epoch: int | None = None
+    rate: int | None = None
+
+    # --- epoch patterns ---
+    # matches: "..._12e_..." or "..._12e" (end)
+    m = re.search(r'_(\d+)e(?=_|$)', stem, re.IGNORECASE)
+    if m:
+        epoch = int(m.group(1))
+    else:
+        # matches: "..._e260_..." like "em-tes_e260_s7020"
+        m2 = re.search(r'_e(\d+)(?=_|$)', stem, re.IGNORECASE)
+        if m2:
+            epoch = int(m2.group(1))
+
+    # --- rate patterns ---
+    # matches: "..._48200", "..._48200s", "..._48200hz", "..._48k"
+    rm = re.search(r'_(\d+)(s|hz|k)?$', stem, re.IGNORECASE)
+    if rm:
+        value = int(rm.group(1))
+        unit = rm.group(2)
+        rate = value * 1000 if unit and unit.lower() == "k" else value
+
+    logging.info(f"!!!!!!!!!! epoch/rate parsed !!!!!!!!!!!!!!!!!! epoch={epoch}, rate={rate} (stem={stem!r})")
+    return epoch, rate
+
+
+def _install_model_files(model_dir: Path, pth: Path, index_path: Path | None, model_info: dict, metadata_root: Path | None) -> dict:
+    model_dir.mkdir(parents=True, exist_ok=True)
+    for existing in model_dir.glob("*.pth"):
+        existing.unlink(missing_ok=True)
+    for existing in model_dir.glob("*.index"):
+        existing.unlink(missing_ok=True)
+
+    dest_pth = model_dir / "model.pth"
+    shutil.copy2(pth, dest_pth)
+
+    dest_index = None
+    if index_path:
+        dest_index = model_dir / "model.index"
+        shutil.copy2(index_path, dest_index)
+
+    if metadata_root:
+        _copy_metadata_files(metadata_root, model_dir)
+
+    info_path = model_dir / "model_info.json"
+    with info_path.open("w", encoding="utf-8") as handle:
+        json.dump(model_info, handle, indent=2, sort_keys=True)
+
+    size_bytes = dest_pth.stat().st_size + (dest_index.stat().st_size if dest_index else 0)
+    return {
+        "model_dir": model_dir,
+        "pth": dest_pth,
+        "index": dest_index,
+        "size_mb": round(size_bytes / (1024 ** 2), 2),
+    }
+
+
+def _download_and_install_model(payload: dict) -> dict:
+    model_url = payload.get("model_url") or ""
+    model_name = payload.get("model_name") or ""
+    user_query = payload.get("user_query") or ""
+    files_info = payload.get("files_info") or {}
+    model_id = payload.get("model_id") or _extract_hf_model_id(model_url)
+    dir_name = payload.get("dir_name") or _safe_model_dir_name(user_query, model_name, model_id)
+
+    model_dir = paths.APPLIO_MODELS_DIR / dir_name
+    if model_dir.exists() and any(model_dir.glob("*.pth")):
+        raise Exception(f"Model '{dir_name}' already exists")
+
+    temp_root = Path(tempfile.mkdtemp(prefix="model_download_"))
+    extracted_root = None
+    pths: list[Path] = []
+    indexes: list[Path] = []
+    source_url = model_url or ""
+
+    try:
+        if files_info.get("zip") and model_id:
+            zip_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['zip']}"
+            zip_path = temp_root / "model.zip"
+            _download_file(zip_url, zip_path)
+            extracted_root = temp_root / "extracted"
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(extracted_root)
+            pths, indexes = _find_model_artifacts(extracted_root)
+            source_url = zip_url
+        elif (files_info.get("pth") or files_info.get("index")) and model_id:
+            if files_info.get("pth"):
+                pth_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['pth']}"
+                pth_path = temp_root / Path(files_info['pth']).name
+                _download_file(pth_url, pth_path)
+                pths = [pth_path]
+                source_url = pth_url
+            if files_info.get("index"):
+                index_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['index']}"
+                index_path = temp_root / Path(files_info['index']).name
+                _download_file(index_url, index_path)
+                indexes = [index_path]
+        elif model_url.lower().endswith(".zip"):
+            zip_path = temp_root / "model.zip"
+            _download_file(model_url, zip_path)
+            extracted_root = temp_root / "extracted"
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(extracted_root)
+            pths, indexes = _find_model_artifacts(extracted_root)
+        elif model_url.lower().endswith(".pth"):
+            filename = Path(urllib.parse.urlparse(model_url).path).name or "model.pth"
+            pth_path = temp_root / filename
+            _download_file(model_url, pth_path)
+            pths = [pth_path]
+            source_url = model_url
+        elif model_url.lower().endswith(".index"):
+            filename = Path(urllib.parse.urlparse(model_url).path).name or "model.index"
+            index_path = temp_root / filename
+            _download_file(model_url, index_path)
+            indexes = [index_path]
+        else:
+            raise Exception("Unable to determine how to download the model")
+
+        selected_pth = _select_best_pth(pths)
+        if not selected_pth:
+            raise Exception("No .pth file found")
+        selected_index = _select_index(indexes, selected_pth)
+
+        epochs, rate = _extract_epoch_rate_from_filename(selected_pth.name)
+        model_info = {
+            "model_id": model_id or dir_name,
+            "model_name": model_name or dir_name,
+            "source_url": source_url,
+            "installed_at": datetime.now().isoformat(),
+            "original_pth": selected_pth.name,
+            "original_index": selected_index.name if selected_index else None,
+            "epochs": epochs,
+            "rate": rate,
+        }
+
+        install_result = _install_model_files(
+            model_dir=model_dir,
+            pth=selected_pth,
+            index_path=selected_index,
+            model_info=model_info,
+            metadata_root=extracted_root or temp_root,
+        )
+        install_result.update({
+            "model_id": model_info["model_id"],
+            "model_name": model_info["model_name"],
+            "dir_name": dir_name,
+        })
+        return install_result
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+
 @app.route('/api/download-model', methods=['POST'])
 def download_model():
-    """Download an RVC model from Hugging Face - ensures both .pth and .index files are present"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "No data provided"}), 400
-        
-        model_url = data.get('url')
-        model_name = data.get('modelName', 'downloaded_model')
-        model_id = data.get('modelId', '')
-        files_info = data.get('files', {})
-        user_query = data.get('userQuery', '')  # User's search query for filename
-        
-        if not model_url:
-            return jsonify({"error": "No URL provided"}), 400
-        
-        # Use user query as base filename, fallback to model name
-        # Clean and sanitize the query for use as filename
-        if user_query:
-            base_name = re.sub(r'[^a-zA-Z0-9\s]', '', user_query)
-            base_name = re.sub(r'\s+', '', base_name)  # Remove spaces
-        else:
-            # Fallback to model name if no query
-            base_name = re.sub(r'[^a-zA-Z0-9\s]', '', model_name)
-            base_name = re.sub(r'\s+', '', base_name)
-        
-        if not base_name:
-            base_name = "downloaded_model"
-        
-        # Secure the model name for directory
-        secure_name = secure_filename(base_name)
-        if not secure_name:
-            secure_name = "downloaded_model"
-        
-        # Create model directory
-        model_dir = paths.APPLIO_MODELS_DIR / secure_name
-        model_dir.mkdir(parents=True, exist_ok=True)
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        downloaded_files = []
-        
-        # If we have a zip file, download and extract it
-        if files_info.get('zip'):
-            zip_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['zip']}"
-            zip_filename = f"{secure_name}.zip"
-            zip_path = model_dir / zip_filename
-            
-            logging.info(f"Downloading zip file from {zip_url}")
-            response = requests.get(zip_url, headers=headers, stream=True, timeout=60)
-            response.raise_for_status()
-            
-            with open(zip_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            
-            # Extract zip file
-            try:
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(model_dir)
-                # Remove zip file after extraction
-                zip_path.unlink()
-                downloaded_files.append("zip (extracted)")
-                
-                # Verify .pth and .index files exist after extraction
-                pth_files = list(model_dir.glob("*.pth"))
-                index_files = list(model_dir.glob("*.index"))
-                
-                if not pth_files:
-                    return jsonify({"error": "Model zip file does not contain a .pth file"}), 400
-                if not index_files:
-                    return jsonify({"error": "Model zip file does not contain an .index file"}), 400
-                
-                # Rename files according to naming convention
-                # .pth file: extract epochs and rate, rename to {userQuery}_{epochs}e_{rate}.pth
-                # .index file: rename to {userQuery}.index
-                # Defaults: epoch=666, rate=48200 if not found
-                
-                # Process .pth file
-                pth_file = pth_files[0]  # Use first .pth file found
-                pth_original_name = pth_file.stem  # Name without extension
-                
-                # Try to extract epochs and rate from filename
-                # Pattern: modelname_500e_48200s.pth or modelname_500e_48200.pth or similar
-                epochs_match = re.search(r'_(\d+)e', pth_original_name, re.IGNORECASE)
-                rate_match = re.search(r'_(\d+)(?:s|\.)', pth_original_name, re.IGNORECASE)
-                
-                # Extract epoch and rate, use defaults if not found
-                epochs = int(epochs_match.group(1)) if epochs_match else 666
-                rate = int(rate_match.group(1)) if rate_match else 48200
-                
-                # Build new .pth filename: {userQuery}_{epochs}e_{rate}.pth
-                new_pth_name = f"{secure_name}_{epochs}e_{rate}.pth"
-                
-                new_pth_path = model_dir / new_pth_name
-                if pth_file.name != new_pth_name:
-                    pth_file.rename(new_pth_path)
-                    logging.info(f"Renamed .pth file from {pth_file.name} to {new_pth_name} (epochs: {epochs}, rate: {rate})")
-                    pth_files = [new_pth_path]
-                
-                # Process .index file - rename to {userQuery}.index
-                index_file = index_files[0]  # Use first .index file found
-                expected_index_name = f"{secure_name}.index"
-                new_index_path = model_dir / expected_index_name
-                if index_file.name != expected_index_name:
-                    index_file.rename(new_index_path)
-                    logging.info(f"Renamed index file from {index_file.name} to {expected_index_name}")
-                    index_files = [new_index_path]
-                    
-            except zipfile.BadZipFile:
-                return jsonify({"error": "Downloaded file is not a valid zip file"}), 400
-        
-        # If we have individual .pth and .index files, download them separately
-        elif files_info.get('pth') or files_info.get('index'):
-            # Download .pth file
-            if files_info.get('pth'):
-                pth_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['pth']}"
-                # Extract original filename from path (may include epochs/steps like "edSheeran_500e_48200s.pth")
-                original_pth_filename = files_info['pth'].split('/')[-1]
-                
-                # Check if the filename already contains the base name
-                # If it does, keep it as is; otherwise, prepend base name
-                if secure_name.lower() in original_pth_filename.lower():
-                    pth_filename = original_pth_filename
-                else:
-                    # Extract base from original filename (remove extension and any suffix)
-                    # Example: "model_500e_48200s.pth" -> "model_500e_48200s.pth" (keep as is)
-                    pth_filename = original_pth_filename
-                
-                pth_path = model_dir / pth_filename
-                
-                logging.info(f"Downloading .pth file from {pth_url}")
-                response = requests.get(pth_url, headers=headers, stream=True, timeout=60)
-                response.raise_for_status()
-                
-                with open(pth_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                
-                downloaded_files.append(f".pth ({pth_filename})")
-            
-            # Download .index file
-            if files_info.get('index'):
-                index_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['index']}"
-                # .index file should use base name only (following naming convention: baseName.index)
-                # Example: "edSheeran.index" not "edSheeran_500e_48200s.index"
-                index_filename = f"{secure_name}.index"
-                index_path = model_dir / index_filename
-                
-                logging.info(f"Downloading .index file from {index_url}")
-                response = requests.get(index_url, headers=headers, stream=True, timeout=60)
-                response.raise_for_status()
-                
-                with open(index_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                
-                downloaded_files.append(f".index ({index_filename})")
-            
-            # Verify both files exist
-            pth_files = list(model_dir.glob("*.pth"))
-            index_files = list(model_dir.glob("*.index"))
-            
-            if not pth_files:
-                return jsonify({"error": "Failed to download .pth file"}), 400
-            if not index_files:
-                return jsonify({"error": "Failed to download .index file"}), 400
-            
-            # Rename files according to naming convention (same as zip extraction)
-            final_pth = pth_files[0]
-            final_index = index_files[0]
-            
-            # Extract epoch and rate from .pth filename if present
-            # Use defaults: epoch=666, rate=48200 if not found
-            epochs_match = re.search(r'_(\d+)e', final_pth.stem, re.IGNORECASE)
-            rate_match = re.search(r'_(\d+)(?:s|\.)', final_pth.stem, re.IGNORECASE)
-            
-            epochs = int(epochs_match.group(1)) if epochs_match else 666
-            rate = int(rate_match.group(1)) if rate_match else 48200
-            
-            # Rename .pth: {userQuery}_{epochs}e_{rate}.pth
-            new_pth_name = f"{secure_name}_{epochs}e_{rate}.pth"
-            
-            new_pth_path = model_dir / new_pth_name
-            if final_pth.name != new_pth_name:
-                final_pth.rename(new_pth_path)
-                logging.info(f"Renamed .pth file from {final_pth.name} to {new_pth_name} (epochs: {epochs}, rate: {rate})")
-                pth_files = [new_pth_path]
-            
-            # Rename .index to {modelName}.index
-            expected_index_name = f"{secure_name}.index"
-            new_index_path = model_dir / expected_index_name
-            if final_index.name != expected_index_name:
-                final_index.rename(new_index_path)
-                index_files = [new_index_path]
-        
-        else:
-            # Fallback: try to download from URL directly
-            logging.info(f"Downloading from URL: {model_url}")
-            response = requests.get(model_url, headers=headers, stream=True, timeout=60)
-            response.raise_for_status()
-            
-            # Try to determine file type from URL or Content-Type
-            content_type = response.headers.get('Content-Type', '')
-            if 'application/zip' in content_type or model_url.endswith('.zip'):
-                zip_filename = f"{secure_name}.zip"
-                zip_path = model_dir / zip_filename
-                
-                with open(zip_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                
-                # Extract if it's a zip
-                try:
-                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                        zip_ref.extractall(model_dir)
-                    # Remove zip file after extraction
-                    zip_path.unlink()
-                    downloaded_files.append("zip (extracted)")
-                    
-                    # Verify and rename files according to naming convention
-                    pth_files = list(model_dir.glob("*.pth"))
-                    index_files = list(model_dir.glob("*.index"))
-                    
-                    if not pth_files:
-                        return jsonify({"error": "Model zip file does not contain a .pth file"}), 400
-                    if not index_files:
-                        return jsonify({"error": "Model zip file does not contain an .index file"}), 400
-                    
-                    # Rename files (same logic as above)
-                    pth_file = pth_files[0]
-                    pth_original_name = pth_file.stem
-                    
-                    # Extract epoch and rate, use defaults if not found
-                    epochs_match = re.search(r'_(\d+)e', pth_original_name, re.IGNORECASE)
-                    rate_match = re.search(r'_(\d+)(?:s|\.)', pth_original_name, re.IGNORECASE)
-                    
-                    epochs = int(epochs_match.group(1)) if epochs_match else 666
-                    rate = int(rate_match.group(1)) if rate_match else 48200
-                    
-                    # Rename .pth: {userQuery}_{epochs}e_{rate}.pth
-                    new_pth_name = f"{secure_name}_{epochs}e_{rate}.pth"
-                    
-                    new_pth_path = model_dir / new_pth_name
-                    if pth_file.name != new_pth_name:
-                        pth_file.rename(new_pth_path)
-                        logging.info(f"Renamed .pth file from {pth_file.name} to {new_pth_name} (epochs: {epochs}, rate: {rate})")
-                        pth_files = [new_pth_path]
-                    
-                    index_file = index_files[0]
-                    expected_index_name = f"{secure_name}.index"
-                    new_index_path = model_dir / expected_index_name
-                    if index_file.name != expected_index_name:
-                        index_file.rename(new_index_path)
-                        logging.info(f"Renamed index file from {index_file.name} to {expected_index_name}")
-                        index_files = [new_index_path]
-                        
-                except zipfile.BadZipFile:
-                    return jsonify({"error": "Downloaded file is not a valid zip file"}), 400
-            else:
-                # Try to get filename from URL
-                filename = model_url.split('/')[-1].split('?')[0]
-                if not filename or '.' not in filename:
-                    return jsonify({"error": "Could not determine file type from URL"}), 400
-                
-                file_path = model_dir / filename
-                with open(file_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                downloaded_files.append(filename)
-        
-        # Final verification: check that we have both .pth and .index files
-        pth_files = list(model_dir.glob("*.pth"))
-        index_files = list(model_dir.glob("*.index"))
-        
-        if not pth_files:
-            return jsonify({"error": "Model folder does not contain a .pth file. RVC models require both .pth and .index files."}), 400
-        if not index_files:
-            return jsonify({"error": "Model folder does not contain an .index file. RVC models require both .pth and .index files."}), 400
-        
-        # Extract epoch and size information from final files
-        final_pth = pth_files[0]
-        final_index = index_files[0]
-        
-        # Extract epoch and rate from .pth filename (e.g., "eminem_500e_48200.pth" -> 500, 48200)
-        epochs_match = re.search(r'_(\d+)e', final_pth.stem, re.IGNORECASE)
-        rate_match = re.search(r'_(\d+)(?:s|\.)', final_pth.stem, re.IGNORECASE)
-        
-        epochs = int(epochs_match.group(1)) if epochs_match else None
-        rate = int(rate_match.group(1)) if rate_match else None
-        
-        # Calculate total size in MB
-        total_size = final_pth.stat().st_size + final_index.stat().st_size
-        size_mb = round(total_size / (1024 * 1024), 2)
-        
-        logging.info(f"Successfully downloaded RVC model to {model_dir}")
-        logging.info(f"  - .pth file: {final_pth.name} ({epochs} epochs)" if epochs else f"  - .pth file: {final_pth.name}")
-        logging.info(f"  - .index file: {final_index.name}")
-        logging.info(f"  - Total size: {size_mb} MB")
-        
-        return jsonify({
-            "message": f"RVC model downloaded successfully",
-            "modelName": secure_name,
-            "path": str(model_dir.relative_to(paths.APPLIO_MODELS_DIR)),
-            "files": {
-                "pth": [f.name for f in pth_files],
-                "index": [f.name for f in index_files]
-            },
-            "epochs": epochs,
-            "size": size_mb
-        })
-        
-    except requests.RequestException as e:
-        logging.error(f"Error downloading model: {e}")
-        return jsonify({"error": f"Failed to download model: {str(e)}"}), 500
-    except Exception as e:
-        logging.error(f"Error downloading model: {e}")
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    data = request.get_json() or {}
+    model_url = data.get("url", "")
+    model_name = data.get("modelName", "")
+    model_id = data.get("modelId", "")
+    files_info = data.get("files") or {}
+    user_query = data.get("userQuery", "")
+
+    resolved_id = model_id or _extract_hf_model_id(model_url) or ""
+    resolved_name = model_name or resolved_id or "downloaded_model"
+    dir_name = _safe_model_dir_name(user_query, resolved_name, resolved_id)
+
+    job_id = uuid.uuid4().hex
+    download_jobs[job_id] = {
+        "jobId": job_id,
+        "modelId": resolved_id or dir_name,
+        "modelName": resolved_name,
+        "status": "downloading",
+        "progress": 0,
+        "started_at": datetime.now().isoformat(),
+        "error": None,
+    }
+
+    payload = {
+        "model_url": model_url,
+        "model_name": resolved_name,
+        "model_id": resolved_id,
+        "user_query": user_query,
+        "files_info": files_info,
+        "dir_name": dir_name,
+    }
+
+    def _runner(job_id_inner, payload_inner):
+        try:
+            result = _download_and_install_model(payload_inner)
+            download_jobs[job_id_inner].update({
+                "status": "completed",
+                "progress": 100,
+                "completed_at": datetime.now().isoformat(),
+                "modelId": result.get("model_id") or payload_inner.get("model_id") or dir_name,
+                "modelName": result.get("model_name") or resolved_name,
+                "dirName": result.get("dir_name"),
+                "size_mb": result.get("size_mb"),
+            })
+        except Exception as exc:
+            download_jobs[job_id_inner].update({
+                "status": "failed",
+                "error": str(exc),
+                "completed_at": datetime.now().isoformat(),
+            })
+
+    threading.Thread(target=_runner, args=(job_id, payload), daemon=True).start()
+
+    return jsonify({
+        "jobId": job_id,
+        "modelId": resolved_id or dir_name,
+        "modelName": resolved_name,
+        "status": "downloading",
+        "started_at": download_jobs[job_id]["started_at"],
+    })
+
+@app.route('/api/models/download/status/<job_id>')
+def download_model_status(job_id):
+    job = download_jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify(job)
 
 @app.route('/api/start-inference', methods=['POST'])
 def start_inference():
@@ -1834,6 +2250,7 @@ def start_inference():
 
         # Create a unique job ID
         job_id = str(uuid.uuid4())
+        run_id = make_run_id()
 
         # Initialize job
         active_jobs[job_id] = {
@@ -1842,6 +2259,7 @@ def start_inference():
             "model_name": model["name"],
             "track": track,
             "params": params,
+            "run_id": run_id,
             "status": "starting",
             "progress": 0,
             "logs": ["Starting inference..."],
@@ -1852,19 +2270,19 @@ def start_inference():
         import threading
         thread = threading.Thread(
             target=run_inference_job,
-            args=(job_id, model, track, params)
+            args=(job_id, run_id, model, track, params)
         )
         thread.daemon = True
         thread.start()
 
-        return jsonify({"jobId": job_id})
+        return jsonify({"jobId": job_id, "runId": run_id})
 
     except Exception as e:
         logging.error(f"Error starting inference: {e}")
         return jsonify({"error": str(e)}), 500
 
 
-def run_inference_job(job_id, model, track, params):
+def run_inference_job(job_id, run_id, model, track, params):
     """Run inference job in isolated process"""
     # Process-level exception handler to prevent any crashes from affecting Flask
     try:
@@ -1953,24 +2371,49 @@ def run_inference_job(job_id, model, track, params):
             return
 
         # Get input audio path (use vocal file)
-        vocal_filename = track.get("vocal", "").split("/").pop().split("\\").pop()
-        use_processed = track.get("processed", True)  # Default to processed for normal flow
-        input_path = str(paths.get_vocal_file_path(vocal_filename, processed=use_processed))
-        
+        file_id = track.get("fileId") or track.get("id")
+        vocals_file_type = track.get("vocalFileType") or track.get("vocalsFileType")
+        use_processed = track.get("processed", True)
+        if vocals_file_type in {"raw_vocals", "processed_vocals"}:
+            use_processed = vocals_file_type == "processed_vocals"
+
+        input_path = None
+        if file_id:
+            base_name = get_upload_base_name(file_id)
+            if not base_name:
+                active_jobs[job_id].update({
+                    'status': 'failed',
+                    'error': f"Unknown fileId: {file_id}"
+                })
+                return
+            input_path = str(paths.get_vocal_file_path(f"{base_name}_vocals.wav", processed=use_processed))
+        else:
+            vocal_filename = track.get("vocal", "").split("/").pop().split("\\").pop()
+            input_path = str(paths.get_vocal_file_path(vocal_filename, processed=use_processed))
+
         # Fallback: if file doesn't exist in processed dir, try raw dir
-        if not os.path.exists(input_path):
-            alt_path = str(paths.get_vocal_file_path(vocal_filename, processed=not use_processed))
+        if input_path and not os.path.exists(input_path):
+            fallback_name = None
+            if file_id:
+                base_name = get_upload_base_name(file_id)
+                if base_name:
+                    fallback_name = f"{base_name}_vocals.wav"
+            if not fallback_name:
+                vocal_filename = track.get("vocal", "").split("/").pop().split("\\").pop()
+                fallback_name = vocal_filename
+            alt_path = str(paths.get_vocal_file_path(fallback_name, processed=not use_processed))
             if os.path.exists(alt_path):
                 input_path = alt_path
                 print(f"[Inference] Using {'raw' if not use_processed else 'processed'} vocals: {input_path}")
 
         # Create output directory
-        paths.INFERENCE_DIR.mkdir(exist_ok=True, parents=True)
-        logging.info(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: {model['name']}_{track.get('instrumental', '') + '-' + track.get('vocal', '')}_inferred.wav")
-        logging.info(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: {track}")
+        run_dir = paths.INFERENCE_RUNS_DIR / run_id
+        run_dir.mkdir(exist_ok=True, parents=True)
+        logging.info(f"Starting inference run {run_id}")
+        logging.info(f"Track payload: {track}")
         # Generate output filename
-        output_filename = f"{model['name']}_{track.get('instrumental', '') + '-' + track.get('vocal', '')}_inferred.wav"
-        output_path = str(paths.get_inference_file_path(output_filename))
+        output_filename = "inferred.wav"
+        output_path = str(run_dir / output_filename)
 
         # Update status
         active_jobs[job_id].update({
@@ -2027,11 +2470,62 @@ def run_inference_job(job_id, model, track, params):
             message, output_file_path = result
             # Check if output file was actually created
             if os.path.exists(output_file_path):
+                file_record = get_upload_metadata(file_id) if file_id else None
+                model_name = model.get("name") or model.get("modelName")
+                model_id = model.get("id") or model.get("modelId") or model.get("model_id") or model_name
+                checkpoint_epoch = selected_checkpoint.get("epochs") or selected_checkpoint.get("epoch")
+                if isinstance(checkpoint_epoch, str):
+                    try:
+                        checkpoint_epoch = int(checkpoint_epoch)
+                    except ValueError:
+                        checkpoint_epoch = None
+                elif isinstance(checkpoint_epoch, (int, float)):
+                    checkpoint_epoch = int(checkpoint_epoch)
+                else:
+                    checkpoint_epoch = None
+                checkpoint_filename = selected_checkpoint.get("filename") or selected_checkpoint.get("pthFile")
+                if checkpoint_filename:
+                    checkpoint_filename = Path(checkpoint_filename).name
+                else:
+                    checkpoint_path = selected_checkpoint.get("path") or model_path
+                    checkpoint_filename = Path(checkpoint_path).name if checkpoint_path else None
+                checkpoint_id = selected_checkpoint.get("checkpointId") or selected_checkpoint.get("id")
+                if not checkpoint_id and checkpoint_filename:
+                    checkpoint_id = Path(checkpoint_filename).stem
+                index_file = Path(index_path).name if index_path else None
+                model_checkpoint = {
+                    "epoch": checkpoint_epoch,
+                    "checkpointId": checkpoint_id,
+                    "pthFile": checkpoint_filename,
+                    "indexFile": index_file,
+                }
+                if not any(model_checkpoint.values()):
+                    model_checkpoint = None
+                run_payload = {
+                    "id": run_id,
+                    "runId": run_id,
+                    "modelName": model_name,
+                    "modelId": model_id,
+                    "modelCheckpoint": model_checkpoint,
+                    "reaction": "none",
+                    "inputFileId": file_id,
+                    "inputStoredName": file_record.get("storedName") if file_record else None,
+                    "inputOriginalName": file_record.get("originalName") if file_record else None,
+                    "inputDisplayName": file_record.get("safeDisplayName") if file_record else None,
+                    "outputFileName": output_filename,
+                    "outputUrl": f"/api/download/inference/{run_id}",
+                    "params": params,
+                    "vocalFileType": vocals_file_type or ("processed_vocals" if use_processed else "raw_vocals"),
+                    "createdAt": datetime.now().isoformat(),
+                }
+                save_inference_run_metadata(run_id, run_payload)
                 active_jobs[job_id].update({
                     'status': 'completed',
                     'progress': 100,
                     'logs': active_jobs[job_id].get('logs', []) + ["Inference completed successfully!"],
-                    'outputFile': output_filename
+                    'outputFile': output_filename,
+                    'runId': run_id,
+                    'outputUrl': run_payload["outputUrl"]
                 })
             else:
                 active_jobs[job_id].update({
@@ -2116,7 +2610,9 @@ def inference_status(job_id):
             "started_at": job["started_at"],
             "completed_at": job.get("completed_at"),
             "error": job.get("error"),
-            "outputFile": job.get("outputFile")
+            "outputFile": job.get("outputFile"),
+            "runId": job.get("runId") or job.get("run_id"),
+            "outputUrl": job.get("outputUrl")
         })
 
     # Check if there's a status file for a completed job
@@ -2148,97 +2644,8 @@ def inference_status(job_id):
 def get_past_inference_results():
     """Get list of past inference results by scanning inference directory"""
     try:
-        results = []
-        inference_dir = Path("data/singing/inference")
-
-        if not inference_dir.exists():
-            return jsonify({"results": []})
-
-        # Scan all .wav files in inference directory
-        for wav_file in inference_dir.glob("*.wav"):
-            if "_inferred.wav" in wav_file.name:
-                try:
-                    # Extract information from filename
-                    filename = wav_file.name
-                    base_name = filename.replace("_inferred.wav", "")
-
-                    # Parse filename to extract model and track info
-                    # Format: {model_name}_{track_id}_inferred.wav
-                    # The challenge: model names can contain spaces/underscores, track_id can be complex
-
-                    model_name = "Unknown Model"
-                    track_name = "Unknown Track"
-
-                    # Parse filename: {model_name}_{track_id}_inferred.wav
-                    # Challenge: model names can contain spaces/underscores
-
-                    # Known model patterns (from logs directory and inference results)
-                    known_models = [
-                        'anne', 'bruno', 'dua', 'EdSheeran', 'vianney', 'mute', 'vald', 'testingtrain',
-                        'dua3test', 'bruno 2', 'edSheeran', 'vianneynew', 'DuaLipa', 'bruno import'
-                    ]
-
-                    # Sort by length (longest first) to ensure longest matches are found first
-                    known_models.sort(key=len, reverse=True)
-
-                    # First, try to match known model patterns from the start
-                    best_match = ""
-                    for model in known_models:
-                        if base_name.startswith(model):
-                            if len(model) > len(best_match):
-                                best_match = model
-
-                    if best_match:
-                        model_name = best_match
-                        track_part = base_name[len(best_match):].strip().lstrip('_')
-                        track_name = track_part if track_part else "unknown"
-                    else:
-                        # Fallback: split on first underscore
-                        parts = base_name.split('_', 1)
-                        if len(parts) >= 2:
-                            potential_model = parts[0]
-                            potential_track = parts[1]
-
-                            # Check if it looks like a reasonable model name
-                            if (len(potential_model) >= 2 and
-                                not potential_model.endswith('.wav') and
-                                not potential_model.replace(' ', '').replace('import', '').isdigit()):
-                                model_name = potential_model
-                                track_name = potential_track
-                            else:
-                                model_name = "Unknown Model"
-                                track_name = base_name
-                        else:
-                            model_name = "Unknown Model"
-                            track_name = base_name
-
-                    # Get file metadata
-                    file_stat = wav_file.stat()
-                    created_timestamp = file_stat.st_ctime
-                    file_size_mb = file_stat.st_size / (1024 * 1024)
-
-                    # Generate a unique ID based on filename
-                    file_id = f"{filename}_{int(created_timestamp)}"
-
-                    results.append({
-                        'id': file_id,
-                        'trackName': track_name,
-                        'modelName': model_name,
-                        'status': 'completed',
-                        'created': datetime.fromtimestamp(created_timestamp).isoformat(),
-                        'params': {},  # Parameters not stored in files
-                        'outputFile': filename,
-                        'fileSize': round(file_size_mb, 2),
-                        'originalTracks': []  # Original tracks not stored
-                    })
-
-                except Exception as e:
-                    print(f"Error processing inference file {wav_file}: {e}")
-                    continue
-
-        # Sort by creation date (newest first)
-        results.sort(key=lambda x: x['created'], reverse=True)
-
+        results = list_inference_runs()
+        results.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
         return jsonify({"results": results})
 
     except Exception as e:
@@ -2247,25 +2654,170 @@ def get_past_inference_results():
         print(traceback.format_exc())
         return jsonify({"error": f"Failed to get results: {str(e)}"}), 500
 
-@app.route('/api/download/inference/<path:filename>', methods=['GET'])
-def download_inference(filename):
+@app.route('/api/runs/<path:run_id>/reaction', methods=['PATCH'])
+def update_run_reaction(run_id):
+    data = request.get_json(silent=True) or {}
+    reaction = data.get("reaction")
+    if reaction not in ALLOWED_RUN_REACTIONS:
+        return jsonify({"error": "Invalid reaction"}), 400
+
+    run_id = urllib.parse.unquote(run_id)
+    run_meta = load_inference_run_metadata(run_id)
+    if not run_meta:
+        return jsonify({"error": "Run not found"}), 404
+
+    run_meta.pop("isFavorite", None)
+    run_meta["reaction"] = reaction
+    save_inference_run_metadata(run_id, run_meta)
+    return jsonify(run_meta)
+
+@app.route('/api/download/inference/<path:run_id>', methods=['GET'])
+def download_inference(run_id):
     """Download inference result file"""
     try:
-        # URL decode the filename
-        filename = urllib.parse.unquote(filename)
+        run_id = urllib.parse.unquote(run_id)
+        run_meta = load_inference_run_metadata(run_id)
+        requested_download_name = request.args.get("downloadName")
 
-        # Get the file path using path manager
-        file_path = paths.get_inference_file_path(filename)
+        if run_meta:
+            output_name = run_meta.get("outputFileName", "inferred.wav")
+            file_path = paths.INFERENCE_RUNS_DIR / run_id / output_name
+            if not file_path.exists():
+                return jsonify({"error": "File not found"}), 404
+            download_name = _sanitize_download_name(requested_download_name, output_name)
+            return send_file(file_path, as_attachment=True, download_name=download_name)
 
-        # Check if file exists
+        # Legacy fallback
+        file_path = paths.get_inference_file_path(run_id)
         if not file_path.exists():
             return jsonify({"error": "File not found"}), 404
-
-        # Send the file
-        return send_file(file_path, as_attachment=True, download_name=filename)
+        download_name = _sanitize_download_name(requested_download_name, file_path.name)
+        return send_file(file_path, as_attachment=True, download_name=download_name)
 
     except Exception as e:
         logging.error(f"Error downloading inference file: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+def _resolve_download_source(source):
+    if not source:
+        return None
+    if isinstance(source, dict):
+        src_type = source.get("type")
+        src_id = source.get("id") or source.get("fileId") or source.get("runId")
+        if not src_type or not src_id:
+            return None
+        if src_type == "instrumental":
+            base_name = get_upload_base_name(src_id)
+            if not base_name:
+                return None
+            return paths.INSTRUMENTAL_DIR / f"{base_name}_instrumental.wav"
+        if src_type in {"raw_vocals", "processed_vocals"}:
+            base_name = get_upload_base_name(src_id)
+            if not base_name:
+                return None
+            target_dir = paths.UVR_RAW_DIR if src_type == "raw_vocals" else paths.UVR_PROCESSED_DIR
+            return target_dir / f"{base_name}_vocals.wav"
+        if src_type == "inference":
+            run_meta = load_inference_run_metadata(src_id)
+            output_name = run_meta.get("outputFileName", "inferred.wav") if run_meta else "inferred.wav"
+            candidate = paths.INFERENCE_RUNS_DIR / src_id / output_name
+            if candidate.exists():
+                return candidate
+            legacy = paths.get_inference_file_path(src_id)
+            return legacy if legacy.exists() else None
+        return None
+
+    if isinstance(source, str):
+        parsed = urllib.parse.urlparse(source)
+        path = parsed.path if parsed.scheme or source.startswith("/") else source
+        if path.startswith("/api/download/inference/"):
+            run_id = path.split("/api/download/inference/")[-1]
+            return _resolve_download_source({"type": "inference", "id": urllib.parse.unquote(run_id)})
+        if path.startswith("/api/download/"):
+            rest = path.split("/api/download/")[-1]
+            parts = rest.split("/", 1)
+            if len(parts) == 2:
+                file_type, file_id = parts
+                return _resolve_download_source({"type": file_type, "id": urllib.parse.unquote(file_id)})
+        candidate = Path(path)
+        if candidate.exists():
+            allowed_roots = {
+                paths.UVR_RAW_DIR,
+                paths.UVR_PROCESSED_DIR,
+                paths.INSTRUMENTAL_DIR,
+                paths.INFERENCE_DIR,
+                paths.INFERENCE_RUNS_DIR,
+                paths.EXPORT_DIR,
+            }
+            try:
+                candidate = candidate.resolve()
+                if any(str(candidate).startswith(str(root.resolve())) for root in allowed_roots):
+                    return candidate
+            except Exception:
+                return None
+    return None
+
+
+@app.route('/api/audio/merge', methods=['POST'])
+def merge_audio():
+    try:
+        data = request.get_json() or {}
+        instrumental = data.get("instrumental") or data.get("instrumentalUrlOrPath")
+        vocal = data.get("vocal") or data.get("vocalUrlOrPath")
+        requested_download_name = data.get("downloadName") or "merged.wav"
+        output_format = (data.get("format") or Path(requested_download_name).suffix.lstrip(".") or "wav").lower()
+
+        download_name = _sanitize_download_name(requested_download_name, f"merged.{output_format}")
+        if not download_name.lower().endswith(f".{output_format}"):
+            download_name = f"{Path(download_name).stem}.{output_format}"
+
+        inst_path = _resolve_download_source(instrumental)
+        vocal_path = _resolve_download_source(vocal)
+        if not inst_path or not vocal_path:
+            return jsonify({"error": "Missing instrumental or vocal source"}), 400
+        if not inst_path.exists() or not vocal_path.exists():
+            return jsonify({"error": "Instrumental or vocal file not found"}), 404
+
+        output_path = Path(tempfile.gettempdir()) / f"merge_{uuid.uuid4().hex}.{output_format}"
+
+        filter_complex = "[0:a]volume=0.8[a0];[1:a]volume=0.8[a1];[a0][a1]amix=inputs=2:normalize=0:dropout_transition=0"
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(inst_path),
+            "-i",
+            str(vocal_path),
+            "-filter_complex",
+            filter_complex,
+            "-ac",
+            "2",
+        ]
+        if output_format == "mp3":
+            cmd += ["-c:a", "libmp3lame", "-q:a", "2"]
+        elif output_format in {"m4a", "aac"}:
+            cmd += ["-c:a", "aac", "-b:a", "192k"]
+        cmd += [str(output_path)]
+
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if result.returncode != 0:
+            logging.error(f"FFmpeg merge failed: {result.stderr}")
+            return jsonify({"error": "Failed to merge audio"}), 500
+
+        @after_this_request
+        def _cleanup(response):
+            try:
+                output_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return response
+
+        mime = "audio/wav" if output_format == "wav" else "audio/mpeg"
+        return send_file(output_path, as_attachment=True, download_name=download_name, mimetype=mime)
+
+    except Exception as e:
+        logging.error(f"Error merging audio: {e}")
         return jsonify({"error": str(e)}), 500
 
 # ===============================
@@ -2610,14 +3162,15 @@ else:
         job['status_message'] = 'Preparing for vocal separation...'
         
         try:
-            # Create clean filename (title.wav without timestamp)
-            title_safe = re.sub(r'[^\w\-_]', '_', params.get('title', 'untitled'))
-            clean_filename = f"{title_safe}.wav"
-            input_path = paths.INPUT_DIR / clean_filename
-            
-            # Copy to input directory with clean name
+            # Register generated audio as a unique upload
+            title_safe = sanitize_filename_for_display(params.get('title', 'untitled'))
+            stored_name, file_id = make_storage_name(title_safe)
+            input_path = paths.INPUT_DIR / stored_name
+
+            # Copy to input directory with unique name
             print(f"[ACE-Step] Copying generated song to input: {input_path}", flush=True)
             shutil.copy(str(output_path), str(input_path))
+            register_upload_metadata(title_safe, stored_name, file_id)
             
             job['progress'] = 94
             job['status_message'] = 'Starting vocal separation...'
@@ -2647,17 +3200,18 @@ else:
                 job['process_job_id'] = process_job_id
                 
                 # Store paths to the processed files
-                vocals_file = paths.UVR_RAW_DIR / f"{title_safe}_vocals.wav"
-                instrumental_file = paths.INSTRUMENTAL_DIR / f"{title_safe}_instrumental.wav"
+                base_name = Path(stored_name).stem
+                vocals_file = paths.UVR_RAW_DIR / f"{base_name}_vocals.wav"
+                instrumental_file = paths.INSTRUMENTAL_DIR / f"{base_name}_instrumental.wav"
                 
                 if vocals_file.exists():
                     job['vocals_file'] = str(vocals_file)
-                    job['vocals_url'] = f"/api/download/raw_vocals/{title_safe}_vocals.wav"
+                    job['vocals_url'] = f"/api/download/raw_vocals/{file_id}"
                     print(f"[ACE-Step] Vocals file: {vocals_file}", flush=True)
                 
                 if instrumental_file.exists():
                     job['instrumental_file'] = str(instrumental_file)
-                    job['instrumental_url'] = f"/api/download/instrumental/{title_safe}_instrumental.wav"
+                    job['instrumental_url'] = f"/api/download/instrumental/{file_id}"
                     print(f"[ACE-Step] Instrumental file: {instrumental_file}", flush=True)
                 
                 # Run voice conversion (inference) if a model was selected
@@ -2732,19 +3286,21 @@ else:
                         # Track object for inference
                         track_obj = {
                             "name": title_safe,
-                            "vocal": f"{title_safe}_vocals.wav",
-                            "instrumental": f"{title_safe}_instrumental.wav",
+                            "fileId": file_id,
+                            "vocalFileType": "raw_vocals",
                             "processed": False,  # ACE-Step vocals are in raw directory
                         }
                         
                         # Create inference job
                         inference_job_id = str(uuid.uuid4())
+                        inference_run_id = make_run_id()
                         active_jobs[inference_job_id] = {
                             "id": inference_job_id,
                             "type": "inference",
                             "model_name": model_name,
                             "track": track_obj,
                             "params": inference_params,
+                            "run_id": inference_run_id,
                             "status": "starting",
                             "progress": 0,
                             "logs": ["Starting inference..."],
@@ -2754,7 +3310,7 @@ else:
                         # Run inference synchronously (we're already in a background thread)
                         print(f"[ACE-Step] Running inference job: {inference_job_id}", flush=True)
                         print(f"[ACE-Step] Model object: {model_obj}", flush=True)
-                        run_inference_job(inference_job_id, model_obj, track_obj, inference_params)
+                        run_inference_job(inference_job_id, inference_run_id, model_obj, track_obj, inference_params)
                         
                         # Check result
                         inference_result = active_jobs.get(inference_job_id, {})
@@ -2762,12 +3318,9 @@ else:
                             job['inference_completed'] = True
                             job['inference_job_id'] = inference_job_id
                             
-                            # Update vocals URL to point to converted vocals
-                            converted_vocals = paths.INFERENCE_DIR / f"{title_safe}_vocals.wav"
-                            if converted_vocals.exists():
-                                job['vocals_file'] = str(converted_vocals)
-                                job['vocals_url'] = f"/api/download/inference/{title_safe}_vocals.wav"
-                                print(f"[ACE-Step] Converted vocals: {converted_vocals}", flush=True)
+                            output_url = inference_result.get("outputUrl")
+                            if output_url:
+                                job['vocals_url'] = output_url
                         else:
                             print(f"[ACE-Step] Voice conversion failed: {inference_result.get('error')}", flush=True)
                             job['inference_completed'] = False

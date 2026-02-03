@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography, Grid } from '@mui/material';
 import AudioWaveform from '../AudioWaveform';
+import { useVolume } from '../../contexts/VolumeContext';
 import styles from './WaveformCell.module.css';
 
 /**
@@ -10,6 +11,7 @@ function WaveformCell({
   url,
   isPlaying,
   isMuted,
+  volume: volumeProp, // Keep prop for backward compatibility but prefer context
   onPlayPause,
   onDownload,
   onReady,
@@ -23,13 +25,19 @@ function WaveformCell({
   isPrimary = false,
   emptyMessage = "No audio",
 }) {
+  const { volumeRef } = useVolume();
+  // Use context volume ref if available, fallback to prop
+  const volume = volumeRef?.current ?? volumeProp ?? 1;
+
   return (
-    <Grid  className={styles.container} sx={{ minWidth: 0 }}>
+    <Grid className={styles.container} sx={{ minWidth: 0 }}>
       {url ? (
         <AudioWaveform
           url={url}
+
           isPlaying={isPlaying}
           isMuted={isMuted}
+          volume={volume}
           onPlayPause={onPlayPause}
           onDownload={onDownload}
           progressColor={progressColor}
@@ -53,4 +61,22 @@ function WaveformCell({
   );
 }
 
-export default WaveformCell;
+const areEqual = (prev, next) =>
+  prev.url === next.url &&
+  prev.isPlaying === next.isPlaying &&
+  prev.isMuted === next.isMuted &&
+  // volume is intentionally excluded - it's handled via context ref
+  prev.progressColor === next.progressColor &&
+  prev.waveColor === next.waveColor &&
+  prev.backgroundColor === next.backgroundColor &&
+  prev.badgeText === next.badgeText &&
+  prev.isPrimary === next.isPrimary &&
+  prev.emptyMessage === next.emptyMessage &&
+  prev.onPlayPause === next.onPlayPause &&
+  prev.onDownload === next.onDownload &&
+  prev.onReady === next.onReady &&
+  prev.onSeek === next.onSeek &&
+  prev.onFinish === next.onFinish &&
+  prev.otherWaveform === next.otherWaveform;
+
+export default React.memo(WaveformCell, areEqual);

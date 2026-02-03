@@ -7,10 +7,8 @@ import {
   Chip,
   Checkbox,
 } from '@mui/material';
-import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import DeleteIcon from '@mui/icons-material/Close';
 import SchoolIcon from '@mui/icons-material/School';
-import { downloadDataset } from '../utils/audioUtils';
 import styles from './DatasetSelectionMode.module.css';
 
 /**
@@ -26,26 +24,9 @@ function DatasetSelectionMode({
   onSelectAllRaw,
   onRemoveFromSelection,
   onTrainWithDataset,
-  onDownloadDataset,
 }) {
   const totalSelectedVocals =
     selectedProcessedVocals.length + selectedRawVocals.length;
-
-  const handleDownload = async () => {
-    const selectedDataset = {
-      processed: selectedProcessedVocals,
-      raw: selectedRawVocals,
-    };
-
-    try {
-      await downloadDataset(selectedDataset);
-      if (onDownloadDataset) {
-        onDownloadDataset(selectedDataset);
-      }
-    } catch (error) {
-      // Error is already handled in downloadDataset
-    }
-  };
 
   return (
     <Collapse in={true} timeout={800} sx={{ mt: 0, transform: 'translateY(-1px)' }}>
@@ -73,22 +54,14 @@ function DatasetSelectionMode({
             <>
               <Button
                 variant="contained"
-                color="secondary"
-                startIcon={<CloudDownloadIcon />}
-                onClick={handleDownload}
-                sx={{ ml: 'auto' }}
-              >
-                Download selected ({totalSelectedVocals})
-              </Button>
-              <Button
-                variant="contained"
                 color="primary"
                 startIcon={<SchoolIcon />}
                 onClick={() => {
                   if (onTrainWithDataset) {
+                    const normalize = (item) => (typeof item === "string" ? item : item?.fileId || item?.id);
                     onTrainWithDataset({
-                      processed: selectedProcessedVocals,
-                      raw: selectedRawVocals,
+                      processed: selectedProcessedVocals.map(normalize).filter(Boolean),
+                      raw: selectedRawVocals.map(normalize).filter(Boolean),
                     });
                   }
                 }}
@@ -109,28 +82,36 @@ function DatasetSelectionMode({
             </Typography>
           ) : (
             <>
-              {selectedProcessedVocals.map((vocal) => (
+              {selectedProcessedVocals.map((vocal) => {
+                const label = typeof vocal === "string" ? vocal : vocal?.displayName || vocal?.originalName || "Track";
+                const key = typeof vocal === "string" ? vocal : vocal?.fileId || vocal?.id || label;
+                return (
                 <Chip
-                  key={`processed-${vocal}`}
-                  label={`${vocal.split('/').pop().replace('_vocals.wav', '')} (processed)`}
+                  key={`processed-${key}`}
+                  label={`${label} (processed)`}
                   color="secondary"
                   variant="outlined"
                   onDelete={() => onRemoveFromSelection(vocal, true)}
                   deleteIcon={<DeleteIcon fontSize="small" />}
                   size="small"
                 />
-              ))}
-              {selectedRawVocals.map((vocal) => (
+              );
+            })}
+              {selectedRawVocals.map((vocal) => {
+                const label = typeof vocal === "string" ? vocal : vocal?.displayName || vocal?.originalName || "Track";
+                const key = typeof vocal === "string" ? vocal : vocal?.fileId || vocal?.id || label;
+                return (
                 <Chip
-                  key={`raw-${vocal}`}
-                  label={`${vocal.split('/').pop().replace('_vocals.wav', '')} (raw)`}
+                  key={`raw-${key}`}
+                  label={`${label} (raw)`}
                   color="primary"
                   variant="outlined"
                   onDelete={() => onRemoveFromSelection(vocal, false)}
                   deleteIcon={<DeleteIcon fontSize="small" />}
                   size="small"
                 />
-              ))}
+              );
+            })}
             </>
           )}
         </Box>

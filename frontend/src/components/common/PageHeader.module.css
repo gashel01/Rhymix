@@ -1,8 +1,8 @@
 .container {
-  margin-bottom: 2rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  padding:12px;
+  
 }
 
 .backButton {
@@ -10,7 +10,10 @@
 }
 
 .title {
-  flex: 1;
+  align-items: center;
+  display: flex;
+  font-family: "Rubik";
+  font-weight: 300;
 }
 
 .actions {

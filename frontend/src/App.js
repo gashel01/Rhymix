@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { VolumeProvider } from "./contexts/VolumeContext";
 import {
   Box,
   Container,
@@ -24,20 +25,19 @@ import HomeIcon from "@mui/icons-material/Home";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
 import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
 import FileUpload from "./components/FileUpload";
-import ProcessingStatus from "./components/ProcessingStatus";
-import DownloadResults from "./components/DownloadResults";
+// import DownloadResults from "./components/DownloadResults";
 import HomeView from "./components/HomeView";
 import TrainingView from "./components/TrainingView";
 import TalkingDatasetUpload from "./components/TalkingDatasetUpload";
 import TalkWorkflowPage from "./talk_frontend/TalkWorkflowPage";
 import InferenceView from "./components/InferenceView";
 import InferenceParams from "./components/InferenceParams";
-import InferenceResults from "./components/InferenceResults";
 import ModelsView from "./components/ModelsView";
 import CreateSongView from "./components/CreateSongView";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import NavigationBar from "./components/NavigationBar";
-import { uploadFiles, startProcessing, getJobStatus, cleanDirectories } from "./utils/apiService";
+import { uploadFiles, startProcessing, getTrackStatuses, cleanDirectories } from "./utils/apiService";
+import { mergeProcessingUpdate, processingEquals, isTerminalProcessingState } from "./utils/processingStatus";
 
 // Tesla/Apple-inspired theme system
 const createAppTheme = (mode) => createTheme({
@@ -58,7 +58,7 @@ const createAppTheme = (mode) => createTheme({
           },
           background: {
             default: '#000000',
-            paper: '#1C1C1E', // iOS dark gray
+            paper: 'transparent', // iOS dark gray
             surface: '#2C2C2E', // iOS surface color
           },
           text: {
@@ -173,7 +173,7 @@ const createAppTheme = (mode) => createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          backgroundColor: mode === 'dark' ? '#1C1C1E' : '#FFFFFF',
+          backgroundColor: mode === 'dark' ? 'rgba(28,28,34,0.72)' : '  rgba(255,255,255,0.74)',
           border: `1px solid ${mode === 'dark' ? '#38383A' : '#C6C6C8'}`,
         },
         elevation1: {
@@ -224,7 +224,7 @@ const createAppTheme = (mode) => createTheme({
   },
 });
 
-const steps = ["Upload Files", "Process Files", "Download Results"];
+const steps = ["Upload Files"];
 
 const globalStylesInputProps = {
   styles: {
@@ -248,15 +248,17 @@ function App() {
   const [files, setFiles] = useState([]);
   const config = {
     process: true,
-    export: true,
+    export: false,
     clean: true,
   };
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [optimisticTracks, setOptimisticTracks] = useState([]);
   const [showHomeView, setShowHomeView] = useState(true);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [createDatasetModalOpen, setCreateDatasetModalOpen] = useState(false);
   const [currentView, setCurrentView] = useState("home");
   const [selectedVocalsForTraining, setSelectedVocalsForTraining] =
     useState(null);
@@ -276,6 +278,9 @@ function App() {
   const [selectedModelForInference, setSelectedModelForInference] = useState(null);
   const [inferenceParams, setInferenceParams] = useState(null);
   const [inferenceData, setInferenceData] = useState(null);
+  const [liveInferenceData, setLiveInferenceData] = useState(null);
+  const [navContext, setNavContext] = useState(null);
+  const [inferenceParamsOrigin, setInferenceParamsOrigin] = useState(null);
 
   const theme = createAppTheme(darkMode ? 'dark' : 'light');
 
@@ -375,7 +380,7 @@ function App() {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
-  const handleNavigation = (view) => {
+  const handleNavigation = useCallback((view) => {
     setCurrentView(view);
     setShowHomeView(view === "home");
     setSelectedVocalsForTraining(null);
@@ -383,6 +388,9 @@ function App() {
     setSelectedModelForInference(null);
     setInferenceParams(null);
     setInferenceData(null);
+    setNavContext(null);
+    setInferenceParamsOrigin(null);
+    if (view !== "inference") setLiveInferenceData(null);
     setDrawerOpen(false);
     // Update URL hash for navigation persistence
     if (view !== "home") {
@@ -390,14 +398,63 @@ function App() {
     } else {
       window.history.replaceState(null, '', window.location.pathname);
     }
-  };
+  }, []);
+
+  const getTrackId = useCallback((track) => {
+    return track?.fileId || track?.trackId || track?.id || track?.runId || track?.tempId || null;
+  }, []);
+
+  const buildNavContext = useCallback(
+    ({ source, selectedTracks = [], selectedModel = null }) => {
+      const ids = (selectedTracks || []).map(getTrackId).filter(Boolean);
+      const uniqueIds = Array.from(new Set(ids));
+      return {
+        source,
+        selectedTrackIds: uniqueIds,
+        selectedModelId: selectedModel?.id || selectedModel?.modelId || null,
+        selectedModelName: selectedModel?.name || selectedModel?.modelName || null,
+      };
+    },
+    [getTrackId]
+  );
+
+  const updateInferenceContext = useCallback(
+    ({ source, selectedTracks = [], selectedModel = null }) => {
+      setSelectedTracksForInference(selectedTracks);
+      setSelectedModelForInference(selectedModel);
+      setNavContext(buildNavContext({ source, selectedTracks, selectedModel }));
+    },
+    [buildNavContext]
+  );
+
+  const openInferenceModelSelection = useCallback(
+    ({ source, selectedTracks }) => {
+      updateInferenceContext({ source, selectedTracks, selectedModel: null });
+      setInferenceParamsOrigin(null);
+      setCurrentView("inference-model-selection");
+      setShowHomeView(false);
+      window.history.replaceState(null, "", "#inference-model-selection");
+    },
+    [updateInferenceContext]
+  );
+
+  const openInferenceParams = useCallback(
+    ({ source, selectedTracks, selectedModel, from }) => {
+      updateInferenceContext({ source, selectedTracks, selectedModel });
+      setInferenceParamsOrigin(from || null);
+      setCurrentView("inference-params");
+      setShowHomeView(false);
+      window.history.replaceState(null, "", "#inference-params");
+    },
+    [updateInferenceContext]
+  );
 
   // Handle URL hash routing for navigation persistence
   useEffect(() => {
     const hash = window.location.hash.substring(1); // Remove the '#'
     if (hash && hash !== 'home') {
       // Only set the view if it's a valid navigation hash
-      const validViews = ['datasets', 'training', 'talking-workflow', 'inference-model-selection', 'inference-params', 'inference-results'];
+      const validViews = ['datasets', 'training', 'talking-workflow', 'inference-model-selection', 'inference-params', 'inference'];
       if (validViews.includes(hash)) {
         setCurrentView(hash);
         setShowHomeView(false);
@@ -406,44 +463,127 @@ function App() {
   }, []);
 
   useEffect(() => {
-    let interval;
-    if (jobId && activeStep === 1) {
-      interval = setInterval(async () => {
-        try {
-          const data = await getJobStatus(jobId);
-          setJobStatus(data);
+    const candidates = (optimisticTracks || []).filter((track) => {
+      const state = track?.processing?.state;
+      return state && !isTerminalProcessingState(state);
+    });
+    const ids = Array.from(
+      new Set(
+        candidates
+          .map((track) => track.trackId || track.fileId)
+          .filter(Boolean)
+      )
+    );
 
-          if (data.status === "completed") {
-            clearInterval(interval);
-            setActiveStep(2);
-          } else if (data.status === "failed") {
-            clearInterval(interval);
-            setError(
-              `Processing failed: ${data.error || "Unknown error"}`
+    if (!ids.length) return;
+
+    let cancelled = false;
+    let interval;
+
+    const pollStatuses = async () => {
+      try {
+        const updates = await getTrackStatuses(ids);
+        if (cancelled || !Array.isArray(updates)) return;
+        const byId = new Map(
+          updates
+            .filter((u) => u && u.trackId)
+            .map((u) => [u.trackId, u])
+        );
+        setOptimisticTracks((prev) => {
+          if (!prev.length) return prev;
+          let changed = false;
+          const next = prev.map((track) => {
+            const trackId = track.trackId || track.fileId;
+            if (!trackId) return track;
+            const update = byId.get(trackId);
+            if (!update || !update.processing) return track;
+            const mergedProcessing = mergeProcessingUpdate(
+              track.processing || null,
+              update.processing
             );
-          }
-        } catch (err) {
-          setError(`Failed to check job status: ${err.message}`);
-          clearInterval(interval);
-        }
-      }, 2000);
-    }
+            if (processingEquals(track.processing, mergedProcessing)) return track;
+            changed = true;
+            return {
+              ...track,
+              processing: mergedProcessing,
+            };
+          });
+          return changed ? next : prev;
+        });
+      } catch (err) {
+        console.error("Failed to check track statuses:", err);
+      }
+    };
+
+    pollStatuses();
+    interval = setInterval(pollStatuses, 2000);
 
     return () => {
+      cancelled = true;
       if (interval) clearInterval(interval);
     };
-  }, [jobId, activeStep]);
+  }, [optimisticTracks]);
 
   const handleProcessFiles = async () => {
+    const filesToUpload = files;
+    setFiles([]);
+    setCreateDatasetModalOpen(false);
     setLoading(true);
+    const nowIso = new Date().toISOString();
+    const pendingUploads = filesToUpload.map((file, index) => ({
+      tempId: `upload-${Date.now()}-${index}`,
+      originalName: file.name,
+      displayName: file.name,
+      createdAt: nowIso,
+      processing: {
+        state: "uploading",
+        step: "upload",
+        message: "Uploading...",
+        progress: 0,
+        updatedAt: nowIso,
+      },
+    }));
+    if (pendingUploads.length) {
+      setOptimisticTracks((prev) => [...pendingUploads, ...prev]);
+    }
     try {
       // Step 1: Upload files
-      await uploadFiles(files);
+      const uploadResponse = await uploadFiles(filesToUpload);
+      const uploadedRecords = uploadResponse?.files || [];
+      const processingStamp = new Date().toISOString();
+      if (uploadedRecords.length) {
+        setOptimisticTracks((prev) =>
+          prev.map((track) => {
+            const pendingIndex = pendingUploads.findIndex((p) => p.tempId === track.tempId);
+            if (pendingIndex === -1) return track;
+            const record = uploadedRecords[pendingIndex];
+            if (!record) return track;
+            return {
+              ...track,
+              trackId: record.fileId,
+              fileId: record.fileId,
+              originalName: record.originalName || track.originalName,
+              displayName: record.safeDisplayName || record.originalName || track.displayName,
+              createdAt: record.createdAt || track.createdAt,
+              processing: {
+                state: "processing",
+                step: "processing",
+                message: "Starting processing...",
+                progress: 0,
+                updatedAt: processingStamp,
+              },
+            };
+          })
+        );
+      }
 
-      // Step 2: Start processing
-      const response = await startProcessing(config);
+      // Step 2: Start processing only the files we just uploaded
+      const response = await startProcessing({
+        ...config,
+        fileIds: uploadedRecords.map((r) => r.fileId),
+      });
       setJobId(response.job_id);
-      setActiveStep(activeStep + 1);
+      setActiveStep(0);
     } catch (err) {
       console.error("Error:", err);
       setError(`Failed to process: ${err.message}`);
@@ -458,14 +598,8 @@ function App() {
       return;
     }
 
-    if (activeStep === 1) {
-      return;
-    }
-
     if (activeStep === 0) {
-      setConfirmDialogOpen(true);
-    } else {
-      setActiveStep(activeStep + 1);
+      handleProcessFiles();
     }
   };
 
@@ -495,9 +629,11 @@ function App() {
     setActiveStep(0);
     setCurrentView("home");
     setShowHomeView(true);
+    setCreateDatasetModalOpen(false);
+    setOptimisticTracks([]);
   };
 
-  const handleTrainWithDataset = (selectedVocals) => {
+  const handleTrainWithDataset = useCallback((selectedVocals) => {
     console.log("Training with selected vocals:", selectedVocals);
 
     // If metadata is available, this is coming from diarization
@@ -509,42 +645,34 @@ function App() {
     setCurrentView("training");
     setShowHomeView(false);
     setShowVoiceConversion(false);
-  };
+  }, []);
 
-  const handleBackToHome = () => {
-    setCurrentView("home");
-    setShowHomeView(true);
-    setSelectedVocalsForTraining(null);
-    setSelectedTracksForInference(null);
-    setSelectedModelForInference(null);
-    setInferenceParams(null);
-    setInferenceData(null);
-  };
+
 
   // Global function for components to trigger view changes
-  const handleInferenceWithTracks = (tracks) => {
-    setSelectedTracksForInference(tracks);
-    setCurrentView("inference-model-selection");
-  };
+  const handleInferenceWithTracks = useCallback(
+    (tracks) => {
+      openInferenceModelSelection({ source: "home", selectedTracks: tracks || [] });
+    },
+    [openInferenceModelSelection]
+  );
 
   // Make function available globally
   window.appSetView = (view, data) => {
-    setCurrentView(view);
-    if (view === "inference-model-selection" && data) {
-      setSelectedTracksForInference(data);
+    if (view === "inference-model-selection") {
+      openInferenceModelSelection({ source: "home", selectedTracks: data || [] });
+      return;
     }
+    setCurrentView(view);
   };
 
-  const handleCreateTalkingDataset = () => {
+  const handleCreateTalkingDataset = useCallback(() => {
     setCurrentView("talking-workflow");
-  };
+  }, []);
 
-  const handleVoiceConversionClick = () => {
-    setShowVoiceConversion(true);
-    setShowHomeView(false);
-    setSelectedVocalsForTraining(null);
-  };
+  const onOpenCreateDataset = useCallback(() => setCreateDatasetModalOpen(true), []);
 
+  
   const navigationItems = [
     {
       id: 'home',
@@ -572,15 +700,18 @@ function App() {
     },
   ];
 
+
   const renderView = () => {
     switch (currentView) {
       case "home":
         return (
           <HomeView
-            onCreateSingingDataset={() => handleNavigation("datasets")}
+            onOpenCreateDataset={onOpenCreateDataset}
             handleTrainWithDataset={handleTrainWithDataset}
             onCreateTalkingDataset={handleCreateTalkingDataset}
             onInferenceWithTracks={handleInferenceWithTracks}
+            optimisticTracks={optimisticTracks}
+            onOptimisticTracksChange={setOptimisticTracks}
           />
         );
 
@@ -619,58 +750,32 @@ function App() {
                 />
               )}
 
-              {activeStep === 1 && (
-                <ProcessingStatus jobStatus={jobStatus} />
-              )}
-
-              {activeStep === 2 && (
+              {/* {activeStep === 2 && (
                 <DownloadResults
                   jobStatus={jobStatus}
                   handleReset={handleReset}
+                  volume={volume}
                 />
-              )}
+              )} */}
             </Box>
 
-            <Box sx={{
-              display: "flex",
-              flexDirection: "row",
-              pt: 4,
-              gap: 2,
-              justifyContent: 'center'
-            }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "row",
+                pt: 4,
+                gap: 2,
+                justifyContent: "center",
+              }}
+            >
               <Button
-                disabled={activeStep === 0 || loading || activeStep === 1}
-                onClick={handleBack}
-                variant="outlined"
-                sx={{ minWidth: 120, borderRadius: 2 }}
+                onClick={handleNext}
+                disabled={loading || files.length === 0}
+                variant="contained"
+                sx={{ minWidth: 160, borderRadius: 2 }}
               >
-                Back
+                {loading ? <CircularProgress size={20} /> : "Upload & Start"}
               </Button>
-              <Box sx={{ flex: "1 1 auto" }} />
-              {activeStep === steps.length - 1 ? (
-                <Button
-                  onClick={handleReset}
-                  disabled={loading}
-                  variant="contained"
-                  sx={{ minWidth: 140, borderRadius: 2 }}
-                >
-                  Start New Process
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleNext}
-                  disabled={
-                    loading ||
-                    (activeStep === 0 && files.length === 0) ||
-                    (activeStep === 1 &&
-                      (!jobStatus || jobStatus.status !== "completed"))
-                  }
-                  variant="contained"
-                  sx={{ minWidth: 120, borderRadius: 2 }}
-                >
-                  {loading ? <CircularProgress size={20} /> : "Next"}
-                </Button>
-              )}
             </Box>
           </Paper>
         );
@@ -692,7 +797,26 @@ function App() {
         return <ModelsView />;
 
       case "inference":
-        return <InferenceView onNavigate={handleNavigation} />;
+        return (
+          <InferenceView
+            onNavigate={handleNavigation}
+            liveInferenceData={liveInferenceData}
+            onSelectionToParams={({ source, selectedTracks, selectedModel }) => {
+              openInferenceParams({
+                source: source || "inference",
+                selectedTracks: selectedTracks || [],
+                selectedModel,
+                from: "inference",
+              });
+            }}
+            onSelectionToModelSelection={({ source, selectedTracks }) => {
+              openInferenceModelSelection({
+                source: source || "inference",
+                selectedTracks: selectedTracks || [],
+              });
+            }}
+          />
+        );
 
       case "talking-workflow":
         return (
@@ -707,11 +831,23 @@ function App() {
           <ModelsView 
             isInferenceSelection={true} 
             selectedTracks={selectedTracksForInference}
-            onBack={() => handleNavigation("home")} 
+            navContext={navContext}
+            onNavigate={handleNavigation}
+            onBack={() => {
+              const source = navContext?.source;
+              if (source === "inference") {
+                handleNavigation("inference");
+                return;
+              }
+              handleNavigation("home");
+            }}
             onModelSelected={(model, tracks) => {
-              setSelectedModelForInference(model);
-              setSelectedTracksForInference(tracks);
-              setCurrentView("inference-params");
+              openInferenceParams({
+                source: navContext?.source || "home",
+                selectedTracks: tracks || selectedTracksForInference || [],
+                selectedModel: model,
+                from: "model",
+              });
             }} 
           />
         );
@@ -721,44 +857,31 @@ function App() {
           <InferenceParams
             selectedModel={selectedModelForInference}
             selectedTracks={selectedTracksForInference}
-            onBack={() => setCurrentView("inference-model-selection")}
-            onStartInference={(data) => {
-              setInferenceData(data);
-              setCurrentView("inference-results");
-            }}
-          />
-        );
-
-      case "inference-results":
-        return (
-          <InferenceResults
-            inferenceData={inferenceData}
-            onBack={(actionData) => {
-              console.log('App received onBack actionData:', actionData);
-              if (actionData && typeof actionData === 'object') {
-                // Handle specific navigation actions from InferenceResults
-                if (actionData.action === 'model_selection' && actionData.tracks) {
-                  console.log('Setting selectedTracksForInference for model_selection:', actionData.tracks);
-                  // Return to model selection with selected tracks
-                  setSelectedTracksForInference(actionData.tracks);
-                  setCurrentView("inference-model-selection");
-                  setShowHomeView(false);
-                  window.history.replaceState(null, '', '#inference-model-selection');
-                } else if (actionData.action === 'inference_params' && actionData.tracks) {
-                  console.log('Setting selectedTracksForInference for inference_params:', actionData.tracks);
-                  // Return to inference parameters with selected tracks
-                  setSelectedTracksForInference(actionData.tracks);
-                  setCurrentView("inference-params");
-                  setShowHomeView(false);
-                  window.history.replaceState(null, '', '#inference-params');
-                } else {
-                  console.log('Action data missing tracks or unrecognized action:', actionData);
-                }
-              } else {
-                console.log('Default back behavior triggered');
-                // Default back behavior
-                handleNavigation("home");
+            navContext={navContext}
+            onBack={() => {
+              if (inferenceParamsOrigin === "model") {
+                setCurrentView("inference-model-selection");
+                window.history.replaceState(null, "", "#inference-model-selection");
+                return;
               }
+              const source = navContext?.source;
+              if (source === "inference") {
+                handleNavigation("inference");
+                return;
+              }
+              handleNavigation("home");
+            }}
+            onGoToModelSelection={() => {
+              openInferenceModelSelection({
+                source: navContext?.source || "home",
+                selectedTracks: selectedTracksForInference || [],
+              });
+            }}
+            onStartInference={(data) => {
+              setLiveInferenceData(data);
+              setCurrentView("inference");
+              setShowHomeView(false);
+              window.history.replaceState(null, '', '#inference');
             }}
           />
         );
@@ -783,49 +906,45 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <GlobalStyles {...globalStylesInputProps} />
+      <VolumeProvider volume={volume}>
 
-      <Box sx={{
+      <div style={{
         display: "flex",
-        flexDirection: "column",
+        
         minHeight: "100vh",
-        backgroundColor: 'background.default'
+        backgroundColor: '#1c1c1f99'// main back color 
       }}>
-        <NavigationBar
-          theme={theme}
-          darkMode={darkMode}
-          open={open}
-          setOpen={setOpen}
-          handleThemeToggle={handleThemeToggle}
-          handleDrawerToggle={handleDrawerToggle}
-          drawerOpen={drawerOpen}
-          navigationItems={navigationItems}
-          currentView={currentView}
-          handleNavigation={handleNavigation}
-          sidebarCollapsed={sidebarCollapsed}
-          handleSidebarToggle={handleSidebarToggle}
-          handleCleanDirectories={handleCleanDirectories}
-          loading={loading}
-          onVolumeChange={onVolumeChange}
-          muted={muted}
-          volume={volume}
-        />
-
+        <div style={{ position: 'relative', display: 'flex' }}>
+          <NavigationBar
+            theme={theme}
+            darkMode={darkMode}
+            open={open}
+            setOpen={setOpen}
+            handleThemeToggle={handleThemeToggle}
+            handleDrawerToggle={handleDrawerToggle}
+            drawerOpen={drawerOpen}
+            navigationItems={navigationItems}
+            currentView={currentView}
+            handleNavigation={handleNavigation}
+            sidebarCollapsed={sidebarCollapsed}
+            handleSidebarToggle={handleSidebarToggle}
+            handleCleanDirectories={handleCleanDirectories}
+            loading={loading}
+            onVolumeChange={onVolumeChange}
+            muted={muted}
+            volume={volume}
+          />
+        </div>
         {/* Main Content */}
-        <Box
+        <div
           component="main"
-          sx={{
+          style={{
             flexGrow: 1,
-            p: 3,
-            ml: {
-              sm: sidebarCollapsed ? '72px' : '280px', // Adjust for collapsed sidebar
-              xs: 0
-            }, // Account for sidebar
-            backgroundColor: 'background.default',
+            backgroundColor: 'transparent',
             minHeight: '100vh',
-            transition: 'margin-left 0.3s ease-in-out',
           }}
         >
-          <Container maxWidth="xl" sx={{ py: 2 }}>
+          <div >
             {error && (
               <Alert
                 severity="error"
@@ -841,7 +960,7 @@ function App() {
             )}
 
             {renderView()}
-          </Container>
+          </div>
 
           {/* Confirmation Dialog */}
           <Dialog
@@ -887,6 +1006,60 @@ function App() {
             </DialogActions>
           </Dialog>
 
+          {/* Create Dataset Modal - rendered in App so HomeView doesn't re-render on jobStatus/polling */}
+          <Dialog
+            open={createDatasetModalOpen}
+            onClose={() => {
+              setCreateDatasetModalOpen(false);
+              setFiles([]);
+            }}
+            maxWidth="md"
+            fullWidth
+            PaperProps={{ sx: { borderRadius: 3 } }}
+          >
+            <DialogTitle sx={{ textAlign: "center", fontWeight: 700 }}>
+              Create Singing Dataset
+            </DialogTitle>
+            <DialogContent>
+              <Paper sx={{ p: 4, borderRadius: 3 }}>
+                <Stepper activeStep={activeStep} sx={{ mb: 6 }}>
+                  {steps.map((label) => (
+                    <Step key={label}>
+                      <StepLabel sx={{ '& .MuiStepLabel-label': { fontSize: '0.9rem', fontWeight: 600 } }}>
+                        {label}
+                      </StepLabel>
+                    </Step>
+                  ))}
+                </Stepper>
+                <Box sx={{ mt: 4, mb: 4 }}>
+                  {activeStep === 0 && (
+                    <FileUpload
+                      key={createDatasetModalOpen ? "open" : "closed"}
+                      files={files}
+                      setFiles={setFiles}
+                      setError={setError}
+                      loading={loading}
+                      setLoading={setLoading}
+                    />
+                  )}
+                  {/* {activeStep === 2 && (
+                    <DownloadResults jobStatus={jobStatus} handleReset={handleReset} />
+                  )} */}
+                </Box>
+                <Box sx={{ display: "flex", flexDirection: "row", pt: 4, gap: 2, justifyContent: "center" }}>
+                  <Button
+                    onClick={handleNext}
+                    disabled={loading || files.length === 0}
+                    variant="contained"
+                    sx={{ minWidth: 160, borderRadius: 2 }}
+                  >
+                    {loading ? <CircularProgress size={20} /> : "Upload & Start"}
+                  </Button>
+                </Box>
+              </Paper>
+            </DialogContent>
+          </Dialog>
+
           {/* Legacy Voice Conversion (if needed) */}
           {showVoiceConversion && (
             <InferenceView
@@ -897,8 +1070,11 @@ function App() {
               }}
             />
           )}
-        </Box>
-      </Box>
+        </div>
+
+
+      </div>
+      </VolumeProvider>
     </ThemeProvider>
   );
 }

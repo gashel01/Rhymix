@@ -1,757 +1,537 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, IconButton, Typography } from "@mui/material";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import PauseIcon from "@mui/icons-material/Pause";
 import DownloadIcon from "@mui/icons-material/Download";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import WaveSurfer from "wavesurfer.js";
+import { useVolume } from "../contexts/VolumeContext";
+
+/**
+ * AudioWaveform (fixed mute)
+ * - Mute works in BOTH controlled and uncontrolled modes:
+ *   - Controlled: pass isMuted + onToggleMute(nextMuted)
+ *   - Uncontrolled: omit onToggleMute => internal mute state is used
+ * - Also calls wavesurfer.setMuted / setVolume / gainNode fallback
+ */
 
 const AudioWaveform = (
   {
     url: initialUrl,
     isPlaying,
-    onPlayPause,
     onDownload,
+
+    // mute props
+    isMuted, // optional controlled
+    onToggleMute, // optional controlled: (nextMuted:boolean)=>void
+
+    // visuals
     height = 70,
     progressColor = "#1976d2",
-    waveColor = "#9e9e9e",
-    backgroundColor = "#2a2a2a",
-    isPrimary = false,
+    waveColor =  "#9e9e9e",
+    backgroundColor,
     badgeText = null,
+    isDark: isDarkProp,
+    volume: volumeProp = 1, // Keep prop for backward compatibility
+
+    // callbacks
     onReady = () => {},
     onPositionChange = () => {},
     onSeek = () => {},
-    otherWaveform = null,
-    isMuted = false,
     onTimeUpdate = () => {},
+    otherWaveform = null,
+
+    // playback state hygiene
+    onRequestStop = () => {}, // optional
   },
   ref
 ) => {
-  const containerRef = useRef();
-  const waveSurferRef = useRef();
+  const containerRef = useRef(null);
+  const waveSurferRef = useRef(null);
+
   const [ready, setReady] = useState(false);
-  const isSyncingRef = useRef(false); // Flag to prevent infinite loops
-  const [rawMode, setRawMode] = useState(false);
   const [url, setUrl] = useState(initialUrl);
-  const audioContext = useRef(null);
-  const gainNode = useRef(null);
+
+  // uncontrolled fallback mute state
+  const [localMuted, setLocalMuted] = useState(false);
+
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef(null);
-  const isReadyRef = useRef(false); // Track if wavesurfer has finished loading
+  const isSyncingRef = useRef(false);
+  const restorePlaybackRef = useRef(null);
 
-  // Create wavesurfer function
-  const createWaveSurfer = (audioUrl) => {
-    if (containerRef.current) {
-      // Reset ready state for new instance
-      isReadyRef.current = false;
-      setReady(false);
-      
-      // Note: abortControllerRef.current should already be set by the caller
+  const audioContext = useRef(null);
+  const gainNode = useRef(null);
+  
+  // Use volume from context if available, otherwise use prop
+  const volumeContext = useVolume();
+  const volumeRef = useRef(volumeContext?.volumeRef?.current ?? volumeProp ?? 1);
 
-      // Create wavesurfer instance
-      const wavesurfer = WaveSurfer.create({
-        container: containerRef.current,
-        waveColor: waveColor,
-        progressColor: progressColor,
-        backgroundColor: backgroundColor,
-        height: height,
-        barWidth: 2,
-        barGap: 1,
-        barRadius: 2,
-        cursorWidth: 1,
-        cursorColor: "#fff",
-        responsive: true,
-        normalize: true,
-        partialRender: true,
-        minPxPerSec: 50,
-        hideScrollbar: true,
-        fetchParams: {
-          signal: abortControllerRef.current.signal,
-        },
-      });
+  const isDark =
+    typeof isDarkProp === "boolean"
+      ? isDarkProp
+      : typeof window !== "undefined"
+      ? window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false
+      : false;
 
-      // Load audio file - catch promise rejection to prevent unhandled rejection errors
-      wavesurfer.load(audioUrl).catch((err) => {
-        if (err.name === 'AbortError' || 
-            err.message?.includes('aborted') || 
-            err.message?.includes('signal is aborted') ||
-            err.message?.includes('BodyStreamBuffer was aborted')) {
-          // Silently ignore: this is expected during cleanup/re-renders
-          return;
-        }
-        console.error("WaveSurfer load error:", err);
-      });
-
-      // Handle user-initiated seeks only, not programmatic ones
-      // Note: "backend" here refers to wavesurfer's internal audio engine (Web Audio API), not the server
-      const handleSeek = () => {
-        // Skip if we're currently synchronizing
-        if (!isSyncingRef.current) {
-          try {
-            // Use the ref to get the current instance (closure variable might be stale)
-            const currentWaveform = waveSurferRef.current;
-            
-            // Make sure wavesurfer's audio engine is initialized (needed to get current time)
-            // The audio engine (backend) is initialized when the "ready" event fires
-            if (currentWaveform ) {
-              const time = currentWaveform.getCurrentTime();
-             
-              // Notify parent component, which will handle syncing the other waveform
-              if (onSeek && typeof onSeek === 'function') {;
-                onSeek(time);
-              }
-            }
-            // If audio engine not ready yet, ignore the seek - it will work once ready
-          } catch (err) {
-            console.error("Error during seek event:", err);
-          }
-        }
-      };
-
-      // Event handlers
-      wavesurfer.on("ready", () => {
-        setReady(true);
-        isReadyRef.current = true; // Mark as ready - no need to abort anymore
-
-        // Set up gain node for muting/unmuting
-        // Check if backend is available before accessing
-        if (wavesurfer.backend && wavesurfer.backend.ac) {
-          audioContext.current = wavesurfer.backend.ac;
-          gainNode.current = audioContext.current.createGain();
-          wavesurfer.backend.setFilters([gainNode.current]);
-
-          // Verify gainNode was created and added to filters
-          const filters = wavesurfer.backend.filters || [];
-          const gainNodeInFilters = filters.find(f => f === gainNode.current);
-          if (!gainNodeInFilters) {
-            console.warn('gainNode created but not found in filters array');
-          }
-
-          // Initialize mute state
-          if (isMuted) {
-            gainNode.current.gain.value = 0;
-          } else {
-            gainNode.current.gain.value = 1;
-          }
-        }
-
-        // Attach seek handlers only after waveform is ready (backend is initialized)
-        wavesurfer.on("seek", handleSeek);
-        wavesurfer.on("interaction", handleSeek);
-
-        // Handle errors (especially AbortError during hot reload)
-        wavesurfer.on("error", (err) => {
-          // Suppress AbortError - it's expected when component unmounts or URL changes
-          if (err.name === 'AbortError' || 
-              err.message?.includes('aborted') || 
-              err.message?.includes('signal is aborted')) {
-            // This is expected during cleanup or hot module reload - silently ignore
-            return;
-          }
-          // Log other errors
-          console.error("WaveSurfer error:", err);
-        });
-
-        // Create a wrapper object that exposes the methods we need
-        // This matches the interface expected by the parent components
-        // Use waveSurferRef.current to always get the current instance (closure variable might be stale)
-        const waveformWrapper = {
-          setCurrentTime: (time) => {
-            try {
-              const currentWavesurfer = waveSurferRef.current;
-              if (currentWavesurfer && typeof time === "number") {
-                // Don't check backend - seekTo might work even if backend isn't fully initialized
-                isSyncingRef.current = true;
-                const duration = currentWavesurfer.getDuration();
-                if (duration > 0 && duration !== Infinity && !isNaN(duration)) {
-                  // Use seekTo with normalized position (0-1) - this is the correct method for wavesurfer
-                  const normalizedPosition = Math.max(0, Math.min(1, time / duration));
-                  currentWavesurfer.seekTo(normalizedPosition);
-                }
-                setTimeout(() => {
-                  isSyncingRef.current = false;
-                }, 50);
-              } else {
-                console.warn('waveformWrapper.setCurrentTime: wavesurfer not available', {
-                  hasWavesurfer: !!currentWavesurfer,
-                  timeType: typeof time
-                });
-              }
-            } catch (err) {
-              console.error("Error in waveformWrapper.setCurrentTime:", err);
-              isSyncingRef.current = false;
-            }
-          },
-          getCurrentTime: () => {
-            const currentWavesurfer = waveSurferRef.current;
-            return currentWavesurfer ? currentWavesurfer.getCurrentTime() : 0;
-          },
-          getDuration: () => {
-            const currentWavesurfer = waveSurferRef.current;
-            return currentWavesurfer ? currentWavesurfer.getDuration() : 0;
-          },
-          isPlaying: () => {
-            const currentWavesurfer = waveSurferRef.current;
-            return currentWavesurfer ? currentWavesurfer.isPlaying() : false;
-          },
-          play: () => {
-            const currentWavesurfer = waveSurferRef.current;
-            if (currentWavesurfer) currentWavesurfer.play();
-          },
-          pause: () => {
-            const currentWavesurfer = waveSurferRef.current;
-            if (currentWavesurfer) currentWavesurfer.pause();
-          },
-          setMuted: (muted) => {
-            const currentWavesurfer = waveSurferRef.current;
-            const targetMuted = !!muted;
-
-            if (currentWavesurfer && typeof currentWavesurfer.setMuted === "function") {
-              currentWavesurfer.setMuted(targetMuted);
-              return;
-            }
-
-            if (currentWavesurfer && typeof currentWavesurfer.setVolume === "function") {
-              currentWavesurfer.setVolume(targetMuted ? 0 : 1);
-              return;
-            }
-
-            let activeGainNode = gainNode.current;
-            let activeAudioContext = audioContext.current;
-            if (!activeGainNode && currentWavesurfer && currentWavesurfer.backend) {
-              const filters = currentWavesurfer.backend.filters || [];
-              activeGainNode = filters.find((f) => f && f.gain !== undefined);
-              activeAudioContext = currentWavesurfer.backend.ac;
-              if (activeGainNode) {
-                gainNode.current = activeGainNode;
-                audioContext.current = activeAudioContext;
-              }
-            }
-
-            if (activeGainNode && activeAudioContext) {
-              const gainValue = targetMuted ? 0 : 1;
-              try {
-                activeGainNode.gain.setValueAtTime(
-                  activeGainNode.gain.value,
-                  activeAudioContext.currentTime
-                );
-                activeGainNode.gain.linearRampToValueAtTime(
-                  gainValue,
-                  activeAudioContext.currentTime + 0.1
-                );
-              } catch (err) {
-                console.error('waveformWrapper.setMuted: error updating gain', err);
-              }
-            }
-          },
-          getWavesurfer: () => waveSurferRef.current,
-        };
-        
-        onReady(waveformWrapper);
-      });
-
-      // Only emit progress updates periodically
-      wavesurfer.on("audioprocess", () => {
-        // Skip if we're currently synchronizing
-        if (!isSyncingRef.current) {
-          onPositionChange(wavesurfer.getCurrentTime());
-        }
-      });
-
-      // Handle playback completion
-      wavesurfer.on("finish", () => {
-        // If we're linked to another waveform and it's not already paused, pause it
-        if (otherWaveform && otherWaveform.isPlaying()) {
-          otherWaveform?.pause();
-        }
-      });
-
-      waveSurferRef.current = wavesurfer;
-      return wavesurfer;
-    }
-    return null;
+  const t = {
+    text: isDark ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.90)",
+    subtext: isDark ? "rgba(255,255,255,0.62)" : "rgba(0,0,0,0.55)",
+    hairline: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)",
+    glass: isDark ? "rgba(18,18,20,0.50)" : "rgba(255,255,255,0.60)",
+    glass2: isDark ? "rgba(18,18,20,0.30)" : "rgba(255,255,255,0.35)",
+    shadow: isDark ? "0 10px 24px rgba(0,0,0,0.35)" : "0 12px 26px rgba(0,0,0,0.10)",
+    radius: 14,
+    bg: backgroundColor ?? (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)"),
   };
 
-  // Initialize wavesurfer when component mounts or URL changes
-  useEffect(() => {
-    isMountedRef.current = true;
-    let timeoutId = null;
-    
-    if (containerRef.current && url) {
-      // 1. Cleanup previous instance
-      if (waveSurferRef.current) {
-        // Abort any ongoing fetch first
-        if (abortControllerRef.current) {
-          try {
-            abortControllerRef.current.abort();
-          } catch (err) {
-            // Ignore abort errors
-          }
-          abortControllerRef.current = null;
-        }
-        
-        // Then destroy the instance
-        try {
-          if (waveSurferRef.current.isPlaying && waveSurferRef.current.isPlaying()) {
-            waveSurferRef.current.pause();
-          }
-          waveSurferRef.current.destroy();
-        } catch (e) {
-          // destroy() sometimes throws if called mid-loading; ignore it
-        }
-        waveSurferRef.current = null;
-        isReadyRef.current = false; // Reset ready state
-      }
+  // decide which mute state to display/use
+  const mutedValue = typeof isMuted === "boolean" ? isMuted : localMuted;
 
-      // 2. Initialize new instance
-      // Small delay to prevent React Strict Mode double-mount from cancelling requests
-      timeoutId = setTimeout(() => {
-        if (!isMountedRef.current || !containerRef.current) return;
-        
-        // Create fresh abort controller for new instance
-        abortControllerRef.current = new AbortController();
-        
-        // Create the wavesurfer instance
-        const wavesurfer = createWaveSurfer(url);
-        if (wavesurfer) {
-          waveSurferRef.current = wavesurfer;
-        }
-      }, 50); // Small delay to let React Strict Mode settle
+  const destroyWaveSurfer = () => {
+    if (abortControllerRef.current) {
+      try {
+        abortControllerRef.current.abort();
+      } catch {}
+      abortControllerRef.current = null;
     }
 
-    // Cleanup on unmount
-    return () => {
-      isMountedRef.current = false;
-      
-      // Clear timeout if component unmounts before delay completes
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      
-      // Abort the fetch first
-      if (abortControllerRef.current) {
-        try {
-          abortControllerRef.current.abort();
-        } catch (err) {
-          // Silently ignore abort errors
-        }
-        abortControllerRef.current = null;
-      }
-      
-      // Then destroy the instance
-      if (waveSurferRef.current) {
-        try {
-          // Stop playback first
-          if (waveSurferRef.current.isPlaying && typeof waveSurferRef.current.isPlaying === "function") {
-            try {
-              if (waveSurferRef.current.isPlaying()) {
-                waveSurferRef.current.pause();
-              }
-            } catch (e) {
-              // Ignore pause errors
-            }
-          }
+    const ws = waveSurferRef.current;
+    if (!ws) return;
 
-          // Unregister events if possible
-          try {
-            waveSurferRef.current.un("ready");
-            waveSurferRef.current.un("seek");
-            waveSurferRef.current.un("interaction");
-            waveSurferRef.current.un("audioprocess");
-            waveSurferRef.current.un("finish");
-          } catch (e) {
-            // Ignore unregister errors
-          }
+    try {
+      ws.un?.("ready");
+      ws.un?.("seek");
+      ws.un?.("interaction");
+      ws.un?.("audioprocess");
+      ws.un?.("finish");
+      ws.un?.("error");
+    } catch {}
 
-          // Destroy with error handling
-          // destroy() sometimes throws if called mid-loading; ignore it
-          if (typeof waveSurferRef.current.destroy === "function") {
-            try {
-              waveSurferRef.current.destroy();
-            } catch (err) {
-              // Silently ignore synchronous errors
-            }
-          }
-        } catch (err) {
-          // Silently ignore all cleanup errors
-        }
-        waveSurferRef.current = null;
+    try {
+      if (ws.isPlaying?.()) ws.pause?.();
+    } catch {}
+    try {
+      ws.stop?.();
+    } catch {}
+
+    try {
+      ws.destroy?.();
+    } catch {}
+
+    waveSurferRef.current = null;
+    audioContext.current = null;
+    gainNode.current = null;
+    setReady(false);
+  };
+
+  const clampVolume = (value) => {
+    if (typeof value !== "number" || Number.isNaN(value)) return 1;
+    return Math.max(0, Math.min(1, value));
+  };
+
+  const applyPlaybackVolume = React.useCallback((muted, value) => {
+    const ws = waveSurferRef.current;
+    if (!ws) return;
+
+    const targetMuted = !!muted;
+    const targetVolume = targetMuted ? 0 : clampVolume(value);
+
+    if (typeof ws.setVolume === "function") {
+      try {
+        ws.setVolume(targetVolume);
+        return;
+      } catch {}
+    }
+    if (typeof ws.setMuted === "function") {
+      try {
+        ws.setMuted(targetMuted);
+        return;
+      } catch {}
+    }
+
+    if (gainNode.current && audioContext.current) {
+      const ac = audioContext.current;
+      const gn = gainNode.current;
+      try {
+        gn.gain.setValueAtTime(gn.gain.value, ac.currentTime);
+        gn.gain.linearRampToValueAtTime(targetVolume, ac.currentTime + 0.08);
+      } catch {}
+    }
+  }, []);
+
+  const createWaveSurfer = (audioUrl) => {
+    if (!containerRef.current) return null;
+
+    setReady(false);
+
+    const ws = WaveSurfer.create({
+      container: containerRef.current,
+      waveColor,
+      progressColor,
+      backgroundColor: t.bg,
+      height,
+      barWidth: 2,
+      barGap: 1,
+      barRadius: 2,
+      cursorWidth: 1,
+      cursorColor: isDark ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.6)",
+      responsive: true,
+      normalize: true,
+      partialRender: true,
+      minPxPerSec: 50,
+      hideScrollbar: true,
+      fetchParams: {
+        signal: abortControllerRef.current?.signal,
+      },
+    });
+
+    ws.on("error", (err) => {
+      if (
+        err?.name === "AbortError" ||
+        err?.message?.includes("aborted") ||
+        err?.message?.includes("signal is aborted") ||
+        err?.message?.includes("BodyStreamBuffer was aborted")
+      ) {
+        return;
       }
-      
-      isReadyRef.current = false; // Reset ready state
+      console.error("WaveSurfer error:", err);
+    });
+
+    const handleSeek = () => {
+      if (isSyncingRef.current) return;
+      try {
+        const cur = waveSurferRef.current;
+        if (!cur) return;
+        const time = cur.getCurrentTime?.() ?? 0;
+        onSeek?.(time);
+      } catch (e) {
+        console.error("Error during seek:", e);
+      }
     };
-  }, [url]); // Only dependency is url now
 
-  // Update our url state if the prop changes
+    ws.on("ready", () => {
+      setReady(true);
+
+      // Setup gain node if possible
+      try {
+        if (ws.backend?.ac) {
+          audioContext.current = ws.backend.ac;
+          gainNode.current = audioContext.current.createGain();
+          ws.backend.setFilters?.([gainNode.current]);
+        }
+      } catch {}
+
+      const restore = restorePlaybackRef.current;
+      const muteToApply = restore?.mutedValue ?? mutedValue;
+      const volToApply = restore?.volume ?? volumeRef.current;
+      applyPlaybackVolume(muteToApply, volToApply);
+
+      // Restore time: otherWaveform (e.g. instrumental) is source of truth when available
+      const timeToRestore =
+        typeof otherWaveform?.getCurrentTime === "function"
+          ? otherWaveform.getCurrentTime()
+          : restore?.lastTime;
+      if (typeof timeToRestore === "number" && timeToRestore >= 0) {
+        try {
+          const d = ws.getDuration?.() ?? 0;
+          if (d > 0 && d !== Infinity && !Number.isNaN(d)) {
+            const norm = Math.max(0, Math.min(1, timeToRestore / d));
+            ws.seekTo?.(norm);
+          } else if (typeof ws.setCurrentTime === "function") {
+            ws.setCurrentTime(timeToRestore);
+          }
+        } catch {}
+      }
+
+      ws.on("seek", handleSeek);
+      ws.on("interaction", handleSeek);
+
+      ws.on("audioprocess", () => {
+        if (isSyncingRef.current) return;
+        try {
+          const curT = ws.getCurrentTime?.() ?? 0;
+          onPositionChange?.(curT);
+          onTimeUpdate?.(curT);
+        } catch {}
+      });
+
+      ws.on("finish", () => {
+        try {
+          if (otherWaveform?.isPlaying?.()) otherWaveform.pause?.();
+        } catch {}
+      });
+
+      const wrapper = {
+        setCurrentTime: (time) => {
+          const cur = waveSurferRef.current;
+          if (!cur || typeof time !== "number") return;
+
+          isSyncingRef.current = true;
+          try {
+            const d = cur.getDuration?.() ?? 0;
+            if (d > 0 && d !== Infinity && !Number.isNaN(d)) {
+              const norm = Math.max(0, Math.min(1, time / d));
+              cur.seekTo?.(norm);
+            }
+          } finally {
+            setTimeout(() => (isSyncingRef.current = false), 40);
+          }
+        },
+        getCurrentTime: () => waveSurferRef.current?.getCurrentTime?.() ?? 0,
+        getDuration: () => waveSurferRef.current?.getDuration?.() ?? 0,
+        isPlaying: () => waveSurferRef.current?.isPlaying?.() ?? false,
+        play: () => waveSurferRef.current?.play?.(),
+        pause: () => waveSurferRef.current?.pause?.(),
+        setMuted: (muted) => applyPlaybackVolume(!!muted, volumeRef.current),
+        getWavesurfer: () => waveSurferRef.current,
+      };
+
+      onReady(wrapper);
+
+      if (restore?.wasPlaying) {
+        try {
+          ws.play?.();
+        } catch {}
+      } else if (isPlaying) {
+        try {
+          ws.play?.();
+        } catch {}
+      }
+      restorePlaybackRef.current = null;
+    });
+
+    ws.load(audioUrl).catch((err) => {
+      if (
+        err?.name === "AbortError" ||
+        err?.message?.includes("aborted") ||
+        err?.message?.includes("signal is aborted") ||
+        err?.message?.includes("BodyStreamBuffer was aborted")
+      ) {
+        return;
+      }
+      console.error("WaveSurfer load error:", err);
+    });
+
+    waveSurferRef.current = ws;
+    return ws;
+  };
+
+  // prop -> internal url
   useEffect(() => {
-    if (initialUrl !== url) {
-      setUrl(initialUrl);
-    }
+    if (initialUrl !== url) setUrl(initialUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialUrl]);
 
-  // Handle play/pause state
+  // create/destroy on url change – capture state before destroy for seamless restore (do NOT call onRequestStop)
   useEffect(() => {
-    if (waveSurferRef.current && ready) {
-      if (isPlaying) {
-        waveSurferRef?.current?.play();
-      } else {
-        waveSurferRef?.current?.pause();
-      }
+    isMountedRef.current = true;
+
+    // Capture state before destroy for seamless restore on URL change (prevents “carryover”)
+    const ws = waveSurferRef.current;
+    if (ws) {
+      try {
+        restorePlaybackRef.current = {
+          wasPlaying: ws.isPlaying?.() ?? false,
+          lastTime: ws.getCurrentTime?.() ?? 0,
+          mutedValue,
+          volume: volumeRef.current ?? 1,
+        };
+      } catch {}
     }
+
+    destroyWaveSurfer();
+
+    if (!containerRef.current || !url) return;
+
+    abortControllerRef.current = new AbortController();
+
+    const id = setTimeout(() => {
+      if (!isMountedRef.current) return;
+      createWaveSurfer(url);
+    }, 30);
+
+    return () => {
+      isMountedRef.current = false;
+      clearTimeout(id);
+      destroyWaveSurfer();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
+
+  // play/pause sync
+  useEffect(() => {
+    const ws = waveSurferRef.current;
+    if (!ws || !ready) return;
+    try {
+      if (isPlaying) ws.play?.();
+      else ws.pause?.();
+    } catch {}
   }, [isPlaying, ready]);
 
-  // Handle mute/unmute state
+  // Single volume-sync effect (context ref or prop fallback). applyPlaybackVolume is stable (useCallback).
   useEffect(() => {
-    const currentWavesurfer = waveSurferRef.current;
-    const targetMuted = !!isMuted;
+    if (!ready) return;
 
-    if (currentWavesurfer && typeof currentWavesurfer.setMuted === "function") {
-      currentWavesurfer.setMuted(targetMuted);
-      return;
+    if (volumeContext?.volumeRef) {
+      const interval = setInterval(() => {
+        const newVolume = volumeContext.volumeRef.current;
+        if (volumeRef.current !== newVolume) {
+          volumeRef.current = newVolume;
+          applyPlaybackVolume(mutedValue, newVolume);
+        }
+      }, 75);
+
+      return () => clearInterval(interval);
     }
 
-    if (currentWavesurfer && typeof currentWavesurfer.setVolume === "function") {
-      currentWavesurfer.setVolume(targetMuted ? 0 : 1);
-      return;
-    }
+    volumeRef.current = volumeProp ?? 1;
+    applyPlaybackVolume(mutedValue, volumeRef.current);
+  }, [ready, mutedValue, volumeProp, volumeContext?.volumeRef, applyPlaybackVolume]);
 
-    if (gainNode.current && audioContext.current) {
-      const gainValue = targetMuted ? 0 : 1;
-      try {
-        gainNode.current.gain.setValueAtTime(
-          gainNode.current.gain.value,
-          audioContext.current.currentTime
-        );
-        gainNode.current.gain.linearRampToValueAtTime(
-          gainValue,
-          audioContext.current.currentTime + 0.1
-        );
-      } catch (err) {
-        console.error('Error updating mute state in useEffect:', err);
-      }
-      return;
-    }
-
-    if (currentWavesurfer && currentWavesurfer.backend && currentWavesurfer.backend.ac) {
-      const filters = currentWavesurfer.backend.filters || [];
-      const foundGainNode = filters.find((f) => f && f.gain !== undefined);
-      if (foundGainNode) {
-        gainNode.current = foundGainNode;
-        audioContext.current = currentWavesurfer.backend.ac;
-        const gainValue = targetMuted ? 0 : 1;
-        foundGainNode.gain.setValueAtTime(
-          foundGainNode.gain.value,
-          currentWavesurfer.backend.ac.currentTime
-        );
-        foundGainNode.gain.linearRampToValueAtTime(
-          gainValue,
-          currentWavesurfer.backend.ac.currentTime + 0.1
-        );
-      }
-    }
-  }, [isMuted, ready]);
-
-  // Handle direct user interactions with the waveform
+  // ✅ mute + volume sync (works for both controlled and uncontrolled)
   useEffect(() => {
-    if (containerRef.current && waveSurferRef.current && ready) {
-      const handleClick = (event) => {
-        // Only handle direct user clicks
-        if (event.isTrusted && !isSyncingRef.current) {
-          // Small timeout to allow wavesurfer to update its time first
-          setTimeout(() => {
-            try {
-              if (waveSurferRef.current && waveSurferRef.current.backend) {
-                const time = waveSurferRef.current.getCurrentTime();
-                onSeek(time);
-              }
-            } catch (err) {
-              console.error("Error in click handler:", err);
-            }
-          }, 10);
-        }
-      };
+    if (!ready) return;
+    applyPlaybackVolume(mutedValue, volumeRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mutedValue, ready]);
 
-      containerRef?.current?.addEventListener("click", handleClick);
-
-      return () => {
-        containerRef?.current?.removeEventListener("click", handleClick);
-      };
-    }
-  }, [ready, onSeek]);
-
-  // This function safely updates the current time without triggering an infinite loop
-  const safeSetCurrentTime = (time) => {
-    if (waveSurferRef.current && ready) {
-      try {
-        // Check if wavesurfer is still valid and has backend initialized
-        if (waveSurferRef.current.backend && typeof time === "number") {
-          // Set the flag to prevent event handlers from firing
-          isSyncingRef.current = true;
-
-          // Set the time
-          waveSurferRef.current.setCurrentTime(time);
-
-          // Reset the flag after a short delay
-          setTimeout(() => {
-            isSyncingRef.current = false;
-          }, 50);
-        }
-      } catch (err) {
-        console.error("Error setting current time:", err);
-        // Reset the flag in case of error
-        isSyncingRef.current = false;
-      }
-    }
-  };
-
-  // Method to get the current playback state
-  const isWaveformPlaying = () => {
-    return waveSurferRef.current?.isPlaying() || false;
-  };
-
-  // Method to mute/unmute the audio without stopping playback
-  const setMuted = (muted) => {
-    if (gainNode.current && audioContext.current) {
-      // Smoothly transition the gain to avoid clicks
-      const gainValue = muted ? 0 : 1;
-      gainNode.current.gain.setValueAtTime(
-        gainNode.current.gain.value,
-        audioContext.current.currentTime
-      );
-      gainNode.current.gain.linearRampToValueAtTime(
-        gainValue,
-        audioContext.current.currentTime + 0.1
-      );
-    }
-  };
-
-  // Expose the waveform control methods to parent component
+  // expose imperative API
   React.useImperativeHandle(ref, () => ({
-    setCurrentTime: safeSetCurrentTime,
-    getCurrentTime: () => {
+    setCurrentTime: (time) => {
+      const ws = waveSurferRef.current;
+      if (!ws || !ready || typeof time !== "number") return;
+      isSyncingRef.current = true;
       try {
-        if (waveSurferRef.current && waveSurferRef.current.getCurrentTime) {
-          return waveSurferRef.current.getCurrentTime();
+        if (typeof ws.setTime === "function") ws.setTime(time);
+        else if (typeof ws.setCurrentTime === "function") ws.setCurrentTime(time);
+        else {
+          const d = ws.getDuration?.() ?? 0;
+          if (d > 0) ws.seekTo?.(Math.max(0, Math.min(1, time / d)));
         }
-        return 0;
-      } catch (err) {
-        console.error("Error getting current time:", err);
-        return 0;
+      } catch (e) {
+        console.error("Error setting time:", e);
+      } finally {
+        setTimeout(() => (isSyncingRef.current = false), 40);
       }
     },
-    getDuration: () => {
-      try {
-        if (waveSurferRef.current && waveSurferRef.current.getDuration) {
-          return waveSurferRef.current.getDuration();
-        }
-        return 0;
-      } catch (err) {
-        console.error("Error getting duration:", err);
-        return 0;
-      }
-    },
-    isPlaying: () => {
-      try {
-        return (
-          (waveSurferRef.current && waveSurferRef.current.isPlaying()) || false
-        );
-      } catch (err) {
-        console.error("Error checking if playing:", err);
-        return false;
-      }
-    },
-    play: () => {
-      try {
-        if (waveSurferRef.current && waveSurferRef.current.backend) {
-          waveSurferRef.current.play();
-        }
-      } catch (err) {
-        console.error("Error during play:", err);
-      }
-    },
-    pause: () => {
-      try {
-        if (waveSurferRef.current && waveSurferRef.current.backend) {
-          waveSurferRef.current.pause();
-        }
-      } catch (err) {
-        console.error("Error during pause:", err);
-      }
-    },
-    setMuted,
+    getCurrentTime: () => waveSurferRef.current?.getCurrentTime?.() ?? 0,
+    getDuration: () => waveSurferRef.current?.getDuration?.() ?? 0,
+    isPlaying: () => waveSurferRef.current?.isPlaying?.() ?? false,
+    play: () => waveSurferRef.current?.play?.(),
+    pause: () => waveSurferRef.current?.pause?.(),
+    setMuted: (muted) => applyPlaybackVolume(!!muted, volumeRef.current),
     getWavesurfer: () => waveSurferRef.current,
   }));
 
-  const toggleVocalType = () => {
-    if (!url || !url.includes("vocals")) return;
+  // ✅ click handler for mute button
+  const handleMuteClick = () => {
+    const next = !mutedValue;
 
-    // Toggle the raw mode state
-    setRawMode(!rawMode);
-
-    // Construct the new URL based on the toggle state
-    let newUrl;
-    if (rawMode) {
-      // Switching from raw to processed
-      newUrl = url.replace("/raw_vocals/", "/processed_vocals/");
-    } else {
-      // Switching from processed to raw
-      newUrl = url.replace("/processed_vocals/", "/raw_vocals/");
+    // Controlled: tell parent what to set
+    if (typeof onToggleMute === "function") {
+      onToggleMute(next);
+      return;
     }
 
-    // Update the URL
-    setUrl(newUrl);
-
-    // If audio is already loaded, recreate it with the new URL
-    if (waveSurferRef.current) {
-      const wasPlaying = waveSurferRef.current.isPlaying();
-      waveSurferRef.current.destroy();
-      createWaveSurfer(newUrl);
-      if (wasPlaying) {
-        // Small delay to ensure the new wavesurfer is ready
-        setTimeout(() => {
-          if (waveSurferRef.current) {
-            waveSurferRef.current.play();
-          }
-        }, 100);
-      }
-    }
+    // Uncontrolled fallback: update local + apply immediately
+    setLocalMuted(next);
+    applyPlaybackVolume(next, volumeRef.current);
   };
 
-  // Add time update event listener
-  useEffect(() => {
-    if (waveSurferRef.current) {
-      // Set up timeupdate event listener
-      const updateTimeHandler = (currentTime) => {
-        onTimeUpdate(currentTime);
-      };
-
-      waveSurferRef.current.on("audioprocess", updateTimeHandler);
-
-      return () => {
-        if (waveSurferRef.current) {
-          waveSurferRef.current.un("audioprocess", updateTimeHandler);
-        }
-      };
-    }
-  }, [waveSurferRef.current, onTimeUpdate]);
-
   return (
-    <Box
-      sx={{
-        position: "relative",
-        width: "100%",
-        overflow: "hidden",
-      }}
-    >
-      {/* Waveform container */}
+    <Box sx={{ position: "relative", width: "100%", overflow: "hidden" }}>
       <Box
         ref={containerRef}
         sx={{
           width: "100%",
           height: `${height}px`,
-          borderRadius: "4px",
+         
           overflow: "hidden",
-          backgroundColor: backgroundColor,
-          opacity: url ? (isMuted ? 0.5 : 1) : 0.3, // Reduced opacity when muted
-          pointerEvents: "auto",
-          overscrollBehaviorY: "none",
-          touchAction: "pan-x",
+          backgroundColor: 'transparent',
+          opacity: url ? (mutedValue ? 0.55 : 1) : 0.35,
+       borderRadius: '12px',
         }}
       />
 
-      {/* Badge for raw/processed */}
       {badgeText && (
         <Typography
           variant="caption"
           sx={{
             position: "absolute",
-            top: 4,
-            right: 8,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            color: "white",
-            padding: "2px 8px",
-            backdropFilter: "blur(5px)",
-            zIndex: 1000,
-            alignSelf: "flex-end",
-            borderRadius: 8,
-            fontSize: "0.7rem",
+            top: 0,
+            right: 2,
+            zIndex: 5,
+            px: "8px",
+            py: "2px",
+            borderRadius: 999,
+            fontSize: "0.70rem",
+            fontWeight: 800,
+            letterSpacing: -0.1,
+            color: t.text,
+             border: `1px solid ${t.hairline}`,
+            background: `linear-gradient(180deg, ${t.glass}, ${t.glass2})`,
+            backdropFilter: "blur(70px)",
+            WebkitBackdropFilter: "blur(10px)",
           }}
         >
           {badgeText}
         </Typography>
       )}
 
-      {/* Controls */}
       <Box
         sx={{
           position: "absolute",
-          right: 8,
-          bottom: 4,
+          right:2,
+          bottom: 0,
+          zIndex: 5,
           display: "flex",
-          zIndex: 1000,
-          gap: 1,
+          gap: 0.75,
+          alignItems: "center",
         }}
       >
-        {/* Mute/Unmute button with container */}
-        <Box
+        <IconButton
+          size="small"
+          disabled={!url || !ready}
+          onClick={handleMuteClick}
           sx={{
-            backgroundColor: "rgba(0,0,0,0.6)",
-            backdropFilter: "blur(3px)",
-            borderRadius: "50%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            height: "28px",
-            width: "28px",
-            "&:hover": { backgroundColor: "rgba(0,0,0,0.8)" },
+            width: 30,
+            height: 30,
+            borderRadius: 2,
+             border: `1px solid ${t.hairline}`,
+            background: `linear-gradient(180deg, ${t.glass}, ${t.glass2})`,
+            backdropFilter: "blur(70px)",
+            WebkitBackdropFilter: "blur(70px)",
+            boxShadow: t.shadow,
+            color: t.text,
+            "&:hover": { background: `linear-gradient(180deg, ${t.glass}, ${t.glass})` },
           }}
         >
-          <IconButton
-            disabled={!url || !ready}
-            onClick={onPlayPause}
-            sx={{
-              color: "white",
-              padding: 0,
-              height: "24px",
-              width: "24px",
-            }}
-          >
-            {isMuted ? (
-              <VolumeOffIcon sx={{ height: "18px", width: "18px" }} />
-            ) : (
-              <VolumeUpIcon sx={{ height: "18px", width: "18px" }} />
-            )}
-          </IconButton>
-        </Box>
+          {mutedValue ? (
+            <VolumeOffIcon sx={{ width: 18, height: 18 }} />
+          ) : (
+            <VolumeUpIcon sx={{ width: 18, height: 18 }} />
+          )}
+        </IconButton>
 
-        {/* Download button with container */}
-        <Box
+        <IconButton
+          size="small"
+          disabled={!url}
+          onClick={onDownload}
           sx={{
-            backgroundColor: "rgba(0,0,0,0.6)",
-            backdropFilter: "blur(3px)",
-            borderRadius: "50%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            height: "28px",
-            width: "28px",
-            "&:hover": { backgroundColor: "rgba(0,0,0,0.8)" },
+            width: 30,
+            height: 30,
+            borderRadius: 2,
+             border: `1px solid ${t.hairline}`,
+            background: `linear-gradient(180deg, ${t.glass}, ${t.glass2})`,
+            backdropFilter: "blur(70px)",
+            WebkitBackdropFilter: "blur(70px)",
+            boxShadow: t.shadow,
+            color: t.text,
+            "&:hover": { background: `linear-gradient(180deg, ${t.glass}, ${t.glass})` },
           }}
         >
-          <IconButton
-            disabled={!url}
-            onClick={onDownload}
-            sx={{
-              color: "white",
-              padding: 0,
-              height: "24px",
-              width: "24px",
-            }}
-          >
-            <DownloadIcon sx={{ height: "18px", width: "18px" }} />
-          </IconButton>
-        </Box>
+          <DownloadIcon sx={{ width: 18, height: 18 }} />
+        </IconButton>
       </Box>
     </Box>
   );

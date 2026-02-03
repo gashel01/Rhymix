@@ -546,7 +546,7 @@ def create_dataset_exports(segment_audio=True, process_audio=True, clean_after=F
         print("\nCleaning up directories after export...")
         clean_directories(include_input=False)  # Don't clean input dir after export
 
-def update_progress(message, progress, current_file=0, total_files=0, file_progress=None):
+def update_progress(message, progress, current_file=0, total_files=0, file_progress=None, file_id=None):
     """Update progress for the current processing task"""
     # Remove emojis from log messages to avoid encoding issues
     import re
@@ -581,6 +581,7 @@ def update_progress(message, progress, current_file=0, total_files=0, file_progr
         'current_file': current_file,
         'total_files': total_files,
         'file_progress': file_progress if file_progress is not None else progress,
+        'file_id': file_id,
         'timestamp': time.time()
     }
     
@@ -600,12 +601,13 @@ def update_progress(message, progress, current_file=0, total_files=0, file_progr
 
 # Custom TQDM class to send progress updates
 class ProgressCallback:
-    def __init__(self, total, desc, file_index, total_files):
+    def __init__(self, total, desc, file_index, total_files, file_id=None):
         self.total = total
         self.n = 0
         self.desc = desc
         self.file_index = file_index
         self.total_files = total_files
+        self.file_id = file_id
 
     def update(self, n):
         self.n += n
@@ -615,18 +617,19 @@ class ProgressCallback:
             progress=progress, 
             current_file=self.file_index, 
             total_files=self.total_files,
-            file_progress=progress  # Add explicit file progress
+            file_progress=progress,  # Add explicit file progress
+            file_id=self.file_id,
         )
 
-def process_all(segment_audio=True, process_audio=True, export_data=False, clean_after=False):
+def process_all(segment_audio=True, process_audio=True, export_data=False, clean_after=False, input_files=None):
     """
-    Process all audio files in the input_dir
+    Process audio files. If input_files is given, process only those paths; else process all in INPUT_DIR.
     """
-    # Force segment_audio to False regardless of what was passed
     segment_audio = False  # Disable segmentation completely
-    
-    # Count total files for progress reporting
-    input_files = list(INPUT_DIR.glob("*.*"))
+    if input_files is not None:
+        input_files = [Path(p) for p in input_files]
+    else:
+        input_files = list(INPUT_DIR.glob("*.*"))
     total_files = len(input_files)
     
     if total_files == 0:
@@ -638,17 +641,14 @@ def process_all(segment_audio=True, process_audio=True, export_data=False, clean
     # Process each file
     for i, file_path in enumerate(input_files, 1):
         try:
-            update_progress(f"[PROCESSING] {file_path.name}...", 0, i, total_files)
+            file_id = file_path.stem
+            update_progress(f"[PROCESSING] {file_path.name}...", 0, i, total_files, file_id=file_id)
             process_file(file_path, segment_audio, process_audio, export_data, i, total_files)
         except Exception as e:
             logger.error(f"Error processing {file_path}: {str(e)}")
             logger.error(traceback.format_exc())
-            update_progress(f"[ERROR] {file_path.name}: {str(e)}", (i-1)/total_files, i, total_files)
-    
-    # Create dataset export if requested
-    if export_data:
-        update_progress("Creating dataset export...", 0.95, total_files, total_files)
-        create_dataset_exports(segment_audio, process_audio, clean_after)
+            file_id = file_path.stem
+            update_progress(f"[ERROR] {file_path.name}: {str(e)}", (i-1)/total_files, i, total_files, file_id=file_id)
     
     # Clean up if requested
     if clean_after:
@@ -661,25 +661,27 @@ def process_file(file_path, segment_audio, process_audio, export_data, file_inde
     """Process a single audio file."""
     normalized_name = normalize_filename(file_path.stem)
     print(f"Processing {normalized_name}...")
+    file_id = file_path.stem
+
+    def report(message, progress, file_progress=None):
+        update_progress(message, progress, file_index, total_files, file_progress, file_id=file_id)
     
     # Convert to WAV (0% -> 20%)
     wav_path = TEMP_WAV_DIR / f"{normalized_name}.wav"
     if not wav_path.exists() or file_path.suffix.lower() != '.wav':
-        update_progress(f"Converting {file_path.name} to WAV format...", 0.1, file_index, total_files)
+        report(f"Converting {file_path.name} to WAV format...", 0.1)
         convert_to_wav(file_path, wav_path)
-        update_progress(f"WAV conversion complete", 0.2, file_index, total_files)
+        report("WAV conversion complete", 0.2)
     
     # Extract vocals (20% -> 70%)
-    update_progress(f"Extracting vocals from {normalized_name}...", 0.2, file_index, total_files)
+    report(f"Extracting vocals from {normalized_name}...", 0.2)
     
     def separation_progress_callback(progress):
         # Scale progress from 20% to 70%
         scaled_progress = 0.2 + (progress * 0.5)
-        update_progress(
-            f"Extracting vocals: {int(progress * 100)}%", 
-            scaled_progress, 
-            file_index, 
-            total_files,
+        report(
+            f"Extracting vocals: {int(progress * 100)}%",
+            scaled_progress,
             progress
         )
     
@@ -687,11 +689,11 @@ def process_file(file_path, segment_audio, process_audio, export_data, file_inde
     
     # Process vocals if requested (70% -> 100%)
     if process_audio:
-        update_progress(f"Processing vocals from {normalized_name}...", 0.7, file_index, total_files)
+        report(f"Processing vocals from {normalized_name}...", 0.7)
         process_vocal_file(normalized_name)
-        update_progress(f"Vocal processing complete", 0.9, file_index, total_files)
+        report("Vocal processing complete", 0.9)
     
-    update_progress(f"Completed {normalized_name}", 1.0, file_index, total_files)
+    report(f"Completed {normalized_name}", 1.0)
 
 # Replace the extract_vocals function to accept a progress callback
 def extract_vocals(wav_path, normalized_name, progress_callback=None):
@@ -1030,8 +1032,9 @@ def process_vocal_file(normalized_name):
 def uv_separate(file_path, file_index, total_files):
     """Extract vocals from audio file using the Ultimate Vocal Remover."""
     base_name = file_path.stem
+    file_id = file_path.stem
     
-    update_progress(f"Converting {file_path.name} to WAV format...", 0.1, file_index, total_files)
+    update_progress(f"Converting {file_path.name} to WAV format...", 0.1, file_index, total_files, file_id=file_id)
     
     # Get the normalized filename (without extension)
     normalized_name = base_name
@@ -1060,10 +1063,10 @@ def uv_separate(file_path, file_index, total_files):
         audio_path = file_path
     
     # Extract vocals using the updated extract_vocals function
-    update_progress(f"Extracting vocals from {normalized_name}...", 0.2, file_index, total_files)
+    update_progress(f"Extracting vocals from {normalized_name}...", 0.2, file_index, total_files, file_id=file_id)
     try:
         # Create a progress callback for the vocal extraction
-        progress_cb = ProgressCallback(100, f"Extracting vocals", file_index, total_files)
+        progress_cb = ProgressCallback(100, "Extracting vocals", file_index, total_files, file_id=file_id)
         
         # Call the extract_vocals function
         vocals_path, instrumental_path = extract_vocals(
@@ -1072,7 +1075,7 @@ def uv_separate(file_path, file_index, total_files):
             progress_callback=progress_cb
         )
         
-        update_progress(f"Successfully extracted vocals for {normalized_name}", 0.4, file_index, total_files)
+        update_progress(f"Successfully extracted vocals for {normalized_name}", 0.4, file_index, total_files, file_id=file_id)
         return vocals_path
     except Exception as e:
         print(f"Error extracting vocals: {e}")

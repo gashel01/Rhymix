@@ -1,11 +1,23 @@
 import React from 'react';
-import { Box, IconButton, Tooltip } from '@mui/material';
+import { Box, IconButton, Tooltip, CircularProgress } from '@mui/material';
 import PlayAllIcon from '@mui/icons-material/PlaylistPlay';
 import PauseIcon from '@mui/icons-material/Pause';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import styles from './TrackControls.module.css';
 
-function TrackControls({ instrumental, vocal, isPlaying, onPlayBoth, onDownloadFullSong, disabled = false }) {
+function TrackControls({
+  instrumental,
+  vocal,
+  isPlaying,
+  onPlayBoth,
+  onDownloadFullSong,
+  disabled = false,
+  downloadDisabledReason,
+  downloading = false,
+}) {
+  const missing = !instrumental || !vocal;
+  const downloadDisabled = disabled || downloading || missing;
+  const downloadTitle = downloadDisabledReason || (downloading ? "Preparing download..." : "Download full song");
   return (
     <Box className={styles.container}>
       <IconButton
@@ -19,15 +31,19 @@ function TrackControls({ instrumental, vocal, isPlaying, onPlayBoth, onDownloadF
         {isPlaying ? <PauseIcon fontSize="small" /> : <PlayAllIcon fontSize="small" />}
       </IconButton>
 
-      <Tooltip title="Download full song">
+      <Tooltip title={downloadTitle}>
         <IconButton
           className={styles.downloadButton}
           size="small"
           style={{ position: 'absolute' }} // Restored
-          onClick={() => (onDownloadFullSong || (() => {}))(instrumental, vocal)}
-          disabled={disabled}
+          onClick={() => (onDownloadFullSong || (() => {}))()}
+          disabled={downloadDisabled}
         >
-          <CloudDownloadIcon sx={{ fontSize: "0.9rem" }} />
+          {downloading ? (
+            <CircularProgress size={16} />
+          ) : (
+            <CloudDownloadIcon sx={{ fontSize: "0.9rem" }} />
+          )}
         </IconButton>
       </Tooltip>
     </Box>

@@ -1,489 +1,235 @@
-import React, { useState, useEffect } from "react";
-import {
-  Box,
-  Typography,
-  Paper,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  CircularProgress,
-  ToggleButton,
-  ToggleButtonGroup,
-} from "@mui/material";
+import React, { useCallback, useEffect, useMemo, memo } from "react";
+import { useVolume } from "../contexts/VolumeContext";
 import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
-import VoiceChatIcon from "@mui/icons-material/VoiceChat";
 import AddIcon from "@mui/icons-material/Add";
+
 import AudioTrackTable from "./AudioTrackTable";
 import ErrorBoundary from "./ErrorBoundary";
 import TabPanel from "./common/TabPanel";
-import { useAudioPlayback } from "../hooks/useAudioPlayback";
 import { useVocalMode } from "../hooks/useVocalMode";
 import { useAvailableFiles } from "../hooks/useAvailableFiles";
 import { downloadFile } from "../utils/audioUtils";
-import { getAvailableTalkingDatasets } from "../utils/apiService";
+import {
+  mergeProcessingUpdate,
+  processingEquals,
+  isTerminalProcessingState,
+} from "../utils/processingStatus";
+import Spinner from "./Homeview/Spinner.js";
+import Panel from "./Homeview/Panel.js";
+import Btn from "./Homeview/Btn.js";
+import MainHeader from "./Homeview/MainHeader.js";
+import IconButton from "./Homeview/IconButton.js";
+
+import { Theme  } from "./Homeview/Theme.js";
+
+import { useAudioPlayback  }  from "./Homeview/useAudioPlayback";
 
 function HomeView({
-  onCreateSingingDataset,
-  onCreateTalkingDataset,
+  onOpenCreateDataset,
   onInferenceWithTracks,
   handleTrainWithDataset,
+  darkMode,
+  optimisticTracks = [],
+  onOptimisticTracksChange,
 }) {
-  const [talkingDatasets, setTalkingDatasets] = useState([]);
-  const [activeTab, setActiveTab] = useState(0);
-  const [createDatasetModalOpen, setCreateDatasetModalOpen] = useState(false);
+  const { volumeRef } = useVolume();
+  // ---------- Theme tokens (same “new style”) ----------
+ const t = Theme({ darkMode }).t;
+ 
 
-  // Use custom hooks
-  const {
-    availableFiles,
-    rawVocals,
-    loading,
-  } = useAvailableFiles();
 
-  const {
-    vocalMode,
-    handleVocalModeChange,
-    vocalsFileType,
-  } = useVocalMode("raw");
+  // ---------- Hooks (unchanged logic) ----------
+  const { availableFiles, rawVocals, loading, refetch } = useAvailableFiles();
 
-  const {
-    playingFile,
-    playingBoth,
-    instrumentalWaveforms,
-    vocalWaveforms,
-    handlePlayPause,
-    handlePlayBoth,
-    handleInstrumentalWaveformReady,
-    handleVocalWaveformReady,
-    stopAllAudio,
-  } = useAudioPlayback();
+  const { vocalMode, handleVocalModeChange, vocalsFileType } = useVocalMode("raw");
 
-  // Handle tab change
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
-  };
+  const { trackPairs } = useAudioPlayback({ rawVocals, availableFiles, vocalMode, optimisticTracks });
 
-  const handleCreateDatasetClick = () => {
-    setCreateDatasetModalOpen(true);
-  };
+  const handleCreateDatasetClick = () => onOpenCreateDataset?.();
 
-  const handleCreateDatasetModalClose = () => {
-    setCreateDatasetModalOpen(false);
-  };
+  const handleDownload = useCallback(
+    async (fileType, filePath, downloadName) => {
+      await downloadFile(fileType, filePath, vocalMode, downloadName);
+    },
+    [vocalMode]
+  );
 
-  const handleCreateSingingDataset = () => {
-    setCreateDatasetModalOpen(false);
-    onCreateSingingDataset && onCreateSingingDataset();
-  };
-
-  const handleCreateTalkingDataset = () => {
-    setCreateDatasetModalOpen(false);
-    onCreateTalkingDataset && onCreateTalkingDataset();
-  };
-
-  const handleDownload = async (fileType, filePath) => {
-    await downloadFile(fileType, filePath, vocalMode);
-  };
-
-  const handleVocalModeChangeWithCleanup = (event, newMode) => {
-    if (newMode !== null) {
-      stopAllAudio();
-      handleVocalModeChange(event, newMode);
-    }
-  };
-
-  const getTrackPairs = () => {
-    const sourceFiles = vocalMode === "processed" ? availableFiles : rawVocals;
-    const isProcessed = vocalMode === "processed";
-
-    return sourceFiles.map((pair, index) => ({
-      instrumental: pair.instrumentalPath
-        ? pair.instrumentalPath.split("/").pop()
-        : null,
-      vocal: pair.vocalPath ? pair.vocalPath.split("/").pop() : null,
-      name: pair.name,
-      instrumentalUrl: pair.instrumentalUrl,
-      vocalUrl: pair.vocalUrl,
-      vocalMode: vocalMode, // "processed" or "raw"
-      isProcessed: isProcessed, // boolean for easier checking
-      id: pair.id || pair.name || `${pair.instrumentalPath || ''}-${pair.vocalPath || ''}-${index}`, // Unique ID for selection
-    }));
-  };
-
-  // Fetch talking datasets on component mount
-  useEffect(() => {
-    const fetchTalkingDatasets = async () => {
-      try {
-        const response = await getAvailableTalkingDatasets();
-
-        if (response && response.datasets) {
-          setTalkingDatasets(response.datasets);
-        }
-      } catch (error) {
-        console.error("Failed to fetch talking datasets:", error);
+  const handleVocalModeChangeWithCleanup = useCallback(
+    (event, newMode) => {
+      if (newMode !== null) {
+        handleVocalModeChange(event, newMode);
       }
-    };
+    },
+    [handleVocalModeChange]
+  );
 
-    fetchTalkingDatasets();
-  }, []);
+  const hasProcessing = useMemo(
+    () =>
+      trackPairs.some((pair) => {
+        const state = pair?.processing?.state;
+        return state && state !== "ready" && state !== "error";
+      }),
+    [trackPairs]
+  );
 
+  useEffect(() => {
+    if (!hasProcessing) return;
+    const interval = setInterval(() => {
+      refetch();
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [hasProcessing, refetch]);
+
+  useEffect(() => {
+    if (!onOptimisticTracksChange || !optimisticTracks.length) return;
+    const serverById = new Map(availableFiles.map((file) => [file.fileId, file]));
+
+    let changed = false;
+    const next = optimisticTracks
+      .map((track) => {
+        const trackId = track.trackId || track.fileId;
+        if (!trackId) return track;
+        const server = serverById.get(trackId);
+        if (!server) return track;
+        const prevProcessing = track.processing || null;
+        const nextProcessing = mergeProcessingUpdate(
+          prevProcessing,
+          server.processing || null
+        );
+        const serverTerminal = isTerminalProcessingState(server.processing?.state);
+        const mergedTerminal = isTerminalProcessingState(nextProcessing?.state);
+
+        if ((serverTerminal || !server.processing) && mergedTerminal) {
+          changed = true;
+          return null;
+        }
+
+        if (!processingEquals(prevProcessing, nextProcessing)) {
+          changed = true;
+          return {
+            ...track,
+            processing: nextProcessing,
+          };
+        }
+        return track;
+      })
+      .filter(Boolean);
+
+    if (changed) {
+      onOptimisticTracksChange(next);
+    }
+  }, [availableFiles, onOptimisticTracksChange, optimisticTracks]);
+
+  const hasRows = trackPairs.length > 0;
+  const showSpinner = loading && !hasRows;
+
+  // ---------- Render ----------
   return (
-    <Box>
-      {/* Header with Create Dataset Button */}
-      <Box sx={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        mb: 4,
-        p: 3,
-        background: "transparent",
-        borderRadius: 4,
-        border: "none",
-      }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-            Your Data Files
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Select files for training or inference, or create new datasets
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          size="large"
-          startIcon={<AddIcon />}
-          onClick={handleCreateDatasetClick}
-          sx={{
-            borderRadius: 3,
-            px: 4,
-            fontWeight: 600,
-            boxShadow: theme => theme.palette.mode === 'dark'
-              ? '0 8px 24px rgba(0,0,0,0.4)'
-              : '0 8px 24px rgba(0,0,0,0.12)',
-            '&:hover': {
-              transform: 'translateY(-2px)',
-              boxShadow: theme => theme.palette.mode === 'dark'
-                ? '0 12px 32px rgba(0,0,0,0.5)'
-                : '0 12px 32px rgba(0,0,0,0.15)',
-            },
-            transition: 'all 0.3s ease',
-          }}
-        >
-          Create Dataset
-        </Button>
-      </Box>
+    <div style={{ minHeight: "100vh", }}>
+      <div style={{ margin: "0 auto" }}>
+        <Panel style={{ borderRadius: 0, border: "none", padding: 0, background: "transparent" }} t={t}>
+          <TabPanel value={0} index={0} sx={{ p: 0, overflow: "visible", }}>
+            {showSpinner ? (
+              <div style={{ display: "grid", placeItems: "center", padding: "48px 12px", textAlign: "center" }}>
+                <Spinner size={34} t={t} />
+                <div style={{ marginTop: 12, fontSize: 14, fontWeight: 900, color: t.text }}>Loading singing data…</div>
+                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 650, color: t.subtext }}>
+                  Please wait while we fetch your audio files.
+                </div>
+              </div>
+            ) : hasRows ? (
+              <ErrorBoundary>
+                <div
+                  style={{
+                    borderRadius: t.radiusLg,
+                    border: `1px solid ${t.hairline}`,
+                    overflow: "visible",
+                    border: "none",
+                    padding: 0,
 
-      {/* Enhanced Data Files Header */}
-      <Paper
-        elevation={3}
-        sx={{
-          borderRadius: 2,
-          overflow: 'hidden',
-          background: theme => theme.palette.mode === 'dark'
-            ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
-            : `linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)`,
-          boxShadow: theme => theme.palette.mode === 'dark'
-            ? '0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)'
-            : '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)',
-          mb: 2,
-        }}
-      >
-       
+                  }}
+                >
 
-        {/* Dataset Toggle */}
-        <Box sx={{
-          p: 2,
-          backgroundColor: theme => theme.palette.mode === 'dark'
-            ? theme.palette.background.paper
-            : theme.palette.background.default,
-          borderTop: 1,
-          borderColor: 'divider',
-        }}>
-          <Box sx={{
-            display: 'flex',
-            justifyContent: 'left',
-          }}>
-            <ToggleButtonGroup
-              value={activeTab}
-              exclusive
-              onChange={(event, newValue) => {
-                if (newValue !== null) {
-                  handleTabChange(event, newValue);
-                }
-              }}
-              sx={{
-                '& .MuiToggleButtonGroup-grouped': {
-                  borderRadius: 0,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  color: 'text.secondary',
-                  px: 3,
-                  py: 1.5,
-                  fontWeight: 500,
-                  fontSize: '1rem',
-                  textTransform: 'none',
-                  minWidth: 160,
-                  '&:first-of-type': {
-                    borderTopLeftRadius: 16,
-                    borderBottomLeftRadius: 16,
-                  },
-                  '&:last-of-type': {
-                    borderTopRightRadius: 16,
-                    borderBottomRightRadius: 16,
-                  },
-                  '&:not(:first-of-type)': {
-                    borderLeft: 'none',
-                    marginLeft: 0,
-                  },
-                  '&.Mui-selected': {
-                    backgroundColor: 'primary.main',
-                    color: 'primary.contrastText',
-                    borderColor: 'primary.main',
-                    boxShadow: theme => theme.palette.mode === 'dark'
-                      ? '0 2px 8px rgba(25, 118, 210, 0.4)'
-                      : '0 2px 8px rgba(25, 118, 210, 0.3)',
-                    '&:hover': {
-                      backgroundColor: 'primary.dark',
-                      borderColor: 'primary.dark',
-                    },
-                  },
-                  '&:hover': {
-                    backgroundColor: theme => theme.palette.mode === 'dark'
-                      ? 'rgba(255,255,255,0.08)'
-                      : 'rgba(0,0,0,0.04)',
-                  },
-                  '& .MuiSvgIcon-root': {
-                    fontSize: '1.25rem',
-                    mr: 1,
-                  },
-                },
-              }}
-            >
-              <ToggleButton value={0}>
-                <LibraryMusicIcon />
-                Singing Data
-              </ToggleButton>
-              <ToggleButton value={1}>
-                <VoiceChatIcon />
-                Talking Data
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
-        </Box>
 
-        {/* Singing Data Tab */}
-        <TabPanel value={activeTab} index={0} sx={{ p: 0 }}>
-          {loading ? (
-            <Box sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              py: 8,
-              px: 4
-            }}>
-              <CircularProgress size={64} sx={{ mb: 3 }} />
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                Loading singing data files...
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Please wait while we fetch your audio files
-              </Typography>
-            </Box>
-          ) : availableFiles.length > 0 ? (
-            <ErrorBoundary>
-              <AudioTrackTable
-              trackPairs={getTrackPairs()}
-              vocalMode={vocalMode}
-              handleVocalModeChange={handleVocalModeChangeWithCleanup}
-              handlePlayPause={handlePlayPause}
-              handleDownload={handleDownload}
-              handlePlayBoth={handlePlayBoth}
-              handleInstrumentalWaveformReady={handleInstrumentalWaveformReady}
-              handleVocalWaveformReady={handleVocalWaveformReady}
-              playingFile={playingFile}
-              playingBoth={playingBoth}
-              instrumentalWaveforms={instrumentalWaveforms}
-              vocalWaveforms={vocalWaveforms}
-              showVocalToggle={true}
-              enablePlayBoth={true}
-              vocalsFileType={vocalsFileType}
-              showDatasetButton={false}
-              hasExports={availableFiles.length > 0}
-              stopAllAudio={stopAllAudio}
-              handleTrainWithDataset={handleTrainWithDataset}
-              showInferenceButton={true}
-              handleInferenceWithTracks={onInferenceWithTracks}
-            />
-            </ErrorBoundary>
-          ) : (
-            <Box sx={{
-              textAlign: 'center',
-              py: 8,
-              px: 4
-            }}>
-              <LibraryMusicIcon sx={{
-                fontSize: 80,
-                color: 'text.secondary',
-                mb: 3,
-                opacity: 0.5
-              }} />
-              <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
-                No Singing Data Files
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
-                Upload and process audio files to create singing datasets for voice training.
-              </Typography>
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<AddIcon />}
-                onClick={handleCreateDatasetClick}
-                sx={{ borderRadius: 3, px: 4 }}
-              >
-                Create Singing Dataset
-              </Button>
-            </Box>
-          )}
-        </TabPanel>
+                  <AudioTrackTable
+                  darkMode={darkMode}
+                    trackPairs={trackPairs}
+                    vocalMode={vocalMode}
+                    handleVocalModeChange={handleVocalModeChangeWithCleanup}
+                    handleDownload={handleDownload}
+                    showVocalToggle={true}
+                    vocalsFileType={vocalsFileType}
+                    showDatasetButton={false}
+                    handleTrainWithDataset={handleTrainWithDataset}
+                    showInferenceButton={true}
+                    handleInferenceWithTracks={onInferenceWithTracks}
+                    volume={volumeRef.current}
+                    header={
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "0px 0px 10px 0px" }}>
+                        <MainHeader title="Your Uploaded Files" subtitle="Select files for training or inference, or create new datasets." t={t} />
 
-        {/* Talking Data Tab */}
-        <TabPanel value={activeTab} index={1} sx={{ p: 3 }}>
-          {talkingDatasets.length > 0 ? (
-            <Box sx={{ textAlign: 'center', py: 8 }}>
-              <VoiceChatIcon sx={{ fontSize: 64, color: 'success.main', mb: 3 }} />
-              <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
-                Talking Datasets Available
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-                {talkingDatasets.length} talking dataset{talkingDatasets.length !== 1 ? 's' : ''} ready for training
-              </Typography>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={() => onCreateTalkingDataset && onCreateTalkingDataset()}
-                sx={{ borderRadius: 3, px: 4 }}
-              >
-                Manage Talking Datasets
-              </Button>
-            </Box>
-          ) : (
-            <Box sx={{
-              textAlign: 'center',
-              py: 8,
-              px: 4
-            }}>
-              <VoiceChatIcon sx={{
-                fontSize: 80,
-                color: 'text.secondary',
-                mb: 3,
-                opacity: 0.5
-              }} />
-              <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
-                No Talking Data Files
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
-                Create talking datasets from conversation recordings for voice training.
-              </Typography>
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<AddIcon />}
-                onClick={handleCreateDatasetClick}
-                sx={{ borderRadius: 3, px: 4 }}
-              >
-                Create Talking Dataset
-              </Button>
-            </Box>
-          )}
-        </TabPanel>
-      </Paper>
+                        <IconButton
+                          variant="primary"
+                          onClick={handleCreateDatasetClick}
+                          style={{ height: 40, padding: "0 14px", alignItems: "center", display: "flex", justifyContent: "center" }}
+                          title="Create Dataset"
+                          t={t}
+                          icon={<AddIcon style={{ fontSize: 18 }} />}
+                        />
+                      </div>
+                    }
+                  />
+                </div>
+              </ErrorBoundary>
+            ) : (
+              <div style={{ textAlign: "center", padding: "44px 12px" }}>
+                <div
+                  style={{
+                    width: 84,
+                    height: 84,
+                    borderRadius: 999,
+                    margin: "0 auto 14px auto",
+                    display: "grid",
+                    placeItems: "center",
+                    border: `1px solid ${t.hairline}`,
+                    background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
+                  }}
+                >
+                  <LibraryMusicIcon style={{ fontSize: 40, opacity: 0.75, color: t.text }} />
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 950, color: t.text }}>No Singing Data Files</div>
+                <div style={{ marginTop: 8, fontSize: 13, fontWeight: 650, color: t.subtext, maxWidth: 520, marginInline: "auto" }}>
+                  Upload and process audio files to create singing datasets for voice training.
+                </div>
 
-      {/* Create Dataset Modal */}
-      <Dialog
-        open={createDatasetModalOpen}
-        onClose={handleCreateDatasetModalClose}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: { borderRadius: 3 }
-        }}
-      >
-        <DialogTitle sx={{ pb: 1 }}>
-          Create New Dataset
-        </DialogTitle>
-        <DialogContent sx={{ pb: 1 }}>
-          <DialogContentText sx={{ mb: 3 }}>
-            Choose the type of dataset you want to create:
-          </DialogContentText>
+                <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
+                  <Btn variant="primary" onClick={handleCreateDatasetClick} style={{ height: 44, padding: "0 16px" }} t={t}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                      <AddIcon style={{ fontSize: 18 }} />
+                      Create Singing Dataset
+                    </span>
+                  </Btn>
+                </div>
+              </div>
+            )}
+          </TabPanel>
+        </Panel>
 
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={handleCreateSingingDataset}
-              sx={{
-                p: 3,
-                borderRadius: 3,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 1,
-                height: 'auto',
-                '&:hover': {
-                  borderColor: 'primary.main',
-                  backgroundColor: 'primary.main',
-                  color: 'primary.contrastText',
-                }
-              }}
-            >
-              <LibraryMusicIcon sx={{ fontSize: 48 }} />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Singing Dataset
-              </Typography>
-              <Typography variant="body2" sx={{ textAlign: 'center' }}>
-                Process songs for voice training
-              </Typography>
-            </Button>
 
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={handleCreateTalkingDataset}
-              sx={{
-                p: 3,
-                borderRadius: 3,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 1,
-                height: 'auto',
-                '&:hover': {
-                  borderColor: 'success.main',
-                  backgroundColor: 'success.main',
-                  color: 'success.contrastText',
-                }
-              }}
-            >
-              <VoiceChatIcon sx={{ fontSize: 48 }} />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Talking Dataset
-              </Typography>
-              <Typography variant="body2" sx={{ textAlign: 'center' }}>
-                Process conversations for voice training
-              </Typography>
-            </Button>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={handleCreateDatasetModalClose} sx={{ borderRadius: 2 }}>
-            Cancel
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+      </div>
+    </div>
   );
 }
 
-export default HomeView;
+// Memoize with custom comparison to ignore volume changes
+// Volume is accessed via context ref, so it doesn't cause re-renders
+export default memo(HomeView, (prevProps, nextProps) => {
+  return (
+    prevProps.onOpenCreateDataset === nextProps.onOpenCreateDataset &&
+    prevProps.onInferenceWithTracks === nextProps.onInferenceWithTracks &&
+    prevProps.handleTrainWithDataset === nextProps.handleTrainWithDataset &&
+    prevProps.darkMode === nextProps.darkMode &&
+    prevProps.optimisticTracks === nextProps.optimisticTracks &&
+    prevProps.onOptimisticTracksChange === nextProps.onOptimisticTracksChange
+  );
+});

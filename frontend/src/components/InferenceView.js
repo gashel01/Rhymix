@@ -1,372 +1,494 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-  Box,
-  Typography,
-  Button,
-  CircularProgress,
-  Alert,
-  IconButton,
-  Chip,
-  Tooltip,
-  Grid,
-} from "@mui/material";
+import React, { useState, useCallback, memo, useEffect, useRef, useMemo } from "react";
+import { useVolume } from "../contexts/VolumeContext";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
 import PsychologyIcon from "@mui/icons-material/Psychology";
-import { useTheme } from "@mui/material/styles";
 import AudioTrackTable from "./AudioTrackTable/AudioTrackTable";
-import { safePlay, safePause, safeSetMuted, getFileNameFromPath } from "./AudioTrackTable/utils";
 import ErrorBoundary from "./ErrorBoundary";
+import { useAudioPlayback } from "./InferenceView/useAudioPlayback";
+import { useTableActions } from "./InferenceView/useTableActions";
+import { Spinner } from './Homeview/Spinner.js';
+import { Alert } from './Homeview/Alert.js';
+import { Theme } from './Homeview/Theme.js';
+import Panel from './Homeview/Panel.js';
+import Btn from './Homeview/Btn.js';
 
-function InferenceView({ onNavigate }) {
-  const theme = useTheme();
-  const [inferenceResults, setInferenceResults] = useState([]);
+function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToParams, onSelectionToModelSelection }) {
+  const { volumeRef } = useVolume();
+  const t = Theme({ darkMode }).t;
+
+  const [serverRuns, setServerRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showOriginal, setShowOriginal] = useState(false);
-  const [selectedRows, setSelectedRows] = useState([]);
-  const [vocalMode, setVocalMode] = useState('converted');
+  const [optimisticRuns, setOptimisticRuns] = useState([]);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [reactionPendingByRunId, setReactionPendingByRunId] = useState({});
+  const pollingJobsRef = useRef(null);
+  const liveStartedRef = useRef(false);
+  const [pollingCount, setPollingCount] = useState(0);
 
-  // Audio playback state
-  const [playingFile, setPlayingFile] = useState(null);
-  const [internalPlayingBoth, setInternalPlayingBoth] = useState({});
-  const [instrumentalWaveforms, setInstrumentalWaveforms] = useState({});
-  const [convertedWaveforms, setConvertedWaveforms] = useState({});
-  const [originalWaveforms, setOriginalWaveforms] = useState({});
-  const [internalMutedInstrumentals, setInternalMutedInstrumentals] = useState({});
-  const [internalMutedConverted, setInternalMutedConverted] = useState({});
-  const [internalMutedOriginal, setInternalMutedOriginal] = useState({});
+  const {
+    trackPairs,
+    fetchInferenceResults,
+    handleVocalModeChange,
+    handleDownload,
+    vocalMode,
+  } = useAudioPlayback({
+    inferenceResults: serverRuns,
+    setLoading,
+    setError,
+    setInferenceResults: setServerRuns,
+    liveResults: optimisticRuns,
+  });
 
-  useEffect(() => {
-    fetchInferenceResults();
+  const {
+    handleRowSelect,
+    handleSelectAllRows,
+    handleDeselectAllRows,
+    selectedRows,
+  } = useTableActions({ inferenceResults: serverRuns, trackPairs });
+
+  const updateReactionLocal = useCallback((runId, reaction) => {
+    if (!runId) return;
+    setServerRuns((prev) =>
+      prev.map((run) => (run.runId === runId ? { ...run, reaction } : run))
+    );
+    setOptimisticRuns((prev) =>
+      prev.map((run) => (run.runId === runId ? { ...run, reaction } : run))
+    );
   }, []);
 
-  const fetchInferenceResults = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/past-inference-results');
-      if (!response.ok) {
-        throw new Error('Failed to fetch inference results');
-      }
+  const handleSetReaction = useCallback(
+    async (runId, nextReaction, previousReaction = "none") => {
+      if (!runId) return;
+      updateReactionLocal(runId, nextReaction);
+      setReactionPendingByRunId((prev) => ({ ...prev, [runId]: true }));
+      try {
+        const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/reaction`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reaction: nextReaction }),
+        });
+        if (!response.ok) throw new Error("Failed to update reaction");
         const data = await response.json();
-      setInferenceResults(data.results || []);
-    } catch (err) {
-      console.error('Error fetching inference results:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+        updateReactionLocal(runId, data?.reaction ?? nextReaction);
+      } catch (err) {
+        updateReactionLocal(runId, previousReaction);
+        setError(err?.message || "Failed to update reaction");
+      } finally {
+        setReactionPendingByRunId((prev) => {
+          if (!prev[runId]) return prev;
+          const next = { ...prev };
+          delete next[runId];
+          return next;
+        });
+      }
+    },
+    [updateReactionLocal]
+  );
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  // Start live inference when liveInferenceData is set
+  useEffect(() => {
+    if (!liveInferenceData?.tracks?.length || liveStartedRef.current) return;
+    if (pollingJobsRef.current?.length) return;
+    liveStartedRef.current = true;
+
+    const startLiveInference = async () => {
+      try {
+        setLiveLoading(true);
+        setError(null);
+        const tracks = liveInferenceData.tracks;
+        const startedAt = new Date().toISOString();
+        const jobs = await Promise.all(
+          tracks.map(async (track) => {
+            const response = await fetch("/api/start-inference", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: liveInferenceData.model,
+                track,
+                params: liveInferenceData.params,
+              }),
+            });
+            if (!response.ok) throw new Error(`Failed to start inference for track ${track?.id ?? "unknown"}`);
+            const result = await response.json();
+            const fileId = track?.fileId || track?.id || null;
+            return {
+              jobId: result.jobId,
+              tempId: result.jobId,
+              runId: result.runId,
+              status: "processing",
+              track,
+              model: liveInferenceData.model,
+              modelId: liveInferenceData.model?.id,
+              modelName: liveInferenceData.model?.name,
+              params: liveInferenceData.params || {},
+              inputFileId: fileId,
+              inputDisplayName: track?.displayName || track?.name || null,
+              inputOriginalName: track?.originalName || null,
+              vocalFileType: track?.vocalFileType || track?.vocalsFileType || liveInferenceData.params?.vocalsFileType,
+              createdAt: startedAt,
+              isNew: true,
+              reaction: "none",
+            };
+          })
+        );
+        setOptimisticRuns(jobs);
+        pollingJobsRef.current = jobs;
+        setPollingCount(jobs.length);
+      } catch (err) {
+        console.error("Error starting inference:", err);
+        setError(err?.message || "Failed to start inference");
+        setLiveLoading(false);
+      }
+    };
+    startLiveInference();
+  }, [liveInferenceData]);
+
+  // Poll for live inference status (runs when pollingCount > 0)
+  useEffect(() => {
+    const pollingJobs = pollingJobsRef.current;
+    if (!pollingCount || !pollingJobs?.length) return;
+
+    const abortController = new AbortController();
+    const intervalId = setInterval(async () => {
+      try {
+        const updated = await Promise.all(
+          pollingJobs.map(async (job) => {
+            const response = await fetch(`/api/inference-status/${job.jobId}`, { signal: abortController.signal });
+            if (!response.ok) return job;
+            const data = await response.json();
+            return {
+              ...job,
+              ...data,
+              runId: data.runId || job.runId,
+              status: data.status || job.status,
+              outputUrl: data.outputUrl || job.outputUrl,
+              track: data.track || job.track,
+            };
+          })
+        );
+        setOptimisticRuns((prev) => {
+          const byId = new Map(prev.map((p) => [p.jobId, p]));
+          return updated.map((n) => {
+            const p = byId.get(n.jobId);
+            if (!p) return n;
+            const same = p.status === n.status && p.outputFile === n.outputFile && p.outputUrl === n.outputUrl;
+            if (same) return p;
+            return {
+              ...p,
+              ...n,
+              runId: n.runId || p.runId,
+              modelName: p.modelName || n.model_name || n.modelName,
+              modelId: p.modelId || n.modelId,
+            };
+          });
+        });
+        const allDone = updated.every((j) => {
+          const status = String(j.status || "").toLowerCase();
+          return status === "completed" || status === "failed" || status === "done";
+        });
+        if (allDone) {
+          clearInterval(intervalId);
+          pollingJobsRef.current = null;
+          setPollingCount(0);
+          setLiveLoading(false);
+          fetchInferenceResults();
+        }
+      } catch (e) {
+        if (e?.name === "AbortError") return;
+        console.error("Error polling inference status:", e);
+      }
+    }, 1000);
+    return () => {
+      abortController.abort();
+      clearInterval(intervalId);
+    };
+  }, [pollingCount]);
+
+  const selectedPairs = useMemo(() => {
+    if (!selectedRows.length) return [];
+    return trackPairs.filter((pair) => selectedRows.includes(pair.id));
+  }, [selectedRows, trackPairs]);
+
+  const uniqueModels = useMemo(() => {
+    const models = new Map();
+    selectedPairs.forEach((pair) => {
+      const key = pair.modelId || pair.modelName;
+      if (!key) return;
+      if (!models.has(key)) {
+        models.set(key, {
+          modelId: pair.modelId || null,
+          modelName: pair.modelName || null,
+        });
+      }
     });
-  };
+    return models;
+  }, [selectedPairs]);
 
-  // Transform past inference results into trackPairs format for AudioTrackTable
-  const getPastInferenceTrackPairs = () => {
+  const selectionModel = useMemo(() => {
+    if (uniqueModels.size !== 1) return null;
+    return Array.from(uniqueModels.values())[0];
+  }, [uniqueModels]);
 
+  const selectedTracks = useMemo(() => {
+    return selectedPairs
+      .map((pair) => {
+        if (pair?.result?.track) return pair.result.track;
+        if (pair?.track) return pair.track;
+        const fileId = pair?.fileId || null;
+        if (!fileId) return null;
+        return {
+          fileId,
+          id: fileId,
+          displayName: pair?.displayName || pair?.name || null,
+          originalName: pair?.originalName || null,
+          vocalFileType: pair?.vocalFileType || pair?.result?.vocalFileType || pair?.result?.params?.vocalsFileType,
+        };
+      })
+      .filter(Boolean);
+  }, [selectedPairs]);
 
+  const getPairTimestamp = useCallback((pair) => {
+    const stamp = pair?.createdAt || pair?.result?.createdAt;
+    if (!stamp) return 0;
+    const parsed = Date.parse(stamp);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }, []);
 
-    console.log("inference result !!!!!!!!!!!!!", inferenceResults);
-    return inferenceResults.map((result) => ({
-      instrumental: result.outputFile, // Use result file for both instrumental and vocal
-      vocal: result.outputFile, // Same file - represents the final converted result
-      name: result.trackName.split('_instrumental')[0] || 'Unknown Track',
-      modelName: result.modelName,
-      instrumentalUrl: `/api/download/instrumental/${result.outputFile.split('_').slice(1).join('_').split('-')[0]}`,
-      originalVocalUrl: `/api/download/${result.params.vocalsFileType || 'processed_vocals'}/${result.outputFile.split('_').slice(1).join('_').split('-')[1]}`,
-      vocalUrl: vocalMode === 'converted'
-        ? `/api/download/inference/${result.outputFile}`
-        : `/api/download/${result.params.vocalsFileType || 'raw_vocals'}/${result.outputFile.split('-').slice(1).join('_').split('_inferred')[0]}`,
-      status: 'completed', // Past results are always completed
-      id: result.id,
-      result: result, // Keep reference to original result
-    }));
-  };
-
-  const handleVocalModeChange = (event, newMode) => {
-    setVocalMode(newMode);
-  };
-
-  const handleDownload = async (result) => {
-    try {
-      const response = await fetch(`/api/download/inference/${result.outputFile}`);
-      if (!response.ok) {
-        throw new Error('Failed to download file');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = result.outputFile.split('/').pop();
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      // Don't log AbortError as it's expected when component unmounts
-      if (error.name !== 'AbortError') {
-        console.error("Error downloading file:", error);
-      }
-      // Silently ignore AbortError - this is expected when navigating away
-    }
-  };
-
-  const handleDownloadFullSong = async (instrumental, vocal) => {
-    // For past results, both instrumental and vocal are the same file (the result)
-    // So downloading the "full song" is the same as downloading the result
-    try {
-      const response = await fetch(`/api/download/inference/${instrumental}`);
-      if (!response.ok) {
-        throw new Error('Failed to download file');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = instrumental.split('/').pop();
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      // Don't log AbortError as it's expected when component unmounts
-      if (error.name !== 'AbortError') {
-        console.error("Error downloading full song:", error);
-      }
-      // Silently ignore AbortError - this is expected when navigating away
-    }
-  };
-
-  // Audio playback functions
-  const handlePlayPause = (trackId, type, track) => {
-    const key = `${trackId}-${type}`;
-
-    if (playingFile?.id === key) {
-      // Pause current playback
-      safePause(playingFile.waveform);
-      setPlayingFile(null);
-    } else {
-      // Stop any currently playing file
-      if (playingFile) {
-        safePause(playingFile.waveform);
-      }
-
-      let waveformToPlay = null;
-      let url = null;
-
-      if (type === 'converted') {
-        const result = inferenceResults.find(r => r.id === trackId);
-        if (result && result.outputFile) {
-          waveformToPlay = convertedWaveforms[result.outputFile];
-          url = `/api/download/inference/${result.outputFile}`;
-        }
-      } else if (type === 'original') {
-        const result = inferenceResults.find(r => r.id === trackId);
-        if (result && result.outputFile) {
-          waveformToPlay = originalWaveforms[result.outputFile];
-          url = `/api/download/${result.params.vocalsFileType || 'processed_vocals'}/${result.outputFile.split('_').slice(1).join('_').split('-')[1]}`;
-        }
-      }
-
-      if (waveformToPlay) {
-        safePlay(waveformToPlay, url);
-        setPlayingFile({ id: key, waveform: waveformToPlay });
-      }
-    }
-  };
-
-  const handlePlayBoth = (trackId, track) => {
-    // For past results, we only have the converted vocal, so play both doesn't make sense
-    // We could implement playing just the vocal, but for now, let's skip this
-    console.log('Play both not available for past inference results');
-  };
-
-  const stopAllAudio = () => {
-    // Stop currently playing file
-    if (playingFile) {
-      safePause(playingFile.waveform);
-      setPlayingFile(null);
-    }
-
-    // Stop all waveforms
-    Object.values(instrumentalWaveforms).forEach(waveform => safePause(waveform));
-    Object.values(convertedWaveforms).forEach(waveform => safePause(waveform));
-    Object.values(originalWaveforms).forEach(waveform => safePause(waveform));
-  };
-
-  // Waveform handling functions
-  const handleConvertedWaveformReady = (trackPath, waveform) => {
-    setConvertedWaveforms(prev => ({ ...prev, [trackPath]: waveform }));
-  };
-
-  const handleOriginalWaveformReady = (trackPath, waveform) => {
-    setOriginalWaveforms(prev => ({ ...prev, [trackPath]: waveform }));
-  };
-
-  // Row selection handlers
-  const handleRowSelect = (resultId, isSelected) => {
-    if (isSelected) {
-      setSelectedRows(prev => [...prev, resultId]);
-    } else {
-      setSelectedRows(prev => prev.filter(id => id !== resultId));
-    }
-  };
-
-  const handleSelectAllRows = () => {
-    const allResultIds = inferenceResults.map(result => result.id);
-    setSelectedRows(allResultIds);
-  };
-
-  const handleDeselectAllRows = () => {
-    setSelectedRows([]);
-  };
-
-  // Navigation actions for selected past results
-  const handleReturnToModelSelection = () => {
-    // For past results, we don't have the original track data
-    // Navigate to model selection without pre-selected tracks
-    if (onNavigate) {
-      onNavigate('inference-model-selection');
-    }
-  };
-
-  const handleReturnToInferenceParams = () => {
-    // For past results, we don't have the original track data
-    // Navigate to inference params without pre-selected tracks
-    if (onNavigate) {
-      onNavigate('inference-params');
-    }
-  };
-
-  // Model reselection functionality
-  const handleReselectModel = (result) => {
-    // For past results, we don't have the original track data
-    // We could navigate to model selection, but without tracks
-    if (onNavigate) {
-      onNavigate('inference-model-selection');
-    }
-  };
-
-  if (loading) {
+  const getPairCheckpoint = useCallback((pair) => {
     return (
-      <Box sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        py: 8
-      }}>
-        <CircularProgress size={64} sx={{ mb: 3 }} />
-        <Typography variant="h6">Loading inference results...</Typography>
-      </Box>
+      pair?.modelCheckpoint ||
+      pair?.result?.modelCheckpoint ||
+      pair?.result?.model?.selectedCheckpoint ||
+      pair?.result?.model?.modelCheckpoint ||
+      null
+    );
+  }, []);
+
+  const normalizeModelCheckpoint = useCallback((checkpoint) => {
+    if (!checkpoint) return null;
+    const epochRaw = checkpoint.epoch ?? checkpoint.epochs;
+    const epoch = typeof epochRaw === "number" ? epochRaw : Number(epochRaw);
+    const pthFile = checkpoint.pthFile || checkpoint.filename || null;
+    const checkpointId =
+      checkpoint.checkpointId ||
+      checkpoint.id ||
+      (pthFile ? pthFile.replace(/\.[^/.]+$/, "") : null);
+    const indexFile = checkpoint.indexFile || null;
+    return {
+      epoch: Number.isFinite(epoch) ? epoch : null,
+      checkpointId,
+      pthFile,
+      indexFile,
+    };
+  }, []);
+
+  const handleReturnToModelSelection = useCallback(() => {
+    if (!onSelectionToModelSelection) {
+      onNavigate?.("inference-model-selection");
+      return;
+    }
+    onSelectionToModelSelection({
+      source: "inference",
+      selectedTracks,
+    });
+  }, [onNavigate, onSelectionToModelSelection, selectedTracks]);
+
+  const handleReturnToInferenceParams = useCallback(() => {
+    if (!selectionModel || !onSelectionToParams) return;
+    const latestPair = selectedPairs.reduce((latest, pair) => {
+      if (!latest) return pair;
+      return getPairTimestamp(pair) >= getPairTimestamp(latest) ? pair : latest;
+    }, null);
+    const checkpointCandidate = getPairCheckpoint(latestPair);
+    const modelPayload = {
+      id: selectionModel.modelId || null,
+      name: selectionModel.modelName || null,
+      modelId: selectionModel.modelId || null,
+      modelName: selectionModel.modelName || null,
+    };
+    if (checkpointCandidate) {
+      if (checkpointCandidate.path) {
+        modelPayload.selectedCheckpoint = checkpointCandidate;
+      } else {
+        modelPayload.modelCheckpoint = normalizeModelCheckpoint(checkpointCandidate);
+      }
+    }
+    onSelectionToParams({
+      source: "inference",
+      selectedTracks,
+      selectedModel: modelPayload,
+    });
+  }, [
+    getPairCheckpoint,
+    getPairTimestamp,
+    normalizeModelCheckpoint,
+    onSelectionToParams,
+    selectedPairs,
+    selectionModel,
+    selectedTracks,
+  ]);
+
+  const showSelectionButton = Boolean(selectionModel);
+
+  const hasRows = trackPairs.length > 0;
+  const showSpinner = loading && !hasRows;
+
+  if (showSpinner) {
+    return (
+      <div style={{ minHeight: "100vh", background: t.pageBg, padding: "18px 0 32px 0" }}>
+        <div style={{ padding: "0 16px", maxWidth: t.maxW, margin: "0 auto" }}>
+          <Panel style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: 28 }} t={t}>
+            <Spinner size={34} t={t} />
+            <div style={{ marginTop: 12, fontSize: 14, fontWeight: 850, color: t.text }}>
+              Loading inference results…
+            </div>
+            <div style={{ marginTop: 6, fontSize: 13, fontWeight: 650, color: t.subtext }}>
+              This may take a few seconds.
+            </div>
+          </Panel>
+        </div>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Box sx={{
-        mb: 4,
-        p: 3,
-       
-      }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-              Past Inference Results
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              View, play, and download your previous voice inference results
-            </Typography>
-          </Box>
-       
-        </Box>
-      </Box>
+  <>
+      <div style={{ marginTop: 16 }}>
+        {error && (
+          <div style={{ marginBottom: 12 }}>
+            <Alert kind="error" onClose={() => setError(null)} t={t}>
+              {error}
+            </Alert>
+          </div>
+        )}
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 4 }}>
-          {error}
-        </Alert>
-      )}
+        {!hasRows ? (
+          <Panel style={{ padding: 28 }} t={t}>
+            <div style={{ textAlign: "center", padding: "26px 0" }}>
+              <div
+                style={{
+                  width: 84,
+                  height: 84,
+                  borderRadius: 999,
+                  margin: "0 auto 14px auto",
+                  display: "grid",
+                  placeItems: "center",
+                  border: `1px solid ${t.hairline}`,
+                  background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
+                }}
+              >
+                <AudioFileIcon style={{ fontSize: 40, opacity: 0.75, color: t.text }} />
+              </div>
 
-      {/* Results Table */}
-      {inferenceResults.length === 0 ? (
-        <Box sx={{
-          textAlign: 'center',
-          py: 8,
-          px: 4
-        }}>
-          <AudioFileIcon sx={{
-            fontSize: 80,
-            color: 'text.secondary',
-            mb: 3,
-            opacity: 0.5
-          }} />
-          <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
-            No Inference Results Yet
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
-            Run your first voice inference using the models from the Models page.
-            Your inference results will appear here.
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<PsychologyIcon />}
-            onClick={() => onNavigate && onNavigate('inference-model-selection')}
-            sx={{ mt: 2 }}
-          >
-            Start Your First Inference
-          </Button>
-        </Box>
-      ) : (
-        <Grid container spacing={4}>
-          <Grid item xs={12}>
-            <ErrorBoundary>
-              <AudioTrackTable
-              trackPairs={getPastInferenceTrackPairs()}
+              <div style={{ fontSize: 18, fontWeight: 950, color: t.text }}>No Inference Results Yet</div>
+              <div style={{ marginTop: 8, fontSize: 13, fontWeight: 650, color: t.subtext, maxWidth: 520, marginInline: "auto" }}>
+                Run your first voice inference using the models from the Models page. Your inference results will appear here.
+              </div>
+
+              <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
+                <Btn
+                  variant="primary"
+                  onClick={() => onNavigate?.("inference-model-selection")}
+                  style={{ height: 44, padding: "0 16px" }}
+                  t={t}
+                >
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                    <PsychologyIcon style={{ fontSize: 18 }} />
+                    Start Your First Inference
+                  </span>
+                </Btn>
+              </div>
+            </div>
+          </Panel>
+        ) : (
+          <ErrorBoundary>
+            <AudioTrackTable
+              darkMode={darkMode}
+              trackPairs={trackPairs}
+              vocalModeType="inference"
               vocalMode={vocalMode}
-              vocalModeType="inference" // Use "converted/original" labels instead of "raw/processed"
               handleVocalModeChange={handleVocalModeChange}
-              handlePlayPause={handlePlayPause}
               handleDownload={handleDownload}
-              handlePlayBoth={handlePlayBoth}
-              handleInstrumentalWaveformReady={() => {}} // No instrumental for past results
-              handleVocalWaveformReady={vocalMode === 'converted' ? handleConvertedWaveformReady : handleOriginalWaveformReady}
-              playingFile={playingFile}
-              playingBoth={internalPlayingBoth}
-              instrumentalWaveforms={instrumentalWaveforms}
-              vocalWaveforms={vocalMode === 'converted' ? convertedWaveforms : originalWaveforms}
-              showVocalToggle={true} // Enable vocal toggle for past results
-              enablePlayBoth={true} // Enable center controls for download functionality
+              showVocalToggle={true}
               vocalsFileType="inference"
               showDatasetButton={false}
               showInferenceButton={false}
-              stopAllAudio={stopAllAudio}
-              mutedInstrumentals={internalMutedInstrumentals}
-              mutedVocals={vocalMode === 'converted' ? internalMutedConverted : internalMutedOriginal}
-              showInferenceResultsActions={true} // Enable row selection and actions
+              showInferenceResultsActions={true}
               onReturnToModelSelection={handleReturnToModelSelection}
-              onReturnToInferenceParams={handleReturnToInferenceParams}
-              externalSelectedRows={selectedRows}
-              onRowSelect={handleRowSelect}
-              onSelectAll={handleSelectAllRows}
-              onDeselectAll={handleDeselectAllRows}
-              handleDownloadFullSong={handleDownloadFullSong}
+              onReturnToInferenceParams={showSelectionButton ? handleReturnToInferenceParams : null}
+              externalSelectedRows={selectedRows} // important
+              onRowSelect={handleRowSelect} // important
+              onSelectAll={handleSelectAllRows} // important
+              onDeselectAll={handleDeselectAllRows} // important
+              enableGrouping
+              onSetReaction={handleSetReaction}
+              reactionPendingByRunId={reactionPendingByRunId}
               defaultLabel=" "
+              volume={volumeRef.current}
+              header={<div style={{ padding: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 16,
+                      display: "grid",
+                      placeItems: "center",
+                      border: `1px solid ${t.hairline}`,
+                      background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <AudioFileIcon style={{ color: t.text }} />
+                  </div>
+
+                  <div style={{ flex: "1 1 340px", minWidth: 240 }}>
+                    <div style={{ fontSize: 26, fontWeight: 950, letterSpacing: -0.6, color: t.text, lineHeight: 1.1 }}>
+                      Past Inference Results
+                    </div>
+                    <div style={{ marginTop: 4, fontSize: 13, fontWeight: 650, color: t.subtext }}>
+                      View, play, and download your previous voice inference results.
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <Btn
+                      variant="outline"
+                      onClick={fetchInferenceResults}
+                      style={{ height: 40, padding: "0 14px" }}
+                      title="Refresh"
+                      t={t}
+                    >
+                      Refresh
+                    </Btn>
+
+                  </div>
+                </div>
+              </div>}
             />
-            </ErrorBoundary>
-          </Grid>
-        </Grid>
-      )}
-    </Box>
+          </ErrorBoundary>
+
+        )}
+      </div>
+
+      <style>{`
+          @keyframes spin{to{transform:rotate(360deg)}}
+        `}</style>
+
+</>
   );
 }
 
-export default InferenceView;
+// Memoize with custom comparison to ignore volume changes
+// Volume is accessed via context ref, so it doesn't cause re-renders
+export default memo(InferenceView, (prevProps, nextProps) => {
+  return (
+    prevProps.onNavigate === nextProps.onNavigate &&
+    prevProps.darkMode === nextProps.darkMode &&
+    prevProps.liveInferenceData === nextProps.liveInferenceData &&
+    prevProps.onSelectionToParams === nextProps.onSelectionToParams &&
+    prevProps.onSelectionToModelSelection === nextProps.onSelectionToModelSelection
+  );
+});
