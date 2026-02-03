@@ -83,7 +83,7 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       radiusMd: 16,
       radiusSm: 12,
 
-      maxW: 1400,
+     
       stickyTop: 12, // a little breathing room
     };
   }, [isDark]);
@@ -1371,7 +1371,6 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
 
 
 
-      <div style={{ height: "300px", width: "100%", background: "red" }} />
     </>
   );
 }
