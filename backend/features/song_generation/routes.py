@@ -1,4 +1,5 @@
 import hashlib
+import shutil
 import threading
 import uuid
 from datetime import datetime
@@ -6,12 +7,14 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request, send_file
 
-from backend.features.song_generation.service import SONG_GENERATION_DIR, run_song_generation_thread
+from backend.features.song_generation.service import SONG_GENERATION_DIR, SONG_GENERATION_JOBS_DIR, run_song_generation_thread
+from backend.features.song_generation.providers.ace_step import ASSET_KEYS, continue_song_generation_full, _asset_path
 from backend.jobs.registry import song_generation_jobs
 
 bp = Blueprint("song_generation", __name__)
 
 
+@bp.route("/api/song-generation", methods=["POST"])
 @bp.route("/api/song-generation/start", methods=["POST"])
 def start_song_generation():
     """Start a new song generation job"""
@@ -33,8 +36,7 @@ def start_song_generation():
             "title": title,
             "params": data,
             "created_at": datetime.now().isoformat(),
-            "output_file": None,
-            "audio_url": None,
+            "audio_url": f"/api/song-generation/audio/{job_id}",
             "error": None,
         }
 
@@ -43,25 +45,36 @@ def start_song_generation():
         # Start generation in background thread
         threading.Thread(target=run_song_generation_thread, args=(job_id, data), daemon=True).start()
 
-        return jsonify({"job_id": job_id, "status": "queued", "message": "Song generation started"})
+        return jsonify({"job_id": job_id})
 
     except Exception as e:
         print(f"Error starting song generation: {e}")
         return jsonify({"error": str(e)}), 500
 
 
-@bp.route("/api/song-generation/status/<job_id>", methods=["GET"])
-def get_song_generation_status(job_id):
-    """Get status of a song generation job"""
+@bp.route("/api/song-generation/<job_id>", methods=["GET"])
+def get_song_generation(job_id):
+    """Get status of a song generation job (new contract)"""
     if job_id not in song_generation_jobs:
         return jsonify({"error": "Job not found"}), 404
 
     job = song_generation_jobs[job_id]
+    assets = job.get("assets")
+    if isinstance(assets, dict):
+        # Ensure ready assets include URL
+        for key, asset in list(assets.items()):
+            if not isinstance(asset, dict):
+                continue
+            if asset.get("ready") and not asset.get("url"):
+                asset["url"] = f"/api/song-generation/{job_id}/audio/{key}"
+                assets[key] = asset
+
     return jsonify(
         {
-            "id": job["id"],
-            "status": job["status"],
-            "progress": job["progress"],
+            "id": job.get("id"),
+            "status": job.get("status"),
+            "stage": job.get("stage"),
+            "progress": job.get("progress", 0),
             "status_message": job.get("status_message", ""),
             "title": job.get("title", ""),
             "audio_url": job.get("audio_url"),
@@ -70,12 +83,34 @@ def get_song_generation_status(job_id):
             "processed": job.get("processed", False),
             "inference_completed": job.get("inference_completed", False),
             "model_name": job.get("params", {}).get("model_name"),
-            "output_filename": job.get("output_filename"),
             "created_at": job.get("created_at"),
             "completed_at": job.get("completed_at"),
             "error": job.get("error"),
+            "assets": assets,
+            "timings": job.get("timings"),
         }
     )
+
+
+@bp.route("/api/song-generation/status/<job_id>", methods=["GET"])
+def get_song_generation_status(job_id):
+    """Legacy status endpoint"""
+    return get_song_generation(job_id)
+
+
+@bp.route("/api/song-generation/<job_id>/full", methods=["POST"])
+def trigger_full_generation(job_id):
+    if job_id not in song_generation_jobs:
+        return jsonify({"error": "Job not found"}), 404
+
+    job = song_generation_jobs[job_id]
+    assets = job.get("assets") or {}
+    preview = assets.get("preview_mix") if isinstance(assets, dict) else None
+    if not (preview and preview.get("ready")):
+        return jsonify({"error": "Preview not ready"}), 400
+
+    threading.Thread(target=continue_song_generation_full, args=(job_id,), daemon=True).start()
+    return jsonify({"ok": True})
 
 
 @bp.route("/api/song-generation/jobs", methods=["GET"])
@@ -95,6 +130,7 @@ def list_song_generation_jobs():
                 "processed": job.get("processed", False),
                 "inference_completed": job.get("inference_completed", False),
                 "model_name": job.get("params", {}).get("model_name"),
+                "assets": job.get("assets"),
                 "created_at": job.get("created_at"),
                 "completed_at": job.get("completed_at"),
             }
@@ -129,21 +165,33 @@ def list_song_generation_jobs():
     return jsonify({"jobs": jobs})
 
 
-@bp.route("/api/song-generation/audio/<job_id>", methods=["GET"])
-def get_song_generation_audio(job_id):
-    """Stream audio for a song generation job"""
+@bp.route("/api/song-generation/<job_id>/audio/<asset_key>", methods=["GET"])
+def get_song_generation_asset(job_id, asset_key):
     if job_id not in song_generation_jobs:
         return jsonify({"error": "Job not found"}), 404
-
-    job = song_generation_jobs[job_id]
-    if job["status"] != "completed" or not job.get("output_file"):
+    if asset_key not in ASSET_KEYS:
+        return jsonify({"error": "Invalid asset key"}), 400
+    p = _asset_path(job_id, asset_key)
+    if not p.exists():
         return jsonify({"error": "Audio not ready"}), 404
+    return send_file(p, mimetype="audio/wav", as_attachment=False)
 
-    output_path = Path(job["output_file"])
-    if not output_path.exists():
-        return jsonify({"error": "Audio file not found"}), 404
 
-    return send_file(output_path, mimetype="audio/wav")
+@bp.route("/api/song-generation/audio/<job_id>", methods=["GET"])
+def get_song_generation_audio(job_id):
+    """Legacy best-available mix"""
+    if job_id not in song_generation_jobs:
+        return jsonify({"error": "Job not found"}), 404
+    for key in ["final_mix_rvc", "full_mix", "preview_mix"]:
+        p = _asset_path(job_id, key)
+        if p.exists():
+            return send_file(p, mimetype="audio/wav", as_attachment=False)
+    legacy_path = song_generation_jobs[job_id].get("output_file")
+    if legacy_path:
+        p = Path(legacy_path)
+        if p.exists():
+            return send_file(p, mimetype="audio/wav", as_attachment=False)
+    return jsonify({"error": "Audio not ready"}), 404
 
 
 @bp.route("/api/song-generation/file/<filename>", methods=["GET"])
@@ -163,10 +211,9 @@ def delete_song_generation(job_id):
         # Check if it's an active job
         if job_id in song_generation_jobs:
             job = song_generation_jobs[job_id]
-            if job.get("output_file"):
-                output_path = Path(job["output_file"])
-                if output_path.exists():
-                    output_path.unlink()
+            job_dir = SONG_GENERATION_JOBS_DIR / job_id
+            if job_dir.exists():
+                shutil.rmtree(job_dir, ignore_errors=True)
             del song_generation_jobs[job_id]
             return jsonify({"message": "Deleted successfully"})
 

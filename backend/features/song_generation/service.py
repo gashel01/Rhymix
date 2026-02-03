@@ -1,4 +1,4 @@
-from backend.features.song_generation.providers.ace_step import AceStepProvider, SONG_GENERATION_DIR
+from backend.features.song_generation.providers.ace_step import AceStepProvider, SONG_GENERATION_DIR, SONG_GENERATION_JOBS_DIR
 
 _PROVIDERS = {"ace_step": AceStepProvider()}
 
@@ -13,4 +13,4 @@ def run_song_generation_thread(job_id, params):
     return provider.run(job_id, params)
 
 
-__all__ = ["SONG_GENERATION_DIR", "run_song_generation_thread"]
+__all__ = ["SONG_GENERATION_DIR", "SONG_GENERATION_JOBS_DIR", "run_song_generation_thread"]

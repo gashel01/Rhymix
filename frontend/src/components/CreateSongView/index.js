@@ -26,6 +26,34 @@ const GENRE_RECS = [
   "Cinematic",
 ];
 
+const SONG_ASSET_KEYS = [
+  "preview_mix",
+  "full_mix",
+  "instrumental",
+  "vocals_raw",
+  "vocals_rvc",
+  "final_mix_rvc",
+];
+
+const SONG_ASSET_LABELS = {
+  preview_mix: "Preview",
+  full_mix: "Full",
+  instrumental: "Instrumental",
+  vocals_raw: "Raw Vocals",
+  vocals_rvc: "Enhanced Vocals",
+  final_mix_rvc: "Final Mix (Enhanced)",
+};
+
+const isAssetReady = (asset) => !!(asset && (asset.ready || asset.url));
+
+const getBestAssetKey = (assets) => {
+  if (!assets) return null;
+  if (isAssetReady(assets.full_mix)) return "full_mix";
+  if (isAssetReady(assets.preview_mix)) return "preview_mix";
+  const ready = SONG_ASSET_KEYS.find((k) => isAssetReady(assets[k]));
+  return ready || null;
+};
+
 const fmt = (s) => {
   const m = Math.floor(s / 60);
   const sec = String(s % 60).padStart(2, "0");
@@ -107,6 +135,9 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
   // Length
   const [duration, setDuration] = useState(180);
   const [durationInput, setDurationInput] = useState("180");
+  const [previewDuration] = useState(35);
+  const [autoFull, setAutoFull] = useState(true);
+  const [enhanceVocals, setEnhanceVocals] = useState(true);
 
   // Generation state
   const [generating, setGenerating] = useState(false);
@@ -122,6 +153,9 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
 
   const timerRef = useRef(null);
   const pollRef = useRef(null);
+  const pollAbortRef = useRef(null);
+  const pollInFlightRef = useRef(false);
+  const progressRef = useRef({});
   const audioRef = useRef(null);
 
   // ---------- UI primitives ----------
@@ -362,15 +396,17 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     >
       {options.map((opt) => {
         const active = value === opt.value;
+        const disabled = !!opt.disabled;
         return (
           <button
             key={opt.value}
             type="button"
-            onClick={() => onChange(opt.value)}
+            onClick={() => !disabled && onChange(opt.value)}
+            disabled={disabled}
             style={{
               border: `1px solid ${active ? "rgba(10,132,255,0.45)" : "transparent"}`,
               background: active ? `linear-gradient(135deg, ${t.primaryWash}, ${t.primaryWash2})` : "transparent",
-              color: t.text,
+              color: disabled ? t.subtext : t.text,
               borderRadius: 12,
               padding: "10px 12px",
               fontWeight: 850,
@@ -378,7 +414,8 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
               display: "inline-flex",
               alignItems: "center",
               gap: 8,
-              cursor: "pointer",
+              cursor: disabled ? "not-allowed" : "pointer",
+              opacity: disabled ? 0.5 : 1,
             }}
           >
             {opt.icon}
@@ -540,6 +577,7 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
+      if (pollAbortRef.current) pollAbortRef.current.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -559,27 +597,45 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     }
   };
 
+  const mapJobToSong = (job) => {
+    const hasAssets = job && typeof job.assets === "object" && job.assets !== null;
+    const selectedAssetKey = hasAssets ? getBestAssetKey(job.assets) : null;
+    return {
+      id: job.id,
+      title: job.title || "Untitled",
+      duration: 0,
+      genres: [],
+      createdAt: job.created_at || job.createdAt,
+      audioUrl: job.audio_url,
+      vocalsUrl: job.vocals_url,
+      instrumentalUrl: job.instrumental_url,
+      processed: job.processed,
+      inferenceCompleted: job.inference_completed,
+      modelName: job.model_name,
+      status: job.status,
+      progress: job.progress,
+      assets: hasAssets ? job.assets : undefined,
+      hasAssets,
+      selectedAssetKey,
+      request: job.params || null,
+      autoFull: job.params?.auto_full ?? true,
+    };
+  };
+
+  const resolveAssetUrl = (song, assetKey) => {
+    const direct = song?.assets?.[assetKey]?.url;
+    if (direct) return direct;
+    if (assetKey) return `/api/song-generation/${song.id}/audio/${assetKey}`;
+    return `/api/song-generation/audio/${song.id}`;
+  };
+
   const loadExistingSongs = async () => {
     try {
       setLoadingSongs(true);
       const res = await fetch(`${API_BASE}/api/song-generation/jobs`);
       if (res.ok) {
         const data = await res.json();
-        const loadedSongs = (data.jobs || []).map((job) => ({
-          id: job.id,
-          title: job.title || "Untitled",
-          duration: 0,
-          genres: [],
-          createdAt: job.created_at,
-          audioUrl: job.audio_url,
-          vocalsUrl: job.vocals_url,
-          instrumentalUrl: job.instrumental_url,
-          processed: job.processed,
-          inferenceCompleted: job.inference_completed,
-          modelName: job.model_name,
-          status: job.status,
-          progress: job.progress,
-        }));
+        const loadedSongs = (data.jobs || []).map(mapJobToSong);
         setSongs(loadedSongs);
 
         const runningJob = loadedSongs.find((s) => s.status && !["completed", "failed"].includes(s.status));
@@ -597,49 +653,79 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     }
   };
 
-  const startPolling = useCallback((jobId) => {
+  const applyProgress = useCallback(
+    (jobId, next) => {
+      const prev = progressRef.current[jobId] ?? 0;
+      const safe = Math.max(prev, next || 0);
+      progressRef.current[jobId] = safe;
+      if (currentJobId === jobId) setProgress(safe);
+      return safe;
+    },
+    [currentJobId]
+  );
+
+  const handleJobUpdate = useCallback(
+    (jobId, data) => {
+      const nextProgress = applyProgress(jobId, data.progress ?? 0);
+      const nextStatusMessage = data.status_message || data.stage || data.status || "";
+      if (currentJobId === jobId) {
+        setStatusMessage(nextStatusMessage);
+      }
+
+      setSongs((prev) =>
+        prev.map((s) => {
+          if (s.id !== jobId) return s;
+          const hasAssets = s.hasAssets || (data && typeof data.assets === "object" && data.assets !== null);
+          const mergedAssets = hasAssets ? { ...(s.assets || {}), ...(data.assets || {}) } : s.assets;
+          const selectedAssetKey =
+            s.selectedAssetKey || (mergedAssets ? getBestAssetKey(mergedAssets) : null);
+          return {
+            ...s,
+            status: data.status || s.status,
+            progress: nextProgress,
+            audioUrl: data.audio_url ?? s.audioUrl,
+            vocalsUrl: data.vocals_url ?? s.vocalsUrl,
+            instrumentalUrl: data.instrumental_url ?? s.instrumentalUrl,
+            processed: data.processed ?? s.processed,
+            inferenceCompleted: data.inference_completed ?? s.inferenceCompleted,
+            modelName: data.model_name ?? s.modelName,
+            assets: mergedAssets,
+            hasAssets,
+            selectedAssetKey,
+          };
+        })
+      );
+    },
+    [applyProgress, currentJobId]
+  );
+
+  const startPolling = useCallback(
+    (jobId) => {
     if (pollRef.current) clearInterval(pollRef.current);
 
     pollRef.current = setInterval(async () => {
+      if (pollInFlightRef.current) return;
       try {
-        const res = await fetch(`${API_BASE}/api/song-generation/status/${jobId}`);
+        pollInFlightRef.current = true;
+        if (pollAbortRef.current) pollAbortRef.current.abort();
+        const controller = new AbortController();
+        pollAbortRef.current = controller;
+
+        let res = await fetch(`${API_BASE}/api/song-generation/${jobId}`, { signal: controller.signal });
         if (!res.ok) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-          setGenerating(false);
-          setError("Failed to get job status");
-          return;
+          res = await fetch(`${API_BASE}/api/song-generation/status/${jobId}`, { signal: controller.signal });
         }
+        if (!res.ok) throw new Error("Failed to get job status");
 
         const data = await res.json();
-        setProgress(data.progress || 0);
-        setStatusMessage(data.status_message || "");
+        handleJobUpdate(jobId, data);
 
         if (data.status === "completed") {
           clearInterval(pollRef.current);
           pollRef.current = null;
           setGenerating(false);
           setCurrentJobId(null);
-          setProgress(100);
-
-          setSongs((prev) =>
-            prev.map((s) =>
-              s.id === jobId
-                ? {
-                  ...s,
-                  status: "completed",
-                  audioUrl: data.audio_url,
-                  vocalsUrl: data.vocals_url,
-                  instrumentalUrl: data.instrumental_url,
-                  processed: data.processed,
-                  inferenceCompleted: data.inference_completed,
-                  modelName: data.model_name,
-                  progress: 100,
-                }
-                : s
-            )
-          );
-
+          applyProgress(jobId, 100);
           setTimeout(() => setProgress(0), 500);
         } else if (data.status === "failed") {
           clearInterval(pollRef.current);
@@ -652,9 +738,13 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
         }
       } catch (e) {
         console.error("Polling error:", e);
+      } finally {
+        pollInFlightRef.current = false;
       }
-    }, 1500);
-  }, []);
+    }, 1000);
+  },
+    [applyProgress, handleJobUpdate]
+  );
 
   // ---------- Genre helpers ----------
   const genreTokens = useMemo(() => genreText.split(",").map((s) => s.trim()).filter(Boolean), [genreText]);
@@ -702,6 +792,10 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     return {
       title: title.trim(),
       audio_duration: duration,
+      duration,
+      preview_duration: previewDuration,
+      auto_full: autoFull,
+      enhance_vocals: enhanceVocals,
       prompt: buildPrompt(),
       lyrics: instrumentalOnly ? "" : lyrics,
       model_name: selectedModel?.name || null,
@@ -730,11 +824,18 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     setStatusMessage("Starting generation...");
 
     try {
-      const res = await fetch(`${API_BASE}/api/song-generation/start`, {
+      let res = await fetch(`${API_BASE}/api/song-generation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
       });
+      if (!res.ok) {
+        res = await fetch(`${API_BASE}/api/song-generation/start`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(params),
+        });
+      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -754,9 +855,13 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
         audioUrl: null,
         modelName: selectedModel?.name || null,
         modelEpoch: selectedCheckpoint?.epochs || null,
-        status: "generating",
+        status: "queued",
         progress: 0,
         request: params,
+        autoFull,
+        assets: {},
+        hasAssets: true,
+        selectedAssetKey: null,
       };
 
       setSongs((prev) => [newSong, ...prev]);
@@ -789,6 +894,19 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     }
   };
 
+  const triggerFullGeneration = async (songId) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/song-generation/${songId}/full`, { method: "POST" });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to start full generation");
+      }
+    } catch (e) {
+      console.error("Full generation error:", e);
+      setError(e.message || "Failed to start full generation");
+    }
+  };
+
   const playPause = (song) => {
     if (playingId === song.id) {
       if (audioRef.current) audioRef.current.pause();
@@ -797,7 +915,14 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     }
 
     if (audioRef.current) audioRef.current.pause();
-    const playUrl = song.vocalsUrl || song.instrumentalUrl || song.audioUrl;
+    let playUrl = null;
+    if (song.hasAssets && song.assets) {
+      const key = song.selectedAssetKey || getBestAssetKey(song.assets);
+      playUrl = key ? resolveAssetUrl(song, key) : null;
+    }
+    if (!playUrl) {
+      playUrl = song.vocalsUrl || song.instrumentalUrl || song.audioUrl;
+    }
     if (playUrl) {
       audioRef.current = new Audio(`${API_BASE}${playUrl}`);
       audioRef.current.play().catch((e) => console.error("Play error:", e));
@@ -913,6 +1038,28 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                       />
                       <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>Seconds (30–240)</div>
                     </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <Pill
+                    tone={autoFull ? "primary" : "neutral"}
+                    onClick={() => setAutoFull((v) => !v)}
+                    title="Generate full song after preview"
+                  >
+                    {autoFull ? "Full after preview ✓" : "Full after preview"}
+                  </Pill>
+                  {!instrumentalOnly && (
+                    <Pill
+                      tone={enhanceVocals ? "primary" : "neutral"}
+                      onClick={() => setEnhanceVocals((v) => !v)}
+                      title="Enhance vocals (RVC)"
+                    >
+                      {enhanceVocals ? "Enhance vocals ✓" : "Enhance vocals"}
+                    </Pill>
+                  )}
+                  <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
+                    Preview plays first. Full generation can be automatic or manual.
                   </div>
                 </div>
 
@@ -1167,9 +1314,17 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                 <div style={{ display: "grid", gap: 12 }}>
                   {songs.map((s) => {
                     const active = playingId === s.id;
-                    const isGenerating = s.status && !["completed", "failed"].includes(s.status);
+                    const assets = s.hasAssets ? s.assets || {} : null;
+                    const selectedAssetKey = assets ? s.selectedAssetKey || getBestAssetKey(assets) : null;
+                    const isAssetReadyNow = selectedAssetKey ? isAssetReady(assets?.[selectedAssetKey]) : false;
+                    const legacyReady = !!(s.vocalsUrl || s.instrumentalUrl || s.audioUrl);
+                    const isReady = assets ? isAssetReadyNow : legacyReady;
+                    const isGenerating = !isReady && s.status && s.status !== "failed";
                     const isFailed = s.status === "failed";
-                    const isReady = s.status === "completed" && (s.vocalsUrl || s.instrumentalUrl || s.audioUrl);
+                    const needsFullCTA =
+                      s.autoFull === false &&
+                      (s.status === "preview_ready" || s.status === "preview_generating") &&
+                      !isAssetReady(assets?.full_mix);
 
                     return (
                       <div
@@ -1244,7 +1399,25 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                           </div>
 
                           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                            {s.vocalsUrl && (
+                            {assets && (
+                              <IconBtn
+                                title="Download Selected"
+                                disabled={!isReady}
+                                onClick={() => {
+                                  const key = selectedAssetKey || getBestAssetKey(assets);
+                                  if (!key) return;
+                                  const a = document.createElement("a");
+                                  a.href = `${API_BASE}${resolveAssetUrl(s, key)}`;
+                                  a.download = `${s.title || "song"}_${key}.wav`;
+                                  a.click();
+                                }}
+                                style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
+                              >
+                                <DownloadIcon fontSize="small" />
+                              </IconBtn>
+                            )}
+
+                            {!assets && s.vocalsUrl && (
                               <IconBtn
                                 title="Download Vocals"
                                 disabled={!isReady}
@@ -1260,7 +1433,7 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                               </IconBtn>
                             )}
 
-                            {s.instrumentalUrl && (
+                            {!assets && s.instrumentalUrl && (
                               <IconBtn
                                 title="Download Instrumental"
                                 disabled={!isReady}
@@ -1276,7 +1449,7 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                               </IconBtn>
                             )}
 
-                            {!s.vocalsUrl && !s.instrumentalUrl && s.audioUrl && (
+                            {!assets && !s.vocalsUrl && !s.instrumentalUrl && s.audioUrl && (
                               <IconBtn
                                 title="Download"
                                 disabled={!isReady}
@@ -1309,6 +1482,36 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                             </IconBtn>
                           </div>
                         </div>
+
+                        {assets && (
+                          <div style={{ marginTop: 10 }}>
+                            <Segmented
+                              value={selectedAssetKey}
+                              onChange={(v) => {
+                                setSongs((prev) =>
+                                  prev.map((sx) => (sx.id === s.id ? { ...sx, selectedAssetKey: v } : sx))
+                                );
+                              }}
+                              options={SONG_ASSET_KEYS.map((k) => ({
+                                value: k,
+                                label: SONG_ASSET_LABELS[k],
+                                disabled: !isAssetReady(assets?.[k]),
+                              }))}
+                            />
+                          </div>
+                        )}
+
+                        {needsFullCTA && (
+                          <div style={{ marginTop: 10 }}>
+                            <Btn
+                              variant="primary"
+                              onClick={() => triggerFullGeneration(s.id)}
+                              style={{ height: 40, borderRadius: 12 }}
+                            >
+                              Generate Full Song
+                            </Btn>
+                          </div>
+                        )}
 
                         {isGenerating && (
                           <div style={{ marginTop: 12 }}>
