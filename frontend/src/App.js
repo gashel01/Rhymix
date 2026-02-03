@@ -36,7 +36,8 @@ import ModelsView from "./components/ModelsView";
 import CreateSongView from "./components/CreateSongView";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import NavigationBar from "./components/NavigationBar";
-import { uploadFiles, startProcessing, getJobStatus, cleanDirectories } from "./utils/apiService";
+import { uploadFiles, startProcessing, getTrackStatuses, cleanDirectories } from "./utils/apiService";
+import { mergeProcessingUpdate, processingEquals, isTerminalProcessingState } from "./utils/processingStatus";
 
 // Tesla/Apple-inspired theme system
 const createAppTheme = (mode) => createTheme({
@@ -462,69 +463,66 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const candidates = (optimisticTracks || []).filter((track) => {
+      const state = track?.processing?.state;
+      return state && !isTerminalProcessingState(state);
+    });
+    const ids = Array.from(
+      new Set(
+        candidates
+          .map((track) => track.trackId || track.fileId)
+          .filter(Boolean)
+      )
+    );
+
+    if (!ids.length) return;
+
+    let cancelled = false;
     let interval;
-    if (jobId && activeStep === 1) {
-      interval = setInterval(async () => {
-        try {
-          const data = await getJobStatus(jobId);
-          setJobStatus(data);
-          setOptimisticTracks((prev) => {
-            if (!prev.length) return prev;
-            const nowIso = new Date().toISOString();
-            const normalizedState =
-              data.status === "completed"
-                ? "ready"
-                : data.status === "failed"
-                ? "error"
-                : data.status === "starting"
-                ? "processing"
-                : data.status || "processing";
-            const progressValue =
-              typeof data.file_progress === "number"
-                ? data.file_progress
-                : typeof data.progress === "number"
-                ? data.progress
-                : 0;
-            const message = data.status_message || data.status || "Processing...";
 
-            return prev.map((track) => {
-              const current = track.processing || {};
-              const currentState = current.state || "processing";
-              if (currentState === "ready" || currentState === "error") return track;
-              return {
-                ...track,
-                processing: {
-                  ...current,
-                  state: normalizedState,
-                  step: normalizedState,
-                  message,
-                  progress: progressValue,
-                  updatedAt: nowIso,
-                },
-              };
-            });
-          });
-
-          if (data.status === "completed") {
-            clearInterval(interval);
-            setActiveStep(2);
-          } else if (data.status === "failed") {
-            clearInterval(interval);
-            setError(
-              `Processing failed: ${data.error || "Unknown error"}`
+    const pollStatuses = async () => {
+      try {
+        const updates = await getTrackStatuses(ids);
+        if (cancelled || !Array.isArray(updates)) return;
+        const byId = new Map(
+          updates
+            .filter((u) => u && u.trackId)
+            .map((u) => [u.trackId, u])
+        );
+        setOptimisticTracks((prev) => {
+          if (!prev.length) return prev;
+          let changed = false;
+          const next = prev.map((track) => {
+            const trackId = track.trackId || track.fileId;
+            if (!trackId) return track;
+            const update = byId.get(trackId);
+            if (!update || !update.processing) return track;
+            const mergedProcessing = mergeProcessingUpdate(
+              track.processing || null,
+              update.processing
             );
-          }
-        } catch (err) {
-          setError(`Failed to check job status: ${err.message}`);
-          clearInterval(interval);
-        }
-      }, 2000);
-    }
+            if (processingEquals(track.processing, mergedProcessing)) return track;
+            changed = true;
+            return {
+              ...track,
+              processing: mergedProcessing,
+            };
+          });
+          return changed ? next : prev;
+        });
+      } catch (err) {
+        console.error("Failed to check track statuses:", err);
+      }
+    };
+
+    pollStatuses();
+    interval = setInterval(pollStatuses, 2000);
 
     return () => {
+      cancelled = true;
       if (interval) clearInterval(interval);
     };
-  }, [jobId, activeStep]);
+  }, [optimisticTracks]);
 
   const handleProcessFiles = async () => {
     const filesToUpload = files;

@@ -249,9 +249,10 @@ def register_upload_metadata(original_name: str, stored_name: str, file_id: str)
         "safeDisplayName": display_name,
         "createdAt": created_at,
     }
-    data = _load_metadata_file(UPLOAD_METADATA_PATH)
-    data.setdefault("files", {})[file_id] = record
-    _save_metadata_file(UPLOAD_METADATA_PATH, data)
+    with processing_metadata_lock:
+        data = _load_metadata_file(UPLOAD_METADATA_PATH)
+        data.setdefault("files", {})[file_id] = record
+        _save_metadata_file(UPLOAD_METADATA_PATH, data)
     return record
 
 def get_upload_metadata(file_id: str):
@@ -261,6 +262,101 @@ def get_upload_metadata(file_id: str):
 def list_upload_metadata() -> list[dict]:
     data = _load_metadata_file(UPLOAD_METADATA_PATH)
     return list(data.get("files", {}).values())
+
+processing_metadata_lock = threading.Lock()
+
+def _processing_state_rank(state: str | None) -> int:
+    ranks = {
+        "queued": 0,
+        "uploading": 1,
+        "processing": 2,
+        "ready": 3,
+        "error": 3,
+    }
+    return ranks.get(str(state or "").lower(), 2)
+
+def _parse_iso_timestamp(value: str | None) -> float | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value).timestamp()
+    except Exception:
+        return None
+
+def _should_apply_processing_update(current: dict | None, incoming: dict) -> bool:
+    if not current:
+        return True
+    curr_state = (current.get("state") or "ready").lower()
+    next_state = (incoming.get("state") or curr_state).lower()
+
+    # Do not allow regression from terminal states
+    if curr_state in {"ready", "error"} and next_state != curr_state:
+        return False
+
+    curr_rank = _processing_state_rank(curr_state)
+    next_rank = _processing_state_rank(next_state)
+    if next_rank < curr_rank:
+        return False
+
+    if next_rank == curr_rank:
+        curr_ts = _parse_iso_timestamp(current.get("updatedAt"))
+        next_ts = _parse_iso_timestamp(incoming.get("updatedAt"))
+        if curr_ts is not None and next_ts is not None and next_ts <= curr_ts:
+            return False
+
+    return True
+
+def _normalize_progress_value(progress):
+    if isinstance(progress, float):
+        if 0 <= progress <= 1:
+            return int(progress * 100)
+        return int(progress)
+    if isinstance(progress, int):
+        return progress
+    if isinstance(progress, str) and progress.isdigit():
+        return int(progress)
+    return None
+
+def update_track_processing(file_id: str, *, state: str | None = None, step: str | None = None,
+                            message: str | None = None, progress=None, extra: dict | None = None) -> dict | None:
+    now_iso = datetime.now().isoformat()
+    with processing_metadata_lock:
+        data = _load_metadata_file(UPLOAD_METADATA_PATH)
+        record = data.get("files", {}).get(file_id)
+        if not record:
+            return None
+        current = record.get("processing") if isinstance(record.get("processing"), dict) else {}
+        next_processing = dict(current)
+
+        if state:
+            next_processing["state"] = state
+        if step is not None:
+            next_processing["step"] = step
+        if message is not None:
+            next_processing["message"] = message
+        if progress is not None:
+            normalized = _normalize_progress_value(progress)
+            if normalized is not None:
+                next_processing["progress"] = normalized
+        if extra:
+            next_processing.update(extra)
+
+        if "state" in next_processing and not next_processing.get("step"):
+            next_processing["step"] = next_processing["state"]
+        if "state" in next_processing and next_processing.get("message") is None:
+            next_processing["message"] = next_processing.get("step") or next_processing["state"]
+
+        next_processing["updatedAt"] = now_iso
+
+        if next_processing == current:
+            return current
+        if not _should_apply_processing_update(current, next_processing):
+            return current
+
+        record["processing"] = next_processing
+        data.setdefault("files", {})[file_id] = record
+        _save_metadata_file(UPLOAD_METADATA_PATH, data)
+        return next_processing
 
 def _collect_processing_file_ids() -> list[str]:
     ids = []
@@ -435,6 +531,14 @@ def process_files():
         'config': cfg, 'started_at': time.time(),
         'fileIds': file_ids,
     }
+    for fid in file_ids or []:
+        update_track_processing(
+            fid,
+            state="queued",
+            step="queued",
+            message="Queued for processing",
+            progress=0,
+        )
 
     time.sleep(1.0)
     threading.Thread(
@@ -584,29 +688,7 @@ def clean_all():
 def get_available_files():
     try:
         if not paths.UVR_PROCESSED_DIR.exists():
-            return jsonify({'files': [], 'message': 'No processed files available'})
-
-        active_job = _get_active_processing_job()
-        active_file_ids = set(active_job.get("fileIds", [])) if active_job else set()
-        processing_payload = None
-        if active_job:
-            status = active_job.get("status") or "processing"
-            state = "processing" if status in {"starting", "processing"} else "error" if status == "failed" else "ready"
-            progress_value = active_job.get("file_progress")
-            if progress_value is None:
-                progress_value = active_job.get("progress")
-            if isinstance(progress_value, float) and 0 <= progress_value <= 1:
-                progress_value = int(progress_value * 100)
-            message = active_job.get("status_message") or status
-            processing_payload = {
-                "state": state,
-                "step": state,
-                "message": message,
-                "progress": progress_value if isinstance(progress_value, (int, float)) else 0,
-                "updatedAt": datetime.now().isoformat(),
-                "currentFile": active_job.get("current_file"),
-                "totalFiles": active_job.get("total_files"),
-            }
+            paths.UVR_PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
         paths.INSTRUMENTAL_DIR.mkdir(parents=True, exist_ok=True)
         pairs = []
@@ -616,8 +698,21 @@ def get_available_files():
             raw_vocals = paths.UVR_RAW_DIR / f"{base_name}_vocals.wav"
             instrumental = paths.INSTRUMENTAL_DIR / f"{base_name}_instrumental.wav"
 
-            if not (processed_vocals.exists() or raw_vocals.exists() or instrumental.exists()):
+            processing = record.get("processing") if isinstance(record.get("processing"), dict) else None
+            has_outputs = processed_vocals.exists() or raw_vocals.exists() or instrumental.exists()
+            processing_state = (processing or {}).get("state")
+            is_processing = processing_state not in (None, "ready", "error")
+            if not has_outputs and not is_processing:
                 continue
+            processed_timestamp = None
+            if has_outputs:
+                processed_timestamp = datetime.fromtimestamp(
+                    max(
+                        (processed_vocals.stat().st_mtime if processed_vocals.exists() else 0),
+                        (raw_vocals.stat().st_mtime if raw_vocals.exists() else 0),
+                        (instrumental.stat().st_mtime if instrumental.exists() else 0),
+                    )
+                ).strftime('%Y-%m-%d %H:%M:%S')
 
             pairs.append({
                 "fileId": record["fileId"],
@@ -631,20 +726,32 @@ def get_available_files():
                 "vocalPathProcessed": processed_vocals.name if processed_vocals.exists() else None,
                 "vocalPathRaw": raw_vocals.name if raw_vocals.exists() else None,
                 "instrumentalPath": instrumental.name if instrumental.exists() else None,
-                "dateProcessed": datetime.fromtimestamp(
-                    max(
-                        (processed_vocals.stat().st_mtime if processed_vocals.exists() else 0),
-                        (raw_vocals.stat().st_mtime if raw_vocals.exists() else 0),
-                        (instrumental.stat().st_mtime if instrumental.exists() else 0),
-                    )
-                ).strftime('%Y-%m-%d %H:%M:%S'),
-                "processing": processing_payload if processing_payload and record.get("fileId") in active_file_ids else None,
+                "dateProcessed": processed_timestamp,
+                "processing": processing,
             })
 
         return jsonify({'files': pairs, 'message': f'Found {len(pairs)} processed files'})
     except Exception as e:
         print(f"Error getting available files: {e}"); traceback.print_exc()
         return jsonify({'files': [], 'error': str(e)})
+
+
+@app.route('/api/tracks/status', methods=['GET'])
+def get_track_statuses():
+    try:
+        raw_ids = request.args.get("ids", "")
+        ids = [v.strip() for v in raw_ids.split(",") if v.strip()]
+        data = _load_metadata_file(UPLOAD_METADATA_PATH)
+        files = data.get("files", {})
+        results = []
+        for track_id in ids:
+            record = files.get(track_id)
+            processing = record.get("processing") if isinstance(record, dict) else None
+            results.append({"trackId": track_id, "processing": processing})
+        return jsonify(results)
+    except Exception as e:
+        print(f"Error getting track statuses: {e}"); traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/delete-files', methods=['POST'])
@@ -657,7 +764,7 @@ def delete_files():
 
         results = []
         print(f"Deleting files for {len(fns)} tracks...")
-        data = _load_metadata_file(UPLOAD_METADATA_PATH)
+        to_remove = []
 
         for fn in fns:
             base = get_upload_base_name(fn)
@@ -682,10 +789,14 @@ def delete_files():
 
             if deleted or failed:
                 results.append({"track": base, "deleted": deleted, "failed": failed})
-                if fn in data.get("files", {}):
-                    data["files"].pop(fn, None)
+                to_remove.append(fn)
 
-        _save_metadata_file(UPLOAD_METADATA_PATH, data)
+        if to_remove:
+            with processing_metadata_lock:
+                data = _load_metadata_file(UPLOAD_METADATA_PATH)
+                for fn in to_remove:
+                    data.get("files", {}).pop(fn, None)
+                _save_metadata_file(UPLOAD_METADATA_PATH, data)
 
         return jsonify({
             "message": f"Processed {len(fns)} tracks",
@@ -708,39 +819,80 @@ def prepare_processing():
         print(f"Error preparing for processing: {e}")
         return jsonify({"error": str(e)}), 500
 
-def get_progress():
-    last = None
+def get_progress_events():
+    events = []
     try:
-        while True: last = progress_queue.get_nowait()
+        while True:
+            events.append(progress_queue.get_nowait())
     except queue.Empty:
-        return last
+        return events
 
 def process_audio_files_thread(job_id, segment, process, export, clean):
-    job = active_jobs[job_id]; job.update(status='processing', steps=[])
+    job = active_jobs[job_id]
+    job.update(status='processing', steps=[])
+    ordered_file_ids = []
+
     def monitor():
-        while job['status'] == 'processing':
-            p = get_progress()
-            if p:
-                if isinstance(p, dict):
-                    fp = p.get('file_progress', job.get('file_progress', 0))
-                    fp = int(fp * 100) if isinstance(fp, float) and 0 <= fp <= 1 else fp
-                    job.update(
-                        progress=p.get('progress', job.get('progress', 0)),
-                        file_progress=fp,
-                        current_file=p.get('current_file', job.get('current_file', 0)),
-                        total_files=p.get('total_files', job.get('total_files', 0)),
-                        status_message=p.get('message', job.get('status_message', ''))
+        def handle_progress_event(p):
+            if isinstance(p, dict):
+                fp = p.get('file_progress', job.get('file_progress', 0))
+                fp = int(fp * 100) if isinstance(fp, float) and 0 <= fp <= 1 else fp
+                current_file = p.get('current_file', job.get('current_file', 0))
+                total_files = p.get('total_files', job.get('total_files', 0))
+                job.update(
+                    progress=p.get('progress', job.get('progress', 0)),
+                    file_progress=fp,
+                    current_file=current_file,
+                    total_files=total_files,
+                    status_message=p.get('message', job.get('status_message', ''))
+                )
+                print(f"Job progress: {job['progress']}%, File progress: {fp}%, File: {job['current_file']}/{job['total_files']}")
+                msg = p.get('message')
+                if msg and (not job['steps'] or job['steps'][-1]['message'] != msg):
+                    if p.get('file_progress') is not None and not str(msg).endswith('%'):
+                        sp = int(p['file_progress'] * 100) if isinstance(p['file_progress'], float) else p['file_progress']
+                        msg = f"{msg} ({sp}%)"
+                    job['steps'].append({'message': msg, 'progress': fp, 'time': time.time()})
+
+                file_id = p.get("file_id")
+                file_index = current_file
+                if not file_id:
+                    if isinstance(file_index, str) and file_index.isdigit():
+                        file_index = int(file_index)
+                    if isinstance(file_index, int) and 1 <= file_index <= len(ordered_file_ids):
+                        file_id = ordered_file_ids[file_index - 1]
+                if file_id:
+                    message = p.get('message') or job.get('status_message') or "Processing..."
+                    raw_progress = p.get('file_progress', p.get('progress', 0))
+                    progress_pct = _normalize_progress_value(raw_progress)
+                    normalized_message = str(message)
+                    msg_lower = normalized_message.lower()
+                    if normalized_message.startswith("[ERROR]"):
+                        state = "error"
+                    elif (progress_pct is not None and progress_pct >= 100) or msg_lower.startswith("completed") or msg_lower.startswith("processing complete"):
+                        state = "ready"
+                    else:
+                        state = "processing"
+
+                    update_track_processing(
+                        file_id,
+                        state=state,
+                        step=state,
+                        message=normalized_message,
+                        progress=progress_pct,
                     )
-                    print(f"Job progress: {job['progress']}%, File progress: {fp}%, File: {job['current_file']}/{job['total_files']}")
-                    msg = p.get('message')
-                    if msg and (not job['steps'] or job['steps'][-1]['message'] != msg):
-                        if p.get('file_progress') is not None and not str(msg).endswith('%'):
-                            sp = int(p['file_progress'] * 100) if isinstance(p['file_progress'], float) else p['file_progress']
-                            msg = f"{msg} ({sp}%)"
-                        job['steps'].append({'message': msg, 'progress': fp, 'time': time.time()})
-                else:
-                    job['progress'] = p
+            else:
+                job['progress'] = p
+
+        while job['status'] == 'processing':
+            events = get_progress_events()
+            for p in events:
+                handle_progress_event(p)
             time.sleep(0.5)
+
+        # Drain any remaining progress updates after processing completes
+        for p in get_progress_events():
+            handle_progress_event(p)
 
     threading.Thread(target=monitor, daemon=True).start()
 
@@ -756,12 +908,35 @@ def process_audio_files_thread(job_id, segment, process, export, clean):
             if p.exists() and p not in seen:
                 seen.add(p)
                 input_paths.append(p)
+                ordered_file_ids.append(fid)
+
+        if not ordered_file_ids:
+            job.update(status='failed', error="No valid files to process", progress=0)
+            return
+
+        for fid in ordered_file_ids:
+            update_track_processing(
+                fid,
+                state="queued",
+                step="queued",
+                message="Queued for processing",
+                progress=0,
+            )
+
         process_all(segment_audio=segment, process_audio=process, export_data=export, clean_after=False, input_files=input_paths)
 
         job.update(status='completed', progress=100, completed_at=time.time(),
                    output_files=collect_output_files(segment, process))
     except Exception as e:
         job.update(status='failed', error=str(e), progress=0)
+        for fid in ordered_file_ids:
+            update_track_processing(
+                fid,
+                state="error",
+                step="error",
+                message=f"Processing failed: {e}",
+                progress=0,
+            )
         print(f"Error in processing thread: {e}"); traceback.print_exc()
 
 

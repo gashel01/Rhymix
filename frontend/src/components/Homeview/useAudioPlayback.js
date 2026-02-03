@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { mergeProcessingUpdate } from "../../utils/processingStatus";
 
 const normalizeProcessing = (processing) => {
   if (!processing) return null;
@@ -17,8 +18,6 @@ const statusFromProcessing = (processing) => {
   if (processing.state === "error") return "failed";
   return "processing";
 };
-
-const getProcessingState = (processing) => processing?.state || "ready";
 
 export const useAudioPlayback = ({ rawVocals, availableFiles, vocalMode, optimisticTracks = [] }) => {
   const serverTrackPairs = useMemo(() => {
@@ -109,11 +108,18 @@ export const useAudioPlayback = ({ rawVocals, availableFiles, vocalMode, optimis
     optimisticTrackPairs.forEach((opt) => {
       if (opt.fileId && serverById.has(opt.fileId)) {
         const server = serverById.get(opt.fileId);
-        const optState = getProcessingState(opt.processing);
-        const keepOptimistic = optState !== "ready" && optState !== "error";
-        const mergedPair = keepOptimistic
-          ? { ...server, ...opt, processing: opt.processing, status: opt.status }
-          : { ...opt, ...server, processing: server.processing, status: server.status };
+        const mergedProcessing = mergeProcessingUpdate(
+          server.processing || null,
+          opt.processing || null
+        );
+        const mergedPair = {
+          ...server,
+          displayName: server.displayName || opt.displayName,
+          originalName: server.originalName || opt.originalName,
+          createdAt: server.createdAt || opt.createdAt,
+          processing: mergedProcessing,
+          status: statusFromProcessing(mergedProcessing),
+        };
         merged.push(mergedPair);
         seen.add(opt.fileId);
         return;

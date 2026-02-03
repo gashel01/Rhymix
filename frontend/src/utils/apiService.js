@@ -76,6 +76,18 @@ export const getJobStatus = async (jobId) => {
 };
 
 /**
+ * Get processing status for multiple tracks
+ * @param {string[]} ids - Track IDs to check
+ * @returns {Promise<Object[]>} - Array of { trackId, processing }
+ */
+export const getTrackStatuses = async (ids) => {
+  const response = await axios.get(`${API_BASE}/api/tracks/status`, {
+    params: { ids: (ids || []).join(",") },
+  });
+  return response.data;
+};
+
+/**
  * Delete audio files for selected tracks
  * @param {string[]} filenames - Array of filenames to delete
  * @returns {Promise<Object>} - Delete operation results

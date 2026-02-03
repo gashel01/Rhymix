@@ -9,6 +9,11 @@ import TabPanel from "./common/TabPanel";
 import { useVocalMode } from "../hooks/useVocalMode";
 import { useAvailableFiles } from "../hooks/useAvailableFiles";
 import { downloadFile } from "../utils/audioUtils";
+import {
+  mergeProcessingUpdate,
+  processingEquals,
+  isTerminalProcessingState,
+} from "../utils/processingStatus";
 import Spinner from "./Homeview/Spinner.js";
 import Panel from "./Homeview/Panel.js";
 import Btn from "./Homeview/Btn.js";
@@ -86,20 +91,20 @@ function HomeView({
         if (!trackId) return track;
         const server = serverById.get(trackId);
         if (!server) return track;
-        const state = server.processing?.state;
-        if (!state || state === "ready" || state === "error") {
+        const prevProcessing = track.processing || null;
+        const nextProcessing = mergeProcessingUpdate(
+          prevProcessing,
+          server.processing || null
+        );
+        const serverTerminal = isTerminalProcessingState(server.processing?.state);
+        const mergedTerminal = isTerminalProcessingState(nextProcessing?.state);
+
+        if ((serverTerminal || !server.processing) && mergedTerminal) {
           changed = true;
           return null;
         }
-        const prevProcessing = track.processing || {};
-        const nextProcessing = server.processing || {};
-        const sameProcessing =
-          prevProcessing.state === nextProcessing.state &&
-          prevProcessing.step === nextProcessing.step &&
-          prevProcessing.message === nextProcessing.message &&
-          prevProcessing.progress === nextProcessing.progress &&
-          prevProcessing.updatedAt === nextProcessing.updatedAt;
-        if (!sameProcessing) {
+
+        if (!processingEquals(prevProcessing, nextProcessing)) {
           changed = true;
           return {
             ...track,
