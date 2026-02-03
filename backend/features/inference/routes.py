@@ -1,0 +1,284 @@
+import json
+import logging
+import os
+import uuid
+
+from flask import Blueprint, jsonify, request, send_file
+from werkzeug.utils import secure_filename
+
+from backend.features.inference.service import run_infer_script, start_inference_job
+from backend.jobs.registry import active_jobs
+from backend.paths.manager import paths
+from backend.storage.inference_runs import ALLOWED_RUN_REACTIONS, list_inference_runs, load_inference_run_metadata, save_inference_run_metadata
+
+bp = Blueprint("inference", __name__)
+
+
+@bp.route("/api/start-inference", methods=["POST"])
+def start_inference():
+    """Start an inference job for a track"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        model = data.get("model")  # Now expecting full model object
+        track = data.get("track")
+        params = data.get("params", {})
+
+        # Debug logging
+        logging.info(f"Received inference request - Model: {model.get('name') if model else 'None'}")
+        logging.info(f"Full track data: {json.dumps(track, indent=2) if track else 'None'}")
+        logging.info(f"Track type: {type(track)}")
+        logging.info(f"Track keys: {list(track.keys()) if track and isinstance(track, dict) else 'Not a dict'}")
+        logging.info(f"Track vocal: {track.get('vocal') if track else 'None'}")
+        logging.info(f"Track instrumental: {track.get('instrumental') if track else 'None'}")
+
+        if not model or not track:
+            return jsonify({"error": "Model and track are required"}), 400
+
+        job_id, run_id = start_inference_job(model, track, params)
+        return jsonify({"jobId": job_id, "runId": run_id})
+
+    except Exception as e:
+        logging.error(f"Error starting inference: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/inference-status/<job_id>", methods=["GET"])
+def inference_status(job_id):
+    """Get the status of an inference job"""
+    # First check in-memory jobs
+    if job_id in active_jobs:
+        job = active_jobs[job_id]
+
+        # Check if there's an updated status file from the worker process
+        status_file = f"job_status_{job_id}.json"
+        if os.path.exists(status_file):
+            try:
+                with open(status_file, "r") as f:
+                    worker_status = json.load(f)
+
+                # Update in-memory job with worker status
+                job.update(
+                    {
+                        "status": worker_status.get("status", job.get("status")),
+                        "progress": worker_status.get("progress", job.get("progress", 0)),
+                        "error": worker_status.get("error", job.get("error")),
+                        "logs": worker_status.get("logs", job.get("logs", [])),
+                        "outputFile": worker_status.get("output_file", job.get("outputFile")),
+                    }
+                )
+
+                # Clean up status file if job is complete
+                if worker_status.get("status") in ["completed", "failed"]:
+                    try:
+                        os.unlink(status_file)
+                    except Exception:
+                        pass
+
+            except Exception:
+                # If we can't read the status file, continue with in-memory data
+                pass
+
+        # Return job data
+        return jsonify(
+            {
+                "id": job["id"],
+                "type": job["type"],
+                "model_name": job["model_name"],
+                "track": job["track"],
+                "status": job["status"],
+                "progress": job["progress"],
+                "logs": job["logs"],
+                "started_at": job["started_at"],
+                "completed_at": job.get("completed_at"),
+                "error": job.get("error"),
+                "outputFile": job.get("outputFile"),
+                "runId": job.get("runId") or job.get("run_id"),
+                "outputUrl": job.get("outputUrl"),
+            }
+        )
+
+    # Check if there's a status file for a completed job
+    status_file = f"job_status_{job_id}.json"
+    if os.path.exists(status_file):
+        try:
+            with open(status_file, "r") as f:
+                job_data = json.load(f)
+
+            # Create temporary job entry for completed job
+            temp_job = {
+                "id": job_id,
+                "type": "inference",
+                "status": job_data.get("status", "unknown"),
+                "progress": job_data.get("progress", 0),
+                "logs": job_data.get("logs", []),
+                "error": job_data.get("error"),
+                "outputFile": job_data.get("output_file"),
+            }
+
+            return jsonify(temp_job)
+
+        except Exception as e:
+            return jsonify({"error": f"Failed to read job status: {str(e)}"}), 500
+
+    return jsonify({"error": "Job not found"}), 404
+
+
+@bp.route("/api/past-inference-results", methods=["GET"])
+def get_past_inference_results():
+    """Get list of past inference results by scanning inference directory"""
+    try:
+        results = list_inference_runs()
+        results.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
+        return jsonify({"results": results})
+
+    except Exception as e:
+        print(f"Error getting past inference results: {e}")
+        import traceback
+
+        print(traceback.format_exc())
+        return jsonify({"error": f"Failed to get results: {str(e)}"}), 500
+
+
+@bp.route("/api/runs/<path:run_id>/reaction", methods=["PATCH"])
+def update_run_reaction(run_id):
+    data = request.get_json(silent=True) or {}
+    reaction = data.get("reaction")
+    if reaction not in ALLOWED_RUN_REACTIONS:
+        return jsonify({"error": "Invalid reaction"}), 400
+
+    import urllib.parse
+
+    run_id = urllib.parse.unquote(run_id)
+    run_meta = load_inference_run_metadata(run_id)
+    if not run_meta:
+        return jsonify({"error": "Run not found"}), 404
+
+    run_meta.pop("isFavorite", None)
+    run_meta["reaction"] = reaction
+    save_inference_run_metadata(run_id, run_meta)
+    return jsonify(run_meta)
+
+
+@bp.route("/api/process-audio", methods=["POST"])
+def process_audio():
+    try:
+        if "audio" not in request.files:
+            return jsonify({"error": "No audio file provided"}), 400
+        f = request.files["audio"]
+        if not f.filename:
+            return jsonify({"error": "Empty filename"}), 400
+
+        pid = str(uuid.uuid4())
+        tmp = paths.TEMP_WAV_DIR / f"process_{pid}"
+        tmp.mkdir(parents=True, exist_ok=True)
+        in_path = str(tmp / secure_filename(f.filename))
+        f.save(in_path)
+
+        form = request.form
+        export_format = form.get("exportFormat", "wav")
+        out_path = str(tmp / f"output_{pid}.wav")
+
+        # typed form helpers
+        b = lambda k, d=False: form.get(k, str(d)).lower() == "true"
+        i = lambda k, d=0: int(form.get(k, d))
+        fl = lambda k, d=0.0: float(form.get(k, d))
+        s = lambda k, d="": form.get(k, d)
+
+        result_message, output_file = run_infer_script(
+            pitch=i("pitch", 0),
+            filter_radius=i("filterRadius", 3),
+            index_rate=fl("indexRate", 0.75),
+            volume_envelope=i("volumeEnvelope", 1),
+            protect=fl("protect", 0.33),
+            hop_length=i("hopLength", 128),
+            f0_method=s("f0Method", "rmvpe"),
+            input_path=in_path,
+            output_path=out_path,
+            pth_path=s("modelPath", ""),
+            index_path=s("indexPath", ""),
+            split_audio=b("splitAudio", True),
+            f0_autotune=b("f0Autotune", False),
+            f0_autotune_strength=fl("f0AutotuneStrength", 0.5),
+            clean_audio=b("cleanAudio", False),
+            clean_strength=fl("cleanStrength", 0.5),
+            export_format=export_format,
+            f0_file=s("f0File", ""),
+            embedder_model=s("embedderModel", "hubert_base"),
+            embedder_model_custom=form.get("embedderModelCustom", None),
+            formant_shifting=b("formantShifting", False),
+            formant_qfrency=fl("formantQfrency", 1.0),
+            formant_timbre=fl("formantTimbre", 1.0),
+            post_process=b("postProcess", False),
+            reverb=b("reverb"),
+            pitch_shift=b("pitchShift"),
+            limiter=b("limiter"),
+            gain=b("gain"),
+            distortion=b("distortion"),
+            chorus=b("chorus"),
+            bitcrush=b("bitcrush"),
+            clipping=b("clipping"),
+            compressor=b("compressor"),
+            delay=b("delay"),
+            reverb_room_size=fl("reverbRoomSize", 0.5),
+            reverb_damping=fl("reverbDamping", 0.5),
+            reverb_wet_gain=fl("reverbWetGain", 0.5),
+            reverb_dry_gain=fl("reverbDryGain", 0.5),
+            reverb_width=fl("reverbWidth", 0.5),
+            reverb_freeze_mode=fl("reverbFreezeMode", 0.5),
+            pitch_shift_semitones=fl("pitchShiftSemitones", 0.0),
+            limiter_threshold=fl("limiterThreshold", -6),
+            limiter_release_time=fl("limiterReleaseTime", 0.01),
+            gain_db=fl("gainDb", 0.0),
+            distortion_gain=fl("distortionGain", 25),
+            chorus_rate=fl("chorusRate", 1.0),
+            chorus_depth=fl("chorusDepth", 0.25),
+            chorus_center_delay=fl("chorusCenterDelay", 7),
+            chorus_feedback=fl("chorusFeedback", 0.0),
+            chorus_mix=fl("chorusMix", 0.5),
+            bitcrush_bit_depth=i("bitcrushBitDepth", 8),
+            clipping_threshold=fl("clippingThreshold", -6),
+            compressor_threshold=fl("compressorThreshold", 0),
+            compressor_ratio=fl("compressorRatio", 1),
+            compressor_attack=fl("compressorAttack", 1.0),
+            compressor_release=fl("compressorRelease", 100),
+            delay_seconds=fl("delaySeconds", 0.5),
+            delay_feedback=fl("delayFeedback", 0.0),
+            delay_mix=fl("delayMix", 0.5),
+            sid=i("sid", 0),
+        )
+
+        if not os.path.exists(output_file):
+            return jsonify({"error": "Failed to generate output file"}), 500
+
+        return jsonify(
+            {
+                "message": result_message,
+                "outputUrl": f"/api/audio-results/{pid}/output.{export_format}",
+                "processId": pid,
+            }
+        )
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Error processing audio: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/audio-results/<process_id>/output.<format>")
+def get_audio_result(process_id, format):
+    try:
+        d = paths.TEMP_WAV_DIR / f"process_{process_id}"
+        f = next((x for x in d.iterdir() if x.name.startswith("output_") and x.suffix == f".{format}"), None)
+        if not f:
+            return jsonify({"error": f"No output file found in format {format}"}), 404
+        return send_file(f, mimetype=f"audio/{format}", as_attachment=False, download_name=f"converted_output.{format}")
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Error getting audio result: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500

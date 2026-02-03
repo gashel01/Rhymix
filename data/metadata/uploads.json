@@ -32,13 +32,6 @@
       "createdAt": "2026-02-03T12:24:52.975131",
       "fileId": "2016c378efbe4466be401be5278428a5",
       "originalName": "4_AM_Ferry_instrumental (1).wav",
-      "processing": {
-        "message": "WAV conversion complete",
-        "progress": 20,
-        "state": "processing",
-        "step": "processing",
-        "updatedAt": "2026-02-03T12:24:55.096945"
-      },
       "safeDisplayName": "4_AM_Ferry_instrumental (1).wav",
       "storedName": "2016c378efbe4466be401be5278428a5.wav"
     },
@@ -53,13 +46,6 @@
       "createdAt": "2026-02-03T12:24:53.052391",
       "fileId": "23a27875601946338d5694430e5fb113",
       "originalName": "All_Night_Long_instrumental.wav",
-      "processing": {
-        "message": "Queued for processing",
-        "progress": 0,
-        "state": "queued",
-        "step": "queued",
-        "updatedAt": "2026-02-03T12:24:54.545696"
-      },
       "safeDisplayName": "All_Night_Long_instrumental.wav",
       "storedName": "23a27875601946338d5694430e5fb113.wav"
     },
@@ -95,13 +81,6 @@
       "createdAt": "2026-02-03T12:18:20.933516",
       "fileId": "45e16c0ca1c84d86a215c9fc8a02750e",
       "originalName": "Did_you_get_the_new_(1)_taylorswift_full.mp3",
-      "processing": {
-        "message": "Processing complete!",
-        "progress": 100,
-        "state": "ready",
-        "step": "ready",
-        "updatedAt": "2026-02-03T12:18:56.332813"
-      },
       "safeDisplayName": "Did_you_get_the_new_(1)_taylorswift_full.mp3",
       "storedName": "45e16c0ca1c84d86a215c9fc8a02750e.mp3"
     },
@@ -123,13 +102,6 @@
       "createdAt": "2026-02-03T12:24:53.075029",
       "fileId": "58972de7f84d4941910a83e2a26978ff",
       "originalName": "audio (4).mp3",
-      "processing": {
-        "message": "Queued for processing",
-        "progress": 0,
-        "state": "queued",
-        "step": "queued",
-        "updatedAt": "2026-02-03T12:24:54.568414"
-      },
       "safeDisplayName": "audio (4).mp3",
       "storedName": "58972de7f84d4941910a83e2a26978ff.mp3"
     },
@@ -167,6 +139,13 @@
       "originalName": "cyril (1).wav",
       "safeDisplayName": "cyril (1).wav",
       "storedName": "a28eeba53e0147e3ae6a93fa045c1735.wav"
+    },
+    "a69a35ce08b24d009aa051c2e0570bb6": {
+      "createdAt": "2026-02-03T15:46:06.238129",
+      "fileId": "a69a35ce08b24d009aa051c2e0570bb6",
+      "originalName": "ttr",
+      "safeDisplayName": "ttr",
+      "storedName": "a69a35ce08b24d009aa051c2e0570bb6"
     },
     "b30d9793070e43deadd5f82d67cfb77a": {
       "createdAt": "2026-02-03T10:25:39.518253",
