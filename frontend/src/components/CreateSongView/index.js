@@ -26,8 +26,10 @@ const GENRE_RECS = [
   "Cinematic",
 ];
 
+const ACESTEP_MAIN_MODELS = ["acestep-v15-turbo", "acestep-v15-base", "acestep-v15-sft"];
+const ACESTEP_LM_MODELS = ["acestep-5Hz-lm-0.6B", "acestep-5Hz-lm-1.7B", "acestep-5Hz-lm-4B"];
+
 const SONG_ASSET_KEYS = [
-  "preview_mix",
   "full_mix",
   "instrumental",
   "vocals_raw",
@@ -36,7 +38,6 @@ const SONG_ASSET_KEYS = [
 ];
 
 const SONG_ASSET_LABELS = {
-  preview_mix: "Preview",
   full_mix: "Full",
   instrumental: "Instrumental",
   vocals_raw: "Raw Vocals",
@@ -49,7 +50,6 @@ const isAssetReady = (asset) => !!(asset && (asset.ready || asset.url));
 const getBestAssetKey = (assets) => {
   if (!assets) return null;
   if (isAssetReady(assets.full_mix)) return "full_mix";
-  if (isAssetReady(assets.preview_mix)) return "preview_mix";
   const ready = SONG_ASSET_KEYS.find((k) => isAssetReady(assets[k]));
   return ready || null;
 };
@@ -135,9 +135,19 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
   // Length
   const [duration, setDuration] = useState(180);
   const [durationInput, setDurationInput] = useState("180");
-  const [previewDuration] = useState(35);
-  const [autoFull, setAutoFull] = useState(true);
   const [enhanceVocals, setEnhanceVocals] = useState(true);
+  // ACE-Step 1.5 configuration
+  const [mainModelPath, setMainModelPath] = useState("acestep-v15-turbo");
+  const [lmModelPath, setLmModelPath] = useState("acestep-5Hz-lm-0.6B");
+  const [lmBackend, setLmBackend] = useState("vllm");
+  const [device, setDevice] = useState("auto");
+  const [initializeLm, setInitializeLm] = useState(true);
+  const [useFlashAttention, setUseFlashAttention] = useState(true);
+  const [offloadToCpu, setOffloadToCpu] = useState(true);
+  const [offloadDitToCpu, setOffloadDitToCpu] = useState(true);
+  const [compileModel, setCompileModel] = useState(true);
+  const [int8Quantization, setInt8Quantization] = useState(true);
+  const [showAceStepAdvanced, setShowAceStepAdvanced] = useState(false);
 
   // Generation state
   const [generating, setGenerating] = useState(false);
@@ -145,6 +155,7 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
   const [statusMessage, setStatusMessage] = useState("");
   const [currentJobId, setCurrentJobId] = useState(null);
   const [error, setError] = useState(null);
+  const [missingDeps, setMissingDeps] = useState(null);
 
   // Results
   const [songs, setSongs] = useState([]);
@@ -382,6 +393,35 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     </div>
   );
 
+  const CheckRow = ({ label, value, onChange, hint }) => (
+    <div style={{ display: "grid", gap: 6 }}>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          padding: "10px 12px",
+          borderRadius: 14,
+          border: `1px solid ${t.hairline}`,
+          background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+          boxShadow: t.shadowSoft,
+          color: t.text,
+          fontWeight: 800,
+        }}
+      >
+        <span>{label}</span>
+        <input
+          type="checkbox"
+          checked={!!value}
+          onChange={(e) => onChange(e.target.checked)}
+          style={{ accentColor: t.primary }}
+        />
+      </label>
+      {hint && <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>{hint}</div>}
+    </div>
+  );
+
   const Segmented = ({ value, onChange, options }) => (
     <div
       style={{
@@ -582,6 +622,33 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const extractMissingDeps = useCallback((msg) => {
+    if (!msg) return null;
+    const missingMatch = msg.match(/Missing packages:\s*([^\n.]+)/i);
+    const pipMatch = msg.match(/pip install [^\n]+/i);
+    if (!missingMatch && !pipMatch) return null;
+    const packages = missingMatch
+      ? missingMatch[1]
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+    return {
+      packages,
+      pip: pipMatch ? pipMatch[0] : "",
+    };
+  }, []);
+
+  const applyError = useCallback(
+    (msg) => {
+      if (!msg) return;
+      setError(msg);
+      const parsed = extractMissingDeps(msg);
+      if (parsed) setMissingDeps(parsed);
+    },
+    [extractMissingDeps]
+  );
+
   const loadAvailableModels = async () => {
     try {
       setLoadingModels(true);
@@ -618,7 +685,7 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       hasAssets,
       selectedAssetKey,
       request: job.params || null,
-      autoFull: job.params?.auto_full ?? true,
+      autoFull: true,
     };
   };
 
@@ -732,7 +799,7 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
           pollRef.current = null;
           setGenerating(false);
           setCurrentJobId(null);
-          setError(data.error || "Generation failed");
+          applyError(data.error || "Generation failed");
           setProgress(0);
           setSongs((prev) => prev.map((s) => (s.id === jobId ? { ...s, status: "failed" } : s)));
         }
@@ -743,7 +810,7 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       }
     }, 1000);
   },
-    [applyProgress, handleJobUpdate]
+    [applyError, applyProgress, handleJobUpdate]
   );
 
   // ---------- Genre helpers ----------
@@ -789,18 +856,28 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       };
     }
 
-    return {
+    const out = {
       title: title.trim(),
       audio_duration: duration,
       duration,
-      preview_duration: previewDuration,
-      auto_full: autoFull,
       enhance_vocals: enhanceVocals,
       prompt: buildPrompt(),
       lyrics: instrumentalOnly ? "" : lyrics,
       model_name: selectedModel?.name || null,
       model: modelForInference,
+      main_model_path: mainModelPath,
+      lm_model_path: lmModelPath,
+      device,
+      lm_backend: lmBackend,
+      initialize_lm: initializeLm,
+      use_flash_attention: useFlashAttention,
+      offload_to_cpu: offloadToCpu,
+      offload_dit_to_cpu: offloadDitToCpu,
+      compile_model: compileModel,
+      int8_quantization: int8Quantization,
     };
+
+    return out;
   };
 
   const syncDuration = (val) => {
@@ -819,6 +896,7 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
 
     const params = buildInferParams();
     setError(null);
+    setMissingDeps(null);
     setGenerating(true);
     setProgress(0);
     setStatusMessage("Starting generation...");
@@ -858,7 +936,6 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
         status: "queued",
         progress: 0,
         request: params,
-        autoFull,
         assets: {},
         hasAssets: true,
         selectedAssetKey: null,
@@ -869,7 +946,7 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       onGenerate?.(newSong);
     } catch (e) {
       console.error("Generation error:", e);
-      setError(e.message || "Failed to start generation");
+      applyError(e.message || "Failed to start generation");
       setGenerating(false);
       setProgress(0);
       setStatusMessage("");
@@ -891,19 +968,6 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       }
     } catch (e) {
       console.error("Delete error:", e);
-    }
-  };
-
-  const triggerFullGeneration = async (songId) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/song-generation/${songId}/full`, { method: "POST" });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to start full generation");
-      }
-    } catch (e) {
-      console.error("Full generation error:", e);
-      setError(e.message || "Failed to start full generation");
     }
   };
 
@@ -952,6 +1016,33 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
 
   return (
     <>
+      <Modal
+        open={!!missingDeps}
+        onClose={() => setMissingDeps(null)}
+        title="Missing Dependencies"
+        footer={
+          <Btn variant="secondary" onClick={() => setMissingDeps(null)} style={{ height: 40 }}>
+            Close
+          </Btn>
+        }
+      >
+        <div style={{ display: "grid", gap: 8 }}>
+          {missingDeps?.packages?.length > 0 && (
+            <div>
+              Missing packages: <strong>{missingDeps.packages.join(", ")}</strong>
+            </div>
+          )}
+          {missingDeps?.pip && (
+            <div>
+              Run this command:
+              <div style={{ marginTop: 6 }}>
+                <code>{missingDeps.pip}</code>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+
       <div style={{  maxWidth: t.maxW, margin: "0 auto" }}>
         <div ref={sentinelRef} />
 
@@ -1042,13 +1133,6 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                 </div>
 
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <Pill
-                    tone={autoFull ? "primary" : "neutral"}
-                    onClick={() => setAutoFull((v) => !v)}
-                    title="Generate full song after preview"
-                  >
-                    {autoFull ? "Full after preview ✓" : "Full after preview"}
-                  </Pill>
                   {!instrumentalOnly && (
                     <Pill
                       tone={enhanceVocals ? "primary" : "neutral"}
@@ -1059,8 +1143,140 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                     </Pill>
                   )}
                   <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
-                    Preview plays first. Full generation can be automatic or manual.
+                    Full song generation starts immediately. Stems and optional RVC run after.
                   </div>
+                </div>
+
+                {/* Generation model */}
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text }}>Generation Model</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ fontWeight: 800, color: t.text }}>ACE-Step 1.5</div>
+                    <Pill
+                      tone={showAceStepAdvanced ? "primary" : "neutral"}
+                      onClick={() => setShowAceStepAdvanced((v) => !v)}
+                      title="Show advanced ACE-Step settings"
+                    >
+                      {showAceStepAdvanced ? "Advanced ✓" : "Advanced"}
+                    </Pill>
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
+                    Defaults tuned for RTX 3070 Ti. Advanced options control LM, offload, and quantization.
+                  </div>
+
+                  {showAceStepAdvanced && (
+                    <div style={{ display: "grid", gap: 10 }}>
+                      <div className="cs-selectWrap">
+                        <select
+                          value={mainModelPath}
+                          onChange={(e) => setMainModelPath(e.target.value)}
+                          style={{
+                            width: "100%",
+                            height: 44,
+                            borderRadius: 16,
+                            border: `1px solid ${t.hairline}`,
+                            background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+                            color: t.text,
+                            padding: "0 12px",
+                            fontWeight: 700,
+                            boxShadow: t.shadowSoft,
+                            outline: "none",
+                            appearance: "none",
+                          }}
+                        >
+                          {ACESTEP_MAIN_MODELS.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="cs-selectChevron">▾</div>
+                      </div>
+
+                      <div className="cs-selectWrap">
+                        <select
+                          value={lmModelPath}
+                          onChange={(e) => setLmModelPath(e.target.value)}
+                          style={{
+                            width: "100%",
+                            height: 44,
+                            borderRadius: 16,
+                            border: `1px solid ${t.hairline}`,
+                            background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+                            color: t.text,
+                            padding: "0 12px",
+                            fontWeight: 700,
+                            boxShadow: t.shadowSoft,
+                            outline: "none",
+                            appearance: "none",
+                          }}
+                        >
+                          {ACESTEP_LM_MODELS.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="cs-selectChevron">▾</div>
+                      </div>
+
+                      <div className="cs-selectWrap">
+                        <select
+                          value={lmBackend}
+                          onChange={(e) => setLmBackend(e.target.value)}
+                          style={{
+                            width: "100%",
+                            height: 44,
+                            borderRadius: 16,
+                            border: `1px solid ${t.hairline}`,
+                            background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+                            color: t.text,
+                            padding: "0 12px",
+                            fontWeight: 700,
+                            boxShadow: t.shadowSoft,
+                            outline: "none",
+                            appearance: "none",
+                          }}
+                        >
+                          <option value="vllm">vllm</option>
+                          <option value="pt">pt</option>
+                        </select>
+                        <div className="cs-selectChevron">▾</div>
+                      </div>
+
+                      <div className="cs-selectWrap">
+                        <select
+                          value={device}
+                          onChange={(e) => setDevice(e.target.value)}
+                          style={{
+                            width: "100%",
+                            height: 44,
+                            borderRadius: 16,
+                            border: `1px solid ${t.hairline}`,
+                            background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+                            color: t.text,
+                            padding: "0 12px",
+                            fontWeight: 700,
+                            boxShadow: t.shadowSoft,
+                            outline: "none",
+                            appearance: "none",
+                          }}
+                        >
+                          <option value="auto">auto</option>
+                          <option value="cuda">cuda</option>
+                          <option value="cpu">cpu</option>
+                        </select>
+                        <div className="cs-selectChevron">▾</div>
+                      </div>
+
+                      <CheckRow label="Initialize 5Hz LM" value={initializeLm} onChange={setInitializeLm} />
+                      <CheckRow label="Use flash attention" value={useFlashAttention} onChange={setUseFlashAttention} />
+                      <CheckRow label="Offload to CPU" value={offloadToCpu} onChange={setOffloadToCpu} />
+                      <CheckRow label="Offload DiT to CPU" value={offloadDitToCpu} onChange={setOffloadDitToCpu} />
+                      <CheckRow label="Compile model" value={compileModel} onChange={setCompileModel} />
+                      <CheckRow label="Int8 quantization" value={int8Quantization} onChange={setInt8Quantization} />
+                    </div>
+                  )}
                 </div>
 
                 <Segmented
@@ -1321,10 +1537,6 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                     const isReady = assets ? isAssetReadyNow : legacyReady;
                     const isGenerating = !isReady && s.status && s.status !== "failed";
                     const isFailed = s.status === "failed";
-                    const needsFullCTA =
-                      s.autoFull === false &&
-                      (s.status === "preview_ready" || s.status === "preview_generating") &&
-                      !isAssetReady(assets?.full_mix);
 
                     return (
                       <div
@@ -1501,17 +1713,6 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                           </div>
                         )}
 
-                        {needsFullCTA && (
-                          <div style={{ marginTop: 10 }}>
-                            <Btn
-                              variant="primary"
-                              onClick={() => triggerFullGeneration(s.id)}
-                              style={{ height: 40, borderRadius: 12 }}
-                            >
-                              Generate Full Song
-                            </Btn>
-                          </div>
-                        )}
 
                         {isGenerating && (
                           <div style={{ marginTop: 12 }}>

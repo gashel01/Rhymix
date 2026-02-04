@@ -23,9 +23,33 @@ from backend.storage.metadata import (
     sanitize_filename_for_display,
 )
 
-# ACE-Step default parameters (can be overridden)
+# -----------------------------
+# ACE-Step v1.5 (only) support
+# -----------------------------
+
+ACESTEP15_DIR = paths.BASE_DIR / "ACE-Step-1.5"
+ACESTEP15_CHECKPOINTS_ROOT = ACESTEP15_DIR / "checkpoints"
+ACESTEP15_VENV_PATH = ACESTEP15_DIR / "venv"  # ACE-Step 1.5 dedicated virtual environment
+ACESTEP15_FALLBACK_VENV_PATH = ACESTEP15_DIR / ".venv"
+
+# ACE-Step 1.5 default parameters (can be overridden)
+ACESTEP15_DEFAULTS = {
+    "checkpoints_root": str(ACESTEP15_CHECKPOINTS_ROOT),
+    "main_model_path": "acestep-v15-turbo",
+    "lm_model_path": "acestep-5Hz-lm-0.6B",
+    "device": "auto",
+    "lm_backend": "vllm",
+    "initialize_lm": True,
+    "use_flash_attention": True,
+    "offload_to_cpu": True,
+    "offload_dit_to_cpu": True,
+    "compile_model": True,
+    "int8_quantization": True,
+}
+
+# ACE-Step inference defaults (kept for compatibility with existing UI params)
 ACESTEP_DEFAULTS = {
-    "infer_step":20, #60,
+    "infer_step": 20,
     "guidance_scale": 15.0,
     "scheduler_type": "euler",
     "cfg_type": "apg",
@@ -41,11 +65,6 @@ ACESTEP_DEFAULTS = {
     "guidance_scale_text": 0.0,
     "guidance_scale_lyric": 0.0,
 }
-
-# ACE-Step paths
-ACESTEP_DIR = paths.BASE_DIR / "ACE-Step"
-ACESTEP_CHECKPOINT_PATH = ACESTEP_DIR / "checkpoints"
-ACESTEP_VENV_PATH = ACESTEP_DIR / "venv"  # ACE-Step's own virtual environment
 
 # Song generation output directory
 SONG_GENERATION_DIR = paths.BASE_DIR / "data" / "generated_songs"
@@ -77,6 +96,40 @@ STATUS_ORDER = [
     "completed",
     "failed",
 ]
+
+
+def _coerce_bool(value, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
+
+
+def _normalize_acestep15_params(params: dict) -> dict:
+    """Return a shallow-copied params dict with ACE-Step 1.5 defaults applied."""
+    p = dict(params or {})
+
+    for key, value in ACESTEP15_DEFAULTS.items():
+        if key not in p or p.get(key) in (None, ""):
+            p[key] = value
+
+    p["device"] = str(p.get("device") or ACESTEP15_DEFAULTS["device"]).strip().lower()
+    p["lm_backend"] = str(p.get("lm_backend") or ACESTEP15_DEFAULTS["lm_backend"]).strip().lower()
+    p["main_model_path"] = str(p.get("main_model_path") or ACESTEP15_DEFAULTS["main_model_path"]).strip()
+    p["lm_model_path"] = str(p.get("lm_model_path") or ACESTEP15_DEFAULTS["lm_model_path"]).strip()
+    p["checkpoints_root"] = str(p.get("checkpoints_root") or ACESTEP15_DEFAULTS["checkpoints_root"]).strip()
+
+    p["initialize_lm"] = _coerce_bool(p.get("initialize_lm"), ACESTEP15_DEFAULTS["initialize_lm"])
+    p["use_flash_attention"] = _coerce_bool(p.get("use_flash_attention"), ACESTEP15_DEFAULTS["use_flash_attention"])
+    p["offload_to_cpu"] = _coerce_bool(p.get("offload_to_cpu"), ACESTEP15_DEFAULTS["offload_to_cpu"])
+    p["offload_dit_to_cpu"] = _coerce_bool(p.get("offload_dit_to_cpu"), ACESTEP15_DEFAULTS["offload_dit_to_cpu"])
+    p["compile_model"] = _coerce_bool(p.get("compile_model"), ACESTEP15_DEFAULTS["compile_model"])
+    p["int8_quantization"] = _coerce_bool(p.get("int8_quantization"), ACESTEP15_DEFAULTS["int8_quantization"])
+
+    return p
 
 
 def _job_dir(job_id: str) -> Path:
@@ -126,51 +179,32 @@ def _set_status(job: dict, status: str, message: str | None = None) -> None:
 
 
 def get_acestep_python():
-    """Get the Python executable for ACE-Step (from its venv if exists)"""
+    """Get the Python executable for ACE-Step 1.5 (from its venv if exists)"""
     if sys.platform == "win32":
-        venv_python = ACESTEP_VENV_PATH / "Scripts" / "python.exe"
+        venv_python = ACESTEP15_VENV_PATH / "Scripts" / "python.exe"
+        fallback_venv_python = ACESTEP15_FALLBACK_VENV_PATH / "Scripts" / "python.exe"
     else:
-        venv_python = ACESTEP_VENV_PATH / "bin" / "python"
+        venv_python = ACESTEP15_VENV_PATH / "bin" / "python"
+        fallback_venv_python = ACESTEP15_FALLBACK_VENV_PATH / "bin" / "python"
 
     if venv_python.exists():
         return str(venv_python)
 
+    if fallback_venv_python.exists():
+        print("[ACE-Step] Warning: venv not found; using .venv for ACE-Step 1.5", flush=True)
+        return str(fallback_venv_python)
+
     # Fallback to system python
+    print("[ACE-Step] Warning: ACE-Step 1.5 venv not found; using system Python", flush=True)
     return sys.executable
 
 
-def _run_acestep_generation(job: dict, job_id: str, infer_params: dict, output_path: Path) -> None:
-    # Find checkpoint path
-    checkpoint_path = str(ACESTEP_CHECKPOINT_PATH)
-    alt_paths = [
-        ACESTEP_DIR / "ckpts",
-        ACESTEP_DIR / "models",
-        Path.home() / ".cache" / "acestep",
-    ]
-    for alt in alt_paths:
-        if alt.exists():
-            checkpoint_path = str(alt)
-            break
+def _run_acestep15_generation(job: dict, job_id: str, infer_params: dict, output_path: Path) -> None:
+    params = _normalize_acestep15_params(infer_params or {})
 
-    checkpoint_dir = Path(checkpoint_path)
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
-
-    def _has_checkpoint_files(path: Path) -> bool:
-        if not path.exists():
-            return False
-        exts = (".safetensors", ".ckpt", ".bin", ".pth", ".pt", ".json", ".yaml", ".yml")
-        for ext in exts:
-            if any(path.rglob(f"*{ext}")):
-                return True
-        return False
-
-    # Get the right Python executable
     python_exe = get_acestep_python()
+    temp_dir = Path(tempfile.mkdtemp(prefix=f"acestep15_{job_id}_"))
 
-    # Create a temporary working directory outside the repo to avoid Flask reloads
-    temp_dir = Path(tempfile.mkdtemp(prefix=f"acestep_{job_id}_"))
-
-    # Create a temporary params file for the subprocess
     params_file = temp_dir / f"{job_id}_params.json"
     with open(params_file, "w") as f:
         json.dump(
@@ -178,185 +212,297 @@ def _run_acestep_generation(job: dict, job_id: str, infer_params: dict, output_p
                 "audio_duration": infer_params.get("audio_duration", 180),
                 "prompt": infer_params.get("prompt", ""),
                 "lyrics": infer_params.get("lyrics", ""),
-                "infer_step": infer_params.get("infer_step", 60),
+                "infer_step": infer_params.get("infer_step", infer_params.get("inference_steps", 20)),
                 "guidance_scale": infer_params.get("guidance_scale", 15.0),
-                "scheduler_type": infer_params.get("scheduler_type", "euler"),
-                "cfg_type": infer_params.get("cfg_type", "apg"),
-                "omega_scale": infer_params.get("omega_scale", 10.0),
                 "actual_seeds": infer_params.get("actual_seeds", [-1]),
-                "guidance_interval": infer_params.get("guidance_interval", 0.5),
-                "guidance_interval_decay": infer_params.get("guidance_interval_decay", 0.0),
-                "min_guidance_scale": infer_params.get("min_guidance_scale", 3.0),
-                "use_erg_tag": infer_params.get("use_erg_tag", True),
-                "use_erg_lyric": infer_params.get("use_erg_lyric", True),
-                "use_erg_diffusion": infer_params.get("use_erg_diffusion", True),
-                "oss_steps": infer_params.get("oss_steps", []),
-                "guidance_scale_text": infer_params.get("guidance_scale_text", 0.0),
-                "guidance_scale_lyric": infer_params.get("guidance_scale_lyric", 0.0),
+                "seed": infer_params.get("seed"),
+                "checkpoints_root": params.get("checkpoints_root"),
+                "main_model_path": params.get("main_model_path"),
+                "lm_model_path": params.get("lm_model_path"),
+                "device": params.get("device"),
+                "lm_backend": params.get("lm_backend"),
+                "initialize_lm": params.get("initialize_lm"),
+                "use_flash_attention": params.get("use_flash_attention"),
+                "offload_to_cpu": params.get("offload_to_cpu"),
+                "offload_dit_to_cpu": params.get("offload_dit_to_cpu"),
+                "compile_model": params.get("compile_model"),
+                "int8_quantization": params.get("int8_quantization"),
             },
             f,
         )
 
-    # Create a wrapper script that will be run
     wrapper_script = temp_dir / f"{job_id}_runner.py"
     with open(wrapper_script, "w") as f:
         f.write(
             f"""
-import sys
+import importlib
 import json
 import os
+import shutil
+import sys
+import traceback
+from pathlib import Path
 
-# Force unbuffered output
-sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
-sys.stderr.reconfigure(line_buffering=True) if hasattr(sys.stderr, 'reconfigure') else None
+sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, "reconfigure") else None
+sys.stderr.reconfigure(line_buffering=True) if hasattr(sys.stderr, "reconfigure") else None
 
-# Windows DLL fix for PyTorch - must be done BEFORE importing torch
-if sys.platform == "win32":
-    try:
-        # Find torch lib directory and add to PATH and DLL directories
-        import site
-        torch_lib_paths = []
+sys.path.insert(0, r"{ACESTEP15_DIR}")
 
-        # Check site-packages
-        for sp in site.getsitepackages():
-            torch_lib = os.path.join(sp, "torch", "lib")
-            if os.path.exists(torch_lib):
-                torch_lib_paths.append(torch_lib)
+os.environ.setdefault("VLLM_HOST_IP", "127.0.0.1")
+os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
+os.environ.setdefault("MASTER_PORT", "2333")
 
-        # Check venv torch
-        venv_sp = os.path.join(os.path.dirname(sys.executable), "..", "Lib", "site-packages", "torch", "lib")
-        if os.path.exists(venv_sp):
-            torch_lib_paths.append(os.path.abspath(venv_sp))
+def _coerce_bool(value, default):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "y", "on")
+    return bool(value)
 
-        # Add to PATH (older Windows compatibility)
-        for tlp in torch_lib_paths:
-            if tlp not in os.environ.get("PATH", ""):
-                os.environ["PATH"] = tlp + os.pathsep + os.environ.get("PATH", "")
-
-        # Add to DLL search path (Windows 10 1607+)
-        for tlp in torch_lib_paths:
-            try:
-                os.add_dll_directory(tlp)
-            except (AttributeError, OSError):
-                pass
-
-    except Exception as e:
-        print(f"Warning: Could not set DLL directory: {{e}}")
-
-# Monkey-patch tqdm BEFORE importing ACE-Step to capture progress
-from tqdm import tqdm as original_tqdm
-class ProgressTqdm(original_tqdm):
-    def __init__(self, *args, **kwargs):
-        # Force output to stdout for capturing
-        kwargs['file'] = sys.stdout
-        kwargs['mininterval'] = 0.5
-        kwargs['ncols'] = 80
-        super().__init__(*args, **kwargs)
-
-    def update(self, n=1):
-        super().update(n)
-        if self.total:
-            mapped_pct = 25 + int((self.n / self.total) * 65)
-            print(f"TQDM_PROGRESS:{{mapped_pct}}:Step {{self.n}}/{{self.total}}")
-            sys.stdout.flush()
-
-# Replace tqdm globally
-import tqdm as tqdm_module
-tqdm_module.tqdm = ProgressTqdm
-
-# Add ACE-Step to path
-sys.path.insert(0, r"{ACESTEP_DIR}")
-
-from acestep.pipeline_ace_step import ACEStepPipeline
-
-# Load params
 with open(r"{params_file}", "r") as pf:
     params = json.load(pf)
 
-print("PROGRESS:15:Loading model...")
+defaults = {ACESTEP15_DEFAULTS!r}
+for key, value in defaults.items():
+    if params.get(key) in (None, ""):
+        params[key] = value
+
+def _require(module_name, pip_name=None):
+    try:
+        importlib.import_module(module_name)
+        return None
+    except Exception:
+        return pip_name or module_name
+
+missing = []
+missing.append(_require("einops", "einops"))
+missing.append(_require("vector_quantize_pytorch", "vector-quantize-pytorch"))
+if _coerce_bool(params.get("use_flash_attention"), True):
+    missing.append(_require("flash_attn", "flash-attn"))
+missing = [m for m in missing if m]
+
+if missing:
+    pip_cmd = "pip install " + " ".join(sorted(set(missing)))
+    print("ERROR:Missing packages: " + ", ".join(sorted(set(missing))) + ". Install with: " + pip_cmd)
+    sys.exit(1)
+
+try:
+    import transformers
+    def _patch_from_pretrained(cls):
+        original = cls.from_pretrained
+        def wrapped(*args, **kwargs):
+            kwargs.setdefault("low_cpu_mem_usage", False)
+            kwargs.setdefault("device_map", None)
+            return original(*args, **kwargs)
+        cls.from_pretrained = wrapped
+    if hasattr(transformers, "AutoModel"):
+        _patch_from_pretrained(transformers.AutoModel)
+    if hasattr(transformers, "AutoModelForCausalLM"):
+        _patch_from_pretrained(transformers.AutoModelForCausalLM)
+except Exception as e:
+    print("WARNING: Failed to patch transformers from_pretrained:", e)
+
+print("PROGRESS:15:Initializing ACE-Step 1.5...")
 sys.stdout.flush()
 
-# Initialize pipeline
-pipeline = ACEStepPipeline(
-    checkpoint_dir=r"{checkpoint_path}",
-    dtype="float16",
-    torch_compile=False,
-    cpu_offload=False,
-    overlapped_decode=True
-    # dtype="bfloat16",
-    # torch_compile=False,
-    # cpu_offload=True,
-    # overlapped_decode=False
+try:
+    from acestep.handler import AceStepHandler
+    from acestep.llm_inference import LLMHandler
+    from acestep.inference import GenerationParams, GenerationConfig, generate_music
 
-)
+    device = str(params.get("device") or "auto").strip().lower()
+    main_model_path = str(params.get("main_model_path") or "acestep-v15-turbo").strip()
+    lm_model_path = str(params.get("lm_model_path") or "acestep-5Hz-lm-0.6B").strip()
+    lm_backend = str(params.get("lm_backend") or "vllm").strip().lower()
+    checkpoints_root = str(params.get("checkpoints_root") or r"{ACESTEP15_CHECKPOINTS_ROOT}").strip()
 
-print("PROGRESS:25:Generating audio...")
-sys.stdout.flush()
+    use_flash_attention = _coerce_bool(params.get("use_flash_attention"), True)
+    offload_to_cpu = _coerce_bool(params.get("offload_to_cpu"), True)
+    offload_dit_to_cpu = _coerce_bool(params.get("offload_dit_to_cpu"), True)
+    compile_model = _coerce_bool(params.get("compile_model"), True)
+    int8_quantization = _coerce_bool(params.get("int8_quantization"), True)
+    initialize_lm = _coerce_bool(params.get("initialize_lm"), True)
 
-# Run generation
-pipeline(
-    audio_duration=params["audio_duration"],
-    prompt=params["prompt"],
-    lyrics=params["lyrics"],
-    infer_step=params["infer_step"],
-    guidance_scale=params["guidance_scale"],
-    scheduler_type=params["scheduler_type"],
-    cfg_type=params["cfg_type"],
-    omega_scale=params["omega_scale"],
-    manual_seeds=", ".join(map(str, params["actual_seeds"])),
-    guidance_interval=params["guidance_interval"],
-    guidance_interval_decay=params["guidance_interval_decay"],
-    min_guidance_scale=params["min_guidance_scale"],
-    use_erg_tag=params["use_erg_tag"],
-    use_erg_lyric=params["use_erg_lyric"],
-    use_erg_diffusion=params["use_erg_diffusion"],
-    oss_steps=", ".join(map(str, params["oss_steps"])),
-    guidance_scale_text=params["guidance_scale_text"],
-    guidance_scale_lyric=params["guidance_scale_lyric"],
-    save_path=r"{output_path}",
-)
+    quantization = None
+    if int8_quantization:
+        if not compile_model:
+            print("WARNING: int8_quantization requires compile_model; disabling quantization")
+        else:
+            try:
+                import torchao  # noqa: F401
+                quantization = "int8_weight_only"
+            except Exception:
+                print("WARNING: torchao not installed; disabling int8_quantization")
+                quantization = None
 
-print("PROGRESS:95:Finalizing...")
-sys.stdout.flush()
+    def _init_dit(handler, do_compile, quant):
+        return handler.initialize_service(
+            project_root=r"{ACESTEP15_DIR}",
+            config_path=main_model_path,
+            device=device,
+            use_flash_attention=use_flash_attention,
+            compile_model=do_compile,
+            offload_to_cpu=offload_to_cpu,
+            offload_dit_to_cpu=offload_dit_to_cpu,
+            quantization=quant,
+        )
 
-if os.path.exists(r"{output_path}"):
-    print("SUCCESS")
-else:
-    print("ERROR:Output file not created")
+    dit_handler = AceStepHandler()
+    try:
+        init_status, enable_generate = _init_dit(dit_handler, compile_model, quantization)
+        if not enable_generate:
+            raise RuntimeError(init_status)
+    except Exception as e:
+        if compile_model:
+            print("WARNING: torch.compile failed; falling back to eager:", e)
+            compile_model = False
+            quantization = None
+            dit_handler = AceStepHandler()
+            init_status, enable_generate = _init_dit(dit_handler, False, None)
+            if not enable_generate:
+                raise RuntimeError(init_status)
+        else:
+            raise
+
+    llm_handler = LLMHandler()
+    if initialize_lm:
+        lm_status, lm_success = llm_handler.initialize(
+            checkpoint_dir=checkpoints_root,
+            lm_model_path=lm_model_path,
+            backend=lm_backend,
+            device=device,
+            offload_to_cpu=offload_to_cpu,
+            dtype=dit_handler.dtype,
+        )
+        if not lm_success:
+            raise RuntimeError(lm_status)
+
+    prompt = str(params.get("prompt") or "")
+    lyrics = str(params.get("lyrics") or "")
+    audio_duration = float(params.get("audio_duration") or params.get("duration") or 30)
+    infer_step = int(params.get("infer_step") or params.get("inference_steps") or 8)
+    guidance_scale = float(params.get("guidance_scale") or 7.0)
+
+    seed_value = params.get("seed")
+    if seed_value is None:
+        seed_list = params.get("actual_seeds") or [-1]
+        seed_value = seed_list[0] if isinstance(seed_list, list) and seed_list else seed_list
+    try:
+        seed_value = int(seed_value)
+    except Exception:
+        seed_value = -1
+
+    use_random_seed = seed_value is None or seed_value < 0
+
+    gen_params = GenerationParams(
+        caption=prompt,
+        lyrics=lyrics,
+        instrumental=(not lyrics.strip()),
+        duration=audio_duration,
+        inference_steps=infer_step,
+        guidance_scale=guidance_scale,
+        seed=seed_value if seed_value is not None else -1,
+        thinking=initialize_lm,
+    )
+    gen_config = GenerationConfig(
+        batch_size=1,
+        use_random_seed=use_random_seed,
+        seeds=[seed_value] if seed_value is not None and seed_value >= 0 else None,
+        audio_format="wav",
+    )
+
+    def _progress(p, desc=None):
+        try:
+            p = float(p)
+        except Exception:
+            return
+        p = max(0.0, min(1.0, p))
+        pct = 25 + int(p * 65)
+        msg = desc or "Generating audio..."
+        print(f"PROGRESS:{{pct}}:{{msg}}")
+        sys.stdout.flush()
+
+    print("PROGRESS:25:Generating audio...")
+    sys.stdout.flush()
+
+    out_dir = Path(r"{temp_dir}") / "out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    result = generate_music(dit_handler, llm_handler, gen_params, gen_config, save_dir=str(out_dir), progress=_progress)
+
+    if not result.success:
+        raise RuntimeError(result.error or result.status_message or "Generation failed")
+
+    audio_path = None
+    if result.audios:
+        audio_path = result.audios[0].get("path")
+
+    target_path = Path(r"{output_path}")
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if audio_path and os.path.exists(audio_path):
+        shutil.copyfile(audio_path, str(target_path))
+    else:
+        audio_tensor = result.audios[0].get("tensor") if result.audios else None
+        if audio_tensor is None:
+            raise RuntimeError("No audio file produced")
+        try:
+            import numpy as np
+            import soundfile as sf
+            if hasattr(audio_tensor, "detach"):
+                audio_tensor = audio_tensor.detach().cpu().numpy()
+            audio_np = audio_tensor
+            if audio_np.ndim == 2 and audio_np.shape[0] in (1, 2):
+                audio_np = audio_np.T
+            elif audio_np.ndim == 1:
+                audio_np = audio_np.reshape(-1, 1)
+            sample_rate = int(result.audios[0].get("sample_rate") or 48000)
+            sf.write(str(target_path), audio_np, sample_rate)
+        except Exception as e:
+            raise RuntimeError(f"Failed to save audio tensor: {{e}}")
+
+    print("PROGRESS:95:Finalizing...")
+    sys.stdout.flush()
+    if target_path.exists():
+        print("SUCCESS")
+    else:
+        print("ERROR:Output file not created")
+        sys.exit(1)
+except SystemExit:
+    raise
+except Exception as e:
+    print(f"ERROR:{{e}}")
+    traceback.print_exc()
+    sys.exit(1)
 """
         )
 
-    # Set up environment for subprocess
     env = os.environ.copy()
-    env["PYTHONUNBUFFERED"] = "1"  # Force unbuffered output
-    env["TQDM_DISABLE"] = "0"  # Keep tqdm enabled but it will output to stderr
-    env["TQDM_MININTERVAL"] = "1"  # Update every second
-    if _has_checkpoint_files(checkpoint_dir):
-        # Avoid re-downloading if cache exists
-        env["HF_HUB_OFFLINE"] = "1"
-        env["TRANSFORMERS_OFFLINE"] = "1"
-        env["HF_DATASETS_OFFLINE"] = "1"
+    env["PYTHONUNBUFFERED"] = "1"
+    env["VLLM_HOST_IP"] = "127.0.0.1"
+    env["MASTER_ADDR"] = "127.0.0.1"
+    env["MASTER_PORT"] = "2333"
 
     if sys.platform == "win32":
-        # Add torch lib to PATH for the subprocess
-        venv_torch_lib = ACESTEP_VENV_PATH / "Lib" / "site-packages" / "torch" / "lib"
+        venv_torch_lib = ACESTEP15_VENV_PATH / "Lib" / "site-packages" / "torch" / "lib"
+        fallback_torch_lib = ACESTEP15_FALLBACK_VENV_PATH / "Lib" / "site-packages" / "torch" / "lib"
         if venv_torch_lib.exists():
             env["PATH"] = str(venv_torch_lib) + os.pathsep + env.get("PATH", "")
+        elif fallback_torch_lib.exists():
+            env["PATH"] = str(fallback_torch_lib) + os.pathsep + env.get("PATH", "")
 
-    # Run the subprocess - merge stderr into stdout so we see all output
     process = subprocess.Popen(
-        [python_exe, "-u", str(wrapper_script)],  # -u for unbuffered output
+        [python_exe, "-u", str(wrapper_script)],
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,  # Merge stderr into stdout
+        stderr=subprocess.STDOUT,
         text=True,
-        cwd=str(ACESTEP_DIR),
+        cwd=str(ACESTEP15_DIR),
         bufsize=1,
         env=env,
     )
 
     job["subprocess_pid"] = process.pid
-
-    # Monitor output for progress updates
     success = False
     error_output = []
 
@@ -365,11 +511,8 @@ else:
             break
 
         line = line.rstrip("\n\r")
-
-        # Always print to Flask console
         print(f"[ACE-Step] {line}", flush=True)
 
-        # Parse our custom progress markers
         if line.startswith("PROGRESS:") or line.startswith("TQDM_PROGRESS:"):
             parts = line.split(":", 2)
             if len(parts) >= 2:
@@ -383,17 +526,14 @@ else:
             success = True
         elif line.startswith("ERROR:"):
             error_output.append(line[6:])
-        # Parse tqdm progress bar output (e.g., "50%|████      | 30/60")
         elif "%|" in line or ("it/s" in line and "/" in line):
             import re as regex
 
-            # Match patterns like "50%|████| 30/60" or "30/60 [00:15<00:15, 2.00it/s]"
             step_match = regex.search(r"(\\d+)/(\\d+)", line)
             pct_match = regex.search(r"(\\d+)%", line)
             if step_match:
                 current = int(step_match.group(1))
                 total = int(step_match.group(2))
-                # Map to 25-90% range
                 pct = 25 + int((current / total) * 65)
                 _set_progress(job, min(pct, 90))
                 job["status_message"] = f"Generating audio... Step {current}/{total}"
@@ -402,13 +542,11 @@ else:
                 mapped_pct = 25 + int((pct / 100) * 65)
                 _set_progress(job, min(mapped_pct, 90))
 
-    # Wait for process to finish
     process.wait()
 
-    # Check remaining output
     remaining = process.stdout.read()
     if remaining:
-        for line in remaining.split("\\n"):
+        for line in remaining.split("\n"):
             line = line.strip()
             if line:
                 print(f"[ACE-Step] {line}", flush=True)
@@ -417,18 +555,19 @@ else:
                 elif line.startswith("ERROR:"):
                     error_output.append(line[6:])
 
-    # Clean up temp files
     try:
         shutil.rmtree(temp_dir, ignore_errors=True)
     except Exception:
         pass
 
     if process.returncode != 0 or not success:
-        error_msg = "\\n".join(error_output) if error_output else f"Process exited with code {process.returncode}"
+        error_msg = "\n".join(error_output) if error_output else f"Process exited with code {process.returncode}"
         raise Exception(error_msg)
 
     if not output_path.exists():
         raise Exception("Generated audio file not found")
+
+
 def _mix_audio(inst_path: Path, vocal_path: Path, output_path: Path) -> bool:
     cmd = [
         "ffmpeg",
@@ -617,7 +756,8 @@ def _run_rvc(job: dict, job_id: str, file_id: str, vocals_file: Path, instrument
 
 def continue_song_generation_full(job_id: str) -> None:
     job = song_generation_jobs[job_id]
-    params = job.get("params") or {}
+    params = _normalize_acestep15_params(job.get("params") or {})
+    job["params"] = params
     infer_params = {**ACESTEP_DEFAULTS, **params}
 
     duration = int(params.get("duration") or params.get("audio_duration") or 180)
@@ -626,13 +766,13 @@ def continue_song_generation_full(job_id: str) -> None:
     full_path = _asset_path(job_id, "full_mix")
     if not full_path.exists():
         _set_status(job, "full_generating", "Generating full song...")
-        _set_progress(job, 35)
+        _set_progress(job, 15)
         full_params = dict(infer_params)
         full_params["audio_duration"] = duration
-        _run_acestep_generation(job, job_id, full_params, full_path)
+        _run_acestep15_generation(job, job_id, full_params, full_path)
         _set_asset_ready(job, job_id, "full_mix", full_path)
         _set_status(job, "full_ready", "Full song ready")
-        _set_progress(job, 50)
+        _set_progress(job, 45)
 
     source_path = full_path if full_path.exists() else _asset_path(job_id, "preview_mix")
     vocals_file, inst_file, file_id = _run_separation(job, job_id, source_path)
@@ -650,6 +790,7 @@ def run_song_generation_thread(job_id, params):
     job = song_generation_jobs[job_id]
 
     try:
+        params = _normalize_acestep15_params(params or {})
         job.setdefault("id", job_id)
         job["params"] = params
         job.setdefault("assets", _init_assets())
@@ -659,26 +800,27 @@ def run_song_generation_thread(job_id, params):
         _set_status(job, "queued", "Job queued...")
         _set_progress(job, 0)
 
-        auto_full = params.get("auto_full", True)
-        preview_duration = int(params.get("preview_duration") or 35)
-
         infer_params = {**ACESTEP_DEFAULTS, **params}
 
-        _set_status(job, "preview_generating", "Generating preview...")
+        _set_status(job, "full_generating", "Generating full song...")
         _set_progress(job, 10)
-        preview_path = _asset_path(job_id, "preview_mix")
-        preview_params = dict(infer_params)
-        preview_params["audio_duration"] = preview_duration
-        _run_acestep_generation(job, job_id, preview_params, preview_path)
-        _set_asset_ready(job, job_id, "preview_mix", preview_path)
-        _set_status(job, "preview_ready", "Preview ready")
-        _set_progress(job, 30)
+        full_path = _asset_path(job_id, "full_mix")
+        full_params = dict(infer_params)
+        full_params["audio_duration"] = int(params.get("duration") or params.get("audio_duration") or 180)
+        _run_acestep15_generation(job, job_id, full_params, full_path)
+        _set_asset_ready(job, job_id, "full_mix", full_path)
+        _set_status(job, "full_ready", "Full song ready")
+        _set_progress(job, 45)
 
-        if not auto_full:
-            job["status_message"] = "Preview ready (full generation pending)"
-            return
+        source_path = full_path
+        vocals_file, inst_file, file_id = _run_separation(job, job_id, source_path)
 
-        continue_song_generation_full(job_id)
+        if params.get("enhance_vocals", True) and file_id and vocals_file:
+            _run_rvc(job, job_id, file_id, vocals_file, inst_file)
+
+        _set_status(job, "completed", "Song generation complete")
+        _set_progress(job, 100)
+        job["completed_at"] = datetime.now().isoformat()
 
     except Exception as e:
         import traceback

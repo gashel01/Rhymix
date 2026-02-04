@@ -8,7 +8,12 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file
 
 from backend.features.song_generation.service import SONG_GENERATION_DIR, SONG_GENERATION_JOBS_DIR, run_song_generation_thread
-from backend.features.song_generation.providers.ace_step import ASSET_KEYS, continue_song_generation_full, _asset_path
+from backend.features.song_generation.providers.ace_step import (
+    ASSET_KEYS,
+    continue_song_generation_full,
+    _asset_path,
+    _normalize_acestep15_params,
+)
 from backend.jobs.registry import song_generation_jobs
 
 bp = Blueprint("song_generation", __name__)
@@ -19,7 +24,7 @@ bp = Blueprint("song_generation", __name__)
 def start_song_generation():
     """Start a new song generation job"""
     try:
-        data = request.get_json() or {}
+        data = _normalize_acestep15_params(request.get_json() or {})
 
         # Validate required fields
         title = data.get("title", "").strip()
@@ -59,6 +64,17 @@ def get_song_generation(job_id):
         return jsonify({"error": "Job not found"}), 404
 
     job = song_generation_jobs[job_id]
+    params = job.get("params") if isinstance(job.get("params"), dict) else {}
+    params_out = (
+        {
+            "main_model_path": params.get("main_model_path"),
+            "lm_model_path": params.get("lm_model_path"),
+            "lm_backend": params.get("lm_backend"),
+            "device": params.get("device"),
+        }
+        if isinstance(params, dict)
+        else None
+    )
     assets = job.get("assets")
     if isinstance(assets, dict):
         # Ensure ready assets include URL
@@ -82,7 +98,12 @@ def get_song_generation(job_id):
             "instrumental_url": job.get("instrumental_url"),
             "processed": job.get("processed", False),
             "inference_completed": job.get("inference_completed", False),
-            "model_name": job.get("params", {}).get("model_name"),
+            "model_name": params.get("model_name"),
+            "main_model_path": params.get("main_model_path"),
+            "lm_model_path": params.get("lm_model_path"),
+            "lm_backend": params.get("lm_backend"),
+            "device": params.get("device"),
+            "params": params_out,
             "created_at": job.get("created_at"),
             "completed_at": job.get("completed_at"),
             "error": job.get("error"),
