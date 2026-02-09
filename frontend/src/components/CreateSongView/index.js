@@ -64,6 +64,707 @@ const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const normalize = (s) => s.trim().replace(/\s+/g, " ");
 const toKey = (s) => normalize(s).toLowerCase();
 
+const resolveAssetUrl = (song, assetKey) => {
+  const direct = song?.assets?.[assetKey]?.url;
+  if (direct) return direct;
+  if (assetKey) return `/api/song-generation/${song.id}/audio/${assetKey}`;
+  return `/api/song-generation/audio/${song.id}`;
+};
+
+const useThemedUI = (t) =>
+  useMemo(() => {
+    const Glass = ({ children, style }) => (
+      <div
+        style={{
+          borderRadius: t.radiusLg,
+          border: `1px solid ${t.hairline}`,
+          background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
+          backdropFilter: "blur(22px) saturate(140%)",
+          WebkitBackdropFilter: "blur(22px) saturate(140%)",
+          boxShadow: t.shadow,
+          ...style,
+        }}
+      >
+        {children}
+      </div>
+    );
+
+    const Panel = ({ children, style }) => (
+      <div
+        style={{
+          borderRadius: t.radiusLg,
+          border: `1px solid ${t.hairline}`,
+          background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+          // backdropFilter: "blur(18px) saturate(140%)",
+          // WebkitBackdropFilter: "blur(18px) saturate(140%)",
+          boxShadow: t.shadowSoft,
+          padding: 18,
+          ...style,
+        }}
+      >
+        {children}
+      </div>
+    );
+
+    const Hairline = ({ style }) => <div style={{ height: 1, background: t.hairline, ...style }} />;
+
+    const Pill = ({ children, tone = "neutral", onClick, onDelete, title: tt, style }) => {
+      const toneMap = {
+        neutral: { bg: t.isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)", fg: t.text, bd: t.hairline },
+        primary: { bg: t.primaryWash, fg: t.primary, bd: "rgba(10,132,255,0.28)" },
+        success: { bg: t.successWash, fg: t.success, bd: "rgba(52,199,89,0.28)" },
+        danger: { bg: t.dangerWash, fg: t.danger, bd: "rgba(255,59,48,0.28)" },
+        warning: { bg: "rgba(255,149,0,0.14)", fg: t.warning, bd: "rgba(255,149,0,0.28)" },
+      }[tone];
+
+      const clickable = !!onClick;
+      return (
+        <span
+          title={tt}
+          role={clickable ? "button" : undefined}
+          tabIndex={clickable ? 0 : undefined}
+          onClick={onClick}
+          onKeyDown={(e) => clickable && e.key === "Enter" && onClick()}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "7px 10px",
+            borderRadius: 999,
+            fontSize: 11,
+            fontWeight: 850,
+            letterSpacing: 0.2,
+            background: toneMap.bg,
+            color: toneMap.fg,
+            border: `1px solid ${toneMap.bd}`,
+            whiteSpace: "nowrap",
+            userSelect: "none",
+            cursor: clickable ? "pointer" : "default",
+            ...style,
+          }}
+        >
+          {children}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: 999,
+                border: `1px solid ${t.hairline}`,
+                background: "transparent",
+                color: t.subtext,
+                display: "grid",
+                placeItems: "center",
+                cursor: "pointer",
+              }}
+              title="Remove"
+              aria-label="Remove"
+            >
+              ×
+            </button>
+          )}
+        </span>
+      );
+    };
+
+    const Btn = ({ children, onClick, variant = "secondary", disabled, style, type = "button", title: tt }) => {
+      const v = {
+        primary: { bg: `linear-gradient(180deg, rgba(10,132,255,0.95), rgba(10,132,255,0.78))`, fg: "white", bd: "rgba(10,132,255,0.45)" },
+        secondary: { bg: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`, fg: t.text, bd: t.hairline },
+        outline: { bg: "transparent", fg: t.text, bd: t.hairline },
+        danger: { bg: `linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))`, fg: "white", bd: "rgba(255,59,48,0.45)" },
+      }[variant];
+
+      return (
+        <button
+          type={type}
+          title={tt}
+          onClick={onClick}
+          disabled={disabled}
+          style={{
+            borderRadius: 14,
+            border: `1px solid ${v.bd}`,
+            background: v.bg,
+            color: v.fg,
+            padding: "10px 12px",
+            fontWeight: 900,
+            letterSpacing: -0.1,
+            cursor: disabled ? "not-allowed" : "pointer",
+            opacity: disabled ? 0.55 : 1,
+            boxShadow: disabled ? "none" : t.shadowSoft,
+            transition: "transform 120ms ease, opacity 160ms ease",
+            ...style,
+          }}
+          onMouseDown={(e) => {
+            if (disabled) return;
+            e.currentTarget.style.transform = "scale(0.985)";
+          }}
+          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        >
+          {children}
+        </button>
+      );
+    };
+
+    const IconBtn = ({ onClick, title: tt, children, disabled, style }) => (
+      <button
+        type="button"
+        onClick={onClick}
+        title={tt}
+        disabled={disabled}
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 14,
+          border: `1px solid ${t.hairline}`,
+          background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+          color: t.text,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.55 : 1,
+          boxShadow: t.shadowSoft,
+          ...style,
+        }}
+      >
+        {children}
+      </button>
+    );
+
+    const Input = ({ value, onChange, placeholder, multiline, rows = 4, mono, disabled, rightNode }) => (
+      <div
+        style={{
+          borderRadius: 16,
+          border: `1px solid ${t.hairline}`,
+          background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+          boxShadow: t.shadowSoft,
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: multiline ? "stretch" : "center" }}>
+          {multiline ? (
+            <textarea
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              disabled={disabled}
+              rows={rows}
+              style={{
+                width: "100%",
+                resize: "vertical",
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                color: t.text,
+                padding: 12,
+                fontSize: 14,
+                fontWeight: 650,
+                lineHeight: 1.35,
+                fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : "inherit",
+                opacity: disabled ? 0.55 : 1,
+              }}
+            />
+          ) : (
+            <input
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              disabled={disabled}
+              style={{
+                width: "100%",
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                color: t.text,
+                padding: "12px 12px",
+                fontSize: 14,
+                fontWeight: 650,
+                opacity: disabled ? 0.55 : 1,
+              }}
+            />
+          )}
+
+          {rightNode && <div style={{ padding: 8, display: "grid", placeItems: "center" }}>{rightNode}</div>}
+        </div>
+      </div>
+    );
+
+    const CheckRow = ({ label, value, onChange, hint }) => (
+      <div style={{ display: "grid", gap: 6 }}>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            padding: "10px 12px",
+            borderRadius: 14,
+            border: `1px solid ${t.hairline}`,
+            background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+            boxShadow: t.shadowSoft,
+            color: t.text,
+            fontWeight: 800,
+          }}
+        >
+          <span>{label}</span>
+          <input
+            type="checkbox"
+            checked={!!value}
+            onChange={(e) => onChange(e.target.checked)}
+            style={{ accentColor: t.primary }}
+          />
+        </label>
+        {hint && <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>{hint}</div>}
+      </div>
+    );
+
+    const Segmented = ({ value, onChange, options }) => (
+      <div
+        style={{
+          display: "inline-flex",
+          padding: 4,
+          borderRadius: 16,
+          border: `1px solid ${t.hairline}`,
+          background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+          boxShadow: t.shadowSoft,
+          gap: 6,
+        }}
+      >
+        {options.map((opt) => {
+          const active = value === opt.value;
+          const disabled = !!opt.disabled;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => !disabled && onChange(opt.value)}
+              disabled={disabled}
+              style={{
+                border: `1px solid ${active ? "rgba(10,132,255,0.45)" : "transparent"}`,
+                background: active ? `linear-gradient(135deg, ${t.primaryWash}, ${t.primaryWash2})` : "transparent",
+                color: disabled ? t.subtext : t.text,
+                borderRadius: 12,
+                padding: "10px 12px",
+                fontWeight: 850,
+                letterSpacing: -0.1,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                cursor: disabled ? "not-allowed" : "pointer",
+                opacity: disabled ? 0.5 : 1,
+              }}
+            >
+              {opt.icon}
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+
+  const Slider = ({ value, min, max, step, onChange, disabled }) => (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      disabled={disabled}
+      style={{ width: "100%", accentColor: t.primary, opacity: disabled ? 0.5 : 1 }}
+    />
+  );
+
+    const ProgressBar = ({ value }) => (
+      <div
+        style={{
+          height: 6,
+          borderRadius: 999,
+          background: t.isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.08)",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: `${Math.max(0, Math.min(100, value || 0))}%`,
+            background: t.primary,
+            borderRadius: 999,
+            transition: "width 220ms ease",
+          }}
+        />
+      </div>
+    );
+
+    const Alert = ({ kind = "error", children, onClose }) => {
+      const tone = kind === "error" ? "danger" : kind === "success" ? "success" : "warning";
+      return (
+        <div
+          style={{
+            borderRadius: 16,
+            border: `1px solid ${t.hairline}`,
+            background: tone === "danger" ? t.dangerWash : tone === "success" ? t.successWash : "rgba(255,149,0,0.14)",
+            padding: "10px 12px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            color: t.text,
+            fontWeight: 750,
+          }}
+        >
+          <div style={{ color: tone === "danger" ? t.danger : tone === "success" ? t.success : t.warning }}>{children}</div>
+          {onClose && (
+            <IconBtn onClick={onClose} title="Dismiss" style={{ width: 34, height: 34, boxShadow: "none" }}>
+              <span style={{ fontWeight: 950 }}>×</span>
+            </IconBtn>
+          )}
+        </div>
+      );
+    };
+
+    const Spinner = ({ size = 16 }) => (
+      <span
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 999,
+          border: `2px solid ${t.isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.18)"}`,
+          borderTopColor: t.primary,
+          display: "inline-block",
+          animation: "spin 0.9s linear infinite",
+        }}
+      />
+    );
+
+    const Wave = ({ active }) => {
+      const bars = useMemo(() => Array.from({ length: 44 }, () => Math.random() * 0.65 + 0.25), []);
+      return (
+        <div
+          style={{
+            marginTop: 12,
+            height: 44,
+            borderRadius: 14,
+            border: `1px solid ${t.hairline}`,
+            background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
+            display: "flex",
+            alignItems: "center",
+            padding: "0 10px",
+            gap: 6,
+            overflow: "hidden",
+          }}
+        >
+          {bars.map((h, i) => (
+            <div
+              key={i}
+              style={{
+                width: 3,
+                height: `${Math.round(h * 100)}%`,
+                borderRadius: 6,
+                background: active ? "rgba(10,132,255,0.90)" : t.isDark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.16)",
+                transition: "background .2s ease",
+              }}
+            />
+          ))}
+        </div>
+      );
+    };
+
+    const Modal = ({ open, onClose, title, children, footer }) => {
+      if (!open) return null;
+      return (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 2000,
+            background: t.isDark ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.30)",
+            display: "grid",
+            placeItems: "center",
+            padding: 16,
+          }}
+        >
+          <Glass style={{ width: "100%", maxWidth: 520, padding: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ fontWeight: 950, letterSpacing: -0.3, color: t.text }}>{title}</div>
+              <IconBtn onClick={onClose} title="Close" style={{ width: 36, height: 36, boxShadow: "none" }}>
+                <CloseIcon style={{ fontSize: 18 }} />
+              </IconBtn>
+            </div>
+            <Hairline style={{ margin: "10px 0 12px 0" }} />
+            <div style={{ color: t.text }}>{children}</div>
+            {footer && (
+              <>
+                <Hairline style={{ margin: "12px 0 10px 0" }} />
+                <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>{footer}</div>
+              </>
+            )}
+          </Glass>
+        </div>
+      );
+    };
+
+    return { Glass, Panel, Hairline, Pill, Btn, IconBtn, Input, CheckRow, Segmented, Slider, ProgressBar, Alert, Spinner, Wave, Modal };
+  }, [t]);
+
+const GeneratedPanel = React.memo(function GeneratedPanel({
+  ui,
+  t,
+  songs,
+  loadingSongs,
+  error,
+  playingId,
+  onPlayPause,
+  onDeleteSong,
+  onSelectAsset,
+  onClearError,
+}) {
+  const { Panel, Spinner, Alert, IconBtn, Segmented, ProgressBar, Wave } = ui;
+
+  return (
+    <Panel style={{ minHeight: 420 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <MusicNoteIcon style={{ fontSize: 18, opacity: 0.9, color: t.text }} />
+        <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text }}>Generated</div>
+        {loadingSongs && <Spinner size={16} />}
+      </div>
+
+      {error && (
+        <Alert kind="error" onClose={onClearError}>
+          {error}
+        </Alert>
+      )}
+
+      {songs.length === 0 && !loadingSongs ? (
+        <div style={{ padding: "42px 0", textAlign: "center", color: t.subtext }}>
+          <div
+            style={{
+              width: 74,
+              height: 74,
+              borderRadius: 999,
+              margin: "0 auto 12px auto",
+              display: "grid",
+              placeItems: "center",
+              border: `1px solid ${t.hairline}`,
+              background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
+            }}
+          >
+            <MusicNoteIcon style={{ fontSize: 34, opacity: 0.6, color: t.text }} />
+          </div>
+          <div style={{ fontWeight: 950, color: t.text }}>No songs yet</div>
+          <div style={{ marginTop: 6, fontSize: 13, fontWeight: 650 }}>
+            Add a title, then describe or paste lyrics and generate.
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 12 }}>
+          {songs.map((s) => {
+            const active = playingId === s.id;
+            const assets = s.hasAssets ? s.assets || {} : null;
+            const selectedAssetKey = assets ? s.selectedAssetKey || getBestAssetKey(assets) : null;
+            const isAssetReadyNow = selectedAssetKey ? isAssetReady(assets?.[selectedAssetKey]) : false;
+            const legacyReady = !!(s.vocalsUrl || s.instrumentalUrl || s.audioUrl);
+            const isReady = assets ? isAssetReadyNow : legacyReady;
+            const isGenerating = !isReady && s.status && s.status !== "failed";
+            const isFailed = s.status === "failed";
+
+            return (
+              <div
+                key={s.id}
+                style={{
+                  borderRadius: t.radiusLg,
+                  border: `1px solid ${isFailed ? "rgba(255,59,48,0.45)" : t.hairline}`,
+                  background: `linear-gradient(180deg, ${t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"}, ${t.isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)"
+                    })`,
+                  padding: 14,
+                  boxShadow: "none",
+                  opacity: isFailed ? 0.72 : 1,
+                }}
+              >
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  {isGenerating ? (
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 14,
+                        display: "grid",
+                        placeItems: "center",
+                        border: `1px solid ${t.hairline}`,
+                        background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
+                      }}
+                    >
+                      <Spinner size={18} />
+                    </div>
+                  ) : (
+                    <IconBtn
+                      onClick={() => onPlayPause(s)}
+                      disabled={!isReady}
+                      title={isReady ? (active ? "Pause" : "Play") : "Not ready yet"}
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 14,
+                        background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
+                        boxShadow: "none",
+                      }}
+                    >
+                      {active ? <PauseIcon /> : <PlayArrowIcon />}
+                    </IconBtn>
+                  )}
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {s.title}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: t.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {isGenerating ? (
+                        `Generating... ${s.progress || 0}%`
+                      ) : isFailed ? (
+                        <span style={{ color: t.danger }}>Generation failed</span>
+                      ) : (
+                        <>
+                          {s.modelName ? (
+                            <span style={{ color: t.primary, fontWeight: 900 }}>
+                              {s.modelName}
+                              {s.modelEpoch ? ` @${s.modelEpoch}e` : ""}
+                            </span>
+                          ) : (
+                            <span>Original voice</span>
+                          )}
+                          {(s.duration || s.genres?.length) && " • "}
+                          {s.duration ? fmt(s.duration) : ""}
+                          {s.genres?.length ? ` • ${s.genres.slice(0, 2).join(", ")}` : ""}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {assets && (
+                      <IconBtn
+                        title="Download Selected"
+                        disabled={!isReady}
+                        onClick={() => {
+                          const key = selectedAssetKey || getBestAssetKey(assets);
+                          if (!key) return;
+                          const a = document.createElement("a");
+                          a.href = `${API_BASE}${resolveAssetUrl(s, key)}`;
+                          a.download = `${s.title || "song"}_${key}.wav`;
+                          a.click();
+                        }}
+                        style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
+                      >
+                        <DownloadIcon fontSize="small" />
+                      </IconBtn>
+                    )}
+
+                    {!assets && s.vocalsUrl && (
+                      <IconBtn
+                        title="Download Vocals"
+                        disabled={!isReady}
+                        onClick={() => {
+                          const a = document.createElement("a");
+                          a.href = `${API_BASE}${s.vocalsUrl}`;
+                          a.download = `${s.title || "song"}_vocals.wav`;
+                          a.click();
+                        }}
+                        style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
+                      >
+                        <MicIcon fontSize="small" />
+                      </IconBtn>
+                    )}
+
+                    {!assets && s.instrumentalUrl && (
+                      <IconBtn
+                        title="Download Instrumental"
+                        disabled={!isReady}
+                        onClick={() => {
+                          const a = document.createElement("a");
+                          a.href = `${API_BASE}${s.instrumentalUrl}`;
+                          a.download = `${s.title || "song"}_instrumental.wav`;
+                          a.click();
+                        }}
+                        style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
+                      >
+                        <MusicNoteIcon fontSize="small" />
+                      </IconBtn>
+                    )}
+
+                    {!assets && !s.vocalsUrl && !s.instrumentalUrl && s.audioUrl && (
+                      <IconBtn
+                        title="Download"
+                        disabled={!isReady}
+                        onClick={() => {
+                          const a = document.createElement("a");
+                          a.href = `${API_BASE}${s.audioUrl}`;
+                          a.download = `${s.title || "song"}.wav`;
+                          a.click();
+                        }}
+                        style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
+                      >
+                        <DownloadIcon fontSize="small" />
+                      </IconBtn>
+                    )}
+
+                    <IconBtn
+                      title="Delete"
+                      disabled={isGenerating}
+                      onClick={() => onDeleteSong(s.id)}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 12,
+                        boxShadow: "none",
+                        borderColor: isGenerating ? t.hairline : "rgba(255,59,48,0.35)",
+                        color: isGenerating ? t.subtext : t.danger,
+                      }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconBtn>
+                  </div>
+                </div>
+
+                {assets && (
+                  <div style={{ marginTop: 10 }}>
+                    <Segmented
+                      value={selectedAssetKey}
+                      onChange={(v) => onSelectAsset(s.id, v)}
+                      options={SONG_ASSET_KEYS.map((k) => ({
+                        value: k,
+                        label: SONG_ASSET_LABELS[k],
+                        disabled: !isAssetReady(assets?.[k]),
+                      }))}
+                    />
+                  </div>
+                )}
+
+                {isGenerating && (
+                  <div style={{ marginTop: 12 }}>
+                    <ProgressBar value={s.progress || 0} />
+                  </div>
+                )}
+
+                {!isGenerating && <Wave active={active} />}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
+  );
+});
+
 function CreateSongView({ onBack, onGenerate, darkMode }) {
   // ---------- Theme tokens ----------
   const isDark = useMemo(() => {
@@ -135,19 +836,35 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
   // Length
   const [duration, setDuration] = useState(180);
   const [durationInput, setDurationInput] = useState("180");
+  const [autoDuration, setAutoDuration] = useState(false);
   const [enhanceVocals, setEnhanceVocals] = useState(true);
   // ACE-Step 1.5 configuration
   const [mainModelPath, setMainModelPath] = useState("acestep-v15-turbo");
   const [lmModelPath, setLmModelPath] = useState("acestep-5Hz-lm-0.6B");
   const [lmBackend, setLmBackend] = useState("vllm");
   const [device, setDevice] = useState("auto");
-  const [initializeLm, setInitializeLm] = useState(true);
+  const [promptEngine, setPromptEngine] = useState("llm"); // llm | fast | caption | assist | expand
+  const [useLmCodes, setUseLmCodes] = useState(true);
+  const [lmCodesTouched, setLmCodesTouched] = useState(false);
   const [useFlashAttention, setUseFlashAttention] = useState(true);
   const [offloadToCpu, setOffloadToCpu] = useState(true);
   const [offloadDitToCpu, setOffloadDitToCpu] = useState(true);
   const [compileModel, setCompileModel] = useState(true);
   const [int8Quantization, setInt8Quantization] = useState(true);
   const [showAceStepAdvanced, setShowAceStepAdvanced] = useState(false);
+  const [bpm, setBpm] = useState("");
+  const [keyscale, setKeyscale] = useState("");
+  const [timeSignature, setTimeSignature] = useState("");
+  const [ditInferenceSteps, setDitInferenceSteps] = useState("");
+  const [shift, setShift] = useState("");
+  const [captionOverride, setCaptionOverride] = useState("");
+  const [mergeMetaIntoCaption, setMergeMetaIntoCaption] = useState(false);
+  const [constraintRapOnly, setConstraintRapOnly] = useState(false);
+  const [constraintNoSinging, setConstraintNoSinging] = useState(false);
+  const [constraintNoHook, setConstraintNoHook] = useState(false);
+  const [negativePrompt, setNegativePrompt] = useState("");
+
+  const initializeLm = useLmCodes || promptEngine === "assist" || promptEngine === "expand";
 
   // Generation state
   const [generating, setGenerating] = useState(false);
@@ -169,446 +886,8 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
   const progressRef = useRef({});
   const audioRef = useRef(null);
 
-  // ---------- UI primitives ----------
-  const Glass = ({ children, style }) => (
-    <div
-      style={{
-        borderRadius: t.radiusLg,
-        border: `1px solid ${t.hairline}`,
-        background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
-        backdropFilter: "blur(22px) saturate(140%)",
-        WebkitBackdropFilter: "blur(22px) saturate(140%)",
-        boxShadow: t.shadow,
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-
-  const Panel = ({ children, style }) => (
-    <div
-      style={{
-        borderRadius: t.radiusLg,
-        border: `1px solid ${t.hairline}`,
-        background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-        // backdropFilter: "blur(18px) saturate(140%)",
-        // WebkitBackdropFilter: "blur(18px) saturate(140%)",
-        boxShadow: t.shadowSoft,
-        padding: 18,
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-
-  const Hairline = ({ style }) => <div style={{ height: 1, background: t.hairline, ...style }} />;
-
-  const Pill = ({ children, tone = "neutral", onClick, onDelete, title: tt, style }) => {
-    const toneMap = {
-      neutral: { bg: t.isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)", fg: t.text, bd: t.hairline },
-      primary: { bg: t.primaryWash, fg: t.primary, bd: "rgba(10,132,255,0.28)" },
-      success: { bg: t.successWash, fg: t.success, bd: "rgba(52,199,89,0.28)" },
-      danger: { bg: t.dangerWash, fg: t.danger, bd: "rgba(255,59,48,0.28)" },
-      warning: { bg: "rgba(255,149,0,0.14)", fg: t.warning, bd: "rgba(255,149,0,0.28)" },
-    }[tone];
-
-    const clickable = !!onClick;
-    return (
-      <span
-        title={tt}
-        role={clickable ? "button" : undefined}
-        tabIndex={clickable ? 0 : undefined}
-        onClick={onClick}
-        onKeyDown={(e) => clickable && e.key === "Enter" && onClick()}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "7px 10px",
-          borderRadius: 999,
-          fontSize: 11,
-          fontWeight: 850,
-          letterSpacing: 0.2,
-          background: toneMap.bg,
-          color: toneMap.fg,
-          border: `1px solid ${toneMap.bd}`,
-          whiteSpace: "nowrap",
-          userSelect: "none",
-          cursor: clickable ? "pointer" : "default",
-          ...style,
-        }}
-      >
-        {children}
-        {onDelete && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            style={{
-              width: 18,
-              height: 18,
-              borderRadius: 999,
-              border: `1px solid ${t.hairline}`,
-              background: "transparent",
-              color: t.subtext,
-              display: "grid",
-              placeItems: "center",
-              cursor: "pointer",
-            }}
-            title="Remove"
-            aria-label="Remove"
-          >
-            ×
-          </button>
-        )}
-      </span>
-    );
-  };
-
-  const Btn = ({ children, onClick, variant = "secondary", disabled, style, type = "button", title: tt }) => {
-    const v = {
-      primary: { bg: `linear-gradient(180deg, rgba(10,132,255,0.95), rgba(10,132,255,0.78))`, fg: "white", bd: "rgba(10,132,255,0.45)" },
-      secondary: { bg: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`, fg: t.text, bd: t.hairline },
-      outline: { bg: "transparent", fg: t.text, bd: t.hairline },
-      danger: { bg: `linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))`, fg: "white", bd: "rgba(255,59,48,0.45)" },
-    }[variant];
-
-    return (
-      <button
-        type={type}
-        title={tt}
-        onClick={onClick}
-        disabled={disabled}
-        style={{
-          borderRadius: 14,
-          border: `1px solid ${v.bd}`,
-          background: v.bg,
-          color: v.fg,
-          padding: "10px 12px",
-          fontWeight: 900,
-          letterSpacing: -0.1,
-          cursor: disabled ? "not-allowed" : "pointer",
-          opacity: disabled ? 0.55 : 1,
-          boxShadow: disabled ? "none" : t.shadowSoft,
-          transition: "transform 120ms ease, opacity 160ms ease",
-          ...style,
-        }}
-        onMouseDown={(e) => {
-          if (disabled) return;
-          e.currentTarget.style.transform = "scale(0.985)";
-        }}
-        onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-      >
-        {children}
-      </button>
-    );
-  };
-
-  const IconBtn = ({ onClick, title: tt, children, disabled, style }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      title={tt}
-      disabled={disabled}
-      style={{
-        width: 40,
-        height: 40,
-        borderRadius: 14,
-        border: `1px solid ${t.hairline}`,
-        background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-        color: t.text,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.55 : 1,
-        boxShadow: t.shadowSoft,
-        ...style,
-      }}
-    >
-      {children}
-    </button>
-  );
-
-  const Input = ({ value, onChange, placeholder, multiline, rows = 4, mono, disabled, rightNode }) => (
-    <div
-      style={{
-        borderRadius: 16,
-        border: `1px solid ${t.hairline}`,
-        background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-        boxShadow: t.shadowSoft,
-        overflow: "hidden",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: multiline ? "stretch" : "center" }}>
-        {multiline ? (
-          <textarea
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            disabled={disabled}
-            rows={rows}
-            style={{
-              width: "100%",
-              resize: "vertical",
-              border: "none",
-              outline: "none",
-              background: "transparent",
-              color: t.text,
-              padding: 12,
-              fontSize: 14,
-              fontWeight: 650,
-              lineHeight: 1.35,
-              fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : "inherit",
-              opacity: disabled ? 0.55 : 1,
-            }}
-          />
-        ) : (
-          <input
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            disabled={disabled}
-            style={{
-              width: "100%",
-              border: "none",
-              outline: "none",
-              background: "transparent",
-              color: t.text,
-              padding: "12px 12px",
-              fontSize: 14,
-              fontWeight: 650,
-              opacity: disabled ? 0.55 : 1,
-            }}
-          />
-        )}
-
-        {rightNode && <div style={{ padding: 8, display: "grid", placeItems: "center" }}>{rightNode}</div>}
-      </div>
-    </div>
-  );
-
-  const CheckRow = ({ label, value, onChange, hint }) => (
-    <div style={{ display: "grid", gap: 6 }}>
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-          padding: "10px 12px",
-          borderRadius: 14,
-          border: `1px solid ${t.hairline}`,
-          background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-          boxShadow: t.shadowSoft,
-          color: t.text,
-          fontWeight: 800,
-        }}
-      >
-        <span>{label}</span>
-        <input
-          type="checkbox"
-          checked={!!value}
-          onChange={(e) => onChange(e.target.checked)}
-          style={{ accentColor: t.primary }}
-        />
-      </label>
-      {hint && <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>{hint}</div>}
-    </div>
-  );
-
-  const Segmented = ({ value, onChange, options }) => (
-    <div
-      style={{
-        display: "inline-flex",
-        padding: 4,
-        borderRadius: 16,
-        border: `1px solid ${t.hairline}`,
-        background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-        boxShadow: t.shadowSoft,
-        gap: 6,
-      }}
-    >
-      {options.map((opt) => {
-        const active = value === opt.value;
-        const disabled = !!opt.disabled;
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => !disabled && onChange(opt.value)}
-            disabled={disabled}
-            style={{
-              border: `1px solid ${active ? "rgba(10,132,255,0.45)" : "transparent"}`,
-              background: active ? `linear-gradient(135deg, ${t.primaryWash}, ${t.primaryWash2})` : "transparent",
-              color: disabled ? t.subtext : t.text,
-              borderRadius: 12,
-              padding: "10px 12px",
-              fontWeight: 850,
-              letterSpacing: -0.1,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              cursor: disabled ? "not-allowed" : "pointer",
-              opacity: disabled ? 0.5 : 1,
-            }}
-          >
-            {opt.icon}
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  const Slider = ({ value, min, max, step, onChange }) => (
-    <input
-      type="range"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      style={{ width: "100%", accentColor: t.primary }}
-    />
-  );
-
-  const ProgressBar = ({ value }) => (
-    <div
-      style={{
-        height: 6,
-        borderRadius: 999,
-        background: t.isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.08)",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          height: "100%",
-          width: `${Math.max(0, Math.min(100, value || 0))}%`,
-          background: t.primary,
-          borderRadius: 999,
-          transition: "width 220ms ease",
-        }}
-      />
-    </div>
-  );
-
-  const Alert = ({ kind = "error", children, onClose }) => {
-    const tone = kind === "error" ? "danger" : kind === "success" ? "success" : "warning";
-    return (
-      <div
-        style={{
-          borderRadius: 16,
-          border: `1px solid ${t.hairline}`,
-          background: tone === "danger" ? t.dangerWash : tone === "success" ? t.successWash : "rgba(255,149,0,0.14)",
-          padding: "10px 12px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-          color: t.text,
-          fontWeight: 750,
-        }}
-      >
-        <div style={{ color: tone === "danger" ? t.danger : tone === "success" ? t.success : t.warning }}>{children}</div>
-        {onClose && (
-          <IconBtn onClick={onClose} title="Dismiss" style={{ width: 34, height: 34, boxShadow: "none" }}>
-            <span style={{ fontWeight: 950 }}>×</span>
-          </IconBtn>
-        )}
-      </div>
-    );
-  };
-
-  const Spinner = ({ size = 16 }) => (
-    <span
-      style={{
-        width: size,
-        height: size,
-        borderRadius: 999,
-        border: `2px solid ${t.isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.18)"}`,
-        borderTopColor: t.primary,
-        display: "inline-block",
-        animation: "spin 0.9s linear infinite",
-      }}
-    />
-  );
-
-  const Wave = ({ active }) => {
-    const bars = useMemo(() => Array.from({ length: 44 }, () => Math.random() * 0.65 + 0.25), []);
-    return (
-      <div
-        style={{
-          marginTop: 12,
-          height: 44,
-          borderRadius: 14,
-          border: `1px solid ${t.hairline}`,
-          background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
-          display: "flex",
-          alignItems: "center",
-          padding: "0 10px",
-          gap: 6,
-          overflow: "hidden",
-        }}
-      >
-        {bars.map((h, i) => (
-          <div
-            key={i}
-            style={{
-              width: 3,
-              height: `${Math.round(h * 100)}%`,
-              borderRadius: 6,
-              background: active ? "rgba(10,132,255,0.90)" : t.isDark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.16)",
-              transition: "background .2s ease",
-            }}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  const Modal = ({ open, onClose, title, children, footer }) => {
-    if (!open) return null;
-    return (
-      <div
-        role="dialog"
-        aria-modal="true"
-        onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 2000,
-          background: t.isDark ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.30)",
-          display: "grid",
-          placeItems: "center",
-          padding: 16,
-        }}
-      >
-        <Glass style={{ width: "100%", maxWidth: 520, padding: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-            <div style={{ fontWeight: 950, letterSpacing: -0.3, color: t.text }}>{title}</div>
-            <IconBtn onClick={onClose} title="Close" style={{ width: 36, height: 36, boxShadow: "none" }}>
-              <CloseIcon style={{ fontSize: 18 }} />
-            </IconBtn>
-          </div>
-          <Hairline style={{ margin: "10px 0 12px 0" }} />
-          <div style={{ color: t.text }}>{children}</div>
-          {footer && (
-            <>
-              <Hairline style={{ margin: "12px 0 10px 0" }} />
-              <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>{footer}</div>
-            </>
-          )}
-        </Glass>
-      </div>
-    );
-  };
+  const ui = useThemedUI(t);
+  const { Glass, Panel, Pill, Btn, IconBtn, Input, CheckRow, Segmented, Slider, ProgressBar, Spinner, Modal } = ui;
 
   // ---------- Load existing songs + models on mount ----------
   useEffect(() => {
@@ -649,6 +928,11 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     [extractMissingDeps]
   );
 
+  useEffect(() => {
+    if (lmCodesTouched) return;
+    setUseLmCodes(promptEngine === "llm");
+  }, [promptEngine, lmCodesTouched]);
+
   const loadAvailableModels = async () => {
     try {
       setLoadingModels(true);
@@ -687,13 +971,6 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       request: job.params || null,
       autoFull: true,
     };
-  };
-
-  const resolveAssetUrl = (song, assetKey) => {
-    const direct = song?.assets?.[assetKey]?.url;
-    if (direct) return direct;
-    if (assetKey) return `/api/song-generation/${song.id}/audio/${assetKey}`;
-    return `/api/song-generation/audio/${song.id}`;
   };
 
   const loadExistingSongs = async () => {
@@ -845,6 +1122,33 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     return bits.join("\n");
   };
 
+  const buildCaptionInput = () => {
+    const base =
+      ["caption", "assist", "expand"].includes(promptEngine) ? captionOverride.trim() : buildPrompt();
+
+    if (!mergeMetaIntoCaption && !constraintRapOnly && !constraintNoSinging && !constraintNoHook) {
+      return base;
+    }
+
+    const extras = [];
+    if (mergeMetaIntoCaption) {
+      if (genreTokens.length) extras.push(`Genres: ${genreTokens.join(", ")}`);
+      if (String(bpm).trim()) extras.push(`BPM: ${bpm}`);
+      if (keyscale.trim()) extras.push(`Key: ${keyscale.trim()}`);
+      if (timeSignature.trim()) extras.push(`Time signature: ${timeSignature.trim()}`);
+    }
+
+    const constraints = [];
+    if (constraintRapOnly) constraints.push("Rap vocals only");
+    if (constraintNoSinging) constraints.push("No singing or melodic chorus");
+    if (constraintNoHook) constraints.push("No hooks or sung chorus");
+    if (constraints.length) extras.push(`Constraints: ${constraints.join("; ")}`);
+
+    if (!extras.length) return base;
+    if (!base) return extras.join("\n");
+    return `${base}\n${extras.join("\n")}`;
+  };
+
   const buildInferParams = () => {
     let modelForInference = null;
     if (selectedModel && selectedCheckpoint) {
@@ -856,13 +1160,22 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       };
     }
 
+    const captionInput = buildCaptionInput();
+
+    const durationValue = autoDuration ? null : duration;
+
     const out = {
       title: title.trim(),
-      audio_duration: duration,
-      duration,
+      audio_duration: durationValue,
+      duration: durationValue,
+      auto_duration: autoDuration,
       enhance_vocals: enhanceVocals,
       prompt: buildPrompt(),
       lyrics: instrumentalOnly ? "" : lyrics,
+      caption_override: ["caption", "assist", "expand"].includes(promptEngine) ? (captionInput || null) : null,
+      prompt_engine: promptEngine,
+      thinking: useLmCodes,
+      lm_negative_prompt: negativePrompt.trim() || "NO USER INPUT",
       model_name: selectedModel?.name || null,
       model: modelForInference,
       main_model_path: mainModelPath,
@@ -877,6 +1190,12 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       int8_quantization: int8Quantization,
     };
 
+    if (String(bpm).trim()) out.bpm = Number(bpm);
+    if (keyscale.trim()) out.keyscale = keyscale.trim();
+    if (timeSignature.trim()) out.timesignature = timeSignature.trim();
+    if (String(ditInferenceSteps).trim()) out.dit_inference_steps = Number(ditInferenceSteps);
+    if (String(shift).trim()) out.shift = Number(shift);
+
     return out;
   };
 
@@ -886,10 +1205,17 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     setDurationInput(String(v));
   };
 
+  const hasPromptOrCaption =
+    mode !== "prompt"
+      ? true
+      : ["caption", "assist", "expand"].includes(promptEngine)
+        ? captionOverride.trim().length > 0 || buildCaptionInput().trim().length > 0
+        : prompt.trim().length > 0;
+
   const canGenerate =
     !generating &&
     title.trim().length > 0 &&
-    (mode === "prompt" ? prompt.trim().length > 0 : instrumentalOnly ? true : lyrics.trim().length > 0);
+    (mode === "prompt" ? hasPromptOrCaption : instrumentalOnly ? true : lyrics.trim().length > 0);
 
   const generate = async () => {
     if (!canGenerate) return;
@@ -924,11 +1250,11 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       const jobId = data.job_id;
       setCurrentJobId(jobId);
 
-      const newSong = {
-        id: jobId,
-        title: title.trim(),
-        duration,
-        genres: [...genreTokens],
+    const newSong = {
+      id: jobId,
+      title: title.trim(),
+      duration: autoDuration ? null : duration,
+      genres: [...genreTokens],
         createdAt: new Date().toISOString(),
         audioUrl: null,
         modelName: selectedModel?.name || null,
@@ -953,47 +1279,59 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     }
   };
 
-  const deleteSong = async (songId) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/song-generation/delete/${songId}`, { method: "DELETE" });
-      if (res.ok) {
-        setSongs((prev) => prev.filter((s) => s.id !== songId));
-        if (playingId === songId) {
-          setPlayingId(null);
-          if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current = null;
+  const deleteSong = useCallback(
+    async (songId) => {
+      try {
+        const res = await fetch(`${API_BASE}/api/song-generation/delete/${songId}`, { method: "DELETE" });
+        if (res.ok) {
+          setSongs((prev) => prev.filter((s) => s.id !== songId));
+          if (playingId === songId) {
+            setPlayingId(null);
+            if (audioRef.current) {
+              audioRef.current.pause();
+              audioRef.current = null;
+            }
           }
         }
+      } catch (e) {
+        console.error("Delete error:", e);
       }
-    } catch (e) {
-      console.error("Delete error:", e);
-    }
-  };
+    },
+    [playingId]
+  );
 
-  const playPause = (song) => {
-    if (playingId === song.id) {
+  const playPause = useCallback(
+    (song) => {
+      if (playingId === song.id) {
+        if (audioRef.current) audioRef.current.pause();
+        setPlayingId(null);
+        return;
+      }
+
       if (audioRef.current) audioRef.current.pause();
-      setPlayingId(null);
-      return;
-    }
+      let playUrl = null;
+      if (song.hasAssets && song.assets) {
+        const key = song.selectedAssetKey || getBestAssetKey(song.assets);
+        playUrl = key ? resolveAssetUrl(song, key) : null;
+      }
+      if (!playUrl) {
+        playUrl = song.vocalsUrl || song.instrumentalUrl || song.audioUrl;
+      }
+      if (playUrl) {
+        audioRef.current = new Audio(`${API_BASE}${playUrl}`);
+        audioRef.current.play().catch((e) => console.error("Play error:", e));
+        audioRef.current.onended = () => setPlayingId(null);
+        setPlayingId(song.id);
+      }
+    },
+    [playingId]
+  );
 
-    if (audioRef.current) audioRef.current.pause();
-    let playUrl = null;
-    if (song.hasAssets && song.assets) {
-      const key = song.selectedAssetKey || getBestAssetKey(song.assets);
-      playUrl = key ? resolveAssetUrl(song, key) : null;
-    }
-    if (!playUrl) {
-      playUrl = song.vocalsUrl || song.instrumentalUrl || song.audioUrl;
-    }
-    if (playUrl) {
-      audioRef.current = new Audio(`${API_BASE}${playUrl}`);
-      audioRef.current.play().catch((e) => console.error("Play error:", e));
-      audioRef.current.onended = () => setPlayingId(null);
-      setPlayingId(song.id);
-    }
-  };
+  const handleSelectAsset = useCallback((songId, assetKey) => {
+    setSongs((prev) => prev.map((sx) => (sx.id === songId ? { ...sx, selectedAssetKey: assetKey } : sx)));
+  }, []);
+
+  const clearError = useCallback(() => setError(null), []);
 
   const sentinelRef = useRef(null);
   const [isStuck, setIsStuck] = useState(false);
@@ -1112,13 +1450,20 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                   <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text }}>Length</div>
                     <div style={{ fontSize: 12, fontWeight: 900, color: t.subtext }}>
-                      {fmt(duration)} (max 4:00)
+                      {autoDuration ? "Auto" : `${fmt(duration)} (max 4:00)`}
                     </div>
                   </div>
 
                   <div className="cs-len">
                     <div style={{ paddingTop: 6 }}>
-                      <Slider value={duration} min={30} max={240} step={5} onChange={syncDuration} />
+                      <Slider
+                        value={duration}
+                        min={30}
+                        max={240}
+                        step={5}
+                        onChange={syncDuration}
+                        disabled={autoDuration}
+                      />
                     </div>
 
                     <div style={{ display: "grid", gap: 6 }}>
@@ -1126,11 +1471,37 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                         value={durationInput}
                         onChange={(v) => setDurationInput(String(v).replace(/[^\d]/g, ""))}
                         placeholder="Seconds"
+                        disabled={autoDuration}
                       />
                       <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>Seconds (30–240)</div>
                     </div>
                   </div>
+                  <CheckRow
+                    label="Let model choose length"
+                    value={autoDuration}
+                    onChange={setAutoDuration}
+                    hint="When enabled, duration is inferred by the model."
+                  />
                 </div>
+
+                {["caption", "assist", "expand"].includes(promptEngine) && (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <div style={{ fontWeight: 900, letterSpacing: -0.2, color: t.text }}>Caption Input</div>
+                    <Input
+                      multiline
+                      rows={4}
+                      value={captionOverride}
+                      onChange={setCaptionOverride}
+                      placeholder={
+                        promptEngine === "assist"
+                          ? "Paste a draft caption. LLM will refine it."
+                          : promptEngine === "expand"
+                            ? "Paste a short caption. LLM will expand it with more detail."
+                            : "Paste the exact caption to use for generation. This bypasses LLM captioning."
+                      }
+                    />
+                  </div>
+                )}
 
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   {!instrumentalOnly && (
@@ -1162,6 +1533,58 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                   </div>
                   <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
                     Defaults tuned for RTX 3070 Ti. Advanced options control LM, offload, and quantization.
+                  </div>
+
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <div style={{ fontWeight: 850, color: t.text }}>Prompt Engine</div>
+                    <Segmented
+                      value={promptEngine}
+                      onChange={(v) => v && setPromptEngine(v)}
+                      options={[
+                        { value: "llm", label: "LLM (Best)" },
+                        { value: "fast", label: "Fast (No LLM)" },
+                        { value: "caption", label: "Direct Caption" },
+                        { value: "assist", label: "LLM Assist" },
+                        { value: "expand", label: "LLM Expand" },
+                      ]}
+                    />
+                    <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
+                      Fast and Direct Caption skip LLM init. Assist/Expand use LLM to rewrite your caption.
+                    </div>
+                  </div>
+
+                  <CheckRow
+                    label="Use LLM for audio codes (slower, more faithful)"
+                    value={useLmCodes}
+                    onChange={(v) => {
+                      setUseLmCodes(v);
+                      setLmCodesTouched(true);
+                    }}
+                    hint="Enable if you want stronger semantic adherence, even in Direct Caption mode."
+                  />
+
+                  <CheckRow
+                    label="Merge BPM/Key/Time/Genres into caption"
+                    value={mergeMetaIntoCaption}
+                    onChange={setMergeMetaIntoCaption}
+                    hint="Appends your BPM/key/time/genres to the caption for stronger control."
+                  />
+
+                  <div style={{ fontWeight: 850, color: t.text, marginTop: 2 }}>Hard Constraints</div>
+                  <CheckRow label="Rap vocals only" value={constraintRapOnly} onChange={setConstraintRapOnly} />
+                  <CheckRow label="No singing / melodic chorus" value={constraintNoSinging} onChange={setConstraintNoSinging} />
+                  <CheckRow label="No hooks / sung chorus" value={constraintNoHook} onChange={setConstraintNoHook} />
+
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <div style={{ fontWeight: 850, color: t.text }}>Negative Prompt</div>
+                    <Input
+                      value={negativePrompt}
+                      onChange={setNegativePrompt}
+                      placeholder="Avoid: singing, melodic chorus, pop hooks, female vocals..."
+                    />
+                    <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
+                      Used for LLM CFG control when LLM codes are enabled.
+                    </div>
                   </div>
 
                   {showAceStepAdvanced && (
@@ -1197,6 +1620,7 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                         <select
                           value={lmModelPath}
                           onChange={(e) => setLmModelPath(e.target.value)}
+                          disabled={!initializeLm}
                           style={{
                             width: "100%",
                             height: 44,
@@ -1224,6 +1648,7 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                         <select
                           value={lmBackend}
                           onChange={(e) => setLmBackend(e.target.value)}
+                          disabled={!initializeLm}
                           style={{
                             width: "100%",
                             height: 44,
@@ -1269,7 +1694,27 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
                         <div className="cs-selectChevron">▾</div>
                       </div>
 
-                      <CheckRow label="Initialize 5Hz LM" value={initializeLm} onChange={setInitializeLm} />
+                      <div style={{ display: "grid", gap: 8 }}>
+                        <div style={{ fontWeight: 850, color: t.text }}>Generation Details</div>
+                        <Input
+                          value={bpm}
+                          onChange={(v) => setBpm(String(v).replace(/[^\d.]/g, ""))}
+                          placeholder="BPM (optional)"
+                        />
+                        <Input value={keyscale} onChange={setKeyscale} placeholder="Key scale (optional) e.g. C Major" />
+                        <Input value={timeSignature} onChange={setTimeSignature} placeholder="Time signature (optional) e.g. 4" />
+                        <Input
+                          value={ditInferenceSteps}
+                          onChange={(v) => setDitInferenceSteps(String(v).replace(/[^\d]/g, ""))}
+                          placeholder="DiT inference steps (optional)"
+                        />
+                        <Input
+                          value={shift}
+                          onChange={(v) => setShift(String(v).replace(/[^\d.]/g, ""))}
+                          placeholder="Shift (optional)"
+                        />
+                      </div>
+
                       <CheckRow label="Use flash attention" value={useFlashAttention} onChange={setUseFlashAttention} />
                       <CheckRow label="Offload to CPU" value={offloadToCpu} onChange={setOffloadToCpu} />
                       <CheckRow label="Offload DiT to CPU" value={offloadDitToCpu} onChange={setOffloadDitToCpu} />
@@ -1494,239 +1939,18 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
 
           {/* RIGHT */}
           <div>
-            <Panel style={{ minHeight: 420 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                <MusicNoteIcon style={{ fontSize: 18, opacity: 0.9, color: t.text }} />
-                <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text }}>Generated</div>
-                {loadingSongs && <Spinner size={16} />}
-              </div>
-
-              {error && (
-                <Alert kind="error" onClose={() => setError(null)}>
-                  {error}
-                </Alert>
-              )}
-
-              {songs.length === 0 && !loadingSongs ? (
-                <div style={{ padding: "42px 0", textAlign: "center", color: t.subtext }}>
-                  <div
-                    style={{
-                      width: 74,
-                      height: 74,
-                      borderRadius: 999,
-                      margin: "0 auto 12px auto",
-                      display: "grid",
-                      placeItems: "center",
-                      border: `1px solid ${t.hairline}`,
-                      background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
-                    }}
-                  >
-                    <MusicNoteIcon style={{ fontSize: 34, opacity: 0.6, color: t.text }} />
-                  </div>
-                  <div style={{ fontWeight: 950, color: t.text }}>No songs yet</div>
-                  <div style={{ marginTop: 6, fontSize: 13, fontWeight: 650 }}>Add a title, then describe or paste lyrics and generate.</div>
-                </div>
-              ) : (
-                <div style={{ display: "grid", gap: 12 }}>
-                  {songs.map((s) => {
-                    const active = playingId === s.id;
-                    const assets = s.hasAssets ? s.assets || {} : null;
-                    const selectedAssetKey = assets ? s.selectedAssetKey || getBestAssetKey(assets) : null;
-                    const isAssetReadyNow = selectedAssetKey ? isAssetReady(assets?.[selectedAssetKey]) : false;
-                    const legacyReady = !!(s.vocalsUrl || s.instrumentalUrl || s.audioUrl);
-                    const isReady = assets ? isAssetReadyNow : legacyReady;
-                    const isGenerating = !isReady && s.status && s.status !== "failed";
-                    const isFailed = s.status === "failed";
-
-                    return (
-                      <div
-                        key={s.id}
-                        style={{
-                          borderRadius: t.radiusLg,
-                          border: `1px solid ${isFailed ? "rgba(255,59,48,0.45)" : t.hairline}`,
-                          background: `linear-gradient(180deg, ${t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"}, ${t.isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)"
-                            })`,
-                          padding: 14,
-                          boxShadow: "none",
-                          opacity: isFailed ? 0.72 : 1,
-                        }}
-                      >
-                        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                          {isGenerating ? (
-                            <div
-                              style={{
-                                width: 44,
-                                height: 44,
-                                borderRadius: 14,
-                                display: "grid",
-                                placeItems: "center",
-                                border: `1px solid ${t.hairline}`,
-                                background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
-                              }}
-                            >
-                              <Spinner size={18} />
-                            </div>
-                          ) : (
-                            <IconBtn
-                              onClick={() => playPause(s)}
-                              disabled={!isReady}
-                              title={isReady ? (active ? "Pause" : "Play") : "Not ready yet"}
-                              style={{
-                                width: 44,
-                                height: 44,
-                                borderRadius: 14,
-                                background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
-                                boxShadow: "none",
-                              }}
-                            >
-                              {active ? <PauseIcon /> : <PlayArrowIcon />}
-                            </IconBtn>
-                          )}
-
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {s.title}
-                            </div>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: t.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {isGenerating ? (
-                                `Generating... ${s.progress || 0}%`
-                              ) : isFailed ? (
-                                <span style={{ color: t.danger }}>Generation failed</span>
-                              ) : (
-                                <>
-                                  {s.modelName ? (
-                                    <span style={{ color: t.primary, fontWeight: 900 }}>
-                                      {s.modelName}
-                                      {s.modelEpoch ? ` @${s.modelEpoch}e` : ""}
-                                    </span>
-                                  ) : (
-                                    <span>Original voice</span>
-                                  )}
-                                  {(s.duration || s.genres?.length) && " • "}
-                                  {s.duration ? fmt(s.duration) : ""}
-                                  {s.genres?.length ? ` • ${s.genres.slice(0, 2).join(", ")}` : ""}
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                            {assets && (
-                              <IconBtn
-                                title="Download Selected"
-                                disabled={!isReady}
-                                onClick={() => {
-                                  const key = selectedAssetKey || getBestAssetKey(assets);
-                                  if (!key) return;
-                                  const a = document.createElement("a");
-                                  a.href = `${API_BASE}${resolveAssetUrl(s, key)}`;
-                                  a.download = `${s.title || "song"}_${key}.wav`;
-                                  a.click();
-                                }}
-                                style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
-                              >
-                                <DownloadIcon fontSize="small" />
-                              </IconBtn>
-                            )}
-
-                            {!assets && s.vocalsUrl && (
-                              <IconBtn
-                                title="Download Vocals"
-                                disabled={!isReady}
-                                onClick={() => {
-                                  const a = document.createElement("a");
-                                  a.href = `${API_BASE}${s.vocalsUrl}`;
-                                  a.download = `${s.title || "song"}_vocals.wav`;
-                                  a.click();
-                                }}
-                                style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
-                              >
-                                <MicIcon fontSize="small" />
-                              </IconBtn>
-                            )}
-
-                            {!assets && s.instrumentalUrl && (
-                              <IconBtn
-                                title="Download Instrumental"
-                                disabled={!isReady}
-                                onClick={() => {
-                                  const a = document.createElement("a");
-                                  a.href = `${API_BASE}${s.instrumentalUrl}`;
-                                  a.download = `${s.title || "song"}_instrumental.wav`;
-                                  a.click();
-                                }}
-                                style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
-                              >
-                                <MusicNoteIcon fontSize="small" />
-                              </IconBtn>
-                            )}
-
-                            {!assets && !s.vocalsUrl && !s.instrumentalUrl && s.audioUrl && (
-                              <IconBtn
-                                title="Download"
-                                disabled={!isReady}
-                                onClick={() => {
-                                  const a = document.createElement("a");
-                                  a.href = `${API_BASE}${s.audioUrl}`;
-                                  a.download = `${s.title || "song"}.wav`;
-                                  a.click();
-                                }}
-                                style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
-                              >
-                                <DownloadIcon fontSize="small" />
-                              </IconBtn>
-                            )}
-
-                            <IconBtn
-                              title="Delete"
-                              disabled={isGenerating}
-                              onClick={() => deleteSong(s.id)}
-                              style={{
-                                width: 36,
-                                height: 36,
-                                borderRadius: 12,
-                                boxShadow: "none",
-                                borderColor: isGenerating ? t.hairline : "rgba(255,59,48,0.35)",
-                                color: isGenerating ? t.subtext : t.danger,
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconBtn>
-                          </div>
-                        </div>
-
-                        {assets && (
-                          <div style={{ marginTop: 10 }}>
-                            <Segmented
-                              value={selectedAssetKey}
-                              onChange={(v) => {
-                                setSongs((prev) =>
-                                  prev.map((sx) => (sx.id === s.id ? { ...sx, selectedAssetKey: v } : sx))
-                                );
-                              }}
-                              options={SONG_ASSET_KEYS.map((k) => ({
-                                value: k,
-                                label: SONG_ASSET_LABELS[k],
-                                disabled: !isAssetReady(assets?.[k]),
-                              }))}
-                            />
-                          </div>
-                        )}
-
-
-                        {isGenerating && (
-                          <div style={{ marginTop: 12 }}>
-                            <ProgressBar value={s.progress || 0} />
-                          </div>
-                        )}
-
-                        {!isGenerating && <Wave active={active} />}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Panel>
+            <GeneratedPanel
+              ui={ui}
+              t={t}
+              songs={songs}
+              loadingSongs={loadingSongs}
+              error={error}
+              playingId={playingId}
+              onPlayPause={playPause}
+              onDeleteSong={deleteSong}
+              onSelectAsset={handleSelectAsset}
+              onClearError={clearError}
+            />
           </div>
         </div>
 
