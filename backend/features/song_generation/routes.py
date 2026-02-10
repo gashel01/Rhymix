@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import shutil
 import threading
 import uuid
@@ -14,9 +15,16 @@ from backend.features.song_generation.providers.ace_step import (
     _asset_path,
     _normalize_acestep15_params,
 )
+from backend.features.song_generation.cover import (
+    get_cover_source_payload,
+    resolve_cover_source,
+    run_cover_generation_thread,
+    transcribe_cover_source,
+)
 from backend.jobs.registry import song_generation_jobs
 
 bp = Blueprint("song_generation", __name__)
+logger = logging.getLogger(__name__)
 
 
 @bp.route("/api/song-generation", methods=["POST"])
@@ -42,6 +50,7 @@ def start_song_generation():
             "params": data,
             "created_at": datetime.now().isoformat(),
             "audio_url": f"/api/song-generation/audio/{job_id}",
+            "derivation_type": "original",
             "error": None,
         }
 
@@ -54,6 +63,112 @@ def start_song_generation():
 
     except Exception as e:
         print(f"Error starting song generation: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/covers", methods=["POST"])
+def start_cover_generation():
+    try:
+        data = request.get_json() or {}
+        source_song_id = str(data.get("source_song_id") or "").strip()
+        title = str(data.get("title") or "").strip()
+        target_voice = str(data.get("target_voice") or "").strip()
+        logger.info(
+            "[cover] POST /api/covers source_song_id=%s title=%s target_voice=%s pitch_shift=%s preserve_tempo=%s strong_audio=%s",
+            source_song_id,
+            title,
+            target_voice,
+            data.get("pitch_shift", 0),
+            data.get("preserve_tempo", True),
+            data.get("strong_audio_conditioning", False),
+        )
+
+        if not source_song_id:
+            return jsonify({"error": "source_song_id is required"}), 400
+        if not title:
+            return jsonify({"error": "Title is required"}), 400
+
+        source = resolve_cover_source(source_song_id)
+        if not source:
+            return jsonify({"error": "Source song not found"}), 404
+        if not source.get("has_audio"):
+            return jsonify({"error": "Source song has no audio"}), 400
+
+        job_id = str(uuid.uuid4())
+        params = {
+            "source_song_id": source_song_id,
+            "target_voice": target_voice or None,
+            "pitch_shift": data.get("pitch_shift", 0),
+            "style_prompt": data.get("style_prompt"),
+            "lyrics": data.get("lyrics"),
+            "cover_mode": data.get("cover_mode", "full"),
+            "preserve_tempo": data.get("preserve_tempo", True),
+            "audio_cover_strength": data.get("audio_cover_strength", 1.0),
+            "strong_audio_conditioning": data.get("strong_audio_conditioning", False),
+            "output_format": data.get("output_format", "wav"),
+            "title": title,
+        }
+        job = {
+            "id": job_id,
+            "status": "queued",
+            "progress": 0,
+            "status_message": "Cover job queued...",
+            "title": title,
+            "params": params,
+            "created_at": datetime.now().isoformat(),
+            "audio_url": f"/api/song-generation/audio/{job_id}",
+            "source_song_id": source.get("source_song_id"),
+            "source_title": source.get("title"),
+            "derivation_type": "cover",
+            "derivation_metadata": {
+                "target_voice": target_voice or None,
+                "pitch_shift": data.get("pitch_shift", 0),
+                "style_prompt": data.get("style_prompt"),
+                "lyrics": data.get("lyrics"),
+                "cover_mode": data.get("cover_mode", "full"),
+                "preserve_tempo": data.get("preserve_tempo", True),
+                "audio_cover_strength": data.get("audio_cover_strength", 1.0),
+                "strong_audio_conditioning": data.get("strong_audio_conditioning", False),
+            },
+            "error": None,
+        }
+        song_generation_jobs[job_id] = job
+        logger.info("[cover:%s] Job queued source_song_id=%s source_type=%s", job_id, source.get("source_song_id"), source.get("source_type"))
+        threading.Thread(target=run_cover_generation_thread, args=(job_id, params), daemon=True).start()
+        return jsonify({"job_id": job_id})
+    except Exception as e:
+        logger.exception("[cover] Failed to start cover generation")
+        print(f"Error starting cover generation: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/covers/<job_id>", methods=["GET"])
+def get_cover_generation(job_id):
+    if job_id not in song_generation_jobs:
+        return jsonify({"error": "Job not found"}), 404
+    return get_song_generation(job_id)
+
+
+@bp.route("/api/covers/source/<path:source_song_id>", methods=["GET"])
+def get_cover_source(source_song_id):
+    source = get_cover_source_payload(source_song_id)
+    if not source:
+        return jsonify({"error": "Source song not found"}), 404
+    return jsonify({"source_song": source})
+
+
+@bp.route("/api/covers/transcribe", methods=["POST"])
+def transcribe_cover_lyrics():
+    try:
+        data = request.get_json() or {}
+        source_song_id = str(data.get("source_song_id") or "").strip()
+        engine = str(data.get("engine") or "whisperx").strip().lower()
+        if not source_song_id:
+            return jsonify({"error": "source_song_id is required"}), 400
+        lyrics = transcribe_cover_source(source_song_id, engine=engine)
+        return jsonify({"lyrics": lyrics})
+    except Exception as e:
+        logger.exception("[cover] Failed to transcribe source song")
         return jsonify({"error": str(e)}), 500
 
 
@@ -109,6 +224,10 @@ def get_song_generation(job_id):
             "error": job.get("error"),
             "assets": assets,
             "timings": job.get("timings"),
+            "derivation_type": job.get("derivation_type"),
+            "source_song_id": job.get("source_song_id"),
+            "source_title": job.get("source_title"),
+            "derivation_metadata": job.get("derivation_metadata"),
         }
     )
 
@@ -154,6 +273,9 @@ def list_song_generation_jobs():
                 "assets": job.get("assets"),
                 "created_at": job.get("created_at"),
                 "completed_at": job.get("completed_at"),
+                "derivation_type": job.get("derivation_type"),
+                "source_song_id": job.get("source_song_id"),
+                "source_title": job.get("source_title"),
             }
         )
 

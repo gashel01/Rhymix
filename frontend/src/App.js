@@ -281,6 +281,11 @@ function App() {
   const [liveInferenceData, setLiveInferenceData] = useState(null);
   const [navContext, setNavContext] = useState(null);
   const [inferenceParamsOrigin, setInferenceParamsOrigin] = useState(null);
+  const [createSongNav, setCreateSongNav] = useState({
+    mode: "create",
+    sourceSongId: null,
+    sourceSong: null,
+  });
 
   const theme = createAppTheme(darkMode ? 'dark' : 'light');
 
@@ -390,6 +395,12 @@ function App() {
     setInferenceData(null);
     setNavContext(null);
     setInferenceParamsOrigin(null);
+    if (view === "create-song") {
+      setCreateSongNav({ mode: "create", sourceSongId: null, sourceSong: null });
+    }
+    if (view !== "create-song") {
+      setCreateSongNav({ mode: "create", sourceSongId: null, sourceSong: null });
+    }
     if (view !== "inference") setLiveInferenceData(null);
     setDrawerOpen(false);
     // Update URL hash for navigation persistence
@@ -399,6 +410,77 @@ function App() {
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, []);
+
+  const toCoverSourceId = useCallback((track, source) => {
+    if (!track || typeof track !== "object") return null;
+    if (source === "inference" && track.runId) return `run:${track.runId}`;
+    if (track.fileId) return `upload:${track.fileId}`;
+    if (track.id && source === "inference") return `run:${track.id}`;
+    if (track.id) return `upload:${track.id}`;
+    return null;
+  }, []);
+
+  const openCreateCover = useCallback(
+    ({ source, track }) => {
+      const sourceSongId = toCoverSourceId(track, source);
+      if (!sourceSongId) return;
+      const sourceSong = {
+        sourceSongId,
+        title: track?.displayName || track?.name || track?.originalName || "Untitled source",
+        artist: track?.artist || null,
+        duration: track?.duration || null,
+        audioUrl: track?.audioUrl || track?.vocalUrl || track?.instrumentalUrl || null,
+        instrumentalUrl: track?.instrumentalUrl || null,
+        vocalsUrl: track?.vocalUrl || track?.originalVocalUrl || null,
+        source,
+      };
+
+      setCreateSongNav({
+        mode: "cover",
+        sourceSongId,
+        sourceSong,
+      });
+      setCurrentView("create-song");
+      setShowHomeView(false);
+      setDrawerOpen(false);
+      window.history.replaceState(
+        null,
+        "",
+        `#create-song?mode=cover&sourceSongId=${encodeURIComponent(sourceSongId)}`
+      );
+    },
+    [toCoverSourceId]
+  );
+
+  const handleHomeCoverTrack = useCallback(
+    (track) => {
+      openCreateCover({ source: "home", track });
+    },
+    [openCreateCover]
+  );
+
+  const handleInferenceCoverTrack = useCallback(
+    (track) => {
+      openCreateCover({ source: "inference", track });
+    },
+    [openCreateCover]
+  );
+
+  const handleHomeCoverTracks = useCallback(
+    (tracks) => {
+      if (!Array.isArray(tracks) || tracks.length === 0) return;
+      handleHomeCoverTrack(tracks[0]);
+    },
+    [handleHomeCoverTrack]
+  );
+
+  const handleInferenceCoverTracks = useCallback(
+    (tracks) => {
+      if (!Array.isArray(tracks) || tracks.length === 0) return;
+      handleInferenceCoverTrack(tracks[0]);
+    },
+    [handleInferenceCoverTrack]
+  );
 
   const getTrackId = useCallback((track) => {
     return track?.fileId || track?.trackId || track?.id || track?.runId || track?.tempId || null;
@@ -453,11 +535,18 @@ function App() {
   useEffect(() => {
     const hash = window.location.hash.substring(1); // Remove the '#'
     if (hash && hash !== 'home') {
+      const [hashView, hashQuery] = hash.split("?");
       // Only set the view if it's a valid navigation hash
-      const validViews = ['datasets', 'training', 'talking-workflow', 'inference-model-selection', 'inference-params', 'inference'];
-      if (validViews.includes(hash)) {
-        setCurrentView(hash);
+      const validViews = ['datasets', 'training', 'talking-workflow', 'inference-model-selection', 'inference-params', 'inference', 'create-song'];
+      if (validViews.includes(hashView)) {
+        setCurrentView(hashView);
         setShowHomeView(false);
+        if (hashView === "create-song" && hashQuery) {
+          const sp = new URLSearchParams(hashQuery);
+          const mode = sp.get("mode") === "cover" ? "cover" : "create";
+          const sourceSongId = sp.get("sourceSongId") || null;
+          setCreateSongNav({ mode, sourceSongId, sourceSong: null });
+        }
       }
     }
   }, []);
@@ -710,6 +799,7 @@ function App() {
             handleTrainWithDataset={handleTrainWithDataset}
             onCreateTalkingDataset={handleCreateTalkingDataset}
             onInferenceWithTracks={handleInferenceWithTracks}
+            onCoverWithTracks={handleHomeCoverTracks}
             optimisticTracks={optimisticTracks}
             onOptimisticTracksChange={setOptimisticTracks}
           />
@@ -790,7 +880,12 @@ function App() {
 
       case "create-song":
         return (
-          <CreateSongView onBack={() => handleNavigation("home")} />
+          <CreateSongView
+            onBack={() => handleNavigation("home")}
+            initialMode={createSongNav.mode}
+            sourceSongId={createSongNav.sourceSongId}
+            initialSourceSong={createSongNav.sourceSong}
+          />
         );
 
       case "models":
@@ -800,6 +895,7 @@ function App() {
         return (
           <InferenceView
             onNavigate={handleNavigation}
+            onCoverWithTracks={handleInferenceCoverTracks}
             liveInferenceData={liveInferenceData}
             onSelectionToParams={({ source, selectedTracks, selectedModel }) => {
               openInferenceParams({

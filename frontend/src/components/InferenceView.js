@@ -12,7 +12,7 @@ import { Theme } from './Homeview/Theme.js';
 import Panel from './Homeview/Panel.js';
 import Btn from './Homeview/Btn.js';
 
-function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToParams, onSelectionToModelSelection }) {
+function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToParams, onSelectionToModelSelection, onCoverWithTracks }) {
   const { volumeRef } = useVolume();
   const t = Theme({ darkMode }).t;
 
@@ -416,6 +416,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
               showDatasetButton={false}
               showInferenceButton={false}
               showInferenceResultsActions={true}
+              handleCoverWithTracks={onCoverWithTracks}
               onReturnToModelSelection={handleReturnToModelSelection}
               onReturnToInferenceParams={showSelectionButton ? handleReturnToInferenceParams : null}
               externalSelectedRows={selectedRows} // important
@@ -489,6 +490,7 @@ export default memo(InferenceView, (prevProps, nextProps) => {
     prevProps.darkMode === nextProps.darkMode &&
     prevProps.liveInferenceData === nextProps.liveInferenceData &&
     prevProps.onSelectionToParams === nextProps.onSelectionToParams &&
-    prevProps.onSelectionToModelSelection === nextProps.onSelectionToModelSelection
+    prevProps.onSelectionToModelSelection === nextProps.onSelectionToModelSelection &&
+    prevProps.onCoverWithTracks === nextProps.onCoverWithTracks
   );
 });

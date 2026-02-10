@@ -27,6 +27,7 @@ import { useAudioPlayback  }  from "./Homeview/useAudioPlayback";
 function HomeView({
   onOpenCreateDataset,
   onInferenceWithTracks,
+  onCoverWithTracks,
   handleTrainWithDataset,
   darkMode,
   optimisticTracks = [],
@@ -163,6 +164,7 @@ function HomeView({
                     handleTrainWithDataset={handleTrainWithDataset}
                     showInferenceButton={true}
                     handleInferenceWithTracks={onInferenceWithTracks}
+                    handleCoverWithTracks={onCoverWithTracks}
                     volume={volumeRef.current}
                     header={
                       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "0px 0px 10px 0px" }}>
@@ -227,6 +229,7 @@ export default memo(HomeView, (prevProps, nextProps) => {
   return (
     prevProps.onOpenCreateDataset === nextProps.onOpenCreateDataset &&
     prevProps.onInferenceWithTracks === nextProps.onInferenceWithTracks &&
+    prevProps.onCoverWithTracks === nextProps.onCoverWithTracks &&
     prevProps.handleTrainWithDataset === nextProps.handleTrainWithDataset &&
     prevProps.darkMode === nextProps.darkMode &&
     prevProps.optimisticTracks === nextProps.optimisticTracks &&

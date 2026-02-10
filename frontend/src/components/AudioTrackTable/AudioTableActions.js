@@ -11,6 +11,7 @@ const AudioTableActions = ({
   trackPairs = [],
   handleTrainWithDataset,
   handleInferenceWithTracks,
+  handleCoverWithTracks,
   showInferenceResultsActions,
   onReturnToModelSelection,
   onReturnToInferenceParams,
@@ -258,6 +259,21 @@ const AudioTableActions = ({
                     Inference Params
                   </Btn>
                 )}
+
+                {handleCoverWithTracks && (
+                  <Btn
+                    variant="primary"
+                    title="Create Cover"
+                    onClick={() => handleCoverWithTracks(getSelectedTracks())}
+                    icon={
+                      <SmallIcon>
+                        <PsychologyIcon />
+                      </SmallIcon>
+                    }
+                  >
+                    Cover
+                  </Btn>
+                )}
               </>
             ) : (
               <>
@@ -288,6 +304,21 @@ const AudioTableActions = ({
                     }
                   >
                     Run Inference
+                  </Btn>
+                )}
+
+                {handleCoverWithTracks && (
+                  <Btn
+                    variant="primary"
+                    title="Create Cover"
+                    onClick={() => handleCoverWithTracks(getSelectedTracks())}
+                    icon={
+                      <SmallIcon>
+                        <PsychologyIcon />
+                      </SmallIcon>
+                    }
+                  >
+                    Cover
                   </Btn>
                 )}
               </>

@@ -1,849 +1,64 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import {
+  API_BASE,
+  clamp,
+  normalize,
+  toKey,
+  getBestAssetKey,
+  resolveAssetUrl,
+} from "./constants";
+import { getTheme } from "./theme";
+import { useThemedUI } from "./useThemedUI";
+import { GeneratedPanel } from "./GeneratedPanel";
+import { CreateSongHeader } from "./CreateSongHeader";
+import { MissingDepsModal } from "./MissingDepsModal";
+import { CreateSongFormPanel } from "./CreateSongFormPanel";
+import { SourceSongPanel } from "./SourceSongPanel";
+import { CoverFormPanel } from "./CoverFormPanel";
+import {
+  getCoverGenerationStatus,
+  getCoverSourceSong,
+  startCoverGeneration,
+  transcribeCoverSource,
+} from "../../utils/apiService";
 
-// keep your existing icon set (NOT changing icons)
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
-import MusicNoteIcon from "@mui/icons-material/MusicNote";
-import LyricsIcon from "@mui/icons-material/Lyrics";
-import DownloadIcon from "@mui/icons-material/Download";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import PauseIcon from "@mui/icons-material/Pause";
-import DeleteIcon from "@mui/icons-material/Delete";
-import MicIcon from "@mui/icons-material/Mic";
-import PersonIcon from "@mui/icons-material/Person";
-import CloseIcon from "@mui/icons-material/Close";
-
-// API base URL
-const API_BASE = "";
-
-const GENRE_RECS = [
-  "Electro-pop",
-  "Synthwave",
-  "Alt-pop",
-  "Indie rock",
-  "Trap",
-  "Lo-fi",
-  "Ambient",
-  "Cinematic",
-];
-
-const ACESTEP_MAIN_MODELS = ["acestep-v15-turbo", "acestep-v15-base", "acestep-v15-sft"];
-const ACESTEP_LM_MODELS = ["acestep-5Hz-lm-0.6B", "acestep-5Hz-lm-1.7B", "acestep-5Hz-lm-4B"];
-
-const SONG_ASSET_KEYS = [
-  "full_mix",
-  "instrumental",
-  "vocals_raw",
-  "vocals_rvc",
-  "final_mix_rvc",
-];
-
-const SONG_ASSET_LABELS = {
-  full_mix: "Full",
-  instrumental: "Instrumental",
-  vocals_raw: "Raw Vocals",
-  vocals_rvc: "Enhanced Vocals",
-  final_mix_rvc: "Final Mix (Enhanced)",
-};
-
-const isAssetReady = (asset) => !!(asset && (asset.ready || asset.url));
-
-const getBestAssetKey = (assets) => {
-  if (!assets) return null;
-  if (isAssetReady(assets.full_mix)) return "full_mix";
-  const ready = SONG_ASSET_KEYS.find((k) => isAssetReady(assets[k]));
-  return ready || null;
-};
-
-const fmt = (s) => {
-  const m = Math.floor(s / 60);
-  const sec = String(s % 60).padStart(2, "0");
-  return `${m}:${sec}`;
-};
-
-const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-const normalize = (s) => s.trim().replace(/\s+/g, " ");
-const toKey = (s) => normalize(s).toLowerCase();
-
-const resolveAssetUrl = (song, assetKey) => {
-  const direct = song?.assets?.[assetKey]?.url;
-  if (direct) return direct;
-  if (assetKey) return `/api/song-generation/${song.id}/audio/${assetKey}`;
-  return `/api/song-generation/audio/${song.id}`;
-};
-
-const useThemedUI = (t) =>
-  useMemo(() => {
-    const Glass = ({ children, style }) => (
-      <div
-        style={{
-          borderRadius: t.radiusLg,
-          border: `1px solid ${t.hairline}`,
-          background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
-          backdropFilter: "blur(22px) saturate(140%)",
-          WebkitBackdropFilter: "blur(22px) saturate(140%)",
-          boxShadow: t.shadow,
-          ...style,
-        }}
-      >
-        {children}
-      </div>
-    );
-
-    const Panel = ({ children, style }) => (
-      <div
-        style={{
-          borderRadius: t.radiusLg,
-          border: `1px solid ${t.hairline}`,
-          background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-          // backdropFilter: "blur(18px) saturate(140%)",
-          // WebkitBackdropFilter: "blur(18px) saturate(140%)",
-          boxShadow: t.shadowSoft,
-          padding: 18,
-          ...style,
-        }}
-      >
-        {children}
-      </div>
-    );
-
-    const Hairline = ({ style }) => <div style={{ height: 1, background: t.hairline, ...style }} />;
-
-    const Pill = ({ children, tone = "neutral", onClick, onDelete, title: tt, style }) => {
-      const toneMap = {
-        neutral: { bg: t.isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)", fg: t.text, bd: t.hairline },
-        primary: { bg: t.primaryWash, fg: t.primary, bd: "rgba(10,132,255,0.28)" },
-        success: { bg: t.successWash, fg: t.success, bd: "rgba(52,199,89,0.28)" },
-        danger: { bg: t.dangerWash, fg: t.danger, bd: "rgba(255,59,48,0.28)" },
-        warning: { bg: "rgba(255,149,0,0.14)", fg: t.warning, bd: "rgba(255,149,0,0.28)" },
-      }[tone];
-
-      const clickable = !!onClick;
-      return (
-        <span
-          title={tt}
-          role={clickable ? "button" : undefined}
-          tabIndex={clickable ? 0 : undefined}
-          onClick={onClick}
-          onKeyDown={(e) => clickable && e.key === "Enter" && onClick()}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "7px 10px",
-            borderRadius: 999,
-            fontSize: 11,
-            fontWeight: 850,
-            letterSpacing: 0.2,
-            background: toneMap.bg,
-            color: toneMap.fg,
-            border: `1px solid ${toneMap.bd}`,
-            whiteSpace: "nowrap",
-            userSelect: "none",
-            cursor: clickable ? "pointer" : "default",
-            ...style,
-          }}
-        >
-          {children}
-          {onDelete && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              style={{
-                width: 18,
-                height: 18,
-                borderRadius: 999,
-                border: `1px solid ${t.hairline}`,
-                background: "transparent",
-                color: t.subtext,
-                display: "grid",
-                placeItems: "center",
-                cursor: "pointer",
-              }}
-              title="Remove"
-              aria-label="Remove"
-            >
-              ×
-            </button>
-          )}
-        </span>
-      );
-    };
-
-    const Btn = ({ children, onClick, variant = "secondary", disabled, style, type = "button", title: tt }) => {
-      const v = {
-        primary: { bg: `linear-gradient(180deg, rgba(10,132,255,0.95), rgba(10,132,255,0.78))`, fg: "white", bd: "rgba(10,132,255,0.45)" },
-        secondary: { bg: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`, fg: t.text, bd: t.hairline },
-        outline: { bg: "transparent", fg: t.text, bd: t.hairline },
-        danger: { bg: `linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))`, fg: "white", bd: "rgba(255,59,48,0.45)" },
-      }[variant];
-
-      return (
-        <button
-          type={type}
-          title={tt}
-          onClick={onClick}
-          disabled={disabled}
-          style={{
-            borderRadius: 14,
-            border: `1px solid ${v.bd}`,
-            background: v.bg,
-            color: v.fg,
-            padding: "10px 12px",
-            fontWeight: 900,
-            letterSpacing: -0.1,
-            cursor: disabled ? "not-allowed" : "pointer",
-            opacity: disabled ? 0.55 : 1,
-            boxShadow: disabled ? "none" : t.shadowSoft,
-            transition: "transform 120ms ease, opacity 160ms ease",
-            ...style,
-          }}
-          onMouseDown={(e) => {
-            if (disabled) return;
-            e.currentTarget.style.transform = "scale(0.985)";
-          }}
-          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-        >
-          {children}
-        </button>
-      );
-    };
-
-    const IconBtn = ({ onClick, title: tt, children, disabled, style }) => (
-      <button
-        type="button"
-        onClick={onClick}
-        title={tt}
-        disabled={disabled}
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 14,
-          border: `1px solid ${t.hairline}`,
-          background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-          color: t.text,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: disabled ? "not-allowed" : "pointer",
-          opacity: disabled ? 0.55 : 1,
-          boxShadow: t.shadowSoft,
-          ...style,
-        }}
-      >
-        {children}
-      </button>
-    );
-
-    const Input = ({ value, onChange, placeholder, multiline, rows = 4, mono, disabled, rightNode }) => (
-      <div
-        style={{
-          borderRadius: 16,
-          border: `1px solid ${t.hairline}`,
-          background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-          boxShadow: t.shadowSoft,
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: multiline ? "stretch" : "center" }}>
-          {multiline ? (
-            <textarea
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              placeholder={placeholder}
-              disabled={disabled}
-              rows={rows}
-              style={{
-                width: "100%",
-                resize: "vertical",
-                border: "none",
-                outline: "none",
-                background: "transparent",
-                color: t.text,
-                padding: 12,
-                fontSize: 14,
-                fontWeight: 650,
-                lineHeight: 1.35,
-                fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" : "inherit",
-                opacity: disabled ? 0.55 : 1,
-              }}
-            />
-          ) : (
-            <input
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              placeholder={placeholder}
-              disabled={disabled}
-              style={{
-                width: "100%",
-                border: "none",
-                outline: "none",
-                background: "transparent",
-                color: t.text,
-                padding: "12px 12px",
-                fontSize: 14,
-                fontWeight: 650,
-                opacity: disabled ? 0.55 : 1,
-              }}
-            />
-          )}
-
-          {rightNode && <div style={{ padding: 8, display: "grid", placeItems: "center" }}>{rightNode}</div>}
-        </div>
-      </div>
-    );
-
-    const CheckRow = ({ label, value, onChange, hint }) => (
-      <div style={{ display: "grid", gap: 6 }}>
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-            padding: "10px 12px",
-            borderRadius: 14,
-            border: `1px solid ${t.hairline}`,
-            background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-            boxShadow: t.shadowSoft,
-            color: t.text,
-            fontWeight: 800,
-          }}
-        >
-          <span>{label}</span>
-          <input
-            type="checkbox"
-            checked={!!value}
-            onChange={(e) => onChange(e.target.checked)}
-            style={{ accentColor: t.primary }}
-          />
-        </label>
-        {hint && <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>{hint}</div>}
-      </div>
-    );
-
-    const Segmented = ({ value, onChange, options }) => (
-      <div
-        style={{
-          display: "inline-flex",
-          padding: 4,
-          borderRadius: 16,
-          border: `1px solid ${t.hairline}`,
-          background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-          boxShadow: t.shadowSoft,
-          gap: 6,
-        }}
-      >
-        {options.map((opt) => {
-          const active = value === opt.value;
-          const disabled = !!opt.disabled;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => !disabled && onChange(opt.value)}
-              disabled={disabled}
-              style={{
-                border: `1px solid ${active ? "rgba(10,132,255,0.45)" : "transparent"}`,
-                background: active ? `linear-gradient(135deg, ${t.primaryWash}, ${t.primaryWash2})` : "transparent",
-                color: disabled ? t.subtext : t.text,
-                borderRadius: 12,
-                padding: "10px 12px",
-                fontWeight: 850,
-                letterSpacing: -0.1,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                cursor: disabled ? "not-allowed" : "pointer",
-                opacity: disabled ? 0.5 : 1,
-              }}
-            >
-              {opt.icon}
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-    );
-
-  const Slider = ({ value, min, max, step, onChange, disabled }) => (
-    <input
-      type="range"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      disabled={disabled}
-      style={{ width: "100%", accentColor: t.primary, opacity: disabled ? 0.5 : 1 }}
-    />
-  );
-
-    const ProgressBar = ({ value }) => (
-      <div
-        style={{
-          height: 6,
-          borderRadius: 999,
-          background: t.isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.08)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            height: "100%",
-            width: `${Math.max(0, Math.min(100, value || 0))}%`,
-            background: t.primary,
-            borderRadius: 999,
-            transition: "width 220ms ease",
-          }}
-        />
-      </div>
-    );
-
-    const Alert = ({ kind = "error", children, onClose }) => {
-      const tone = kind === "error" ? "danger" : kind === "success" ? "success" : "warning";
-      return (
-        <div
-          style={{
-            borderRadius: 16,
-            border: `1px solid ${t.hairline}`,
-            background: tone === "danger" ? t.dangerWash : tone === "success" ? t.successWash : "rgba(255,149,0,0.14)",
-            padding: "10px 12px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-            color: t.text,
-            fontWeight: 750,
-          }}
-        >
-          <div style={{ color: tone === "danger" ? t.danger : tone === "success" ? t.success : t.warning }}>{children}</div>
-          {onClose && (
-            <IconBtn onClick={onClose} title="Dismiss" style={{ width: 34, height: 34, boxShadow: "none" }}>
-              <span style={{ fontWeight: 950 }}>×</span>
-            </IconBtn>
-          )}
-        </div>
-      );
-    };
-
-    const Spinner = ({ size = 16 }) => (
-      <span
-        style={{
-          width: size,
-          height: size,
-          borderRadius: 999,
-          border: `2px solid ${t.isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.18)"}`,
-          borderTopColor: t.primary,
-          display: "inline-block",
-          animation: "spin 0.9s linear infinite",
-        }}
-      />
-    );
-
-    const Wave = ({ active }) => {
-      const bars = useMemo(() => Array.from({ length: 44 }, () => Math.random() * 0.65 + 0.25), []);
-      return (
-        <div
-          style={{
-            marginTop: 12,
-            height: 44,
-            borderRadius: 14,
-            border: `1px solid ${t.hairline}`,
-            background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
-            display: "flex",
-            alignItems: "center",
-            padding: "0 10px",
-            gap: 6,
-            overflow: "hidden",
-          }}
-        >
-          {bars.map((h, i) => (
-            <div
-              key={i}
-              style={{
-                width: 3,
-                height: `${Math.round(h * 100)}%`,
-                borderRadius: 6,
-                background: active ? "rgba(10,132,255,0.90)" : t.isDark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.16)",
-                transition: "background .2s ease",
-              }}
-            />
-          ))}
-        </div>
-      );
-    };
-
-    const Modal = ({ open, onClose, title, children, footer }) => {
-      if (!open) return null;
-      return (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 2000,
-            background: t.isDark ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.30)",
-            display: "grid",
-            placeItems: "center",
-            padding: 16,
-          }}
-        >
-          <Glass style={{ width: "100%", maxWidth: 520, padding: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <div style={{ fontWeight: 950, letterSpacing: -0.3, color: t.text }}>{title}</div>
-              <IconBtn onClick={onClose} title="Close" style={{ width: 36, height: 36, boxShadow: "none" }}>
-                <CloseIcon style={{ fontSize: 18 }} />
-              </IconBtn>
-            </div>
-            <Hairline style={{ margin: "10px 0 12px 0" }} />
-            <div style={{ color: t.text }}>{children}</div>
-            {footer && (
-              <>
-                <Hairline style={{ margin: "12px 0 10px 0" }} />
-                <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>{footer}</div>
-              </>
-            )}
-          </Glass>
-        </div>
-      );
-    };
-
-    return { Glass, Panel, Hairline, Pill, Btn, IconBtn, Input, CheckRow, Segmented, Slider, ProgressBar, Alert, Spinner, Wave, Modal };
-  }, [t]);
-
-const GeneratedPanel = React.memo(function GeneratedPanel({
-  ui,
-  t,
-  songs,
-  loadingSongs,
-  error,
-  playingId,
-  onPlayPause,
-  onDeleteSong,
-  onSelectAsset,
-  onClearError,
+function CreateSongView({
+  onBack,
+  onGenerate,
+  darkMode,
+  initialMode = "create",
+  sourceSongId = null,
+  initialSourceSong = null,
 }) {
-  const { Panel, Spinner, Alert, IconBtn, Segmented, ProgressBar, Wave } = ui;
-
-  return (
-    <Panel style={{ minHeight: 420 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-        <MusicNoteIcon style={{ fontSize: 18, opacity: 0.9, color: t.text }} />
-        <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text }}>Generated</div>
-        {loadingSongs && <Spinner size={16} />}
-      </div>
-
-      {error && (
-        <Alert kind="error" onClose={onClearError}>
-          {error}
-        </Alert>
-      )}
-
-      {songs.length === 0 && !loadingSongs ? (
-        <div style={{ padding: "42px 0", textAlign: "center", color: t.subtext }}>
-          <div
-            style={{
-              width: 74,
-              height: 74,
-              borderRadius: 999,
-              margin: "0 auto 12px auto",
-              display: "grid",
-              placeItems: "center",
-              border: `1px solid ${t.hairline}`,
-              background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
-            }}
-          >
-            <MusicNoteIcon style={{ fontSize: 34, opacity: 0.6, color: t.text }} />
-          </div>
-          <div style={{ fontWeight: 950, color: t.text }}>No songs yet</div>
-          <div style={{ marginTop: 6, fontSize: 13, fontWeight: 650 }}>
-            Add a title, then describe or paste lyrics and generate.
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gap: 12 }}>
-          {songs.map((s) => {
-            const active = playingId === s.id;
-            const assets = s.hasAssets ? s.assets || {} : null;
-            const selectedAssetKey = assets ? s.selectedAssetKey || getBestAssetKey(assets) : null;
-            const isAssetReadyNow = selectedAssetKey ? isAssetReady(assets?.[selectedAssetKey]) : false;
-            const legacyReady = !!(s.vocalsUrl || s.instrumentalUrl || s.audioUrl);
-            const isReady = assets ? isAssetReadyNow : legacyReady;
-            const isGenerating = !isReady && s.status && s.status !== "failed";
-            const isFailed = s.status === "failed";
-
-            return (
-              <div
-                key={s.id}
-                style={{
-                  borderRadius: t.radiusLg,
-                  border: `1px solid ${isFailed ? "rgba(255,59,48,0.45)" : t.hairline}`,
-                  background: `linear-gradient(180deg, ${t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"}, ${t.isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)"
-                    })`,
-                  padding: 14,
-                  boxShadow: "none",
-                  opacity: isFailed ? 0.72 : 1,
-                }}
-              >
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  {isGenerating ? (
-                    <div
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 14,
-                        display: "grid",
-                        placeItems: "center",
-                        border: `1px solid ${t.hairline}`,
-                        background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
-                      }}
-                    >
-                      <Spinner size={18} />
-                    </div>
-                  ) : (
-                    <IconBtn
-                      onClick={() => onPlayPause(s)}
-                      disabled={!isReady}
-                      title={isReady ? (active ? "Pause" : "Play") : "Not ready yet"}
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 14,
-                        background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
-                        boxShadow: "none",
-                      }}
-                    >
-                      {active ? <PauseIcon /> : <PlayArrowIcon />}
-                    </IconBtn>
-                  )}
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {s.title}
-                    </div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: t.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {isGenerating ? (
-                        `Generating... ${s.progress || 0}%`
-                      ) : isFailed ? (
-                        <span style={{ color: t.danger }}>Generation failed</span>
-                      ) : (
-                        <>
-                          {s.modelName ? (
-                            <span style={{ color: t.primary, fontWeight: 900 }}>
-                              {s.modelName}
-                              {s.modelEpoch ? ` @${s.modelEpoch}e` : ""}
-                            </span>
-                          ) : (
-                            <span>Original voice</span>
-                          )}
-                          {(s.duration || s.genres?.length) && " • "}
-                          {s.duration ? fmt(s.duration) : ""}
-                          {s.genres?.length ? ` • ${s.genres.slice(0, 2).join(", ")}` : ""}
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {assets && (
-                      <IconBtn
-                        title="Download Selected"
-                        disabled={!isReady}
-                        onClick={() => {
-                          const key = selectedAssetKey || getBestAssetKey(assets);
-                          if (!key) return;
-                          const a = document.createElement("a");
-                          a.href = `${API_BASE}${resolveAssetUrl(s, key)}`;
-                          a.download = `${s.title || "song"}_${key}.wav`;
-                          a.click();
-                        }}
-                        style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
-                      >
-                        <DownloadIcon fontSize="small" />
-                      </IconBtn>
-                    )}
-
-                    {!assets && s.vocalsUrl && (
-                      <IconBtn
-                        title="Download Vocals"
-                        disabled={!isReady}
-                        onClick={() => {
-                          const a = document.createElement("a");
-                          a.href = `${API_BASE}${s.vocalsUrl}`;
-                          a.download = `${s.title || "song"}_vocals.wav`;
-                          a.click();
-                        }}
-                        style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
-                      >
-                        <MicIcon fontSize="small" />
-                      </IconBtn>
-                    )}
-
-                    {!assets && s.instrumentalUrl && (
-                      <IconBtn
-                        title="Download Instrumental"
-                        disabled={!isReady}
-                        onClick={() => {
-                          const a = document.createElement("a");
-                          a.href = `${API_BASE}${s.instrumentalUrl}`;
-                          a.download = `${s.title || "song"}_instrumental.wav`;
-                          a.click();
-                        }}
-                        style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
-                      >
-                        <MusicNoteIcon fontSize="small" />
-                      </IconBtn>
-                    )}
-
-                    {!assets && !s.vocalsUrl && !s.instrumentalUrl && s.audioUrl && (
-                      <IconBtn
-                        title="Download"
-                        disabled={!isReady}
-                        onClick={() => {
-                          const a = document.createElement("a");
-                          a.href = `${API_BASE}${s.audioUrl}`;
-                          a.download = `${s.title || "song"}.wav`;
-                          a.click();
-                        }}
-                        style={{ width: 36, height: 36, borderRadius: 12, boxShadow: "none" }}
-                      >
-                        <DownloadIcon fontSize="small" />
-                      </IconBtn>
-                    )}
-
-                    <IconBtn
-                      title="Delete"
-                      disabled={isGenerating}
-                      onClick={() => onDeleteSong(s.id)}
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 12,
-                        boxShadow: "none",
-                        borderColor: isGenerating ? t.hairline : "rgba(255,59,48,0.35)",
-                        color: isGenerating ? t.subtext : t.danger,
-                      }}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconBtn>
-                  </div>
-                </div>
-
-                {assets && (
-                  <div style={{ marginTop: 10 }}>
-                    <Segmented
-                      value={selectedAssetKey}
-                      onChange={(v) => onSelectAsset(s.id, v)}
-                      options={SONG_ASSET_KEYS.map((k) => ({
-                        value: k,
-                        label: SONG_ASSET_LABELS[k],
-                        disabled: !isAssetReady(assets?.[k]),
-                      }))}
-                    />
-                  </div>
-                )}
-
-                {isGenerating && (
-                  <div style={{ marginTop: 12 }}>
-                    <ProgressBar value={s.progress || 0} />
-                  </div>
-                )}
-
-                {!isGenerating && <Wave active={active} />}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </Panel>
-  );
-});
-
-function CreateSongView({ onBack, onGenerate, darkMode }) {
-  // ---------- Theme tokens ----------
   const isDark = useMemo(() => {
     if (typeof darkMode === "boolean") return darkMode;
     if (typeof window === "undefined") return false;
     return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
   }, [darkMode]);
 
-  const t = useMemo(() => {
-    // ✅ NEW STYLE: clean neutral backgrounds (NO galaxy/radial backplates)
-    const pageBg = isDark ? "#0B0B0F" : "#F4F5F7";
-    const surfaceA = isDark ? "rgba(22,22,26,0.72)" : "rgba(255,255,255,0.74)";
-    const surfaceB = isDark ? "rgba(28,28,34,0.62)" : "rgba(250,250,252,0.78)";
-    const cardA = isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.86)";
-    const cardB = isDark ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.72)";
+  const t = useMemo(() => getTheme(isDark), [isDark]);
+  const ui = useThemedUI(t);
 
-    return {
-      isDark,
-      pageBg,
-
-      text: isDark ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.90)",
-      subtext: isDark ? "rgba(255,255,255,0.62)" : "rgba(0,0,0,0.55)",
-      hairline: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)",
-
-      glassA: surfaceA,
-      glassB: surfaceB,
-
-      cardA,
-      cardB,
-
-      shadow: isDark ? "0 18px 44px rgba(0,0,0,0.60)" : "0 18px 46px rgba(0,0,0,0.12)",
-      shadowSoft: isDark ? "0 10px 24px rgba(0,0,0,0.45)" : "0 12px 26px rgba(0,0,0,0.10)",
-
-      primary: isDark ? "rgba(10,132,255,1)" : "rgba(0,122,255,1)",
-      primaryWash: isDark ? "rgba(10,132,255,0.20)" : "rgba(0,122,255,0.16)",
-      primaryWash2: isDark ? "rgba(10,132,255,0.10)" : "rgba(0,122,255,0.08)",
-
-      success: "rgba(52,199,89,1)",
-      successWash: isDark ? "rgba(52,199,89,0.18)" : "rgba(52,199,89,0.14)",
-      warning: "rgba(255,149,0,1)",
-      danger: "rgba(255,59,48,1)",
-      dangerWash: isDark ? "rgba(255,59,48,0.20)" : "rgba(255,59,48,0.14)",
-
-      radiusLg: 22,
-      radiusMd: 16,
-      radiusSm: 12,
-
-     
-      stickyTop: 12, // a little breathing room
-    };
-  }, [isDark]);
-
-  // ---------- Core inputs ----------
-  const [mode, setMode] = useState("prompt"); // prompt | lyrics
+  const [flowMode, setFlowMode] = useState(initialMode === "cover" ? "cover" : "create");
+  const [mode, setMode] = useState("prompt");
   const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("");
   const [lyrics, setLyrics] = useState("");
-
-  // Style helpers
   const [genreText, setGenreText] = useState("");
   const [instrumentalOnly, setInstrumentalOnly] = useState(false);
-
-  // Persona/Model selection
   const [availableModels, setAvailableModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState(null);
   const [selectedCheckpoint, setSelectedCheckpoint] = useState(null);
   const [loadingModels, setLoadingModels] = useState(true);
-
-  // Length
   const [duration, setDuration] = useState(180);
   const [durationInput, setDurationInput] = useState("180");
   const [autoDuration, setAutoDuration] = useState(false);
   const [enhanceVocals, setEnhanceVocals] = useState(true);
-  // ACE-Step 1.5 configuration
   const [mainModelPath, setMainModelPath] = useState("acestep-v15-turbo");
   const [lmModelPath, setLmModelPath] = useState("acestep-5Hz-lm-0.6B");
   const [lmBackend, setLmBackend] = useState("vllm");
   const [device, setDevice] = useState("auto");
-  const [promptEngine, setPromptEngine] = useState("llm"); // llm | fast | caption | assist | expand
+  const [promptEngine, setPromptEngine] = useState("llm");
   const [useLmCodes, setUseLmCodes] = useState(true);
   const [lmCodesTouched, setLmCodesTouched] = useState(false);
   const [useFlashAttention, setUseFlashAttention] = useState(true);
@@ -863,18 +78,32 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
   const [constraintNoSinging, setConstraintNoSinging] = useState(false);
   const [constraintNoHook, setConstraintNoHook] = useState(false);
   const [negativePrompt, setNegativePrompt] = useState("");
+  const [useNegativePrompt, setUseNegativePrompt] = useState(false);
 
-  const initializeLm = useLmCodes || promptEngine === "assist" || promptEngine === "expand";
+  const [coverSelectedModel, setCoverSelectedModel] = useState(null);
+  const [coverSelectedCheckpoint, setCoverSelectedCheckpoint] = useState(null);
+  const [coverPitchShift, setCoverPitchShift] = useState("0");
+  const [coverStylePrompt, setCoverStylePrompt] = useState("");
+  const [coverPreserveTempo, setCoverPreserveTempo] = useState(true);
+  const [coverOutputFormat, setCoverOutputFormat] = useState("wav");
+  const [coverStrength, setCoverStrength] = useState(1.0);
+  const [coverStrengthInput, setCoverStrengthInput] = useState("1");
+  const [coverStrongAudio, setCoverStrongAudio] = useState(false);
+  const [coverLyrics, setCoverLyrics] = useState("");
+  const [coverTranscribing, setCoverTranscribing] = useState(false);
+  const [coverTranscribeError, setCoverTranscribeError] = useState(null);
+  const [coverTranscribeEngine, setCoverTranscribeEngine] = useState("whisperx");
+  const [coverMode, setCoverMode] = useState("full");
+  const [sourceSong, setSourceSong] = useState(initialSourceSong || null);
+  const [loadingSourceSong, setLoadingSourceSong] = useState(false);
+  const [sourceSongError, setSourceSongError] = useState(null);
 
-  // Generation state
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
   const [currentJobId, setCurrentJobId] = useState(null);
   const [error, setError] = useState(null);
   const [missingDeps, setMissingDeps] = useState(null);
-
-  // Results
   const [songs, setSongs] = useState([]);
   const [playingId, setPlayingId] = useState(null);
   const [loadingSongs, setLoadingSongs] = useState(true);
@@ -885,11 +114,31 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
   const pollInFlightRef = useRef(false);
   const progressRef = useRef({});
   const audioRef = useRef(null);
+  const sentinelRef = useRef(null);
+  const [isStuck, setIsStuck] = useState(false);
 
-  const ui = useThemedUI(t);
-  const { Glass, Panel, Pill, Btn, IconBtn, Input, CheckRow, Segmented, Slider, ProgressBar, Spinner, Modal } = ui;
+  const hashSourceSongId = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const hash = window.location.hash || "";
+    const query = hash.includes("?") ? hash.split("?")[1] : "";
+    if (!query) return null;
+    const sp = new URLSearchParams(query);
+    return sp.get("sourceSongId");
+  }, []);
 
-  // ---------- Load existing songs + models on mount ----------
+  const effectiveSourceSongId =
+    sourceSongId || initialSourceSong?.sourceSongId || hashSourceSongId;
+  const isCaptionEngine = ["caption", "assist", "expand"].includes(promptEngine);
+  const initializeLm = useLmCodes || promptEngine === "assist" || promptEngine === "expand";
+
+  useEffect(() => {
+    setFlowMode(initialMode === "cover" ? "cover" : "create");
+  }, [initialMode]);
+
+  useEffect(() => {
+    if (initialSourceSong) setSourceSong(initialSourceSong);
+  }, [initialSourceSong]);
+
   useEffect(() => {
     loadExistingSongs();
     loadAvailableModels();
@@ -898,8 +147,63 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       if (timerRef.current) clearInterval(timerRef.current);
       if (pollAbortRef.current) pollAbortRef.current.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (lmCodesTouched) return;
+    setUseLmCodes(promptEngine === "llm");
+  }, [promptEngine, lmCodesTouched]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([entry]) => setIsStuck(!entry.isIntersecting), {
+      threshold: 1,
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (flowMode !== "cover") {
+      setSourceSongError(null);
+      return;
+    }
+    if (!effectiveSourceSongId && !sourceSong?.sourceSongId) {
+      setSourceSongError("Missing source song. Select a song and click Cover.");
+      return;
+    }
+
+    let cancelled = false;
+    const loadSource = async () => {
+      try {
+        setLoadingSourceSong(true);
+        setSourceSongError(null);
+        const sourceId = effectiveSourceSongId || sourceSong?.sourceSongId;
+        if (!sourceId) return;
+        const data = await getCoverSourceSong(sourceId);
+        if (cancelled) return;
+        setSourceSong(data?.source_song || null);
+      } catch (e) {
+        if (cancelled) return;
+        setSourceSongError(e?.message || "Failed to load source song.");
+      } finally {
+        if (!cancelled) setLoadingSourceSong(false);
+      }
+    };
+
+    loadSource();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveSourceSongId, flowMode, sourceSong?.sourceSongId]);
+
+  useEffect(() => {
+    if (flowMode !== "cover") return;
+    if (!sourceSong?.title) return;
+    if (title.trim()) return;
+    setTitle(`${sourceSong.title} (Cover)`);
+  }, [flowMode, sourceSong?.title, title]);
 
   const extractMissingDeps = useCallback((msg) => {
     if (!msg) return null;
@@ -907,15 +211,9 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     const pipMatch = msg.match(/pip install [^\n]+/i);
     if (!missingMatch && !pipMatch) return null;
     const packages = missingMatch
-      ? missingMatch[1]
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
+      ? missingMatch[1].split(",").map((s) => s.trim()).filter(Boolean)
       : [];
-    return {
-      packages,
-      pip: pipMatch ? pipMatch[0] : "",
-    };
+    return { packages, pip: pipMatch ? pipMatch[0] : "" };
   }, []);
 
   const applyError = useCallback(
@@ -927,11 +225,6 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     },
     [extractMissingDeps]
   );
-
-  useEffect(() => {
-    if (lmCodesTouched) return;
-    setUseLmCodes(promptEngine === "llm");
-  }, [promptEngine, lmCodesTouched]);
 
   const loadAvailableModels = async () => {
     try {
@@ -950,7 +243,6 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
 
   const mapJobToSong = (job) => {
     const hasAssets = job && typeof job.assets === "object" && job.assets !== null;
-    const selectedAssetKey = hasAssets ? getBestAssetKey(job.assets) : null;
     return {
       id: job.id,
       title: job.title || "Untitled",
@@ -967,8 +259,11 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       progress: job.progress,
       assets: hasAssets ? job.assets : undefined,
       hasAssets,
-      selectedAssetKey,
+      selectedAssetKey: hasAssets ? getBestAssetKey(job.assets) : null,
       request: job.params || null,
+      derivationType: job.derivation_type || job.derivationType || null,
+      sourceSongId: job.source_song_id || job.sourceSongId || null,
+      sourceTitle: job.source_title || job.sourceTitle || null,
       autoFull: true,
     };
   };
@@ -981,13 +276,15 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
         const data = await res.json();
         const loadedSongs = (data.jobs || []).map(mapJobToSong);
         setSongs(loadedSongs);
-
-        const runningJob = loadedSongs.find((s) => s.status && !["completed", "failed"].includes(s.status));
+        const runningJob = loadedSongs.find(
+          (s) => s.status && !["completed", "failed"].includes(s.status)
+        );
         if (runningJob) {
           setCurrentJobId(runningJob.id);
           setGenerating(true);
           setProgress(runningJob.progress || 0);
-          startPolling(runningJob.id);
+          const pollType = runningJob.derivationType === "cover" ? "cover" : "create";
+          startPolling(runningJob.id, pollType);
         }
       }
     } catch (e) {
@@ -1011,18 +308,14 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
   const handleJobUpdate = useCallback(
     (jobId, data) => {
       const nextProgress = applyProgress(jobId, data.progress ?? 0);
-      const nextStatusMessage = data.status_message || data.stage || data.status || "";
       if (currentJobId === jobId) {
-        setStatusMessage(nextStatusMessage);
+        setStatusMessage(data.status_message || data.stage || data.status || "");
       }
-
       setSongs((prev) =>
         prev.map((s) => {
           if (s.id !== jobId) return s;
           const hasAssets = s.hasAssets || (data && typeof data.assets === "object" && data.assets !== null);
           const mergedAssets = hasAssets ? { ...(s.assets || {}), ...(data.assets || {}) } : s.assets;
-          const selectedAssetKey =
-            s.selectedAssetKey || (mergedAssets ? getBestAssetKey(mergedAssets) : null);
           return {
             ...s,
             status: data.status || s.status,
@@ -1033,9 +326,12 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
             processed: data.processed ?? s.processed,
             inferenceCompleted: data.inference_completed ?? s.inferenceCompleted,
             modelName: data.model_name ?? s.modelName,
+            derivationType: data.derivation_type ?? s.derivationType,
+            sourceSongId: data.source_song_id ?? s.sourceSongId,
+            sourceTitle: data.source_title ?? s.sourceTitle,
             assets: mergedAssets,
             hasAssets,
-            selectedAssetKey,
+            selectedAssetKey: s.selectedAssetKey || (mergedAssets ? getBestAssetKey(mergedAssets) : null),
           };
         })
       );
@@ -1044,54 +340,71 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
   );
 
   const startPolling = useCallback(
-    (jobId) => {
-    if (pollRef.current) clearInterval(pollRef.current);
+    (jobId, pollType = "create") => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(async () => {
+        if (pollInFlightRef.current) return;
+        try {
+          pollInFlightRef.current = true;
+          if (pollAbortRef.current) pollAbortRef.current.abort();
+          const controller = new AbortController();
+          pollAbortRef.current = controller;
 
-    pollRef.current = setInterval(async () => {
-      if (pollInFlightRef.current) return;
-      try {
-        pollInFlightRef.current = true;
-        if (pollAbortRef.current) pollAbortRef.current.abort();
-        const controller = new AbortController();
-        pollAbortRef.current = controller;
+          let data = null;
+          if (pollType === "cover") {
+            try {
+              data = await getCoverGenerationStatus(jobId, controller.signal);
+            } catch (_) {
+              const fallback = await fetch(`${API_BASE}/api/song-generation/${jobId}`, {
+                signal: controller.signal,
+              });
+              if (!fallback.ok) throw new Error("Failed to get cover status");
+              data = await fallback.json();
+            }
+          } else {
+            let res = await fetch(`${API_BASE}/api/song-generation/${jobId}`, {
+              signal: controller.signal,
+            });
+            if (!res.ok) {
+              res = await fetch(`${API_BASE}/api/song-generation/status/${jobId}`, {
+                signal: controller.signal,
+              });
+            }
+            if (!res.ok) throw new Error("Failed to get job status");
+            data = await res.json();
+          }
 
-        let res = await fetch(`${API_BASE}/api/song-generation/${jobId}`, { signal: controller.signal });
-        if (!res.ok) {
-          res = await fetch(`${API_BASE}/api/song-generation/status/${jobId}`, { signal: controller.signal });
+          handleJobUpdate(jobId, data);
+          if (data.status === "completed") {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+            setGenerating(false);
+            setCurrentJobId(null);
+            applyProgress(jobId, 100);
+            setTimeout(() => setProgress(0), 500);
+          } else if (data.status === "failed") {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+            setGenerating(false);
+            setCurrentJobId(null);
+            applyError(data.error || "Generation failed");
+            setProgress(0);
+            setSongs((prev) => prev.map((s) => (s.id === jobId ? { ...s, status: "failed" } : s)));
+          }
+        } catch (e) {
+          console.error("Polling error:", e);
+        } finally {
+          pollInFlightRef.current = false;
         }
-        if (!res.ok) throw new Error("Failed to get job status");
-
-        const data = await res.json();
-        handleJobUpdate(jobId, data);
-
-        if (data.status === "completed") {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-          setGenerating(false);
-          setCurrentJobId(null);
-          applyProgress(jobId, 100);
-          setTimeout(() => setProgress(0), 500);
-        } else if (data.status === "failed") {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-          setGenerating(false);
-          setCurrentJobId(null);
-          applyError(data.error || "Generation failed");
-          setProgress(0);
-          setSongs((prev) => prev.map((s) => (s.id === jobId ? { ...s, status: "failed" } : s)));
-        }
-      } catch (e) {
-        console.error("Polling error:", e);
-      } finally {
-        pollInFlightRef.current = false;
-      }
-    }, 1000);
-  },
+      }, 1000);
+    },
     [applyError, applyProgress, handleJobUpdate]
   );
 
-  // ---------- Genre helpers ----------
-  const genreTokens = useMemo(() => genreText.split(",").map((s) => s.trim()).filter(Boolean), [genreText]);
+  const genreTokens = useMemo(
+    () => genreText.split(",").map((s) => s.trim()).filter(Boolean),
+    [genreText]
+  );
   const usedGenreKeys = useMemo(() => new Set(genreTokens.map(toKey)), [genreTokens]);
 
   const addGenreToken = (token) => {
@@ -1099,19 +412,19 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     if (!tt) return;
     const current = genreText.split(",").map(normalize).filter(Boolean);
     const exists = current.some((x) => toKey(x) === toKey(tt));
-    const next = exists ? current : [...current, tt];
-    setGenreText(next.join(", "));
+    setGenreText((exists ? current : [...current, tt]).join(", "));
   };
 
   const removeGenreToken = (token) => {
     const key = toKey(token);
-    const next = genreText
-      .split(",")
-      .map(normalize)
-      .filter(Boolean)
-      .filter((x) => toKey(x) !== key);
-
-    setGenreText(next.join(", "));
+    setGenreText(
+      genreText
+        .split(",")
+        .map(normalize)
+        .filter(Boolean)
+        .filter((x) => toKey(x) !== key)
+        .join(", ")
+    );
   };
 
   const buildPrompt = () => {
@@ -1123,13 +436,10 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
   };
 
   const buildCaptionInput = () => {
-    const base =
-      ["caption", "assist", "expand"].includes(promptEngine) ? captionOverride.trim() : buildPrompt();
-
+    const base = isCaptionEngine ? captionOverride.trim() : buildPrompt();
     if (!mergeMetaIntoCaption && !constraintRapOnly && !constraintNoSinging && !constraintNoHook) {
       return base;
     }
-
     const extras = [];
     if (mergeMetaIntoCaption) {
       if (genreTokens.length) extras.push(`Genres: ${genreTokens.join(", ")}`);
@@ -1137,13 +447,11 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       if (keyscale.trim()) extras.push(`Key: ${keyscale.trim()}`);
       if (timeSignature.trim()) extras.push(`Time signature: ${timeSignature.trim()}`);
     }
-
     const constraints = [];
     if (constraintRapOnly) constraints.push("Rap vocals only");
     if (constraintNoSinging) constraints.push("No singing or melodic chorus");
     if (constraintNoHook) constraints.push("No hooks or sung chorus");
     if (constraints.length) extras.push(`Constraints: ${constraints.join("; ")}`);
-
     if (!extras.length) return base;
     if (!base) return extras.join("\n");
     return `${base}\n${extras.join("\n")}`;
@@ -1159,11 +467,8 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
         checkpoints: selectedModel.checkpoints,
       };
     }
-
     const captionInput = buildCaptionInput();
-
     const durationValue = autoDuration ? null : duration;
-
     const out = {
       title: title.trim(),
       audio_duration: durationValue,
@@ -1172,10 +477,10 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       enhance_vocals: enhanceVocals,
       prompt: buildPrompt(),
       lyrics: instrumentalOnly ? "" : lyrics,
-      caption_override: ["caption", "assist", "expand"].includes(promptEngine) ? (captionInput || null) : null,
+      caption_override: isCaptionEngine ? (captionInput || null) : null,
       prompt_engine: promptEngine,
       thinking: useLmCodes,
-      lm_negative_prompt: negativePrompt.trim() || "NO USER INPUT",
+      lm_negative_prompt: useNegativePrompt ? (negativePrompt.trim() || "NO USER INPUT") : "NO USER INPUT",
       model_name: selectedModel?.name || null,
       model: modelForInference,
       main_model_path: mainModelPath,
@@ -1189,13 +494,11 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
       compile_model: compileModel,
       int8_quantization: int8Quantization,
     };
-
     if (String(bpm).trim()) out.bpm = Number(bpm);
     if (keyscale.trim()) out.keyscale = keyscale.trim();
     if (timeSignature.trim()) out.timesignature = timeSignature.trim();
     if (String(ditInferenceSteps).trim()) out.dit_inference_steps = Number(ditInferenceSteps);
     if (String(shift).trim()) out.shift = Number(shift);
-
     return out;
   };
 
@@ -1205,84 +508,168 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
     setDurationInput(String(v));
   };
 
-  const hasPromptOrCaption =
-    mode !== "prompt"
-      ? true
-      : ["caption", "assist", "expand"].includes(promptEngine)
-        ? captionOverride.trim().length > 0 || buildCaptionInput().trim().length > 0
-        : prompt.trim().length > 0;
+  const formatCoverStrength = (val) => String(Number(val.toFixed(2)));
+  const syncCoverStrength = (val) => {
+    const v = clamp(Number(val), 0.1, 1.0);
+    const normalized = Number(v.toFixed(2));
+    setCoverStrength(normalized);
+    setCoverStrengthInput(formatCoverStrength(normalized));
+  };
 
-  const canGenerate =
+  const onCoverStrengthInputChange = (val) => {
+    const cleaned = String(val).replace(/[^\d.]/g, "");
+    setCoverStrengthInput(cleaned);
+    if (!cleaned || cleaned === ".") return;
+    const parsed = Number(cleaned);
+    if (Number.isNaN(parsed)) return;
+    syncCoverStrength(parsed);
+  };
+
+  useEffect(() => {
+    if (coverStrongAudio) syncCoverStrength(1.0);
+  }, [coverStrongAudio]);
+
+  const hasStylePrompt = prompt.trim().length > 0;
+  const hasCaptionInput = captionOverride.trim().length > 0 || buildCaptionInput().trim().length > 0;
+  const hasPromptOrCaption = isCaptionEngine ? hasCaptionInput : hasStylePrompt;
+  const hasLyricsInput = instrumentalOnly || lyrics.trim().length > 0;
+  const hasCoverSourceAudio = Boolean(
+    sourceSong?.audioUrl || sourceSong?.instrumentalUrl || sourceSong?.vocalsUrl
+  );
+
+  const canGenerateCreate =
     !generating &&
     title.trim().length > 0 &&
-    (mode === "prompt" ? hasPromptOrCaption : instrumentalOnly ? true : lyrics.trim().length > 0);
+    (mode === "prompt" ? hasPromptOrCaption : hasStylePrompt && hasLyricsInput);
 
-  const generate = async () => {
-    if (!canGenerate) return;
+  const canGenerateCover =
+    !generating &&
+    title.trim().length > 0 &&
+    !!effectiveSourceSongId &&
+    hasCoverSourceAudio &&
+    !loadingSourceSong &&
+    !sourceSongError;
 
+  const canGenerate = flowMode === "cover" ? canGenerateCover : canGenerateCreate;
+
+  const generateCreate = async () => {
     const params = buildInferParams();
-    setError(null);
-    setMissingDeps(null);
-    setGenerating(true);
-    setProgress(0);
-    setStatusMessage("Starting generation...");
-
-    try {
-      let res = await fetch(`${API_BASE}/api/song-generation`, {
+    let res = await fetch(`${API_BASE}/api/song-generation`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+      res = await fetch(`${API_BASE}/api/song-generation/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
       });
-      if (!res.ok) {
-        res = await fetch(`${API_BASE}/api/song-generation/start`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(params),
-        });
-      }
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to start generation");
-      }
-
-      const data = await res.json();
-      const jobId = data.job_id;
-      setCurrentJobId(jobId);
-
+    }
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || "Failed to start generation");
+    }
+    const data = await res.json();
+    const jobId = data.job_id;
+    setCurrentJobId(jobId);
     const newSong = {
       id: jobId,
       title: title.trim(),
       duration: autoDuration ? null : duration,
       genres: [...genreTokens],
-        createdAt: new Date().toISOString(),
-        audioUrl: null,
-        modelName: selectedModel?.name || null,
-        modelEpoch: selectedCheckpoint?.epochs || null,
-        status: "queued",
-        progress: 0,
-        request: params,
-        assets: {},
-        hasAssets: true,
-        selectedAssetKey: null,
-      };
+      createdAt: new Date().toISOString(),
+      audioUrl: null,
+      modelName: selectedModel?.name || null,
+      modelEpoch: selectedCheckpoint?.epochs || null,
+      status: "queued",
+      progress: 0,
+      request: params,
+      assets: {},
+      hasAssets: true,
+      selectedAssetKey: null,
+    };
+    setSongs((prev) => [newSong, ...prev]);
+    startPolling(jobId, "create");
+    onGenerate?.(newSong);
+  };
 
-      setSongs((prev) => [newSong, ...prev]);
-      startPolling(jobId);
-      onGenerate?.(newSong);
+  const generateCover = async () => {
+    const params = {
+      title: title.trim(),
+      source_song_id: effectiveSourceSongId,
+      target_voice: coverSelectedModel?.name || null,
+      pitch_shift: Number.isFinite(Number(coverPitchShift)) ? Number(coverPitchShift) : 0,
+      style_prompt: coverStylePrompt.trim() || null,
+      lyrics: coverLyrics.trim() || null,
+      cover_mode: coverMode,
+      preserve_tempo: !!coverPreserveTempo,
+      output_format: coverOutputFormat || "wav",
+      audio_cover_strength: coverStrength,
+      strong_audio_conditioning: !!coverStrongAudio,
+    };
+    const data = await startCoverGeneration(params);
+    const jobId = data.job_id;
+    if (!jobId) throw new Error("Cover job did not return a job id");
+    setCurrentJobId(jobId);
+    const newSong = {
+      id: jobId,
+      title: title.trim(),
+      createdAt: new Date().toISOString(),
+      status: "queued",
+      progress: 0,
+      request: params,
+      assets: {},
+      hasAssets: true,
+      selectedAssetKey: null,
+      derivationType: "cover",
+      sourceSongId: effectiveSourceSongId,
+      sourceTitle: sourceSong?.title || null,
+    };
+    setSongs((prev) => [newSong, ...prev]);
+    startPolling(jobId, "cover");
+    onGenerate?.(newSong);
+  };
+
+  const generate = async () => {
+    if (!canGenerate) return;
+    setError(null);
+    setMissingDeps(null);
+    setGenerating(true);
+    setProgress(0);
+    setStatusMessage(flowMode === "cover" ? "Starting cover generation..." : "Starting generation...");
+    try {
+      if (flowMode === "cover") await generateCover();
+      else await generateCreate();
     } catch (e) {
       console.error("Generation error:", e);
-      applyError(e.message || "Failed to start generation");
+      applyError(e?.message || "Failed to start generation");
       setGenerating(false);
       setProgress(0);
       setStatusMessage("");
     }
   };
 
+  const transcribeCoverLyrics = async () => {
+    if (!effectiveSourceSongId) return;
+    setCoverTranscribeError(null);
+    setCoverTranscribing(true);
+    try {
+      const data = await transcribeCoverSource(effectiveSourceSongId, coverTranscribeEngine);
+      setCoverLyrics(String(data?.lyrics || ""));
+    } catch (e) {
+      setCoverTranscribeError(e?.message || "Failed to transcribe source song");
+    } finally {
+      setCoverTranscribing(false);
+    }
+  };
+
   const deleteSong = useCallback(
     async (songId) => {
       try {
-        const res = await fetch(`${API_BASE}/api/song-generation/delete/${songId}`, { method: "DELETE" });
+        const res = await fetch(`${API_BASE}/api/song-generation/delete/${songId}`, {
+          method: "DELETE",
+        });
         if (res.ok) {
           setSongs((prev) => prev.filter((s) => s.id !== songId));
           if (playingId === songId) {
@@ -1307,16 +694,13 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
         setPlayingId(null);
         return;
       }
-
       if (audioRef.current) audioRef.current.pause();
       let playUrl = null;
       if (song.hasAssets && song.assets) {
         const key = song.selectedAssetKey || getBestAssetKey(song.assets);
         playUrl = key ? resolveAssetUrl(song, key) : null;
       }
-      if (!playUrl) {
-        playUrl = song.vocalsUrl || song.instrumentalUrl || song.audioUrl;
-      }
+      if (!playUrl) playUrl = song.vocalsUrl || song.instrumentalUrl || song.audioUrl;
       if (playUrl) {
         audioRef.current = new Audio(`${API_BASE}${playUrl}`);
         audioRef.current.play().catch((e) => console.error("Play error:", e));
@@ -1333,611 +717,169 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
 
   const clearError = useCallback(() => setError(null), []);
 
-  const sentinelRef = useRef(null);
-  const [isStuck, setIsStuck] = useState(false);
-
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        // when sentinel is NOT visible, sticky header has reached the top
-        setIsStuck(!entry.isIntersecting);
-      },
-      { threshold: 1 }
-    );
-
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
+  const aceStepProps = {
+    showAceStepAdvanced,
+    setShowAceStepAdvanced,
+    promptEngine,
+    setPromptEngine,
+    useLmCodes,
+    setUseLmCodes,
+    setLmCodesTouched,
+    mergeMetaIntoCaption,
+    setMergeMetaIntoCaption,
+    constraintRapOnly,
+    setConstraintRapOnly,
+    constraintNoSinging,
+    setConstraintNoSinging,
+    constraintNoHook,
+    setConstraintNoHook,
+    useNegativePrompt,
+    setUseNegativePrompt,
+    negativePrompt,
+    setNegativePrompt,
+    initializeLm,
+    mainModelPath,
+    setMainModelPath,
+    lmModelPath,
+    setLmModelPath,
+    lmBackend,
+    setLmBackend,
+    device,
+    setDevice,
+    bpm,
+    setBpm,
+    keyscale,
+    setKeyscale,
+    timeSignature,
+    setTimeSignature,
+    ditInferenceSteps,
+    setDitInferenceSteps,
+    shift,
+    setShift,
+    useFlashAttention,
+    setUseFlashAttention,
+    offloadToCpu,
+    setOffloadToCpu,
+    offloadDitToCpu,
+    setOffloadDitToCpu,
+    compileModel,
+    setCompileModel,
+    int8Quantization,
+    setInt8Quantization,
+  };
 
   return (
     <>
-      <Modal
+      <MissingDepsModal
         open={!!missingDeps}
         onClose={() => setMissingDeps(null)}
-        title="Missing Dependencies"
-        footer={
-          <Btn variant="secondary" onClick={() => setMissingDeps(null)} style={{ height: 40 }}>
-            Close
-          </Btn>
-        }
-      >
-        <div style={{ display: "grid", gap: 8 }}>
-          {missingDeps?.packages?.length > 0 && (
-            <div>
-              Missing packages: <strong>{missingDeps.packages.join(", ")}</strong>
-            </div>
-          )}
-          {missingDeps?.pip && (
-            <div>
-              Run this command:
-              <div style={{ marginTop: 6 }}>
-                <code>{missingDeps.pip}</code>
-              </div>
-            </div>
-          )}
-        </div>
-      </Modal>
-
-      <div style={{  maxWidth: t.maxW, margin: "0 auto" }}>
+        missingDeps={missingDeps}
+        ui={ui}
+      />
+      <div style={{ maxWidth: t.maxW, margin: "0 auto" }}>
         <div ref={sentinelRef} />
-
-        <div
-          style={{
-            backdropFilter: isStuck ? "blur(20px)" : "none",
-
-            // ✅ TRANSITION between “floating card” and “stuck bar”
-                    // no left/right padding when stuck
-            borderRadius: isStuck ? 0 : t.radiusLg,     // square corners when stuck
-            border: ` 1px solid ${t.hairline}`,
-
-            margin: isStuck ? 0 : "24px 24px 0 24px",
-
-            background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
-            position: "sticky",
-            top: 0,
-            zIndex: 1000,
-            boxShadow: isStuck ? t.shadowSoft : t.shadow,
-            overflow: "hidden",
-
-            // ✅ smooth animation
-            transition:
-              "padding 180ms ease, border-radius 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
-          }}
-        >
-          <Glass style={{border:"none", boxShadow:"none", background:"transparent", backgroundColor:"transparent", borderRadius:0, backdropFilter:"none" , padding:14}}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: 16,
-                  display: "grid",
-                  placeItems: "center",
-                  border: `1px solid ${t.hairline}`,
-                  background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
-                  flexShrink: 0,
-                }}
-              >
-                <AutoAwesomeIcon style={{ color: t.text }} />
-              </div>
-
-              <div style={{ flex: "1 1 320px", minWidth: 240 }}>
-                <div style={{ fontSize: 26, fontWeight: 950, letterSpacing: -0.6, color: t.text, lineHeight: 1.1 }}>
-                  Create Song
-                </div>
-                <div style={{ marginTop: 4, fontSize: 13, fontWeight: 650, color: t.subtext }}>
-                  Title + style hints + prompt/lyrics. Max length 4:00.
-                </div>
-              </div>
-
-
-            </div>
-          </Glass>
-        </div>
-
-        <div className="cs-grid" style={{ margin: "16px 24px 0 24px" }}>
-          {/* LEFT */}
-          <div>
-            <Panel style={{ marginBottom: 14 }}>
-              <div style={{ display: "grid", gap: 12 }}>
-                <Input value={title} onChange={setTitle} placeholder="Song title (used as output name)" />
-
-                {/* Length */}
-                <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-                    <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text }}>Length</div>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: t.subtext }}>
-                      {autoDuration ? "Auto" : `${fmt(duration)} (max 4:00)`}
-                    </div>
-                  </div>
-
-                  <div className="cs-len">
-                    <div style={{ paddingTop: 6 }}>
-                      <Slider
-                        value={duration}
-                        min={30}
-                        max={240}
-                        step={5}
-                        onChange={syncDuration}
-                        disabled={autoDuration}
-                      />
-                    </div>
-
-                    <div style={{ display: "grid", gap: 6 }}>
-                      <Input
-                        value={durationInput}
-                        onChange={(v) => setDurationInput(String(v).replace(/[^\d]/g, ""))}
-                        placeholder="Seconds"
-                        disabled={autoDuration}
-                      />
-                      <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>Seconds (30–240)</div>
-                    </div>
-                  </div>
-                  <CheckRow
-                    label="Let model choose length"
-                    value={autoDuration}
-                    onChange={setAutoDuration}
-                    hint="When enabled, duration is inferred by the model."
-                  />
-                </div>
-
-                {["caption", "assist", "expand"].includes(promptEngine) && (
-                  <div style={{ display: "grid", gap: 8 }}>
-                    <div style={{ fontWeight: 900, letterSpacing: -0.2, color: t.text }}>Caption Input</div>
-                    <Input
-                      multiline
-                      rows={4}
-                      value={captionOverride}
-                      onChange={setCaptionOverride}
-                      placeholder={
-                        promptEngine === "assist"
-                          ? "Paste a draft caption. LLM will refine it."
-                          : promptEngine === "expand"
-                            ? "Paste a short caption. LLM will expand it with more detail."
-                            : "Paste the exact caption to use for generation. This bypasses LLM captioning."
-                      }
-                    />
-                  </div>
-                )}
-
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  {!instrumentalOnly && (
-                    <Pill
-                      tone={enhanceVocals ? "primary" : "neutral"}
-                      onClick={() => setEnhanceVocals((v) => !v)}
-                      title="Enhance vocals (RVC)"
-                    >
-                      {enhanceVocals ? "Enhance vocals ✓" : "Enhance vocals"}
-                    </Pill>
-                  )}
-                  <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
-                    Full song generation starts immediately. Stems and optional RVC run after.
-                  </div>
-                </div>
-
-                {/* Generation model */}
-                <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text }}>Generation Model</div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                    <div style={{ fontWeight: 800, color: t.text }}>ACE-Step 1.5</div>
-                    <Pill
-                      tone={showAceStepAdvanced ? "primary" : "neutral"}
-                      onClick={() => setShowAceStepAdvanced((v) => !v)}
-                      title="Show advanced ACE-Step settings"
-                    >
-                      {showAceStepAdvanced ? "Advanced ✓" : "Advanced"}
-                    </Pill>
-                  </div>
-                  <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
-                    Defaults tuned for RTX 3070 Ti. Advanced options control LM, offload, and quantization.
-                  </div>
-
-                  <div style={{ display: "grid", gap: 8 }}>
-                    <div style={{ fontWeight: 850, color: t.text }}>Prompt Engine</div>
-                    <Segmented
-                      value={promptEngine}
-                      onChange={(v) => v && setPromptEngine(v)}
-                      options={[
-                        { value: "llm", label: "LLM (Best)" },
-                        { value: "fast", label: "Fast (No LLM)" },
-                        { value: "caption", label: "Direct Caption" },
-                        { value: "assist", label: "LLM Assist" },
-                        { value: "expand", label: "LLM Expand" },
-                      ]}
-                    />
-                    <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
-                      Fast and Direct Caption skip LLM init. Assist/Expand use LLM to rewrite your caption.
-                    </div>
-                  </div>
-
-                  <CheckRow
-                    label="Use LLM for audio codes (slower, more faithful)"
-                    value={useLmCodes}
-                    onChange={(v) => {
-                      setUseLmCodes(v);
-                      setLmCodesTouched(true);
-                    }}
-                    hint="Enable if you want stronger semantic adherence, even in Direct Caption mode."
-                  />
-
-                  <CheckRow
-                    label="Merge BPM/Key/Time/Genres into caption"
-                    value={mergeMetaIntoCaption}
-                    onChange={setMergeMetaIntoCaption}
-                    hint="Appends your BPM/key/time/genres to the caption for stronger control."
-                  />
-
-                  <div style={{ fontWeight: 850, color: t.text, marginTop: 2 }}>Hard Constraints</div>
-                  <CheckRow label="Rap vocals only" value={constraintRapOnly} onChange={setConstraintRapOnly} />
-                  <CheckRow label="No singing / melodic chorus" value={constraintNoSinging} onChange={setConstraintNoSinging} />
-                  <CheckRow label="No hooks / sung chorus" value={constraintNoHook} onChange={setConstraintNoHook} />
-
-                  <div style={{ display: "grid", gap: 8 }}>
-                    <div style={{ fontWeight: 850, color: t.text }}>Negative Prompt</div>
-                    <Input
-                      value={negativePrompt}
-                      onChange={setNegativePrompt}
-                      placeholder="Avoid: singing, melodic chorus, pop hooks, female vocals..."
-                    />
-                    <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
-                      Used for LLM CFG control when LLM codes are enabled.
-                    </div>
-                  </div>
-
-                  {showAceStepAdvanced && (
-                    <div style={{ display: "grid", gap: 10 }}>
-                      <div className="cs-selectWrap">
-                        <select
-                          value={mainModelPath}
-                          onChange={(e) => setMainModelPath(e.target.value)}
-                          style={{
-                            width: "100%",
-                            height: 44,
-                            borderRadius: 16,
-                            border: `1px solid ${t.hairline}`,
-                            background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                            color: t.text,
-                            padding: "0 12px",
-                            fontWeight: 700,
-                            boxShadow: t.shadowSoft,
-                            outline: "none",
-                            appearance: "none",
-                          }}
-                        >
-                          {ACESTEP_MAIN_MODELS.map((m) => (
-                            <option key={m} value={m}>
-                              {m}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="cs-selectChevron">▾</div>
-                      </div>
-
-                      <div className="cs-selectWrap">
-                        <select
-                          value={lmModelPath}
-                          onChange={(e) => setLmModelPath(e.target.value)}
-                          disabled={!initializeLm}
-                          style={{
-                            width: "100%",
-                            height: 44,
-                            borderRadius: 16,
-                            border: `1px solid ${t.hairline}`,
-                            background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                            color: t.text,
-                            padding: "0 12px",
-                            fontWeight: 700,
-                            boxShadow: t.shadowSoft,
-                            outline: "none",
-                            appearance: "none",
-                          }}
-                        >
-                          {ACESTEP_LM_MODELS.map((m) => (
-                            <option key={m} value={m}>
-                              {m}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="cs-selectChevron">▾</div>
-                      </div>
-
-                      <div className="cs-selectWrap">
-                        <select
-                          value={lmBackend}
-                          onChange={(e) => setLmBackend(e.target.value)}
-                          disabled={!initializeLm}
-                          style={{
-                            width: "100%",
-                            height: 44,
-                            borderRadius: 16,
-                            border: `1px solid ${t.hairline}`,
-                            background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                            color: t.text,
-                            padding: "0 12px",
-                            fontWeight: 700,
-                            boxShadow: t.shadowSoft,
-                            outline: "none",
-                            appearance: "none",
-                          }}
-                        >
-                          <option value="vllm">vllm</option>
-                          <option value="pt">pt</option>
-                        </select>
-                        <div className="cs-selectChevron">▾</div>
-                      </div>
-
-                      <div className="cs-selectWrap">
-                        <select
-                          value={device}
-                          onChange={(e) => setDevice(e.target.value)}
-                          style={{
-                            width: "100%",
-                            height: 44,
-                            borderRadius: 16,
-                            border: `1px solid ${t.hairline}`,
-                            background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                            color: t.text,
-                            padding: "0 12px",
-                            fontWeight: 700,
-                            boxShadow: t.shadowSoft,
-                            outline: "none",
-                            appearance: "none",
-                          }}
-                        >
-                          <option value="auto">auto</option>
-                          <option value="cuda">cuda</option>
-                          <option value="cpu">cpu</option>
-                        </select>
-                        <div className="cs-selectChevron">▾</div>
-                      </div>
-
-                      <div style={{ display: "grid", gap: 8 }}>
-                        <div style={{ fontWeight: 850, color: t.text }}>Generation Details</div>
-                        <Input
-                          value={bpm}
-                          onChange={(v) => setBpm(String(v).replace(/[^\d.]/g, ""))}
-                          placeholder="BPM (optional)"
-                        />
-                        <Input value={keyscale} onChange={setKeyscale} placeholder="Key scale (optional) e.g. C Major" />
-                        <Input value={timeSignature} onChange={setTimeSignature} placeholder="Time signature (optional) e.g. 4" />
-                        <Input
-                          value={ditInferenceSteps}
-                          onChange={(v) => setDitInferenceSteps(String(v).replace(/[^\d]/g, ""))}
-                          placeholder="DiT inference steps (optional)"
-                        />
-                        <Input
-                          value={shift}
-                          onChange={(v) => setShift(String(v).replace(/[^\d.]/g, ""))}
-                          placeholder="Shift (optional)"
-                        />
-                      </div>
-
-                      <CheckRow label="Use flash attention" value={useFlashAttention} onChange={setUseFlashAttention} />
-                      <CheckRow label="Offload to CPU" value={offloadToCpu} onChange={setOffloadToCpu} />
-                      <CheckRow label="Offload DiT to CPU" value={offloadDitToCpu} onChange={setOffloadDitToCpu} />
-                      <CheckRow label="Compile model" value={compileModel} onChange={setCompileModel} />
-                      <CheckRow label="Int8 quantization" value={int8Quantization} onChange={setInt8Quantization} />
-                    </div>
-                  )}
-                </div>
-
-                <Segmented
-                  value={mode}
-                  onChange={(v) => v && setMode(v)}
-                  options={[
-                    { value: "prompt", label: "Describe", icon: <MusicNoteIcon style={{ fontSize: 18 }} /> },
-                    { value: "lyrics", label: "Lyrics", icon: <LyricsIcon style={{ fontSize: 18 }} /> },
-                  ]}
+        <CreateSongHeader ui={ui} t={t} isStuck={isStuck} mode={flowMode} />
+        <div className="cs-grid" style={{ margin: "20px 20px 0 20px" }}>
+          <div style={{ display: "grid", gap: 14 }}>
+            {flowMode === "cover" ? (
+              <>
+                <SourceSongPanel
+                  ui={ui}
+                  t={t}
+                  sourceSong={sourceSong}
+                  loading={loadingSourceSong}
+                  error={sourceSongError}
                 />
-
-                {mode === "prompt" ? (
-                  <Input
-                    multiline
-                    rows={4}
-                    value={prompt}
-                    onChange={setPrompt}
-                    placeholder="Describe the track… e.g., crisp electro-pop, cinematic drums, euphoric hook."
-                  />
-                ) : (
-                  <Input
-                    multiline
-                    rows={8}
-                    mono
-                    value={lyrics}
-                    onChange={setLyrics}
-                    disabled={instrumentalOnly}
-                    placeholder={`[Verse]\n...\n\n[Chorus]\n...`}
-                  />
-                )}
-
-                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                  <Pill
-                    tone={instrumentalOnly ? "primary" : "neutral"}
-                    onClick={() => setInstrumentalOnly((v) => !v)}
-                    title="Toggle instrumental only"
-                  >
-                    {instrumentalOnly ? "Instrumental ✓" : "Instrumental"}
-                  </Pill>
-                  <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>Disables lyrics input.</div>
-                </div>
-              </div>
-            </Panel>
-
-            {/* Genre */}
-            <Panel style={{ marginBottom: 14 }}>
-              <div style={{ display: "grid", gap: 10 }}>
-                <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text }}>Genre</div>
-
-                {genreTokens.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {genreTokens.map((g) => (
-                      <Pill key={g} tone="neutral" onDelete={() => removeGenreToken(g)}>
-                        {g}
-                      </Pill>
-                    ))}
-                  </div>
-                )}
-
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {GENRE_RECS.filter((r) => !usedGenreKeys.has(toKey(r))).map((r) => (
-                    <Pill key={r} tone="primary" onClick={() => addGenreToken(r)} title="Add genre">
-                      {r}
-                    </Pill>
-                  ))}
-                </div>
-
-                <Input value={genreText} onChange={setGenreText} placeholder="Type genres/styles… e.g., Synthwave, Electro-pop" />
-              </div>
-            </Panel>
-
-            {/* Persona */}
-            {!instrumentalOnly && (
-              <Panel style={{ marginBottom: 14 }}>
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                      <PersonIcon style={{ fontSize: 18, opacity: 0.9, color: t.text }} />
-                      <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text }}>Persona</div>
-                      {loadingModels && <Spinner size={14} />}
-                    </div>
-                    <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>Optional: Apply a voice model to the generated vocals.</div>
-                  </div>
-
-                  <div className="cs-selectWrap">
-                    <select
-                      value={selectedModel?.name || ""}
-                      onChange={(e) => {
-                        if (e.target.value === "") {
-                          setSelectedModel(null);
-                          setSelectedCheckpoint(null);
-                        } else {
-                          const model = availableModels.find((m) => m.name === e.target.value);
-                          setSelectedModel(model || null);
-                          if (model?.checkpoints?.length) {
-                            const best = model.checkpoints.find((c) => c.isBest) || model.checkpoints[0];
-                            setSelectedCheckpoint(best);
-                          } else {
-                            setSelectedCheckpoint(null);
-                          }
-                        }
-                      }}
-                      style={{
-                        width: "100%",
-                        height: 44,
-                        borderRadius: 16,
-                        border: `1px solid ${t.hairline}`,
-                        background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                        color: t.text,
-                        padding: "0 12px",
-                        fontWeight: 700,
-                        boxShadow: t.shadowSoft,
-                        outline: "none",
-                        appearance: "none",
-                      }}
-                    >
-                      <option value="">None (Original Voice)</option>
-                      {availableModels.map((m) => (
-                        <option key={m.name} value={m.name}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="cs-selectChevron">▾</div>
-                  </div>
-
-                  {selectedModel && selectedModel.checkpoints?.length > 0 && (
-                    <div className="cs-selectWrap">
-                      <select
-                        value={selectedCheckpoint?.filename || ""}
-                        onChange={(e) => {
-                          const cp = selectedModel.checkpoints.find((c) => c.filename === e.target.value);
-                          setSelectedCheckpoint(cp || null);
-                        }}
-                        style={{
-                          width: "100%",
-                          height: 44,
-                          borderRadius: 16,
-                          border: `1px solid ${t.hairline}`,
-                          background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                          color: t.text,
-                          padding: "0 12px",
-                          fontWeight: 700,
-                          boxShadow: t.shadowSoft,
-                          outline: "none",
-                          appearance: "none",
-                        }}
-                      >
-                        {selectedModel.checkpoints.map((cp) => (
-                          <option key={cp.filename} value={cp.filename}>
-                            {cp.epochs}e {cp.isBest ? "(Best)" : ""} - {cp.size_mb}MB
-                          </option>
-                        ))}
-                      </select>
-                      <div className="cs-selectChevron">▾</div>
-                    </div>
-                  )}
-
-                  {selectedModel && selectedCheckpoint && (
-                    <Pill
-                      tone="primary"
-                      onDelete={() => {
-                        setSelectedModel(null);
-                        setSelectedCheckpoint(null);
-                      }}
-                    >
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                        <PersonIcon style={{ fontSize: 16 }} />
-                        {selectedModel.name} @ {selectedCheckpoint.epochs}e
-                      </span>
-                    </Pill>
-                  )}
-                </div>
-              </Panel>
+                <CoverFormPanel
+                  ui={ui}
+                  t={t}
+                  title={title}
+                  setTitle={setTitle}
+                  pitchShift={coverPitchShift}
+                  setPitchShift={setCoverPitchShift}
+                  coverStrength={coverStrength}
+                  coverStrengthInput={coverStrengthInput}
+                  onCoverStrengthChange={syncCoverStrength}
+                  onCoverStrengthInputChange={onCoverStrengthInputChange}
+                  strongAudioConditioning={coverStrongAudio}
+                  setStrongAudioConditioning={setCoverStrongAudio}
+                  lyrics={coverLyrics}
+                  setLyrics={setCoverLyrics}
+                  onTranscribe={transcribeCoverLyrics}
+                  transcribing={coverTranscribing}
+                  transcribeError={coverTranscribeError}
+                  canTranscribe={!!effectiveSourceSongId && hasCoverSourceAudio && !loadingSourceSong}
+                  transcribeEngine={coverTranscribeEngine}
+                  setTranscribeEngine={setCoverTranscribeEngine}
+                  coverMode={coverMode}
+                  setCoverMode={setCoverMode}
+                  stylePrompt={coverStylePrompt}
+                  setStylePrompt={setCoverStylePrompt}
+                  preserveTempo={coverPreserveTempo}
+                  setPreserveTempo={setCoverPreserveTempo}
+                  loadingModels={loadingModels}
+                  availableModels={availableModels}
+                  selectedModel={coverSelectedModel}
+                  selectedCheckpoint={coverSelectedCheckpoint}
+                  onSelectModel={setCoverSelectedModel}
+                  onSelectCheckpoint={setCoverSelectedCheckpoint}
+                  onClearPersona={() => {
+                    setCoverSelectedModel(null);
+                    setCoverSelectedCheckpoint(null);
+                  }}
+                  generating={generating}
+                  progress={progress}
+                  statusMessage={statusMessage}
+                  canGenerate={canGenerate}
+                  onGenerate={generate}
+                />
+              </>
+            ) : (
+              <CreateSongFormPanel
+                ui={ui}
+                t={t}
+                title={title}
+                setTitle={setTitle}
+                duration={duration}
+                durationInput={durationInput}
+                autoDuration={autoDuration}
+                syncDuration={syncDuration}
+                setDurationInput={setDurationInput}
+                setAutoDuration={setAutoDuration}
+                promptEngine={promptEngine}
+                captionOverride={captionOverride}
+                setCaptionOverride={setCaptionOverride}
+                enhanceVocals={enhanceVocals}
+                setEnhanceVocals={setEnhanceVocals}
+                instrumentalOnly={instrumentalOnly}
+                setInstrumentalOnly={setInstrumentalOnly}
+                mode={mode}
+                setMode={setMode}
+                prompt={prompt}
+                setPrompt={setPrompt}
+                lyrics={lyrics}
+                setLyrics={setLyrics}
+                aceStepProps={aceStepProps}
+                genreText={genreText}
+                setGenreText={setGenreText}
+                genreTokens={genreTokens}
+                usedGenreKeys={usedGenreKeys}
+                addGenreToken={addGenreToken}
+                removeGenreToken={removeGenreToken}
+                loadingModels={loadingModels}
+                availableModels={availableModels}
+                selectedModel={selectedModel}
+                selectedCheckpoint={selectedCheckpoint}
+                setSelectedModel={setSelectedModel}
+                setSelectedCheckpoint={setSelectedCheckpoint}
+                generating={generating}
+                progress={progress}
+                statusMessage={statusMessage}
+                canGenerate={canGenerate}
+                onGenerate={generate}
+              />
             )}
-
-            <Btn
-              variant="secondary"
-              onClick={generate}
-              disabled={!canGenerate}
-              style={{
-                width: "100%",
-                height: generating ? 74 : 56,
-                borderRadius: 18,
-                textTransform: "none",
-              }}
-            >
-              {generating ? (
-                <div style={{ width: "100%" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 900,
-                        color: t.subtext,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {statusMessage || "Generating..."}
-                    </div>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: t.subtext }}>{progress}%</div>
-                  </div>
-                  <ProgressBar value={progress} />
-                </div>
-              ) : (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-                  <AutoAwesomeIcon style={{ fontSize: 18 }} />
-                  Generate Song
-                </span>
-              )}
-            </Btn>
           </div>
-
-          {/* RIGHT */}
           <div>
             <GeneratedPanel
               ui={ui}
@@ -1953,10 +895,8 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
             />
           </div>
         </div>
-
         <style>{`
           @keyframes spin{to{transform:rotate(360deg)}}
-
           .cs-grid{
             display:grid;
             grid-template-columns: 1fr;
@@ -1969,7 +909,6 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
               gap:16px;
             }
           }
-
           .cs-len{
             display:grid;
             grid-template-columns: 1fr;
@@ -1981,7 +920,6 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
               align-items:center;
             }
           }
-
           .cs-selectWrap{
             position:relative;
           }
@@ -1996,9 +934,6 @@ function CreateSongView({ onBack, onGenerate, darkMode }) {
           }
         `}</style>
       </div>
-
-
-
     </>
   );
 }

@@ -258,3 +258,73 @@ export const processAudio = async (formData, abortSignal = null) => {
     throw error;
   }
 };
+
+/**
+ * Get source song details for cover mode
+ * @param {string} sourceSongId - Namespaced source id (e.g. upload:abc, run:xyz)
+ * @param {AbortSignal|null} abortSignal
+ * @returns {Promise<Object>}
+ */
+export const getCoverSourceSong = async (sourceSongId, abortSignal = null) => {
+  const response = await fetch(`${API_BASE}/api/covers/source/${encodeURIComponent(sourceSongId)}`, {
+    signal: abortSignal,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to load source song");
+  }
+  return data;
+};
+
+/**
+ * Start an async cover generation job
+ * @param {Object} payload - cover request payload
+ * @returns {Promise<Object>}
+ */
+export const startCoverGeneration = async (payload) => {
+  const response = await fetch(`${API_BASE}/api/covers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {}),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to start cover generation");
+  }
+  return data;
+};
+
+/**
+ * Get cover job status
+ * @param {string} jobId
+ * @param {AbortSignal|null} abortSignal
+ * @returns {Promise<Object>}
+ */
+export const getCoverGenerationStatus = async (jobId, abortSignal = null) => {
+  const response = await fetch(`${API_BASE}/api/covers/${encodeURIComponent(jobId)}`, {
+    signal: abortSignal,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to get cover status");
+  }
+  return data;
+};
+
+/**
+ * Transcribe source song lyrics for cover mode
+ * @param {string} sourceSongId
+ * @returns {Promise<Object>}
+ */
+export const transcribeCoverSource = async (sourceSongId, engine = "whisperx") => {
+  const response = await fetch(`${API_BASE}/api/covers/transcribe`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source_song_id: sourceSongId, engine }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to transcribe source song");
+  }
+  return data;
+};

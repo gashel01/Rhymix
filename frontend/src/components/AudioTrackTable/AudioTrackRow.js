@@ -484,7 +484,7 @@ const {t} = Theme({darkMode});
               <Pill t={t} tone="new" style={{ borderRadius: "6px" }}>NEW</Pill>
             )}
             {modelUsed && <Pill t={t} tone="meta" style={{ fontFamily: "Rubik", fontWeight: 500, borderRadius: "6px" }}>{modelUsed}</Pill>}
-           
+
           </div>
         </div>
         {(paramsSummary || runTimestamp) && (

@@ -466,6 +466,16 @@ class AceStepPersistentWorker:
                 lyrics = str(p.get("lyrics") or "")
                 caption_override = str(p.get("caption_override") or "").strip()
                 lm_negative_prompt = str(p.get("lm_negative_prompt") or "NO USER INPUT")
+                task_type = str(p.get("task_type") or "text2music").strip().lower() or "text2music"
+                instruction = str(p.get("instruction") or "").strip()
+                src_audio_path = str(p.get("src_audio") or "").strip() or None
+                reference_audio_path = str(p.get("reference_audio") or "").strip() or None
+                vocal_language = str(p.get("vocal_language") or "unknown").strip() or "unknown"
+                audio_cover_strength_raw = p.get("audio_cover_strength")
+                try:
+                    audio_cover_strength = float(audio_cover_strength_raw) if audio_cover_strength_raw not in (None, "") else 1.0
+                except Exception:
+                    audio_cover_strength = 1.0
 
                 use_lm_codes = prompt_engine == "llm"
                 thinking = _coerce_bool(p.get("thinking"), use_lm_codes)
@@ -547,7 +557,18 @@ class AceStepPersistentWorker:
                 gen_params = GenerationParams(
                     caption=caption,
                     lyrics=lyrics,
-                    instrumental=(not lyrics.strip()),
+                    instrumental=(task_type != "cover" and (not lyrics.strip())),
+                    task_type=task_type,
+                    instruction=instruction
+                    or (
+                        "Generate audio semantic tokens based on the given conditions:"
+                        if task_type == "cover"
+                        else "Fill the audio semantic mask based on the given conditions:"
+                    ),
+                    src_audio=src_audio_path,
+                    reference_audio=reference_audio_path,
+                    audio_cover_strength=audio_cover_strength,
+                    vocal_language=vocal_language,
                     duration=audio_duration,
                     inference_steps=infer_step,
                     guidance_scale=guidance_scale,
@@ -776,8 +797,9 @@ def _get_persistent_worker() -> AceStepPersistentWorker:
 
 def _run_acestep15_generation(job: dict, job_id: str, infer_params: dict, output_path: Path) -> None:
     params = _normalize_acestep15_params(infer_params or {})
+    force_subprocess = _coerce_bool(infer_params.get("force_subprocess"), False)
 
-    if USE_PERSISTENT_WORKER:
+    if USE_PERSISTENT_WORKER and not force_subprocess:
         try:
             worker = _get_persistent_worker()
             worker.run_job(job, job_id, params, output_path)
@@ -796,6 +818,12 @@ def _run_acestep15_generation(job: dict, job_id: str, infer_params: dict, output
                 "auto_duration": infer_params.get("auto_duration"),
                 "prompt": infer_params.get("prompt", ""),
                 "lyrics": infer_params.get("lyrics", ""),
+                "task_type": infer_params.get("task_type"),
+                "instruction": infer_params.get("instruction"),
+                "src_audio": infer_params.get("src_audio"),
+                "reference_audio": infer_params.get("reference_audio"),
+                "audio_cover_strength": infer_params.get("audio_cover_strength"),
+                "vocal_language": infer_params.get("vocal_language"),
                 "caption_override": infer_params.get("caption_override"),
                 "prompt_engine": infer_params.get("prompt_engine"),
                 "thinking": infer_params.get("thinking"),
@@ -920,8 +948,17 @@ try:
     prompt_engine = str(params.get("prompt_engine") or "").strip().lower()
     if prompt_engine not in ("llm", "fast", "caption", "assist", "expand"):
         prompt_engine = "llm"
-
     caption_override = str(params.get("caption_override") or "").strip()
+    task_type = str(params.get("task_type") or "text2music").strip().lower() or "text2music"
+    instruction = str(params.get("instruction") or "").strip()
+    src_audio_path = str(params.get("src_audio") or "").strip() or None
+    reference_audio_path = str(params.get("reference_audio") or "").strip() or None
+    vocal_language = str(params.get("vocal_language") or "unknown").strip() or "unknown"
+    audio_cover_strength_raw = params.get("audio_cover_strength")
+    try:
+        audio_cover_strength = float(audio_cover_strength_raw) if audio_cover_strength_raw not in (None, "") else 1.0
+    except Exception:
+        audio_cover_strength = 1.0
 
     use_lm_codes = prompt_engine == "llm"
     thinking = _coerce_bool(params.get("thinking"), use_lm_codes)
@@ -1058,7 +1095,18 @@ try:
     gen_params = GenerationParams(
         caption=caption,
         lyrics=lyrics,
-        instrumental=(not lyrics.strip()),
+        instrumental=(task_type != "cover" and (not lyrics.strip())),
+        task_type=task_type,
+        instruction=instruction
+        or (
+            "Generate audio semantic tokens based on the given conditions:"
+            if task_type == "cover"
+            else "Fill the audio semantic mask based on the given conditions:"
+        ),
+        src_audio=src_audio_path,
+        reference_audio=reference_audio_path,
+        audio_cover_strength=audio_cover_strength,
+        vocal_language=vocal_language,
         duration=audio_duration,
         inference_steps=infer_step,
         guidance_scale=guidance_scale,

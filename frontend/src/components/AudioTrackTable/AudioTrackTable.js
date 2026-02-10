@@ -42,6 +42,7 @@ const AudioTrackTable = (props) => {
     onSelectAll,
     onDeselectAll,
     onDeleteSelected,
+    handleCoverWithTracks,
     handleDownloadDataset,
     externalDeleteResult,
     onClearDeleteResult,
@@ -52,6 +53,10 @@ const AudioTrackTable = (props) => {
     reactionPendingByRunId,
     darkMode,
   } = props;
+
+  const resolvedVocalsFileType =
+    typeof vocalsFileType === "function" ? vocalsFileType(vocalMode) : vocalsFileType;
+  const effectiveVocalsFileType = resolvedVocalsFileType || "processed_vocals";
 
   const [mutes, setMutes] = useState({ instrumental: {}, vocal: {} });
   const [playingBoth, setPlayingBoth] = useState(playingBothProp);
@@ -274,6 +279,7 @@ const AudioTrackTable = (props) => {
         handleDownloadDataset={handleDownloadDataset}
         handleTrainWithDataset={handleTrainWithDataset}
         handleInferenceWithTracks={handleInferenceWithTracks}
+        handleCoverWithTracks={handleCoverWithTracks}
         showInferenceResultsActions={showInferenceResultsActions}
         onReturnToModelSelection={onReturnToModelSelection}
         onReturnToInferenceParams={onReturnToInferenceParams}
@@ -343,11 +349,11 @@ const AudioTrackTable = (props) => {
                       name={pair.displayName || pair.name || (vocalModeType === "inference" ? "Unknown Track" : getCleanFileName(pair.instrumental))}
                       modelUsed={vocalModeType === "inference" ? (pair.modelName ?? null) : null}
                       instrumentalUrl={pair.instrumentalUrl || (pair.fileId ? `/api/download/instrumental/${pair.fileId}` : undefined)}
-                      vocalUrl={pair.vocalUrl || (pair.fileId ? `/api/download/${vocalsFileType}/${pair.fileId}` : undefined)}
+                      vocalUrl={pair.vocalUrl || (pair.fileId ? `/api/download/${effectiveVocalsFileType}/${pair.fileId}` : undefined)}
                       playingBoth={playingBoth}
                       vocalMode={vocalMode}
                       vocalModeType={vocalModeType}
-                      vocalsFileType={vocalsFileType}
+                      vocalsFileType={effectiveVocalsFileType}
                       isInstrumentalPlaying={isPlaying || playingFile?.name === pair.instrumentalKey}
                       isVocalPlaying={isPlaying || playingFile?.name === pair.vocalKey}
                       internalMutedInstrumentals={mutes.instrumental}
