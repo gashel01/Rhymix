@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { createPortal } from "react-dom";
 import CloseIcon from "@mui/icons-material/Close";
 
 export function useThemedUI(t) {
@@ -277,12 +278,12 @@ export function useThemedUI(t) {
 
     const Modal = ({ open, onClose, title, children, footer }) => {
       if (!open) return null;
-      return (
+      const content = (
         <div
           role="dialog"
           aria-modal="true"
           onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}
-          style={{ position: "fixed", inset: 0, zIndex: 2000, background: t.isDark ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.30)", display: "grid", placeItems: "center", padding: 16 }}
+          style={{ position: "fixed", inset: 0, zIndex: 12000, background: t.isDark ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.30)", display: "grid", placeItems: "center", padding: 16 }}
         >
           <Glass style={{ width: "100%", maxWidth: 520, padding: 14 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
@@ -300,6 +301,8 @@ export function useThemedUI(t) {
           </Glass>
         </div>
       );
+      if (typeof document === "undefined") return content;
+      return createPortal(content, document.body);
     };
 
     return { Glass, Panel, Hairline, Pill, Btn, IconBtn, Input, CheckRow, Segmented, Slider, ProgressBar, Alert, Spinner, Wave, Modal };

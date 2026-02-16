@@ -577,7 +577,7 @@ function CreateSongView({
     const updatePos = () => {
       if (!engineMenuRef.current) return;
       const rect = engineMenuRef.current.getBoundingClientRect();
-      const width = 180;
+      const width = Math.max(180, rect.width);
       const left = Math.min(
         Math.max(8, rect.right - width),
         (window.innerWidth || 0) - width - 8
@@ -798,6 +798,20 @@ function CreateSongView({
   };
 
   const actionLabel = flowMode === "cover" ? "Create cover" : "Create song";
+  const actionTone = promptEngine === "fast"
+    ? {
+        bg: "linear-gradient(180deg, rgba(10,132,255,0.95), rgba(10,132,255,0.78))",
+        bd: "rgba(10,132,255,0.45)",
+      }
+    : promptEngine === "caption"
+      ? {
+          bg: "linear-gradient(180deg, rgba(255,149,0,0.95), rgba(255,149,0,0.78))",
+          bd: "rgba(255,149,0,0.45)",
+        }
+      : {
+          bg: "linear-gradient(180deg, rgba(212,175,55,0.95), rgba(212,175,55,0.78))",
+          bd: "rgba(212,175,55,0.45)",
+        };
   const createActionNode = (
     <div style={{ position: "relative", width: "100%", maxWidth: 340, minWidth: 240 }} ref={engineMenuRef}>
       <ui.Btn
@@ -812,6 +826,8 @@ function CreateSongView({
           fontWeight: 700,
           textTransform: "none",
           paddingRight: 52,
+          background: actionTone.bg,
+          border: `1px solid ${actionTone.bd}`,
         }}
       >
         {generating ? (
@@ -875,7 +891,7 @@ function CreateSongView({
           <div
             ref={engineMenuPopupRef}
             style={{
-              position: "absolute",
+              position: "fixed",
               left: engineMenuPos.left,
               top: engineMenuPos.top,
               minWidth: engineMenuPos.width,
@@ -884,6 +900,8 @@ function CreateSongView({
               borderRadius: 12,
               boxShadow: t.shadow,
               zIndex: 3000,
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
               overflow: "hidden",
             }}
           >
@@ -1033,6 +1051,7 @@ function CreateSongView({
                 selectedCheckpoint={selectedCheckpoint}
                 setSelectedModel={setSelectedModel}
                 setSelectedCheckpoint={setSelectedCheckpoint}
+                isStuck={isStuck}
               />
             )}
           </div>

@@ -55,6 +55,7 @@ export function CreateSongFormPanel({
   selectedCheckpoint,
   setSelectedModel,
   setSelectedCheckpoint,
+  isStuck,
 }) {
   const { Panel, Input, Modal, Pill } = ui;
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -97,8 +98,8 @@ export function CreateSongFormPanel({
   );
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <Panel style={{ padding: 28 }}>
+    <div style={{ display: "grid", gap: 16  }}>
+      <Panel style={{ padding: 28 , borderRadius: isStuck ? "0px" : "24px" }}>
         <div style={{ display: "grid", gap: 20 }}>
           <div>
             <div style={{ display: "flex", alignItems: "start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
