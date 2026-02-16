@@ -1,4 +1,5 @@
 import hashlib
+import json
 import logging
 import shutil
 import threading
@@ -25,6 +26,112 @@ from backend.jobs.registry import song_generation_jobs
 
 bp = Blueprint("song_generation", __name__)
 logger = logging.getLogger(__name__)
+
+def _job_manifest_path(job_id: str) -> Path:
+    return SONG_GENERATION_JOBS_DIR / job_id / "job.json"
+
+
+def _serialize_job_for_manifest(job: dict) -> dict:
+    return {
+        "id": job.get("id"),
+        "title": job.get("title"),
+        "params": job.get("params"),
+        "created_at": job.get("created_at"),
+        "completed_at": job.get("completed_at"),
+        "derivation_type": job.get("derivation_type"),
+        "source_song_id": job.get("source_song_id"),
+        "source_title": job.get("source_title"),
+        "derivation_metadata": job.get("derivation_metadata"),
+        "status": job.get("status"),
+        "status_message": job.get("status_message"),
+        "error": job.get("error"),
+    }
+
+
+def _write_job_manifest(job_id: str, job: dict) -> None:
+    try:
+        path = _job_manifest_path(job_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as handle:
+            json.dump(_serialize_job_for_manifest(job), handle, indent=2, sort_keys=True)
+    except Exception:
+        logger.exception("Failed to write song generation manifest for %s", job_id)
+
+
+def _load_job_manifest(job_id: str) -> dict | None:
+    path = _job_manifest_path(job_id)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        logger.exception("Failed to read song generation manifest for %s", job_id)
+        return None
+
+
+def _build_assets_from_disk(job_id: str) -> dict | None:
+    assets = {}
+    for key in ASSET_KEYS:
+        path = _asset_path(job_id, key)
+        if path.exists():
+            assets[key] = {
+                "ready": True,
+                "url": f"/api/song-generation/{job_id}/audio/{key}",
+                "path": str(path),
+            }
+    return assets or None
+
+
+def _hydrate_job_from_disk(job_id: str) -> dict | None:
+    job_dir = SONG_GENERATION_JOBS_DIR / job_id
+    if not job_dir.exists():
+        return None
+    manifest = _load_job_manifest(job_id) or {}
+    assets = _build_assets_from_disk(job_id)
+    if not manifest and not assets:
+        return None
+    created_at = manifest.get("created_at")
+    if not created_at:
+        try:
+            created_at = datetime.fromtimestamp(job_dir.stat().st_ctime).isoformat()
+        except Exception:
+            created_at = datetime.now().isoformat()
+    completed_at = manifest.get("completed_at")
+    if not completed_at and assets:
+        try:
+            latest = max(Path(a["path"]).stat().st_mtime for a in assets.values() if a.get("path"))
+            completed_at = datetime.fromtimestamp(latest).isoformat()
+        except Exception:
+            completed_at = None
+    status = manifest.get("status") or ("completed" if assets else "queued")
+    progress = 100 if assets else 0
+    return {
+        "id": job_id,
+        "status": status,
+        "progress": progress,
+        "status_message": manifest.get("status_message", ""),
+        "title": manifest.get("title") or "Generated song",
+        "params": manifest.get("params") or {},
+        "created_at": created_at,
+        "completed_at": completed_at,
+        "audio_url": f"/api/song-generation/audio/{job_id}",
+        "assets": assets,
+        "derivation_type": manifest.get("derivation_type") or "original",
+        "source_song_id": manifest.get("source_song_id"),
+        "source_title": manifest.get("source_title"),
+        "derivation_metadata": manifest.get("derivation_metadata"),
+        "error": manifest.get("error"),
+    }
+
+
+def _get_or_load_job(job_id: str) -> dict | None:
+    job = song_generation_jobs.get(job_id)
+    if job:
+        return job
+    job = _hydrate_job_from_disk(job_id)
+    if job:
+        song_generation_jobs[job_id] = job
+    return job
 
 
 @bp.route("/api/song-generation", methods=["POST"])
@@ -55,6 +162,7 @@ def start_song_generation():
         }
 
         song_generation_jobs[job_id] = job
+        _write_job_manifest(job_id, job)
 
         # Start generation in background thread
         threading.Thread(target=run_song_generation_thread, args=(job_id, data), daemon=True).start()
@@ -133,6 +241,7 @@ def start_cover_generation():
             "error": None,
         }
         song_generation_jobs[job_id] = job
+        _write_job_manifest(job_id, job)
         logger.info("[cover:%s] Job queued source_song_id=%s source_type=%s", job_id, source.get("source_song_id"), source.get("source_type"))
         threading.Thread(target=run_cover_generation_thread, args=(job_id, params), daemon=True).start()
         return jsonify({"job_id": job_id})
@@ -144,7 +253,7 @@ def start_cover_generation():
 
 @bp.route("/api/covers/<job_id>", methods=["GET"])
 def get_cover_generation(job_id):
-    if job_id not in song_generation_jobs:
+    if not _get_or_load_job(job_id):
         return jsonify({"error": "Job not found"}), 404
     return get_song_generation(job_id)
 
@@ -175,10 +284,9 @@ def transcribe_cover_lyrics():
 @bp.route("/api/song-generation/<job_id>", methods=["GET"])
 def get_song_generation(job_id):
     """Get status of a song generation job (new contract)"""
-    if job_id not in song_generation_jobs:
+    job = _get_or_load_job(job_id)
+    if not job:
         return jsonify({"error": "Job not found"}), 404
-
-    job = song_generation_jobs[job_id]
     params = job.get("params") if isinstance(job.get("params"), dict) else {}
     params_out = (
         {
@@ -199,6 +307,8 @@ def get_song_generation(job_id):
             if asset.get("ready") and not asset.get("url"):
                 asset["url"] = f"/api/song-generation/{job_id}/audio/{key}"
                 assets[key] = asset
+
+    _write_job_manifest(job_id, job)
 
     return jsonify(
         {
@@ -240,10 +350,9 @@ def get_song_generation_status(job_id):
 
 @bp.route("/api/song-generation/<job_id>/full", methods=["POST"])
 def trigger_full_generation(job_id):
-    if job_id not in song_generation_jobs:
+    job = _get_or_load_job(job_id)
+    if not job:
         return jsonify({"error": "Job not found"}), 404
-
-    job = song_generation_jobs[job_id]
     assets = job.get("assets") or {}
     preview = assets.get("preview_mix") if isinstance(assets, dict) else None
     if not (preview and preview.get("ready")):
@@ -258,6 +367,7 @@ def list_song_generation_jobs():
     """List all song generation jobs"""
     jobs = []
     for job_id, job in song_generation_jobs.items():
+        _write_job_manifest(job_id, job)
         jobs.append(
             {
                 "id": job["id"],
@@ -278,6 +388,39 @@ def list_song_generation_jobs():
                 "source_title": job.get("source_title"),
             }
         )
+
+    # Scan for job directories created by the pipeline (persistent assets)
+    try:
+        for d in SONG_GENERATION_JOBS_DIR.iterdir():
+            if not d.is_dir():
+                continue
+            job_id = d.name
+            if job_id in song_generation_jobs:
+                continue
+            job = _hydrate_job_from_disk(job_id)
+            if job:
+                jobs.append(
+                    {
+                        "id": job.get("id"),
+                        "status": job.get("status"),
+                        "progress": job.get("progress", 0),
+                        "title": job.get("title", ""),
+                        "audio_url": job.get("audio_url"),
+                        "vocals_url": job.get("vocals_url"),
+                        "instrumental_url": job.get("instrumental_url"),
+                        "processed": job.get("processed", False),
+                        "inference_completed": job.get("inference_completed", False),
+                        "model_name": (job.get("params") or {}).get("model_name"),
+                        "assets": job.get("assets"),
+                        "created_at": job.get("created_at"),
+                        "completed_at": job.get("completed_at"),
+                        "derivation_type": job.get("derivation_type"),
+                        "source_song_id": job.get("source_song_id"),
+                        "source_title": job.get("source_title"),
+                    }
+                )
+    except Exception as e:
+        print(f"Error scanning job directories: {e}")
 
     # Also scan for existing generated songs on disk
     try:
@@ -310,7 +453,7 @@ def list_song_generation_jobs():
 
 @bp.route("/api/song-generation/<job_id>/audio/<asset_key>", methods=["GET"])
 def get_song_generation_asset(job_id, asset_key):
-    if job_id not in song_generation_jobs:
+    if not _get_or_load_job(job_id):
         return jsonify({"error": "Job not found"}), 404
     if asset_key not in ASSET_KEYS:
         return jsonify({"error": "Invalid asset key"}), 400
@@ -323,7 +466,7 @@ def get_song_generation_asset(job_id, asset_key):
 @bp.route("/api/song-generation/audio/<job_id>", methods=["GET"])
 def get_song_generation_audio(job_id):
     """Legacy best-available mix"""
-    if job_id not in song_generation_jobs:
+    if not _get_or_load_job(job_id):
         return jsonify({"error": "Job not found"}), 404
     for key in ["final_mix_rvc", "full_mix", "preview_mix"]:
         p = _asset_path(job_id, key)
@@ -358,6 +501,12 @@ def delete_song_generation(job_id):
             if job_dir.exists():
                 shutil.rmtree(job_dir, ignore_errors=True)
             del song_generation_jobs[job_id]
+            return jsonify({"message": "Deleted successfully"})
+
+        # Check if it's a job directory on disk
+        job_dir = SONG_GENERATION_JOBS_DIR / job_id
+        if job_dir.exists() and job_dir.is_dir():
+            shutil.rmtree(job_dir, ignore_errors=True)
             return jsonify({"message": "Deleted successfully"})
 
         # Check if it's a file-based job (starts with "file_")

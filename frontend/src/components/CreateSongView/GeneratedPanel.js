@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import DownloadIcon from "@mui/icons-material/Download";
 import DeleteIcon from "@mui/icons-material/Delete";
 import MicIcon from "@mui/icons-material/Mic";
+import AudioWaveform from "../AudioWaveform";
 import {
   API_BASE,
   SONG_ASSET_KEYS,
@@ -26,11 +27,23 @@ export const GeneratedPanel = React.memo(function GeneratedPanel({
   onSelectAsset,
   onClearError,
 }) {
-  const { Panel, Spinner, Alert, IconBtn, Segmented, ProgressBar, Wave } = ui;
+  const { Panel, Spinner, Alert, IconBtn, Segmented, ProgressBar } = ui;
+  const [page, setPage] = useState(1);
+  const pageSize = 6;
+  const totalPages = Math.max(1, Math.ceil(songs.length / pageSize));
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const visibleSongs = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return songs.slice(start, start + pageSize);
+  }, [page, songs]);
 
   return (
-    <Panel style={{ minHeight: 380, padding: 24 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+    <Panel style={{ minHeight: 380, padding: 24 ,margin: "20px 20px 20px 0px"}}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: -0.2, color: t.text }}>Your songs</h2>
         {loadingSongs && <Spinner size={14} />}
       </div>
@@ -63,7 +76,7 @@ export const GeneratedPanel = React.memo(function GeneratedPanel({
         </div>
       ) : (
         <div style={{ display: "grid", gap: 14 }}>
-          {songs.map((s) => {
+          {visibleSongs.map((s) => {
             const active = playingId === s.id;
             const assets = s.hasAssets ? s.assets || {} : null;
             const selectedAssetKey = assets ? s.selectedAssetKey || getBestAssetKey(assets) : null;
@@ -73,6 +86,22 @@ export const GeneratedPanel = React.memo(function GeneratedPanel({
             const isGenerating = !isReady && s.status && s.status !== "failed";
             const isFailed = s.status === "failed";
             const durationStr = s.duration ? `${Math.floor(s.duration / 60)}:${String(s.duration % 60).padStart(2, "0")}` : "";
+            const genreList = Array.isArray(s.genres) ? s.genres.filter(Boolean) : [];
+            const genreLabel = genreList.length ? `Style: ${genreList.join(", ")}` : "";
+            const personaLabel = (s.enhanceVocals && (s.personaName || s.modelName))
+              ? `Persona: ${s.personaName || s.modelName}`
+              : "";
+            const extraMeta = [genreLabel, personaLabel].filter(Boolean).join(" · ");
+            const fallbackAssetKey = assets ? getBestAssetKey(assets) : null;
+            const assetKeyForUrl = isAssetReadyNow ? selectedAssetKey : fallbackAssetKey;
+            const assetPath = assets && assetKeyForUrl && isAssetReady(assets?.[assetKeyForUrl])
+              ? resolveAssetUrl(s, assetKeyForUrl)
+              : null;
+            const legacyPath = s.vocalsUrl || s.instrumentalUrl || s.audioUrl || null;
+            const rawPath = assetPath || legacyPath;
+            const waveformUrl = rawPath
+              ? (rawPath.startsWith("http") ? rawPath : `${API_BASE}${rawPath}`)
+              : null;
 
             return (
               <div
@@ -120,6 +149,11 @@ export const GeneratedPanel = React.memo(function GeneratedPanel({
                           .join(" · ")
                       )}
                     </div>
+                    {extraMeta && !isGenerating && !isFailed && (
+                      <div style={{ fontSize: 12, fontWeight: 600, color: t.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 4 }}>
+                        {extraMeta}
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -220,10 +254,65 @@ export const GeneratedPanel = React.memo(function GeneratedPanel({
                   </div>
                 )}
 
-                {!isGenerating && <Wave active={active} />}
+                {!isGenerating && (
+                  <div style={{ marginTop: 12 }}>
+                    <AudioWaveform
+                      url={isReady ? waveformUrl : null}
+                      isPlaying={active}
+                      onRequestStop={() => onPlayPause(s)}
+                      height={70}
+                      showControls={false}
+                      interactive={true}
+                      minPxPerSec={1}
+                      waveColor={t.isDark ? "rgba(255,255,255,0.28)" : "rgba(0,0,0,0.18)"}
+                      progressColor={t.primary}
+                      backgroundColor={t.isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)"}
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {songs.length > 0 && totalPages > 1 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 10,
+              border: `1px solid ${t.hairline}`,
+              background: "transparent",
+              color: page === 1 ? t.subtext : t.text,
+              fontWeight: 700,
+              cursor: page === 1 ? "not-allowed" : "pointer",
+            }}
+          >
+            Prev
+          </button>
+          <div style={{ fontSize: 12, fontWeight: 700, color: t.subtext }}>
+            Page {page} of {totalPages}
+          </div>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 10,
+              border: `1px solid ${t.hairline}`,
+              background: "transparent",
+              color: page === totalPages ? t.subtext : t.text,
+              fontWeight: 700,
+              cursor: page === totalPages ? "not-allowed" : "pointer",
+            }}
+          >
+            Next
+          </button>
         </div>
       )}
     </Panel>

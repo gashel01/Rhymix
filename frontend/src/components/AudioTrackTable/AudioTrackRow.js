@@ -55,6 +55,7 @@ const AudioTrackRow = (props) => {
     reactionPending = false,
     onToggleGroup,
     onSetReaction,
+    onOpenStudio,
     darkMode,
   } = props;
 // ---------- Theme tokens ----------
@@ -454,6 +455,26 @@ const {t} = Theme({darkMode});
               text={normaliseTitle(displayName)}
               style={{ fontFamily: "Poppins", fontWeight: 500, letterSpacing: -0.2, color: t.text, display: "flex", alignItems: "center" }}
             />
+            {onOpenStudio && (
+              <button
+                type="button"
+                disabled={actionsDisabled}
+                onClick={() => onOpenStudio(pair)}
+                style={{
+                  marginLeft: 6,
+                  borderRadius: 8,
+                  border: `1px solid ${t.hairline}`,
+                  background: t.isDark ? "rgba(0,194,255,0.2)" : "rgba(0,122,255,0.12)",
+                  color: t.text,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "4px 8px",
+                  cursor: actionsDisabled ? "not-allowed" : "pointer",
+                }}
+              >
+                Studio
+              </button>
+            )}
             
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
@@ -623,6 +644,7 @@ const areEqual = (prev, next) =>
   prev.reactionPending === next.reactionPending &&
   prev.processing === next.processing &&
   prev.onToggleGroup === next.onToggleGroup &&
-  prev.onSetReaction === next.onSetReaction;
+  prev.onSetReaction === next.onSetReaction &&
+  prev.onOpenStudio === next.onOpenStudio;
 
 export default React.memo(AudioTrackRow, areEqual);

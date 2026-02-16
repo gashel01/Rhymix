@@ -1,0 +1,591 @@
+{
+  "jobs": {
+    "0685427b105f4dcfaa447dd7de77d1a2": {
+      "createdAt": "2026-02-11T13:00:56.517013",
+      "error": "AI bridge returned invalid JSON",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-11T13:00:56.540442",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-11T13:00:56.583316",
+          "type": "status"
+        },
+        {
+          "error": "AI bridge returned invalid JSON",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-11T13:09:37.383326",
+          "type": "status"
+        }
+      ],
+      "id": "0685427b105f4dcfaa447dd7de77d1a2",
+      "payload": {
+        "durationSec": 10,
+        "endSec": 204.56,
+        "prompt": "",
+        "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+        "startSec": 0
+      },
+      "progress": 100,
+      "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Running AI job...",
+      "type": "stem_extract",
+      "updatedAt": "2026-02-11T13:09:37.383326"
+    },
+    "0a2e306670694433891f42550ef7ff34": {
+      "createdAt": "2026-02-11T15:42:40.399800",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-11T15:42:40.419390",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-11T15:42:40.462457",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-11T15:45:52.233537",
+          "type": "status"
+        }
+      ],
+      "id": "0a2e306670694433891f42550ef7ff34",
+      "payload": {
+        "durationSec": 10,
+        "endSec": 5,
+        "prompt": "",
+        "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+        "startSec": 0
+      },
+      "progress": 100,
+      "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+      "result": {
+        "stems": [
+          {
+            "assetId": "uvr_stem:bb949fa87b1b408c86006aa41497ecf4",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_drums_d22bc6de04e64ccf96a020b9d113328f.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_drums_d22bc6de04e64ccf96a020b9d113328f.wav",
+            "durationSec": 204.56,
+            "label": "Drums",
+            "sampleRate": 44100,
+            "trackName": "drums"
+          },
+          {
+            "assetId": "uvr_stem:b8bddb35a70c4929afc97f75d46bb235",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_bass_80ed182dd1e4489488c0a74aab36fff3.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_bass_80ed182dd1e4489488c0a74aab36fff3.wav",
+            "durationSec": 204.56,
+            "label": "Bass",
+            "sampleRate": 44100,
+            "trackName": "bass"
+          },
+          {
+            "assetId": "uvr_stem:a2b7f1b96a5943989dc4a24b354ef321",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_mids_033c74d04bc44ed2ade6299b6bd3513a.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_mids_033c74d04bc44ed2ade6299b6bd3513a.wav",
+            "durationSec": 204.56,
+            "label": "Mids",
+            "sampleRate": 44100,
+            "trackName": "mids"
+          },
+          {
+            "assetId": "uvr_stem:50acfe42ab1342f7b309963692fd7bda",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_highs_90ec90c384fd4d6f9d7870642756c1e1.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_highs_90ec90c384fd4d6f9d7870642756c1e1.wav",
+            "durationSec": 204.56,
+            "label": "Highs",
+            "sampleRate": 44100,
+            "trackName": "highs"
+          }
+        ]
+      },
+      "status": "completed",
+      "statusMessage": "Running AI job...",
+      "type": "stem_extract_uvr",
+      "updatedAt": "2026-02-11T15:45:52.233537"
+    },
+    "2a2dbfd496d94789a8db9c567a32e50e": {
+      "createdAt": "2026-02-11T13:13:26.016915",
+      "error": "AI bridge returned invalid JSON",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-11T13:13:26.044568",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-11T13:13:26.097095",
+          "type": "status"
+        },
+        {
+          "error": "AI bridge returned invalid JSON",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-11T13:27:42.313830",
+          "type": "status"
+        }
+      ],
+      "id": "2a2dbfd496d94789a8db9c567a32e50e",
+      "payload": {
+        "durationSec": 10,
+        "endSec": 204.56,
+        "prompt": "",
+        "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+        "startSec": 0
+      },
+      "progress": 100,
+      "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Running AI job...",
+      "type": "stem_extract",
+      "updatedAt": "2026-02-11T13:27:42.314382"
+    },
+    "4758b0a932cd40e29b4ea40fc9c1e5d6": {
+      "createdAt": "2026-02-11T12:44:26.565431",
+      "error": "AI backend not configured. Set STUDIO_AI_ADAPTER=local and STUDIO_AI_BRIDGE to a Python bridge entrypoint.",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-11T12:44:26.588280",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-11T12:44:26.640393",
+          "type": "status"
+        },
+        {
+          "error": "AI backend not configured. Set STUDIO_AI_ADAPTER=local and STUDIO_AI_BRIDGE to a Python bridge entrypoint.",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-11T12:44:26.683881",
+          "type": "status"
+        }
+      ],
+      "id": "4758b0a932cd40e29b4ea40fc9c1e5d6",
+      "payload": {
+        "durationSec": 10,
+        "endSec": 107.8,
+        "prompt": "",
+        "sourceAssetId": "instrumental:7dc76610cf944cf5b52aab83acd5b426",
+        "startSec": 0
+      },
+      "progress": 100,
+      "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Running AI job...",
+      "type": "stem_extract",
+      "updatedAt": "2026-02-11T12:44:26.683881"
+    },
+    "54689ee3c55746a69de5fba232b01477": {
+      "createdAt": "2026-02-11T12:38:10.213896",
+      "error": "AI backend not configured. Set STUDIO_AI_ADAPTER=local and STUDIO_AI_BRIDGE to a Python bridge entrypoint.",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-11T12:38:10.233246",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-11T12:38:10.281295",
+          "type": "status"
+        },
+        {
+          "error": "AI backend not configured. Set STUDIO_AI_ADAPTER=local and STUDIO_AI_BRIDGE to a Python bridge entrypoint.",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-11T12:38:10.332401",
+          "type": "status"
+        }
+      ],
+      "id": "54689ee3c55746a69de5fba232b01477",
+      "payload": {
+        "durationSec": 10,
+        "endSec": 107.8,
+        "prompt": "",
+        "sourceAssetId": "instrumental:7dc76610cf944cf5b52aab83acd5b426",
+        "startSec": 0
+      },
+      "progress": 100,
+      "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Running AI job...",
+      "type": "stem_extract",
+      "updatedAt": "2026-02-11T12:38:10.332401"
+    },
+    "7024adb296fc4429beff551634b5cd6d": {
+      "createdAt": "2026-02-11T12:54:52.486878",
+      "error": "AI backend not configured. Set STUDIO_AI_ADAPTER=local and STUDIO_AI_BRIDGE to a Python bridge entrypoint.",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-11T12:54:52.510246",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-11T12:54:52.562709",
+          "type": "status"
+        },
+        {
+          "error": "AI backend not configured. Set STUDIO_AI_ADAPTER=local and STUDIO_AI_BRIDGE to a Python bridge entrypoint.",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-11T12:54:52.611276",
+          "type": "status"
+        }
+      ],
+      "id": "7024adb296fc4429beff551634b5cd6d",
+      "payload": {
+        "durationSec": 10,
+        "endSec": 107.8,
+        "prompt": "",
+        "sourceAssetId": "instrumental:7dc76610cf944cf5b52aab83acd5b426",
+        "startSec": 0
+      },
+      "progress": 100,
+      "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Running AI job...",
+      "type": "stem_extract",
+      "updatedAt": "2026-02-11T12:54:52.611276"
+    },
+    "8b7ec3692e5545c994acf09622cadd84": {
+      "createdAt": "2026-02-11T15:51:03.325520",
+      "error": "AI bridge returned invalid JSON",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-11T15:51:03.351513",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-11T15:51:03.401058",
+          "type": "status"
+        },
+        {
+          "error": "AI bridge returned invalid JSON",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-11T16:02:11.038625",
+          "type": "status"
+        }
+      ],
+      "id": "8b7ec3692e5545c994acf09622cadd84",
+      "payload": {
+        "durationSec": 10,
+        "endSec": 5,
+        "prompt": "",
+        "sourceAssetId": "vocal:ebdc764e42ae4dd7880b954ced98dcc3",
+        "startSec": 0
+      },
+      "progress": 100,
+      "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Running AI job...",
+      "type": "vocal2bgm",
+      "updatedAt": "2026-02-11T16:02:11.038625"
+    },
+    "a675e882280f4c7db059be4fbb22ddce": {
+      "createdAt": "2026-02-12T12:37:16.101537",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-12T12:37:16.144065",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-12T12:37:16.194261",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-12T12:38:19.285356",
+          "type": "status"
+        }
+      ],
+      "id": "a675e882280f4c7db059be4fbb22ddce",
+      "payload": {
+        "sourceAssetId": "vocal:222d20fc8bf447b3a8cebff65b828ba4",
+        "stem": "vocal"
+      },
+      "progress": 100,
+      "projectId": "98388241861645ddaa6b275fd23f7a6e",
+      "result": {
+        "stems": [
+          {
+            "assetId": "uvr_stem:4456780a57474cf3b5c622d6af94b424",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_drums_9d826ab9bcab449bb2f5699397a58664.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_drums_9d826ab9bcab449bb2f5699397a58664.wav",
+            "durationSec": 99.0,
+            "label": "Drums",
+            "sampleRate": 44100,
+            "trackName": "drums"
+          },
+          {
+            "assetId": "uvr_stem:494bbe27313a4f3db428f0a37be3e709",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_bass_55340d601357459ba738a76da1727c7a.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_bass_55340d601357459ba738a76da1727c7a.wav",
+            "durationSec": 99.0,
+            "label": "Bass",
+            "sampleRate": 44100,
+            "trackName": "bass"
+          },
+          {
+            "assetId": "uvr_stem:e6eeb96562094e40a99d1d8272248ea4",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_mids_25b811b50eb143bb8e991f9f3999e5cc.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_mids_25b811b50eb143bb8e991f9f3999e5cc.wav",
+            "durationSec": 99.0,
+            "label": "Mids",
+            "sampleRate": 44100,
+            "trackName": "mids"
+          },
+          {
+            "assetId": "uvr_stem:84c66508864c4027b1150730493001a9",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_highs_e12e12ffd58f4d308cd2914f906be4d7.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_highs_e12e12ffd58f4d308cd2914f906be4d7.wav",
+            "durationSec": 99.0,
+            "label": "Highs",
+            "sampleRate": 44100,
+            "trackName": "highs"
+          }
+        ]
+      },
+      "status": "completed",
+      "statusMessage": "Running AI job...",
+      "type": "stem_extract_uvr",
+      "updatedAt": "2026-02-12T12:38:19.285356"
+    },
+    "af77ee02568a484fbfee41a9be66190b": {
+      "createdAt": "2026-02-11T12:37:47.960967",
+      "error": "AI backend not configured. Set STUDIO_AI_ADAPTER=local and STUDIO_AI_BRIDGE to a Python bridge entrypoint.",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-11T12:37:48.016306",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-11T12:37:48.057133",
+          "type": "status"
+        },
+        {
+          "error": "AI backend not configured. Set STUDIO_AI_ADAPTER=local and STUDIO_AI_BRIDGE to a Python bridge entrypoint.",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-11T12:37:48.114849",
+          "type": "status"
+        }
+      ],
+      "id": "af77ee02568a484fbfee41a9be66190b",
+      "payload": {
+        "durationSec": 10,
+        "endSec": 107.8,
+        "prompt": "",
+        "sourceAssetId": "instrumental:7dc76610cf944cf5b52aab83acd5b426",
+        "startSec": 0
+      },
+      "progress": 100,
+      "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Running AI job...",
+      "type": "stem_extract",
+      "updatedAt": "2026-02-11T12:37:48.114849"
+    },
+    "c3c7a4f2bda8472e8441d3bd8f29b3d2": {
+      "createdAt": "2026-02-11T16:06:24.924844",
+      "error": "AI bridge returned invalid JSON",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-11T16:06:24.946288",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-11T16:06:24.991673",
+          "type": "status"
+        },
+        {
+          "error": "AI bridge returned invalid JSON",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-11T16:07:30.965215",
+          "type": "status"
+        }
+      ],
+      "id": "c3c7a4f2bda8472e8441d3bd8f29b3d2",
+      "payload": {
+        "durationSec": 10,
+        "endSec": 204.56,
+        "prompt": "",
+        "sourceAssetId": "vocal:ebdc764e42ae4dd7880b954ced98dcc3",
+        "startSec": 0
+      },
+      "progress": 100,
+      "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Running AI job...",
+      "type": "add_layer",
+      "updatedAt": "2026-02-11T16:07:30.965215"
+    },
+    "d0cae14fa2f64c68aabcfe8586a7bb09": {
+      "createdAt": "2026-02-11T22:08:37.539308",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-11T22:08:37.583358",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-11T22:08:37.630118",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-11T22:09:42.515425",
+          "type": "status"
+        }
+      ],
+      "id": "d0cae14fa2f64c68aabcfe8586a7bb09",
+      "payload": {
+        "sourceAssetId": "instrumental:7dc76610cf944cf5b52aab83acd5b426"
+      },
+      "progress": 100,
+      "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+      "result": {
+        "stems": [
+          {
+            "assetId": "uvr_stem:54658907880b409dae79186a52a6df4c",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_drums_8578ad0377d24aa09712f8a0103a00ff.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_drums_8578ad0377d24aa09712f8a0103a00ff.wav",
+            "durationSec": 107.8,
+            "label": "Drums",
+            "sampleRate": 44100,
+            "trackName": "drums"
+          },
+          {
+            "assetId": "uvr_stem:0948a199d53447a98ede2de19967837f",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_bass_c15cc5da243b4928b2b7770109b86a25.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_bass_c15cc5da243b4928b2b7770109b86a25.wav",
+            "durationSec": 107.8,
+            "label": "Bass",
+            "sampleRate": 44100,
+            "trackName": "bass"
+          },
+          {
+            "assetId": "uvr_stem:fc5c7ee691a14fa1a77ad3f79f8771ca",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_mids_e48757a274464ac48ed6b40bc609ade9.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_mids_e48757a274464ac48ed6b40bc609ade9.wav",
+            "durationSec": 107.8,
+            "label": "Mids",
+            "sampleRate": 44100,
+            "trackName": "mids"
+          },
+          {
+            "assetId": "uvr_stem:3804d715894640dbb3800a25a8daa0b3",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_highs_db5082c4648d416ea32899779f888475.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_highs_db5082c4648d416ea32899779f888475.wav",
+            "durationSec": 107.8,
+            "label": "Highs",
+            "sampleRate": 44100,
+            "trackName": "highs"
+          }
+        ]
+      },
+      "status": "completed",
+      "statusMessage": "Running AI job...",
+      "type": "stem_extract_uvr",
+      "updatedAt": "2026-02-11T22:09:42.515425"
+    },
+    "f6558cb60c724b80a0bd55f4ce0e3e80": {
+      "createdAt": "2026-02-11T13:27:46.988029",
+      "error": "AI bridge returned invalid JSON",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-11T13:27:47.015883",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-11T13:27:47.063231",
+          "type": "status"
+        },
+        {
+          "error": "AI bridge returned invalid JSON",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-11T14:40:59.207596",
+          "type": "status"
+        }
+      ],
+      "id": "f6558cb60c724b80a0bd55f4ce0e3e80",
+      "payload": {
+        "durationSec": 204.56,
+        "endSec": 204.56,
+        "prompt": "",
+        "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+        "startSec": 0
+      },
+      "progress": 100,
+      "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Running AI job...",
+      "type": "stem_extract",
+      "updatedAt": "2026-02-11T14:40:59.207596"
+    }
+  }
+}

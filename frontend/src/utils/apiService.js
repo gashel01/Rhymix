@@ -100,6 +100,18 @@ export const deleteFiles = async (filenames) => {
 };
 
 /**
+ * Delete inference runs
+ * @param {string[]} runIds - Array of inference run IDs to delete
+ * @returns {Promise<Object>} - Delete operation results
+ */
+export const deleteInferenceRuns = async (runIds) => {
+  const response = await axios.post(`${API_BASE}/api/delete-inference-runs`, {
+    runIds
+  });
+  return response.data;
+};
+
+/**
  * Clean directories
  * @param {Object} options - Clean options { include_input, force }
  * @returns {Promise<Object>} - Response data

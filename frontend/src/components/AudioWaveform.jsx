@@ -29,6 +29,7 @@ const AudioWaveform = (
     progressColor = "#1976d2",
     waveColor =  "#9e9e9e",
     backgroundColor,
+    minPxPerSec = 50,
     badgeText = null,
     isDark: isDarkProp,
     volume: volumeProp = 1, // Keep prop for backward compatibility
@@ -42,6 +43,12 @@ const AudioWaveform = (
 
     // playback state hygiene
     onRequestStop = () => {}, // optional
+
+    // studio/static mode
+    interactive = true,
+    showControls = true,
+    pixelsPerSecond = null,
+    clipStartSec = null,
   },
   ref
 ) => {
@@ -178,8 +185,10 @@ const AudioWaveform = (
       responsive: true,
       normalize: true,
       partialRender: true,
-      minPxPerSec: 50,
+      minPxPerSec,
       hideScrollbar: true,
+      interact: interactive,
+      dragToSeek: interactive,
       fetchParams: {
         signal: abortControllerRef.current?.signal,
       },
@@ -243,8 +252,10 @@ const AudioWaveform = (
         } catch {}
       }
 
-      ws.on("seek", handleSeek);
-      ws.on("interaction", handleSeek);
+      if (interactive) {
+        ws.on("seek", handleSeek);
+        ws.on("interaction", handleSeek);
+      }
 
       ws.on("audioprocess", () => {
         if (isSyncingRef.current) return;
@@ -255,11 +266,14 @@ const AudioWaveform = (
         } catch {}
       });
 
-      ws.on("finish", () => {
-        try {
-          if (otherWaveform?.isPlaying?.()) otherWaveform.pause?.();
-        } catch {}
-      });
+    ws.on("finish", () => {
+      try {
+        if (otherWaveform?.isPlaying?.()) otherWaveform.pause?.();
+      } catch {}
+      try {
+        onRequestStop?.();
+      } catch {}
+    });
 
       const wrapper = {
         setCurrentTime: (time) => {
@@ -368,6 +382,18 @@ const AudioWaveform = (
     } catch {}
   }, [isPlaying, ready]);
 
+  // align waveform to clip window (static studio view)
+  useEffect(() => {
+    if (!ready) return;
+    const ws = waveSurferRef.current;
+    if (!ws || !ws.drawer?.wrapper) return;
+    if (!pixelsPerSecond || clipStartSec == null) return;
+    try {
+      ws.zoom?.(pixelsPerSecond);
+      ws.drawer.wrapper.scrollLeft = Math.max(0, clipStartSec * pixelsPerSecond);
+    } catch {}
+  }, [ready, pixelsPerSecond, clipStartSec]);
+
   // Single volume-sync effect (context ref or prop fallback). applyPlaybackVolume is stable (useCallback).
   useEffect(() => {
     if (!ready) return;
@@ -445,7 +471,7 @@ const AudioWaveform = (
         sx={{
           width: "100%",
           height: `${height}px`,
-         
+          pointerEvents: interactive ? "auto" : "none",
           overflow: "hidden",
           backgroundColor: 'transparent',
           opacity: url ? (mutedValue ? 0.55 : 1) : 0.35,
@@ -478,61 +504,63 @@ const AudioWaveform = (
         </Typography>
       )}
 
-      <Box
-        sx={{
-          position: "absolute",
-          right:2,
-          bottom: 0,
-          zIndex: 5,
-          display: "flex",
-          gap: 0.75,
-          alignItems: "center",
-        }}
-      >
-        <IconButton
-          size="small"
-          disabled={!url || !ready}
-          onClick={handleMuteClick}
+      {showControls && (
+        <Box
           sx={{
-            width: 30,
-            height: 30,
-            borderRadius: 2,
-             border: `1px solid ${t.hairline}`,
-            background: `linear-gradient(180deg, ${t.glass}, ${t.glass2})`,
-            backdropFilter: "blur(70px)",
-            WebkitBackdropFilter: "blur(70px)",
-            boxShadow: t.shadow,
-            color: t.text,
-            "&:hover": { background: `linear-gradient(180deg, ${t.glass}, ${t.glass})` },
+            position: "absolute",
+            right: 2,
+            bottom: 0,
+            zIndex: 5,
+            display: "flex",
+            gap: 0.75,
+            alignItems: "center",
           }}
         >
-          {mutedValue ? (
-            <VolumeOffIcon sx={{ width: 18, height: 18 }} />
-          ) : (
-            <VolumeUpIcon sx={{ width: 18, height: 18 }} />
-          )}
-        </IconButton>
+          <IconButton
+            size="small"
+            disabled={!url || !ready}
+            onClick={handleMuteClick}
+            sx={{
+              width: 30,
+              height: 30,
+              borderRadius: 2,
+              border: `1px solid ${t.hairline}`,
+              background: `linear-gradient(180deg, ${t.glass}, ${t.glass2})`,
+              backdropFilter: "blur(70px)",
+              WebkitBackdropFilter: "blur(70px)",
+              boxShadow: t.shadow,
+              color: t.text,
+              "&:hover": { background: `linear-gradient(180deg, ${t.glass}, ${t.glass})` },
+            }}
+          >
+            {mutedValue ? (
+              <VolumeOffIcon sx={{ width: 18, height: 18 }} />
+            ) : (
+              <VolumeUpIcon sx={{ width: 18, height: 18 }} />
+            )}
+          </IconButton>
 
-        <IconButton
-          size="small"
-          disabled={!url}
-          onClick={onDownload}
-          sx={{
-            width: 30,
-            height: 30,
-            borderRadius: 2,
-             border: `1px solid ${t.hairline}`,
-            background: `linear-gradient(180deg, ${t.glass}, ${t.glass2})`,
-            backdropFilter: "blur(70px)",
-            WebkitBackdropFilter: "blur(70px)",
-            boxShadow: t.shadow,
-            color: t.text,
-            "&:hover": { background: `linear-gradient(180deg, ${t.glass}, ${t.glass})` },
-          }}
-        >
-          <DownloadIcon sx={{ width: 18, height: 18 }} />
-        </IconButton>
-      </Box>
+          <IconButton
+            size="small"
+            disabled={!url}
+            onClick={onDownload}
+            sx={{
+              width: 30,
+              height: 30,
+              borderRadius: 2,
+              border: `1px solid ${t.hairline}`,
+              background: `linear-gradient(180deg, ${t.glass}, ${t.glass2})`,
+              backdropFilter: "blur(70px)",
+              WebkitBackdropFilter: "blur(70px)",
+              boxShadow: t.shadow,
+              color: t.text,
+              "&:hover": { background: `linear-gradient(180deg, ${t.glass}, ${t.glass})` },
+            }}
+          >
+            <DownloadIcon sx={{ width: 18, height: 18 }} />
+          </IconButton>
+        </Box>
+      )}
     </Box>
   );
 };

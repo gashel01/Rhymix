@@ -4,6 +4,14 @@ import sys
 
 
 def bootstrap_env():
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+    except Exception:
+        pass
+    enable_logs = os.getenv("RHYMIX_ENABLE_LOGS", "").lower() in {"1", "true", "yes"}
+    log_level = os.getenv("RHYMIX_LOG_LEVEL", "INFO").upper()
     # Disable FFmpeg requirement for torchaudio BEFORE any torch imports
     os.environ["TORIO_USE_FFMPEG"] = "0"
     # Alternative FFmpeg disable methods
@@ -14,18 +22,22 @@ def bootstrap_env():
     # Reduce verbose logging
     os.environ["PYTHONWARNINGS"] = "ignore"
 
-    # Set root logger to CRITICAL to suppress all debug output
-    logging.basicConfig(level=logging.CRITICAL, format="%(levelname)s: %(message)s")
-    logging.getLogger().setLevel(logging.CRITICAL)
+    if enable_logs:
+        logging.basicConfig(level=log_level, format="%(levelname)s: %(message)s")
+        logging.getLogger().setLevel(log_level)
+    else:
+        # Set root logger to CRITICAL to suppress all debug output
+        logging.basicConfig(level=logging.CRITICAL, format="%(levelname)s: %(message)s")
+        logging.getLogger().setLevel(logging.CRITICAL)
 
-    # Suppress ALL debuggers that cause verbose output
-    for logger_name in ["torio", "byteflow", "torch", "torchaudio", "applio", "rvc", "core"]:
-        logger = logging.getLogger(logger_name)
-        logger.setLevel(logging.CRITICAL)
-        logger.disabled = True
-        # Also disable any handlers
-        for handler in logger.handlers:
-            handler.setLevel(logging.CRITICAL)
+        # Suppress ALL debuggers that cause verbose output
+        for logger_name in ["torio", "byteflow", "torch", "torchaudio", "applio", "rvc", "core"]:
+            logger = logging.getLogger(logger_name)
+            logger.setLevel(logging.CRITICAL)
+            logger.disabled = True
+            # Also disable any handlers
+            for handler in logger.handlers:
+                handler.setLevel(logging.CRITICAL)
 
     # Ensure applio and rvc are on the path
     applio_path = os.path.abspath("applio")

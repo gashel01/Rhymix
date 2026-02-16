@@ -1,7 +1,9 @@
 import json
 import logging
 import os
+import shutil
 import uuid
+import urllib.parse
 
 from flask import Blueprint, jsonify, request, send_file
 from werkzeug.utils import secure_filename
@@ -140,6 +142,76 @@ def get_past_inference_results():
 
         print(traceback.format_exc())
         return jsonify({"error": f"Failed to get results: {str(e)}"}), 500
+
+
+@bp.route("/api/delete-inference-runs", methods=["POST"])
+def delete_inference_runs():
+    try:
+        data = request.get_json(silent=True) or {}
+        run_ids = (
+            data.get("runIds")
+            or data.get("run_ids")
+            or data.get("runs")
+            or data.get("ids")
+        )
+        if run_ids is None:
+            return jsonify({"error": "No runIds provided"}), 400
+        if not isinstance(run_ids, list):
+            return jsonify({"error": "runIds must be a list"}), 400
+
+        results = []
+        total_deleted = 0
+        total_failed = 0
+        base_runs_dir = paths.INFERENCE_RUNS_DIR.resolve()
+        base_legacy_dir = paths.INFERENCE_DIR.resolve()
+
+        for raw in run_ids:
+            run_id = urllib.parse.unquote(str(raw))
+            deleted = []
+            failed = []
+
+            run_dir = (paths.INFERENCE_RUNS_DIR / run_id).resolve()
+            if base_runs_dir in run_dir.parents or run_dir == base_runs_dir:
+                if run_dir.exists() and run_dir.is_dir():
+                    try:
+                        shutil.rmtree(run_dir)
+                        deleted.append(f"run:{run_id}")
+                    except Exception as e:
+                        failed.append(f"Failed to delete run dir: {e}")
+            else:
+                failed.append("Invalid runId path")
+
+            legacy_path = paths.get_inference_file_path(run_id).resolve()
+            if base_legacy_dir in legacy_path.parents or legacy_path == base_legacy_dir:
+                if legacy_path.exists() and legacy_path.is_file():
+                    try:
+                        legacy_path.unlink(missing_ok=True)
+                        deleted.append(f"legacy:{legacy_path.name}")
+                    except Exception as e:
+                        failed.append(f"Failed to delete legacy file: {e}")
+            else:
+                failed.append("Invalid legacy path")
+
+            if not deleted and not failed:
+                failed.append("Run not found")
+
+            results.append({"runId": run_id, "deleted": deleted, "failed": failed})
+            if deleted:
+                total_deleted += 1
+            total_failed += len(failed)
+
+        return jsonify(
+            {
+                "message": f"Processed {len(run_ids)} runs",
+                "results": results,
+                "total_deleted": total_deleted,
+                "total_failed": total_failed,
+            }
+        )
+
+    except Exception as e:
+        logging.error(f"Error deleting inference runs: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @bp.route("/api/runs/<path:run_id>/reaction", methods=["PATCH"])

@@ -1,0 +1,4101 @@
+{
+  "byAsset": {
+    "222d20fc8bf447b3a8cebff65b828ba4": "98388241861645ddaa6b275fd23f7a6e",
+    "7dc76610cf944cf5b52aab83acd5b426": "323c01d9798748b1a4afa0b2d0a4b021",
+    "95f20397246c466a8d5bf5e724b1cd70": "195aaf17a4a54518ab3d508d8b499307",
+    "e428a97b82454635b8f670ab0d67a6b5": "aa8a78c8ca074d06a7e6551afeba4c10",
+    "ebdc764e42ae4dd7880b954ced98dcc3": "23640eb3100c44598b9143aaa7fe55a3"
+  },
+  "projects": {
+    "195aaf17a4a54518ab3d508d8b499307": {
+      "assets": {
+        "instrumental:95f20397246c466a8d5bf5e724b1cd70": {
+          "durationSec": 150.117007,
+          "fileType": "instrumental",
+          "id": "instrumental:95f20397246c466a8d5bf5e724b1cd70",
+          "kind": "instrumental",
+          "label": "Instrumental",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\instrumentals\\95f20397246c466a8d5bf5e724b1cd70_instrumental.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/instrumental/95f20397246c466a8d5bf5e724b1cd70"
+        },
+        "vocal:95f20397246c466a8d5bf5e724b1cd70": {
+          "durationSec": 150.11701,
+          "fileType": "processed_vocals",
+          "id": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+          "kind": "vocal",
+          "label": "Vocals",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\vocals\\processed\\95f20397246c466a8d5bf5e724b1cd70_vocals.wav",
+          "sampleRate": 192000,
+          "url": "/api/download/processed_vocals/95f20397246c466a8d5bf5e724b1cd70"
+        }
+      },
+      "clips": [
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "f8de7ce8-53e0-4f8e-8f2b-d46525a86bc8",
+          "laneId": "0b87381a61464ecdbf547b4d214778c2",
+          "sourceAssetId": "instrumental:95f20397246c466a8d5bf5e724b1cd70",
+          "srcEndSec": 42.43333282470703,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "ac2f7bf6-1bdf-49cd-a06a-fd3eaffa5866",
+          "laneId": "6e00e1ee07134b5fbf3f8613f0db2036",
+          "sourceAssetId": "instrumental:95f20397246c466a8d5bf5e724b1cd70",
+          "srcEndSec": 150.117007,
+          "srcStartSec": 42.43333282470703,
+          "timelineStartSec": 42
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "a155c946c0c243cb80f4b0c13814f15a",
+          "laneId": "f54cbc4cfc8f4ad6baa21e99e7798a84",
+          "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+          "srcEndSec": 150.11701,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        }
+      ],
+      "lanes": [
+        {
+          "gainDb": 0,
+          "id": "1be214cd69804b78b563ee9c8bf5f402",
+          "mute": false,
+          "name": "Stems",
+          "order": 1,
+          "projectId": "195aaf17a4a54518ab3d508d8b499307",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "stem"
+        },
+        {
+          "gainDb": 0,
+          "id": "1d9d62d201fb4a56b24000dd5aa0b854",
+          "mute": false,
+          "name": "Instrumental",
+          "order": 2,
+          "projectId": "195aaf17a4a54518ab3d508d8b499307",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "instrumental"
+        },
+        {
+          "gainDb": 0,
+          "id": "6e00e1ee07134b5fbf3f8613f0db2036",
+          "mute": false,
+          "name": "Mix",
+          "order": 3,
+          "projectId": "195aaf17a4a54518ab3d508d8b499307",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "mix"
+        },
+        {
+          "gainDb": 0,
+          "id": "0b87381a61464ecdbf547b4d214778c2",
+          "mute": false,
+          "name": "Generated Layers",
+          "order": 4,
+          "projectId": "195aaf17a4a54518ab3d508d8b499307",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "generated"
+        },
+        {
+          "color": "#007dd6",
+          "gainDb": 0,
+          "id": "f54cbc4cfc8f4ad6baa21e99e7798a84",
+          "mute": false,
+          "name": "Vocals",
+          "order": 5,
+          "projectId": "195aaf17a4a54518ab3d508d8b499307",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "vocal"
+        }
+      ],
+      "metadata": {},
+      "project": {
+        "assetId": "95f20397246c466a8d5bf5e724b1cd70",
+        "bpm": null,
+        "createdAt": "2026-02-11T18:48:18.580997",
+        "durationSec": 150.11701,
+        "id": "195aaf17a4a54518ab3d508d8b499307",
+        "key": null,
+        "sampleRate": 192000,
+        "timeSignature": null,
+        "updatedAt": "2026-02-12T12:24:39.948863"
+      }
+    },
+    "23640eb3100c44598b9143aaa7fe55a3": {
+      "assets": {
+        "instrumental:ebdc764e42ae4dd7880b954ced98dcc3": {
+          "durationSec": 204.56,
+          "fileType": "instrumental",
+          "id": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+          "kind": "instrumental",
+          "label": "Instrumental",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\instrumentals\\ebdc764e42ae4dd7880b954ced98dcc3_instrumental.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/instrumental/ebdc764e42ae4dd7880b954ced98dcc3"
+        },
+        "uvr_stem:50acfe42ab1342f7b309963692fd7bda": {
+          "durationSec": 204.56,
+          "id": "uvr_stem:50acfe42ab1342f7b309963692fd7bda",
+          "kind": "stem",
+          "label": "Highs",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_highs_90ec90c384fd4d6f9d7870642756c1e1.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/exports/uvr_stem_highs_90ec90c384fd4d6f9d7870642756c1e1.wav"
+        },
+        "uvr_stem:a2b7f1b96a5943989dc4a24b354ef321": {
+          "durationSec": 204.56,
+          "id": "uvr_stem:a2b7f1b96a5943989dc4a24b354ef321",
+          "kind": "stem",
+          "label": "Mids",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_mids_033c74d04bc44ed2ade6299b6bd3513a.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/exports/uvr_stem_mids_033c74d04bc44ed2ade6299b6bd3513a.wav"
+        },
+        "uvr_stem:b8bddb35a70c4929afc97f75d46bb235": {
+          "durationSec": 204.56,
+          "id": "uvr_stem:b8bddb35a70c4929afc97f75d46bb235",
+          "kind": "stem",
+          "label": "Bass",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_bass_80ed182dd1e4489488c0a74aab36fff3.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/exports/uvr_stem_bass_80ed182dd1e4489488c0a74aab36fff3.wav"
+        },
+        "uvr_stem:bb949fa87b1b408c86006aa41497ecf4": {
+          "durationSec": 204.56,
+          "id": "uvr_stem:bb949fa87b1b408c86006aa41497ecf4",
+          "kind": "stem",
+          "label": "Drums",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_drums_d22bc6de04e64ccf96a020b9d113328f.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/exports/uvr_stem_drums_d22bc6de04e64ccf96a020b9d113328f.wav"
+        },
+        "vocal:ebdc764e42ae4dd7880b954ced98dcc3": {
+          "durationSec": 204.56,
+          "fileType": "processed_vocals",
+          "id": "vocal:ebdc764e42ae4dd7880b954ced98dcc3",
+          "kind": "vocal",
+          "label": "Vocals",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\vocals\\processed\\ebdc764e42ae4dd7880b954ced98dcc3_vocals.wav",
+          "sampleRate": 192000,
+          "url": "/api/download/processed_vocals/ebdc764e42ae4dd7880b954ced98dcc3"
+        }
+      },
+      "clips": [
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "ec4b1952-ba85-415d-8a1e-072bd4dfc827",
+          "laneId": "d2c4888a8ae44f8b97e2ffca86d2dc55",
+          "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+          "srcEndSec": 17.160880412353514,
+          "srcStartSec": 12.354166412353514,
+          "timelineStartSec": 0
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "32d8c893-38b5-4c46-a1c7-dc7ec75e2168",
+          "laneId": "d2c4888a8ae44f8b97e2ffca86d2dc55",
+          "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+          "srcEndSec": 21.160880412353514,
+          "srcStartSec": 17.160880412353514,
+          "timelineStartSec": 5
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "312ce31c-6162-4056-bfdc-26b974aa6e8c",
+          "laneId": "d2c4888a8ae44f8b97e2ffca86d2dc55",
+          "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+          "srcEndSec": 204.56,
+          "srcStartSec": 21.610913412353515,
+          "timelineStartSec": 9
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "8234db71-4edd-459c-bcb2-ff528ec422f1",
+          "laneId": "63edf8d8f3b843f4ad86cd99cd523ead",
+          "sourceAssetId": "vocal:ebdc764e42ae4dd7880b954ced98dcc3",
+          "srcEndSec": 3.7666664123535156,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "a130f09d-d4e9-4f2f-9199-58d5a04069a3",
+          "laneId": "63edf8d8f3b843f4ad86cd99cd523ead",
+          "sourceAssetId": "vocal:ebdc764e42ae4dd7880b954ced98dcc3",
+          "srcEndSec": 204.56,
+          "srcStartSec": 10.808811,
+          "timelineStartSec": 9
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "8fd5d2cb9c8c48eda122955008f17f40",
+          "laneId": "1da2d1f6ab204154b4752d6ffe0deecb",
+          "sourceAssetId": "uvr_stem:bb949fa87b1b408c86006aa41497ecf4",
+          "srcEndSec": 204.56,
+          "srcStartSec": 0,
+          "timelineStartSec": 0.5
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "a4193e06c9a94be5b8b333832502c34d",
+          "laneId": "4290f0da70624528ac6cbca7c57699fe",
+          "sourceAssetId": "uvr_stem:b8bddb35a70c4929afc97f75d46bb235",
+          "srcEndSec": 204.56,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "4669e70a053647d68da362c8ba557eb4",
+          "laneId": "30e5dfc725f641e19e94c24369d39a21",
+          "sourceAssetId": "uvr_stem:a2b7f1b96a5943989dc4a24b354ef321",
+          "srcEndSec": 204.56,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "47c9c90a45d942d79bb550d61805dee8",
+          "laneId": "0f4aaeff841642bbb00e41e4c2b570ee",
+          "sourceAssetId": "uvr_stem:50acfe42ab1342f7b309963692fd7bda",
+          "srcEndSec": 204.56,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "c3e4ee42-0fcf-43f8-a74e-67430520f2ee",
+          "laneId": "5a32142e16f646dfab30c905e908dc77",
+          "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+          "srcEndSec": 18.67754682470703,
+          "srcStartSec": 17.160880412353514,
+          "timelineStartSec": 5
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "1e60309f-9b5d-4ccf-8517-e0a6c1fc4a82",
+          "laneId": "5a32142e16f646dfab30c905e908dc77",
+          "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+          "srcEndSec": 21.610913412353515,
+          "srcStartSec": 18.67754682470703,
+          "timelineStartSec": 6.5
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "0bbf8fb1-a504-463a-8145-d4e581f9eb81",
+          "laneId": "f8bacc2f4ac84af4b6dd6f7e01a273f0",
+          "sourceAssetId": "uvr_stem:bb949fa87b1b408c86006aa41497ecf4",
+          "srcEndSec": 204.56,
+          "srcStartSec": 0,
+          "timelineStartSec": 3.5
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "b870f46e-f521-4a09-a06a-362f5233eec3",
+          "laneId": "4290f0da70624528ac6cbca7c57699fe",
+          "sourceAssetId": "uvr_stem:b8bddb35a70c4929afc97f75d46bb235",
+          "srcEndSec": 204.56,
+          "srcStartSec": 0,
+          "timelineStartSec": 4.450033000000001
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "f740aacd-91ca-4c25-8499-c8d9561ba491",
+          "laneId": "30e5dfc725f641e19e94c24369d39a21",
+          "sourceAssetId": "uvr_stem:a2b7f1b96a5943989dc4a24b354ef321",
+          "srcEndSec": 204.56,
+          "srcStartSec": 0,
+          "timelineStartSec": 4.5
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "83fdf3e3-5e50-497c-868a-aadd57cb8c60",
+          "laneId": "0f4aaeff841642bbb00e41e4c2b570ee",
+          "sourceAssetId": "uvr_stem:50acfe42ab1342f7b309963692fd7bda",
+          "srcEndSec": 204.56,
+          "srcStartSec": 0,
+          "timelineStartSec": 4.450033000000001
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "4632ae1d-4f5a-48cf-98d9-b7a55713a79f",
+          "laneId": "5a32142e16f646dfab30c905e908dc77",
+          "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+          "srcEndSec": 204.56,
+          "srcStartSec": 0,
+          "timelineStartSec": 9.5
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "d783da18-bdda-4345-8d30-18ad156fef0d",
+          "laneId": "b8a2e0f9227940b0be3632c5aa93cc5f",
+          "sourceAssetId": "uvr_stem:50acfe42ab1342f7b309963692fd7bda",
+          "srcEndSec": 165.5,
+          "srcStartSec": 0,
+          "timelineStartSec": 13
+        }
+      ],
+      "lanes": [
+        {
+          "gainDb": 5.5,
+          "id": "5a32142e16f646dfab30c905e908dc77",
+          "mute": false,
+          "name": "Instrumental",
+          "order": 1,
+          "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+          "solo": true,
+          "sourceAssetId": null,
+          "type": "instrumental"
+        },
+        {
+          "gainDb": 0,
+          "id": "63edf8d8f3b843f4ad86cd99cd523ead",
+          "mute": false,
+          "name": "Vocals",
+          "order": 2,
+          "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "vocal"
+        },
+        {
+          "color": "#1377be",
+          "gainDb": 0,
+          "id": "d2c4888a8ae44f8b97e2ffca86d2dc55",
+          "mute": false,
+          "name": "Mix",
+          "order": 3,
+          "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+          "solo": true,
+          "sourceAssetId": null,
+          "type": "mix"
+        },
+        {
+          "gainDb": 0,
+          "id": "f8bacc2f4ac84af4b6dd6f7e01a273f0",
+          "mute": false,
+          "name": "Generated Layers",
+          "order": 4,
+          "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "generated"
+        },
+        {
+          "gainDb": 0,
+          "id": "1da2d1f6ab204154b4752d6ffe0deecb",
+          "mute": false,
+          "name": "Drums",
+          "order": 5,
+          "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+          "solo": false,
+          "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+          "type": "stem"
+        },
+        {
+          "gainDb": 0,
+          "id": "b8a2e0f9227940b0be3632c5aa93cc5f",
+          "mute": false,
+          "name": "Stems",
+          "order": 6,
+          "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "stem"
+        },
+        {
+          "gainDb": 0,
+          "id": "4290f0da70624528ac6cbca7c57699fe",
+          "mute": false,
+          "name": "Bass",
+          "order": 7,
+          "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+          "solo": false,
+          "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+          "type": "stem"
+        },
+        {
+          "gainDb": 0,
+          "id": "30e5dfc725f641e19e94c24369d39a21",
+          "mute": false,
+          "name": "Mids",
+          "order": 8,
+          "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+          "solo": false,
+          "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+          "type": "stem"
+        },
+        {
+          "gainDb": 0,
+          "id": "0f4aaeff841642bbb00e41e4c2b570ee",
+          "mute": false,
+          "name": "Highs",
+          "order": 9,
+          "projectId": "23640eb3100c44598b9143aaa7fe55a3",
+          "solo": false,
+          "sourceAssetId": "instrumental:ebdc764e42ae4dd7880b954ced98dcc3",
+          "type": "stem"
+        }
+      ],
+      "metadata": {},
+      "project": {
+        "assetId": "ebdc764e42ae4dd7880b954ced98dcc3",
+        "bpm": null,
+        "createdAt": "2026-02-11T13:00:40.768779",
+        "durationSec": 204.56,
+        "id": "23640eb3100c44598b9143aaa7fe55a3",
+        "key": null,
+        "sampleRate": 192000,
+        "timeSignature": null,
+        "updatedAt": "2026-02-11T18:20:31.489500"
+      }
+    },
+    "323c01d9798748b1a4afa0b2d0a4b021": {
+      "assets": {
+        "instrumental:7dc76610cf944cf5b52aab83acd5b426": {
+          "durationSec": 107.8,
+          "fileType": "instrumental",
+          "id": "instrumental:7dc76610cf944cf5b52aab83acd5b426",
+          "kind": "instrumental",
+          "label": "Instrumental",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\instrumentals\\7dc76610cf944cf5b52aab83acd5b426_instrumental.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/instrumental/7dc76610cf944cf5b52aab83acd5b426"
+        },
+        "uvr_stem:0948a199d53447a98ede2de19967837f": {
+          "durationSec": 107.8,
+          "id": "uvr_stem:0948a199d53447a98ede2de19967837f",
+          "kind": "stem",
+          "label": "Bass",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_bass_c15cc5da243b4928b2b7770109b86a25.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/exports/uvr_stem_bass_c15cc5da243b4928b2b7770109b86a25.wav"
+        },
+        "uvr_stem:3804d715894640dbb3800a25a8daa0b3": {
+          "durationSec": 107.8,
+          "id": "uvr_stem:3804d715894640dbb3800a25a8daa0b3",
+          "kind": "stem",
+          "label": "Highs",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_highs_db5082c4648d416ea32899779f888475.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/exports/uvr_stem_highs_db5082c4648d416ea32899779f888475.wav"
+        },
+        "uvr_stem:54658907880b409dae79186a52a6df4c": {
+          "durationSec": 107.8,
+          "id": "uvr_stem:54658907880b409dae79186a52a6df4c",
+          "kind": "stem",
+          "label": "Drums",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_drums_8578ad0377d24aa09712f8a0103a00ff.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/exports/uvr_stem_drums_8578ad0377d24aa09712f8a0103a00ff.wav"
+        },
+        "uvr_stem:fc5c7ee691a14fa1a77ad3f79f8771ca": {
+          "durationSec": 107.8,
+          "id": "uvr_stem:fc5c7ee691a14fa1a77ad3f79f8771ca",
+          "kind": "stem",
+          "label": "Mids",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_mids_e48757a274464ac48ed6b40bc609ade9.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/exports/uvr_stem_mids_e48757a274464ac48ed6b40bc609ade9.wav"
+        },
+        "vocal:7dc76610cf944cf5b52aab83acd5b426": {
+          "durationSec": 107.8,
+          "fileType": "processed_vocals",
+          "id": "vocal:7dc76610cf944cf5b52aab83acd5b426",
+          "kind": "vocal",
+          "label": "Vocals",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\vocals\\processed\\7dc76610cf944cf5b52aab83acd5b426_vocals.wav",
+          "sampleRate": 192000,
+          "url": "/api/download/processed_vocals/7dc76610cf944cf5b52aab83acd5b426"
+        }
+      },
+      "clips": [
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "550981febd1b4e329b648943fbc35a34",
+          "laneId": "04b0e892605b48ba8dd2cf3a5baaef1b",
+          "sourceAssetId": "instrumental:7dc76610cf944cf5b52aab83acd5b426",
+          "srcEndSec": 107.8,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "f58da5d9a7bb4d4db5eabb22bc0dc396",
+          "laneId": "a1fd370ae2914a9f900f8156f3194622",
+          "sourceAssetId": "vocal:7dc76610cf944cf5b52aab83acd5b426",
+          "srcEndSec": 107.8,
+          "srcStartSec": 0,
+          "timelineStartSec": 2.5
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "2fbd3cd9-7e44-42a5-bbcb-00dc51cb6248",
+          "laneId": "46264db7b4ce44f2a681238d33b8e774",
+          "sourceAssetId": "uvr_stem:54658907880b409dae79186a52a6df4c",
+          "srcEndSec": 4.208333206176758,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "3b2beeff-f39d-43e5-931e-f844cc8fd9fa",
+          "laneId": "2d947dda9132458fad96e01db2079d98",
+          "sourceAssetId": "uvr_stem:54658907880b409dae79186a52a6df4c",
+          "srcEndSec": 107.8,
+          "srcStartSec": 4.208333206176758,
+          "timelineStartSec": 4
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "283e12f3065f482a96242a88c7b7a42c",
+          "laneId": "31b129240ff54ba3968d5612e5121746",
+          "sourceAssetId": "uvr_stem:0948a199d53447a98ede2de19967837f",
+          "srcEndSec": 107.8,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "94a66fed916b436db15d2b41e940961b",
+          "laneId": "51138f710c954db89918baf5a7dbde80",
+          "sourceAssetId": "uvr_stem:fc5c7ee691a14fa1a77ad3f79f8771ca",
+          "srcEndSec": 107.8,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "ba8f879a48e744e8a5c4318163f619aa",
+          "laneId": "22068becd813440bab25f870cef792aa",
+          "sourceAssetId": "uvr_stem:3804d715894640dbb3800a25a8daa0b3",
+          "srcEndSec": 107.8,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "913d2f87-d933-4f68-b705-68e089b72b98",
+          "label": "MIDI \u00b7 Drums",
+          "laneId": "7b243d79-5a0d-46ef-a919-2934f7ae9048",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Drums",
+            "midiFileBase64": null,
+            "mode": "melody",
+            "notes": [],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 0.5,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "15cad16a-1053-4406-8826-e16d95540d0a",
+          "label": "MIDI \u00b7 Piano",
+          "laneId": "ca4807f5-c4eb-43e3-8e57-df7b3b93129e",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Piano",
+            "midiFileBase64": null,
+            "mode": "melody",
+            "notes": [],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 0.5,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "82a8208c-e52d-4e33-9152-d640b88a9649",
+          "label": "MIDI \u00b7 Drums",
+          "laneId": "8c41de81-edc5-402d-8dd3-397ff8720c30",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Drums",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAUQD/UQMHoSAA/1gEBAIYCJogmSRGeIkkAIVQmSQieIkkAHiZJE54iSQAgXCZJDB4iSQAhVCZJC14iSQAhVCZJC94iSQAgXCZJCZ4iSQAAP8vAA==",
+            "mode": "rhythm",
+            "notes": [
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 3360,
+                "velocity": 70
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 4200,
+                "velocity": 34
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 4440,
+                "velocity": 78
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 4800,
+                "velocity": 48
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 5640,
+                "velocity": 45
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 6480,
+                "velocity": 47
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 6840,
+                "velocity": 38
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 7.25,
+          "srcStartSec": 0,
+          "timelineStartSec": 17.5
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "0e9a697c-eaa6-4449-b304-27ef10b2e20a",
+          "label": "MIDI \u00b7 Drums",
+          "laneId": "7d9d0af9-6b55-401e-8df2-c4f34e59a67c",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Drums",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAWgD/UQMHoSAA/1gEBAIYCJFomSRbeIkkAIJomSRdeIkkAACZJGt4iSQAhFiZJC54iSQAgXCZJCt4iSQAmiCZJE54iSQAgXCZJF94iSQAhFiZJDh4iSQAAP8vAA==",
+            "mode": "rhythm",
+            "notes": [
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 2280,
+                "velocity": 91
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 2760,
+                "velocity": 93
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 2880,
+                "velocity": 107
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 3600,
+                "velocity": 46
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 3960,
+                "velocity": 43
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 7440,
+                "velocity": 78
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 7800,
+                "velocity": 95
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 8520,
+                "velocity": 56
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 9,
+          "srcStartSec": 0,
+          "timelineStartSec": 18
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "b7f34412-a027-49a7-b0d7-b82726e78084",
+          "label": "MIDI \u00b7 Drums",
+          "laneId": "ed246bf6-8ac4-4e98-ba3e-88acbc3c6e4b",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Drums",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAJQD/UQMHoSAA/1gEBAIYCJEkmSQzYIkkAJ8gmSQgYIkkAAD/LwA=",
+            "mode": "rhythm",
+            "notes": [
+              {
+                "channel": 9,
+                "durationTick": 96,
+                "note": 36,
+                "startTick": 2212,
+                "velocity": 51
+              },
+              {
+                "channel": 9,
+                "durationTick": 96,
+                "note": 36,
+                "startTick": 6308,
+                "velocity": 32
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 6.670833333333333,
+          "srcStartSec": 0,
+          "timelineStartSec": 22
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "0b458f2e-cd6e-4a24-ae89-b13a46b8d443",
+          "label": "MIDI \u00b7 Piano",
+          "laneId": "49e83e4d-6c0f-43c3-9a28-ac5be8764c5c",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Piano",
+            "midiFileBase64": null,
+            "mode": "melody",
+            "notes": [],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 0.5,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "a430a769-0df6-4b52-8441-141a1709f3d3",
+          "label": "MIDI \u00b7 Piano",
+          "laneId": "8ca844ed-f7bf-4f6b-81f4-facd70bb36c4",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Piano",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAUQD/UQMHoSAA/1gEBAIYCINgkDlYeIA5AACQLVqBcIAtAACQL2OBcIAvAACQM2WCaIAzAACQNVB4gDUAgXCQM1t4gDMAgmiQOEx4gDgAAP8vAA==",
+            "mode": "melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 57,
+                "startTick": 480,
+                "velocity": 88
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 45,
+                "startTick": 480,
+                "velocity": 90
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 47,
+                "startTick": 720,
+                "velocity": 99
+              },
+              {
+                "channel": 0,
+                "durationTick": 360,
+                "note": 51,
+                "startTick": 960,
+                "velocity": 101
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 53,
+                "startTick": 1320,
+                "velocity": 80
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 51,
+                "startTick": 1680,
+                "velocity": 91
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 56,
+                "startTick": 2160,
+                "velocity": 76
+              }
+            ],
+            "ppq": 480,
+            "soundfont": "acoustic_grand_piano",
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 2.375,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "4b9d172a-25d5-4401-a07a-081b544881c0",
+          "label": "MIDI \u00b7 Piano",
+          "laneId": "5bbf89d8-e0c0-40e5-ae51-3547fe143771",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Piano",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAABFwD/UQMHoSAA/1gEBAIYCJBwkC9IeIAvAHiQLkd4gC4Ag2CQL0N4gC8AeJAtPniALQB4kC9QeIAvAHiQLVB4gC0AeJApYIFwgCkAAJApXIFwgCkAg2CQKUx4gCkAgXCQN0OBcIA3AACQK2WEWIArAACQNz+BcIA3AIVQkC1Sh0CALQB4kDBbeIAwAACQL1Z4gC8AgXCQL0Z4gC8AeJAwV3iAMAB4kC1UeIAtAACQL014gC8AeJAtUHiALQB4kClheIApAHiQKV6BcIApAACQKVGBcIApAINgkCtGgmiAKwAAkDc5eIA3AACQK1iBcIArAIJokCtCeIArAHiQKUd4gCkAAJApWYFwgCkAeJApUoZIgCkAAP8vAA==",
+            "mode": "melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 2160,
+                "velocity": 72
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 46,
+                "startTick": 2400,
+                "velocity": 71
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 3000,
+                "velocity": 67
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 45,
+                "startTick": 3240,
+                "velocity": 62
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 3480,
+                "velocity": 80
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 45,
+                "startTick": 3720,
+                "velocity": 80
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 41,
+                "startTick": 3960,
+                "velocity": 96
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 41,
+                "startTick": 4200,
+                "velocity": 92
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 4920,
+                "velocity": 76
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 55,
+                "startTick": 5280,
+                "velocity": 67
+              },
+              {
+                "channel": 0,
+                "durationTick": 600,
+                "note": 43,
+                "startTick": 5280,
+                "velocity": 101
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 55,
+                "startTick": 5520,
+                "velocity": 63
+              },
+              {
+                "channel": 0,
+                "durationTick": 960,
+                "note": 45,
+                "startTick": 6480,
+                "velocity": 82
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 48,
+                "startTick": 7560,
+                "velocity": 91
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 7680,
+                "velocity": 86
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 8040,
+                "velocity": 70
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 48,
+                "startTick": 8280,
+                "velocity": 87
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 45,
+                "startTick": 8520,
+                "velocity": 84
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 8640,
+                "velocity": 77
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 45,
+                "startTick": 8880,
+                "velocity": 80
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 9120,
+                "velocity": 97
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 41,
+                "startTick": 9360,
+                "velocity": 94
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 41,
+                "startTick": 9600,
+                "velocity": 81
+              },
+              {
+                "channel": 0,
+                "durationTick": 360,
+                "note": 43,
+                "startTick": 10320,
+                "velocity": 70
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 55,
+                "startTick": 10560,
+                "velocity": 57
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 43,
+                "startTick": 10680,
+                "velocity": 88
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 43,
+                "startTick": 11280,
+                "velocity": 66
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 11520,
+                "velocity": 71
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 41,
+                "startTick": 11640,
+                "velocity": 89
+              },
+              {
+                "channel": 0,
+                "durationTick": 840,
+                "note": 41,
+                "startTick": 12000,
+                "velocity": 82
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 13.375,
+          "srcStartSec": 0,
+          "timelineStartSec": 2
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "51e55cc9-6d95-4c3e-93ba-42937a2f9698",
+          "label": "MIDI \u00b7 Guitar",
+          "laneId": "150b5143-1420-4a9e-8b8e-2cd76b0f03d4",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Guitar",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAbQD/UQMHoSAA/1gEBAIYCI4IkDBagXCAMAB4kDNdeIAzAIZIkDBQeIAwAIJokDNhgXCAMwB4kClCgXCAKQB4kCdIeIAnAIJokC9QeIAvAIFwkDJVeIAyAIZIkC5MeIAuAIJokDJOeIAyAAD/LwA=",
+            "mode": "melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 48,
+                "startTick": 1800,
+                "velocity": 90
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 51,
+                "startTick": 2160,
+                "velocity": 93
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 48,
+                "startTick": 3120,
+                "velocity": 80
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 51,
+                "startTick": 3600,
+                "velocity": 97
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 41,
+                "startTick": 3960,
+                "velocity": 66
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 39,
+                "startTick": 4320,
+                "velocity": 72
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 4800,
+                "velocity": 80
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 50,
+                "startTick": 5160,
+                "velocity": 85
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 46,
+                "startTick": 6120,
+                "velocity": 76
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 50,
+                "startTick": 6600,
+                "velocity": 78
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 7,
+          "srcStartSec": 0,
+          "timelineStartSec": 15
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "a8f1dfb0-3fe9-4443-8d84-4e8cc11682e2",
+          "label": "MIDI \u00b7 Guitar",
+          "laneId": "0559d853-ea7c-49d2-bee7-7485433852f0",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Guitar",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAHQD/UQMHoSAA/1gEBAIYCIGPOJBLF3iASwAA/y8A",
+            "mode": "melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 75,
+                "startTick": 18360,
+                "velocity": 23
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 19.25,
+          "srcStartSec": 0,
+          "timelineStartSec": 21.295833333333334
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "32bc681a-78e7-4ef4-aa3c-cb5db42dc1e0",
+          "label": "MIDI \u00b7 Guitar",
+          "laneId": "37f12bd1-ea5d-47f8-a319-58657ce60e97",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Guitar",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAA5AD/UQMHoSAA/1gEBAIYCI94kChRgXCAKACDYJAtUHiALQCBcJAvTIJogC8AAJBYQIFwgFgAAJAuW4JogC4AeJApRIFwgCkAgmiQLFeBcIAsAIFwkC9OgXCALwAAkC9ieIAvAACQL16CaIAvAACQLmB4gC4AAJAuWoFwgC4AgmiQKVV4gCkAgmiQLFuBcIAsAIFwkC5qeIAuAHiQLk6BcIAuAACQL1F4gC8AAJAuSXiALgCCaJAsTXiALACCaJApZIJogCkAAJApY4FwgCkAAJApWYFwgCkAAJAqXYFwgCoAAP8vAA==",
+            "mode": "melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 40,
+                "startTick": 2040,
+                "velocity": 81
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 45,
+                "startTick": 2760,
+                "velocity": 80
+              },
+              {
+                "channel": 0,
+                "durationTick": 360,
+                "note": 47,
+                "startTick": 3120,
+                "velocity": 76
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 88,
+                "startTick": 3360,
+                "velocity": 64
+              },
+              {
+                "channel": 0,
+                "durationTick": 360,
+                "note": 46,
+                "startTick": 3600,
+                "velocity": 91
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 41,
+                "startTick": 4080,
+                "velocity": 68
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 44,
+                "startTick": 4680,
+                "velocity": 87
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 47,
+                "startTick": 5160,
+                "velocity": 78
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 5400,
+                "velocity": 98
+              },
+              {
+                "channel": 0,
+                "durationTick": 360,
+                "note": 47,
+                "startTick": 5520,
+                "velocity": 94
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 46,
+                "startTick": 5880,
+                "velocity": 96
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 46,
+                "startTick": 6000,
+                "velocity": 90
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 6600,
+                "velocity": 85
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 44,
+                "startTick": 7080,
+                "velocity": 91
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 46,
+                "startTick": 7560,
+                "velocity": 106
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 46,
+                "startTick": 7800,
+                "velocity": 78
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 8040,
+                "velocity": 81
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 46,
+                "startTick": 8160,
+                "velocity": 73
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 44,
+                "startTick": 8640,
+                "velocity": 77
+              },
+              {
+                "channel": 0,
+                "durationTick": 360,
+                "note": 41,
+                "startTick": 9120,
+                "velocity": 100
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 41,
+                "startTick": 9480,
+                "velocity": 99
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 41,
+                "startTick": 9600,
+                "velocity": 89
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 42,
+                "startTick": 9840,
+                "velocity": 93
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 10.5,
+          "srcStartSec": 0,
+          "timelineStartSec": 21.5
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "77cfdbc2-77ba-4a14-ab29-82dd010a1c9b",
+          "label": "MIDI \u00b7 Drums",
+          "laneId": "7aaae167-3e08-46bd-8d1c-df503a013af1",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Drums",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAUgD/UQMHoSAA/1gEBAIYCJJgmSRReIkkAIFwmSQkeIkkAINgmSQgeIkkAIFwmSRFeIkkAIRYmSRKeIkkAINgmSQheIkkAIkwmSQjeIkkAAD/LwA=",
+            "mode": "rhythm",
+            "notes": [
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 2400,
+                "velocity": 81
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 2760,
+                "velocity": 36
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 3360,
+                "velocity": 32
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 3720,
+                "velocity": 69
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 4440,
+                "velocity": 74
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 5040,
+                "velocity": 33
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 6360,
+                "velocity": 35
+              }
+            ],
+            "ppq": 480,
+            "soundfont": "flute",
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 6.75,
+          "srcStartSec": 0,
+          "timelineStartSec": 22.5
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "e38abe71-49e2-468d-9763-457ed1553c36",
+          "label": "MIDI \u00b7 Strings",
+          "laneId": "78990741-1627-4dd8-a079-38da91e891c7",
+          "midi": {
+            "bpm": 120,
+            "instrument": "Strings",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAALgD/UQMHoSAA/1gEBAIYCI4ImSQoeIkkAIZImSQoeIkkAIRYmSQleIkkAAD/LwA=",
+            "mode": "rhythm",
+            "notes": [
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 1800,
+                "velocity": 40
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 2760,
+                "velocity": 40
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 3480,
+                "velocity": 37
+              }
+            ],
+            "ppq": 480,
+            "soundfont": "flute",
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 3.75,
+          "srcStartSec": 0,
+          "timelineStartSec": 24.5
+        }
+      ],
+      "lanes": [
+        {
+          "fx": {
+            "echo": {
+              "enabled": false,
+              "feedback": 0.33,
+              "mix": 0.37,
+              "time": 0.29
+            },
+            "lowpass": {
+              "cutoff": 10310,
+              "enabled": false
+            }
+          },
+          "gainDb": 0,
+          "id": "a1fd370ae2914a9f900f8156f3194622",
+          "mute": false,
+          "name": "Vocals",
+          "order": 1,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "vocal"
+        },
+        {
+          "gainDb": 0,
+          "id": "04b0e892605b48ba8dd2cf3a5baaef1b",
+          "mute": false,
+          "name": "Instrumental",
+          "order": 2,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "instrumental"
+        },
+        {
+          "gainDb": 0,
+          "id": "2d947dda9132458fad96e01db2079d98",
+          "mute": false,
+          "name": "Stems",
+          "order": 4,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "stem"
+        },
+        {
+          "gainDb": 4.5,
+          "id": "46264db7b4ce44f2a681238d33b8e774",
+          "mute": false,
+          "name": "Drums",
+          "order": 6,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": "instrumental:7dc76610cf944cf5b52aab83acd5b426",
+          "type": "stem"
+        },
+        {
+          "gainDb": 0,
+          "id": "31b129240ff54ba3968d5612e5121746",
+          "mute": false,
+          "name": "Bass",
+          "order": 7,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": "instrumental:7dc76610cf944cf5b52aab83acd5b426",
+          "type": "stem"
+        },
+        {
+          "gainDb": 0,
+          "id": "51138f710c954db89918baf5a7dbde80",
+          "mute": false,
+          "name": "Mids",
+          "order": 8,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": "instrumental:7dc76610cf944cf5b52aab83acd5b426",
+          "type": "stem"
+        },
+        {
+          "gainDb": 0,
+          "id": "22068becd813440bab25f870cef792aa",
+          "mute": false,
+          "name": "Highs",
+          "order": 9,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": "instrumental:7dc76610cf944cf5b52aab83acd5b426",
+          "type": "stem"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "7b243d79-5a0d-46ef-a919-2934f7ae9048",
+          "instrument": "Drums",
+          "mute": false,
+          "name": "Drums 11:38:34 PM",
+          "order": 18,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 12,
+          "id": "ca4807f5-c4eb-43e3-8e57-df7b3b93129e",
+          "instrument": "Piano",
+          "mute": false,
+          "name": "Piano 11:40:02 PM",
+          "order": 19,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 12,
+          "id": "8c41de81-edc5-402d-8dd3-397ff8720c30",
+          "instrument": "Drums",
+          "mute": false,
+          "name": "Drums 11:40:54 PM",
+          "order": 20,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "7d9d0af9-6b55-401e-8df2-c4f34e59a67c",
+          "instrument": "Drums",
+          "mute": false,
+          "name": "Drums 11:42:31 PM",
+          "order": 21,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "ed246bf6-8ac4-4e98-ba3e-88acbc3c6e4b",
+          "instrument": "Drums",
+          "mute": false,
+          "name": "Drums 11:43:13 PM",
+          "order": 22,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "49e83e4d-6c0f-43c3-9a28-ac5be8764c5c",
+          "instrument": "Piano",
+          "mute": false,
+          "name": "Piano 11:55:14 PM",
+          "order": 23,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 12,
+          "id": "8ca844ed-f7bf-4f6b-81f4-facd70bb36c4",
+          "instrument": "Piano",
+          "mute": false,
+          "name": "Piano 11:56:59 PM",
+          "order": 24,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 12,
+          "id": "5bbf89d8-e0c0-40e5-ae51-3547fe143771",
+          "instrument": "Piano",
+          "mute": false,
+          "name": "Piano 12:09:57 AM",
+          "order": 25,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "150b5143-1420-4a9e-8b8e-2cd76b0f03d4",
+          "instrument": "Guitar",
+          "mute": false,
+          "name": "Guitar 12:11:28 AM",
+          "order": 26,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "0559d853-ea7c-49d2-bee7-7485433852f0",
+          "instrument": "Guitar",
+          "mute": false,
+          "name": "Guitar 12:12:18 AM",
+          "order": 27,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "37f12bd1-ea5d-47f8-a319-58657ce60e97",
+          "instrument": "Guitar",
+          "mute": false,
+          "name": "Guitar 12:12:32 AM",
+          "order": 28,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "7aaae167-3e08-46bd-8d1c-df503a013af1",
+          "instrument": "Drums",
+          "mute": false,
+          "name": "Drums 12:13:31 AM",
+          "order": 29,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": true,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 11.5,
+          "id": "78990741-1627-4dd8-a079-38da91e891c7",
+          "instrument": "Strings",
+          "mute": false,
+          "name": "Strings 12:14:22 AM",
+          "order": 30,
+          "projectId": "323c01d9798748b1a4afa0b2d0a4b021",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        }
+      ],
+      "metadata": {},
+      "project": {
+        "assetId": "7dc76610cf944cf5b52aab83acd5b426",
+        "bpm": 120,
+        "createdAt": "2026-02-11T12:37:11.071194",
+        "durationSec": 107.8,
+        "id": "323c01d9798748b1a4afa0b2d0a4b021",
+        "key": null,
+        "sampleRate": 192000,
+        "timeSignature": null,
+        "updatedAt": "2026-02-12T00:16:12.170665"
+      }
+    },
+    "98388241861645ddaa6b275fd23f7a6e": {
+      "assets": {
+        "instrumental:222d20fc8bf447b3a8cebff65b828ba4": {
+          "durationSec": 99.0,
+          "fileType": "instrumental",
+          "id": "instrumental:222d20fc8bf447b3a8cebff65b828ba4",
+          "kind": "instrumental",
+          "label": "Instrumental",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\instrumentals\\222d20fc8bf447b3a8cebff65b828ba4_instrumental.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/instrumental/222d20fc8bf447b3a8cebff65b828ba4"
+        },
+        "uvr_stem:4456780a57474cf3b5c622d6af94b424": {
+          "durationSec": 99.0,
+          "id": "uvr_stem:4456780a57474cf3b5c622d6af94b424",
+          "kind": "stem",
+          "label": "Drums",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_drums_9d826ab9bcab449bb2f5699397a58664.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/exports/uvr_stem_drums_9d826ab9bcab449bb2f5699397a58664.wav"
+        },
+        "uvr_stem:494bbe27313a4f3db428f0a37be3e709": {
+          "durationSec": 99.0,
+          "id": "uvr_stem:494bbe27313a4f3db428f0a37be3e709",
+          "kind": "stem",
+          "label": "Bass",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_bass_55340d601357459ba738a76da1727c7a.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/exports/uvr_stem_bass_55340d601357459ba738a76da1727c7a.wav"
+        },
+        "uvr_stem:84c66508864c4027b1150730493001a9": {
+          "durationSec": 99.0,
+          "id": "uvr_stem:84c66508864c4027b1150730493001a9",
+          "kind": "stem",
+          "label": "Highs",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_highs_e12e12ffd58f4d308cd2914f906be4d7.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/exports/uvr_stem_highs_e12e12ffd58f4d308cd2914f906be4d7.wav"
+        },
+        "uvr_stem:e6eeb96562094e40a99d1d8272248ea4": {
+          "durationSec": 99.0,
+          "id": "uvr_stem:e6eeb96562094e40a99d1d8272248ea4",
+          "kind": "stem",
+          "label": "Mids",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_mids_25b811b50eb143bb8e991f9f3999e5cc.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/exports/uvr_stem_mids_25b811b50eb143bb8e991f9f3999e5cc.wav"
+        },
+        "vocal:222d20fc8bf447b3a8cebff65b828ba4": {
+          "durationSec": 99.0,
+          "fileType": "processed_vocals",
+          "id": "vocal:222d20fc8bf447b3a8cebff65b828ba4",
+          "kind": "vocal",
+          "label": "Vocals",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\vocals\\processed\\222d20fc8bf447b3a8cebff65b828ba4_vocals.wav",
+          "sampleRate": 192000,
+          "url": "/api/download/processed_vocals/222d20fc8bf447b3a8cebff65b828ba4"
+        }
+      },
+      "clips": [
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "a583c9aa-a423-4887-8e3f-3366f122509b",
+          "label": "MIDI \u00b7 Piano",
+          "laneId": "2f8d75f4-9621-4023-a5d8-329ac2acd714",
+          "midi": {
+            "bpm": 60,
+            "instrument": "Piano",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAZAD/UQMPQkAA/1gEBAIYCB2QOCwygDgAhmyQMX2GZ4AxAAiQM2CCRIAzABqQL3OGFoAvACiQMVOGcYAxAIJTkChegSGAKAAVkCtXbIArAAKQKFiBEoAoAAOQKlmDPIAqAAD/LwA=",
+            "mode": "dubler_melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationTick": 871,
+                "note": 49,
+                "startTick": 955,
+                "velocity": 125
+              },
+              {
+                "channel": 0,
+                "durationTick": 324,
+                "note": 51,
+                "startTick": 1834,
+                "velocity": 96
+              },
+              {
+                "channel": 0,
+                "durationTick": 790,
+                "note": 47,
+                "startTick": 2184,
+                "velocity": 115
+              },
+              {
+                "channel": 0,
+                "durationTick": 881,
+                "note": 49,
+                "startTick": 3014,
+                "velocity": 83
+              },
+              {
+                "channel": 0,
+                "durationTick": 161,
+                "note": 40,
+                "startTick": 4234,
+                "velocity": 94
+              },
+              {
+                "channel": 0,
+                "durationTick": 108,
+                "note": 43,
+                "startTick": 4416,
+                "velocity": 87
+              },
+              {
+                "channel": 0,
+                "durationTick": 146,
+                "note": 40,
+                "startTick": 4526,
+                "velocity": 88
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 8.758333206176758,
+          "srcStartSec": 0,
+          "timelineStartSec": 0.025000000000000133
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "d54163a7-6371-4220-864a-3deb2b669b45",
+          "label": "MIDI \u00b7 Piano",
+          "laneId": "c4f99eb8-3fb5-48fc-891a-3907f59537c6",
+          "midi": {
+            "bpm": 60,
+            "instrument": "Piano",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAZAD/UQMPQkAA/1gEBAIYCB2QOCwygDgAhmyQMX2GZ4AxAAiQM2CCRIAzABqQL3OGFoAvACiQMVOGcYAxAIJTkChegSGAKAAVkCtXbIArAAKQKFiBEoAoAAOQKlmDPIAqAAD/LwA=",
+            "mode": "dubler_melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationTick": 871,
+                "note": 49,
+                "startTick": 955,
+                "velocity": 125
+              },
+              {
+                "channel": 0,
+                "durationTick": 324,
+                "note": 51,
+                "startTick": 1834,
+                "velocity": 96
+              },
+              {
+                "channel": 0,
+                "durationTick": 790,
+                "note": 47,
+                "startTick": 2184,
+                "velocity": 115
+              },
+              {
+                "channel": 0,
+                "durationTick": 881,
+                "note": 49,
+                "startTick": 3014,
+                "velocity": 83
+              },
+              {
+                "channel": 0,
+                "durationTick": 161,
+                "note": 40,
+                "startTick": 4234,
+                "velocity": 94
+              },
+              {
+                "channel": 0,
+                "durationTick": 108,
+                "note": 43,
+                "startTick": 4416,
+                "velocity": 87
+              },
+              {
+                "channel": 0,
+                "durationTick": 146,
+                "note": 40,
+                "startTick": 4526,
+                "velocity": 88
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 8.758333206176758,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "71a62aa2-4fce-4f25-8cec-9b6db241afef",
+          "label": "MIDI \u00b7 Drums",
+          "laneId": "d454f73c-9555-45dc-b790-6ea2b7d75f90",
+          "midi": {
+            "bpm": 60,
+            "instrument": "Drums",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAATwD/UQMPQkAA/1gEBAIYCIJomSRIeIkkAIFwmSRGeIkkAACZJFN4iSQAgmiZJEJ4iSQAAJkkPHiJJACCaJkkNXiJJAAAmSRDeIkkAAD/LwA=",
+            "mode": "dubler_drums",
+            "notes": [
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 360,
+                "velocity": 72
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 720,
+                "velocity": 70
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 840,
+                "velocity": 83
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 1320,
+                "velocity": 66
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 1440,
+                "velocity": 60
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 1920,
+                "velocity": 53
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 2040,
+                "velocity": 67
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 4.5,
+          "srcStartSec": 0.8499998728434244,
+          "timelineStartSec": 2.6833332061767576
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "885ddd94-5aff-4772-8beb-4fe563f9ca70",
+          "label": "MIDI \u00b7 Drums",
+          "laneId": "d454f73c-9555-45dc-b790-6ea2b7d75f90",
+          "midi": {
+            "bpm": 60,
+            "instrument": "Drums",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAATwD/UQMPQkAA/1gEBAIYCIJomSRIeIkkAIFwmSRGeIkkAACZJFN4iSQAgmiZJEJ4iSQAAJkkPHiJJACCaJkkNXiJJAAAmSRDeIkkAAD/LwA=",
+            "mode": "dubler_drums",
+            "notes": [
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 360,
+                "velocity": 72
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 720,
+                "velocity": 70
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 840,
+                "velocity": 83
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 1320,
+                "velocity": 66
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 1440,
+                "velocity": 60
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 1920,
+                "velocity": 53
+              },
+              {
+                "channel": 9,
+                "durationTick": 120,
+                "note": 36,
+                "startTick": 2040,
+                "velocity": 67
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 4.5,
+          "srcStartSec": 1.199999745686849,
+          "timelineStartSec": 6.683333206176758
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "8efc5e47-a2fc-42ef-bd01-9f394a97547e",
+          "label": "MIDI \u00b7 Bass",
+          "laneId": "bf0b5e39-ecff-4b50-93b9-2bc920b8e055",
+          "midi": {
+            "bpm": 60,
+            "cc": [
+              {
+                "cc": 74,
+                "timeSec": 1.31,
+                "value": 63
+              },
+              {
+                "cc": 71,
+                "timeSec": 1.31,
+                "value": 32
+              },
+              {
+                "cc": 74,
+                "timeSec": 1.42,
+                "value": 0
+              },
+              {
+                "cc": 71,
+                "timeSec": 1.42,
+                "value": 18
+              },
+              {
+                "cc": 74,
+                "timeSec": 2.21,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 2.21,
+                "value": 68
+              },
+              {
+                "cc": 74,
+                "timeSec": 2.43,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 2.43,
+                "value": 98
+              },
+              {
+                "cc": 74,
+                "timeSec": 3.16,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 3.16,
+                "value": 92
+              },
+              {
+                "cc": 74,
+                "timeSec": 3.62,
+                "value": 95
+              },
+              {
+                "cc": 71,
+                "timeSec": 3.62,
+                "value": 82
+              },
+              {
+                "cc": 74,
+                "timeSec": 4.430000000000001,
+                "value": 28
+              },
+              {
+                "cc": 71,
+                "timeSec": 4.430000000000001,
+                "value": 50
+              },
+              {
+                "cc": 74,
+                "timeSec": 6.04,
+                "value": 79
+              },
+              {
+                "cc": 71,
+                "timeSec": 6.04,
+                "value": 87
+              },
+              {
+                "cc": 74,
+                "timeSec": 6.2,
+                "value": 45
+              },
+              {
+                "cc": 71,
+                "timeSec": 6.2,
+                "value": 91
+              },
+              {
+                "cc": 74,
+                "timeSec": 6.6000000000000005,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 6.6000000000000005,
+                "value": 127
+              },
+              {
+                "cc": 74,
+                "timeSec": 7.1000000000000005,
+                "value": 117
+              },
+              {
+                "cc": 71,
+                "timeSec": 7.1000000000000005,
+                "value": 127
+              },
+              {
+                "cc": 74,
+                "timeSec": 7.260000000000001,
+                "value": 33
+              },
+              {
+                "cc": 71,
+                "timeSec": 7.260000000000001,
+                "value": 80
+              },
+              {
+                "cc": 74,
+                "timeSec": 7.680000000000001,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 7.680000000000001,
+                "value": 127
+              }
+            ],
+            "instrument": "Bass",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAYgD/UQMPQkAA/1gEBAIYCIRYkCxneIAsAACQLX6CaIAtAACQLmV4gC4AAJAtRniALQCCaJAvUYJogC8AeJAnToVQgCcAAJAnN3iAJwB4kCUvgXCAJQAAkDgrgXCAOAAA/y8A",
+            "mode": "dubler_melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationSec": 1.075,
+                "durationTick": 516,
+                "note": 46,
+                "startSec": 0.8083335876464844,
+                "startTick": 388,
+                "velocity": 126
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 46,
+                "startTick": 1080,
+                "velocity": 101
+              },
+              {
+                "channel": 0,
+                "durationSec": 0.43333358764648455,
+                "durationTick": 208,
+                "note": 44,
+                "startSec": 2.75,
+                "startTick": 1320,
+                "velocity": 70
+              },
+              {
+                "channel": 0,
+                "durationSec": 0.75,
+                "durationTick": 360,
+                "note": 42,
+                "startSec": 3.45,
+                "startTick": 1656,
+                "velocity": 81
+              },
+              {
+                "channel": 0,
+                "durationTick": 720,
+                "note": 39,
+                "startTick": 2160,
+                "velocity": 78
+              },
+              {
+                "channel": 0,
+                "durationSec": 0.25,
+                "durationTick": 120,
+                "note": 38,
+                "startSec": 5.983333587646484,
+                "startTick": 2872,
+                "velocity": 55
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 37,
+                "startTick": 3120,
+                "velocity": 47
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 7.5,
+          "srcStartSec": 0,
+          "timelineStartSec": 1.0083333333333333
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "46aa1ea1-28fe-4032-9c42-571dd1e7ec31",
+          "label": "MIDI \u00b7 Strings",
+          "laneId": "1a870b2e-81d8-4b54-9a98-fcaa4dd9038c",
+          "midi": {
+            "bpm": 60,
+            "cc": [
+              {
+                "cc": 74,
+                "timeSec": 0.1,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 0.1,
+                "value": 127
+              },
+              {
+                "cc": 74,
+                "timeSec": 1.32,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 1.32,
+                "value": 127
+              },
+              {
+                "cc": 74,
+                "timeSec": 3.0000000000000004,
+                "value": 6
+              },
+              {
+                "cc": 71,
+                "timeSec": 3.0000000000000004,
+                "value": 85
+              },
+              {
+                "cc": 74,
+                "timeSec": 4.05,
+                "value": 9
+              },
+              {
+                "cc": 71,
+                "timeSec": 4.05,
+                "value": 53
+              },
+              {
+                "cc": 74,
+                "timeSec": 5.69,
+                "value": 14
+              },
+              {
+                "cc": 71,
+                "timeSec": 5.69,
+                "value": 43
+              },
+              {
+                "cc": 74,
+                "timeSec": 6.21,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 6.21,
+                "value": 58
+              },
+              {
+                "cc": 74,
+                "timeSec": 7.41,
+                "value": 0
+              },
+              {
+                "cc": 71,
+                "timeSec": 7.41,
+                "value": 52
+              },
+              {
+                "cc": 74,
+                "timeSec": 8.02,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 8.02,
+                "value": 127
+              }
+            ],
+            "instrument": "Strings",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAWgD/UQMPQkAA/1gEBAIYCACQNEd4gDQAg2CQMWOEWIAxAIFwkDQxg2CANAAAkC9GhVCALwB4kDJqeIAyAHiQMVSBcIAxAIJokDFyeIAxAHiQMjt4gDIAAP8vAA==",
+            "mode": "dubler_melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationSec": 1.4916664123535157,
+                "durationTick": 716,
+                "note": 49,
+                "startSec": 1.25,
+                "startTick": 600,
+                "velocity": 99
+              },
+              {
+                "channel": 0,
+                "durationSec": 1.2583335876464843,
+                "durationTick": 604,
+                "note": 52,
+                "startSec": 2.949999237060547,
+                "startTick": 1416,
+                "velocity": 49
+              },
+              {
+                "channel": 0,
+                "durationSec": 1.2333333333333334,
+                "durationTick": 592,
+                "note": 47,
+                "startSec": 4.216666666666667,
+                "startTick": 2024,
+                "velocity": 70
+              },
+              {
+                "channel": 0,
+                "durationSec": 1.5222213745117195,
+                "durationTick": 731,
+                "note": 49,
+                "startSec": 5.5611122131347654,
+                "startTick": 2669,
+                "velocity": 106
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 8.25,
+          "srcStartSec": 0,
+          "timelineStartSec": 0.28749999999999876
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "0308c0ba-8d16-4116-b81f-bc60f2605a2e",
+          "label": "MIDI \u00b7 Strings",
+          "laneId": "3d7049f5-ff93-4fcf-909b-28491393e360",
+          "midi": {
+            "bpm": 60,
+            "cc": [
+              {
+                "cc": 74,
+                "timeSec": 1.08,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 1.08,
+                "value": 102
+              },
+              {
+                "cc": 74,
+                "timeSec": 1.1999999999999997,
+                "value": 79
+              },
+              {
+                "cc": 71,
+                "timeSec": 1.1999999999999997,
+                "value": 24
+              },
+              {
+                "cc": 74,
+                "timeSec": 1.61,
+                "value": 13
+              },
+              {
+                "cc": 71,
+                "timeSec": 1.61,
+                "value": 21
+              },
+              {
+                "cc": 74,
+                "timeSec": 1.87,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 1.87,
+                "value": 89
+              },
+              {
+                "cc": 74,
+                "timeSec": 2.4,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 2.4,
+                "value": 97
+              },
+              {
+                "cc": 74,
+                "timeSec": 2.66,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 2.66,
+                "value": 121
+              },
+              {
+                "cc": 74,
+                "timeSec": 2.86,
+                "value": 70
+              },
+              {
+                "cc": 71,
+                "timeSec": 2.86,
+                "value": 20
+              },
+              {
+                "cc": 74,
+                "timeSec": 3.23,
+                "value": 116
+              },
+              {
+                "cc": 71,
+                "timeSec": 3.23,
+                "value": 77
+              },
+              {
+                "cc": 74,
+                "timeSec": 3.48,
+                "value": 84
+              },
+              {
+                "cc": 71,
+                "timeSec": 3.48,
+                "value": 95
+              },
+              {
+                "cc": 74,
+                "timeSec": 4.2,
+                "value": 0
+              },
+              {
+                "cc": 71,
+                "timeSec": 4.2,
+                "value": 57
+              },
+              {
+                "cc": 74,
+                "timeSec": 4.3,
+                "value": 64
+              },
+              {
+                "cc": 71,
+                "timeSec": 4.3,
+                "value": 21
+              },
+              {
+                "cc": 74,
+                "timeSec": 4.7700000000000005,
+                "value": 0
+              },
+              {
+                "cc": 71,
+                "timeSec": 4.7700000000000005,
+                "value": 74
+              },
+              {
+                "cc": 74,
+                "timeSec": 5.15,
+                "value": 56
+              },
+              {
+                "cc": 71,
+                "timeSec": 5.15,
+                "value": 17
+              },
+              {
+                "cc": 74,
+                "timeSec": 5.9,
+                "value": 126
+              },
+              {
+                "cc": 71,
+                "timeSec": 5.9,
+                "value": 87
+              },
+              {
+                "cc": 74,
+                "timeSec": 5.99,
+                "value": 79
+              },
+              {
+                "cc": 71,
+                "timeSec": 5.99,
+                "value": 24
+              },
+              {
+                "cc": 74,
+                "timeSec": 6.34,
+                "value": 86
+              },
+              {
+                "cc": 71,
+                "timeSec": 6.34,
+                "value": 16
+              },
+              {
+                "cc": 74,
+                "timeSec": 8.48,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 8.48,
+                "value": 72
+              },
+              {
+                "cc": 74,
+                "timeSec": 8.91,
+                "value": 112
+              },
+              {
+                "cc": 71,
+                "timeSec": 8.91,
+                "value": 51
+              },
+              {
+                "cc": 74,
+                "timeSec": 9.31,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 9.31,
+                "value": 127
+              },
+              {
+                "cc": 74,
+                "timeSec": 9.41,
+                "value": 87
+              },
+              {
+                "cc": 71,
+                "timeSec": 9.41,
+                "value": 48
+              },
+              {
+                "cc": 74,
+                "timeSec": 9.59,
+                "value": 105
+              },
+              {
+                "cc": 71,
+                "timeSec": 9.59,
+                "value": 85
+              },
+              {
+                "cc": 74,
+                "timeSec": 9.73,
+                "value": 88
+              },
+              {
+                "cc": 71,
+                "timeSec": 9.73,
+                "value": 41
+              },
+              {
+                "cc": 74,
+                "timeSec": 10.23,
+                "value": 114
+              },
+              {
+                "cc": 71,
+                "timeSec": 10.23,
+                "value": 45
+              },
+              {
+                "cc": 74,
+                "timeSec": 10.35,
+                "value": 85
+              },
+              {
+                "cc": 71,
+                "timeSec": 10.35,
+                "value": 127
+              },
+              {
+                "cc": 74,
+                "timeSec": 10.450000000000001,
+                "value": 0
+              },
+              {
+                "cc": 71,
+                "timeSec": 10.450000000000001,
+                "value": 55
+              }
+            ],
+            "instrument": "Strings",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAvAD/UQMPQkAA/1gEBAIYCINgkDBweIAwAACQL32BcIAvAACQK3h4gCsAAJAvZYFwgC8AeJAsSXiALAAAkC9GeIAvAACQMFB4gDAAeJAvSniALwAAkC5WgmiALgAAkDBCeIAwAACQL2SBcIAvAACQNlV4gDYAeJAyQ3iAMgCBcJAsSHiALAAAkCxAeIAsAIdAkDBngmiAMAAAkDBoeIAwAACQL3F4gC8AAJAzYHiAMwCBcJAnWHiAJwAA/y8A",
+            "mode": "dubler_melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 48,
+                "startTick": 480,
+                "velocity": 112
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 47,
+                "startTick": 600,
+                "velocity": 125
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 43,
+                "startTick": 720,
+                "velocity": 120
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 47,
+                "startTick": 840,
+                "velocity": 101
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 44,
+                "startTick": 1200,
+                "velocity": 73
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 1320,
+                "velocity": 70
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 48,
+                "startTick": 1320,
+                "velocity": 80
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 1560,
+                "velocity": 74
+              },
+              {
+                "channel": 0,
+                "durationTick": 360,
+                "note": 46,
+                "startTick": 1680,
+                "velocity": 86
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 48,
+                "startTick": 2040,
+                "velocity": 66
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 47,
+                "startTick": 2040,
+                "velocity": 100
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 54,
+                "startTick": 2280,
+                "velocity": 85
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 50,
+                "startTick": 2520,
+                "velocity": 67
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 44,
+                "startTick": 2880,
+                "velocity": 72
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 44,
+                "startTick": 3000,
+                "velocity": 64
+              },
+              {
+                "channel": 0,
+                "durationTick": 360,
+                "note": 48,
+                "startTick": 4080,
+                "velocity": 103
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 48,
+                "startTick": 4440,
+                "velocity": 104
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 4560,
+                "velocity": 113
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 51,
+                "startTick": 4560,
+                "velocity": 96
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 39,
+                "startTick": 4920,
+                "velocity": 88
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 10.5,
+          "srcStartSec": 0,
+          "timelineStartSec": 9.191666666666666
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "6852c430-9992-4ca2-a950-3ddd3890935d",
+          "label": "MIDI \u00b7 Strings",
+          "laneId": "2b379743-b7de-4673-8444-49a82ada21c5",
+          "midi": {
+            "bpm": 60,
+            "instrument": "Strings",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAABqAD/UQMPQkAA/1gEBAIYCIFwkC9wgXCALwB4kDBmeIAwAHiQN1F4gDcAAJAwMoFwgDAAAJAvPHiALwAAkC5DgXCALgAAkC0veIAtAACQL2CBcIAvAACQLEd4gCwAAJApP3iAKQAAkCZOgXCAJgB4kDdgeIA3AACQOG6BcIA4AACQN054gDcAAJA4NXiAOACNEJAqYniAKgAAkCt1eIArAHiQLnt4gC4AAJAxa3iAMQB4kDZ0eIA2AACQM2l4gDMAeJAyWXiAMgAAkC9oeIAvAHiQOGl4gDgAAJAqZniAKgAAkCZSeIAmAACQJ1yCaIAnAIdAkCl6eIApAACQKm14gCoAeJAucniALgAAkDBneIAwAACQL2p4gC8AAJApYXiAKQAAkCpfeIAqAHiQKFN4gCgAAJAnXIFwgCcAAJAoSniAKAAAkCpSeIAqAHiQKmJ4gCoAAJApc3iAKQB4kC5heIAuAACQMGh4gDAAAJAvcHiALwAAkClneIApAACQKmKBcIAqAHiQJ0F4gCcAAJAoSYFwgCgAAJApUXiAKQAAkCpkeIAqAAD/LwA=",
+            "mode": "dubler_melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 47,
+                "startTick": 240,
+                "velocity": 112
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 48,
+                "startTick": 600,
+                "velocity": 102
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 55,
+                "startTick": 840,
+                "velocity": 81
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 48,
+                "startTick": 960,
+                "velocity": 50
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 1200,
+                "velocity": 60
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 46,
+                "startTick": 1320,
+                "velocity": 67
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 45,
+                "startTick": 1560,
+                "velocity": 47
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 47,
+                "startTick": 1680,
+                "velocity": 96
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 44,
+                "startTick": 1920,
+                "velocity": 71
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 2040,
+                "velocity": 63
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 38,
+                "startTick": 2160,
+                "velocity": 78
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 55,
+                "startTick": 2520,
+                "velocity": 96
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 56,
+                "startTick": 2640,
+                "velocity": 110
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 55,
+                "startTick": 2760,
+                "velocity": 78
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 56,
+                "startTick": 2880,
+                "velocity": 53
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 42,
+                "startTick": 4680,
+                "velocity": 98
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 43,
+                "startTick": 4680,
+                "velocity": 117
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 46,
+                "startTick": 4920,
+                "velocity": 123
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 49,
+                "startTick": 4920,
+                "velocity": 107
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 54,
+                "startTick": 5160,
+                "velocity": 116
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 51,
+                "startTick": 5160,
+                "velocity": 105
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 50,
+                "startTick": 5400,
+                "velocity": 89
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 5400,
+                "velocity": 104
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 56,
+                "startTick": 5640,
+                "velocity": 105
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 42,
+                "startTick": 5760,
+                "velocity": 102
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 38,
+                "startTick": 5880,
+                "velocity": 82
+              },
+              {
+                "channel": 0,
+                "durationTick": 360,
+                "note": 39,
+                "startTick": 5880,
+                "velocity": 92
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 7200,
+                "velocity": 122
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 42,
+                "startTick": 7320,
+                "velocity": 109
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 46,
+                "startTick": 7560,
+                "velocity": 114
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 48,
+                "startTick": 7680,
+                "velocity": 103
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 7800,
+                "velocity": 106
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 7920,
+                "velocity": 97
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 42,
+                "startTick": 8040,
+                "velocity": 95
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 40,
+                "startTick": 8280,
+                "velocity": 83
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 39,
+                "startTick": 8280,
+                "velocity": 92
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 40,
+                "startTick": 8520,
+                "velocity": 74
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 42,
+                "startTick": 8640,
+                "velocity": 82
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 42,
+                "startTick": 8880,
+                "velocity": 98
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 8880,
+                "velocity": 115
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 46,
+                "startTick": 9120,
+                "velocity": 97
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 48,
+                "startTick": 9240,
+                "velocity": 104
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 9360,
+                "velocity": 112
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 9480,
+                "velocity": 103
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 42,
+                "startTick": 9600,
+                "velocity": 98
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 39,
+                "startTick": 9960,
+                "velocity": 65
+              },
+              {
+                "channel": 0,
+                "durationTick": 240,
+                "note": 40,
+                "startTick": 9960,
+                "velocity": 73
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 10200,
+                "velocity": 81
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 42,
+                "startTick": 10320,
+                "velocity": 100
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 21.75,
+          "srcStartSec": 0,
+          "timelineStartSec": 21.591666666666665
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "ea0d6176-3a7a-4a07-842b-21c2d92d6cc0",
+          "label": "MIDI \u00b7 Strings",
+          "laneId": "371a53fe-f5d9-448a-b383-148b183f3300",
+          "midi": {
+            "bpm": 60,
+            "instrument": "Strings",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAqAD/UQMPQkAA/1gEBAIYCIRYkCpseIAqAACQKVt4gCkAAJArY3iAKwB4kC5teIAuAHiQMFJ4gDAAeJApVHiAKQAAkCpmeIAqAACQK154gCsAAJArcHiAKwCBcJAoT3iAKAAAkClQeIApAACQK1l4gCsAAJAqZHiAKgCOCJAsVniALAAAkC1ZeIAtAHiQL294gC8AhFiQNXh4gDUAgXCQM3B4gDMAAP8vAA==",
+            "mode": "dubler_melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 42,
+                "startTick": 600,
+                "velocity": 108
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 720,
+                "velocity": 91
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 43,
+                "startTick": 840,
+                "velocity": 99
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 46,
+                "startTick": 1080,
+                "velocity": 109
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 48,
+                "startTick": 1320,
+                "velocity": 82
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 1560,
+                "velocity": 84
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 42,
+                "startTick": 1680,
+                "velocity": 102
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 43,
+                "startTick": 1680,
+                "velocity": 94
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 43,
+                "startTick": 1800,
+                "velocity": 112
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 40,
+                "startTick": 2160,
+                "velocity": 79
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 41,
+                "startTick": 2280,
+                "velocity": 80
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 43,
+                "startTick": 2280,
+                "velocity": 89
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 42,
+                "startTick": 2400,
+                "velocity": 100
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 44,
+                "startTick": 4320,
+                "velocity": 86
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 45,
+                "startTick": 4440,
+                "velocity": 89
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 47,
+                "startTick": 4680,
+                "velocity": 111
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 53,
+                "startTick": 5400,
+                "velocity": 120
+              },
+              {
+                "channel": 0,
+                "durationTick": 120,
+                "note": 51,
+                "startTick": 5760,
+                "velocity": 112
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 12.25,
+          "srcStartSec": 0,
+          "timelineStartSec": 44.6625
+        }
+      ],
+      "lanes": [
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "c4f99eb8-3fb5-48fc-891a-3907f59537c6",
+          "instrument": "Piano",
+          "mute": false,
+          "name": "Piano 12:23:37 AM",
+          "order": 1,
+          "projectId": "98388241861645ddaa6b275fd23f7a6e",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#ff6b6b",
+          "fx": {
+            "chorus": {
+              "depth": 0.001,
+              "enabled": true
+            },
+            "pitch": {
+              "semitones": 12
+            },
+            "reverb": {
+              "decay": 6.2,
+              "enabled": true,
+              "mix": 0.64
+            }
+          },
+          "gainDb": 0,
+          "id": "2f8d75f4-9621-4023-a5d8-329ac2acd714",
+          "instrument": "Piano",
+          "mute": false,
+          "name": "Piano 12:24:45 AM",
+          "order": 2,
+          "projectId": "98388241861645ddaa6b275fd23f7a6e",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#ffd166",
+          "fx": {
+            "pitch": {
+              "semitones": -9
+            },
+            "reverb": {
+              "decay": 5.2,
+              "enabled": true,
+              "mix": 0.69
+            }
+          },
+          "gainDb": 0,
+          "id": "d454f73c-9555-45dc-b790-6ea2b7d75f90",
+          "instrument": "Drums",
+          "mute": false,
+          "name": "Drums 12:30:46 AM",
+          "order": 3,
+          "projectId": "98388241861645ddaa6b275fd23f7a6e",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#06d6a0",
+          "fx": {},
+          "gainDb": 0,
+          "id": "bf0b5e39-ecff-4b50-93b9-2bc920b8e055",
+          "instrument": "Bass",
+          "mute": false,
+          "name": "Bass 12:34:13 AM",
+          "order": 4,
+          "projectId": "98388241861645ddaa6b275fd23f7a6e",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#4cc9f0",
+          "fx": {},
+          "gainDb": 0,
+          "id": "1a870b2e-81d8-4b54-9a98-fcaa4dd9038c",
+          "instrument": "Strings",
+          "mute": false,
+          "name": "Strings 12:36:30 AM",
+          "order": 5,
+          "projectId": "98388241861645ddaa6b275fd23f7a6e",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#f28482",
+          "fx": {},
+          "gainDb": 0,
+          "id": "3d7049f5-ff93-4fcf-909b-28491393e360",
+          "instrument": "Strings",
+          "mute": false,
+          "name": "Strings 12:48:11 AM",
+          "order": 6,
+          "projectId": "98388241861645ddaa6b275fd23f7a6e",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#8ac926",
+          "fx": {},
+          "gainDb": 0,
+          "id": "2b379743-b7de-4673-8444-49a82ada21c5",
+          "instrument": "Strings",
+          "mute": false,
+          "name": "Strings 12:49:11 AM",
+          "order": 7,
+          "projectId": "98388241861645ddaa6b275fd23f7a6e",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#ff9f1c",
+          "fx": {},
+          "gainDb": 0,
+          "id": "371a53fe-f5d9-448a-b383-148b183f3300",
+          "instrument": "Strings",
+          "mute": false,
+          "name": "Strings 12:51:38 AM",
+          "order": 8,
+          "projectId": "98388241861645ddaa6b275fd23f7a6e",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        }
+      ],
+      "metadata": {},
+      "project": {
+        "assetId": "222d20fc8bf447b3a8cebff65b828ba4",
+        "bpm": 60,
+        "createdAt": "2026-02-12T11:22:48.104634",
+        "durationSec": 99,
+        "id": "98388241861645ddaa6b275fd23f7a6e",
+        "key": null,
+        "sampleRate": 192000,
+        "timeSignature": null,
+        "updatedAt": "2026-02-14T00:52:24.397047"
+      }
+    },
+    "aa8a78c8ca074d06a7e6551afeba4c10": {
+      "assets": {
+        "instrumental:e428a97b82454635b8f670ab0d67a6b5": {
+          "durationSec": 204.56,
+          "fileType": "instrumental",
+          "id": "instrumental:e428a97b82454635b8f670ab0d67a6b5",
+          "kind": "instrumental",
+          "label": "Instrumental",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\instrumentals\\e428a97b82454635b8f670ab0d67a6b5_instrumental.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/instrumental/e428a97b82454635b8f670ab0d67a6b5"
+        },
+        "vocal:e428a97b82454635b8f670ab0d67a6b5": {
+          "durationSec": 204.56,
+          "fileType": "processed_vocals",
+          "id": "vocal:e428a97b82454635b8f670ab0d67a6b5",
+          "kind": "vocal",
+          "label": "Vocals",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\vocals\\processed\\e428a97b82454635b8f670ab0d67a6b5_vocals.wav",
+          "sampleRate": 192000,
+          "url": "/api/download/processed_vocals/e428a97b82454635b8f670ab0d67a6b5"
+        }
+      },
+      "clips": [
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "5368b53f-ba69-4fe8-8a06-1ae72a6de14e",
+          "label": "MIDI \u00b7 Piano",
+          "laneId": "7f2ed340-fd8e-4c7d-a5b6-06cd61b3a0a8",
+          "midi": {
+            "bpm": 60,
+            "instrument": "Piano",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAUAD/UQMPQkAA/1gEBAIYCINqkC52gViALgArkC51VoAuAIIzkC5wOoAuAD6QK3NDgCsAgWKQKXZDgCkAgQKQKmVqgCoATJA8b1uAPAAA/y8A",
+            "mode": "melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationTick": 216,
+                "note": 46,
+                "startTick": 490,
+                "velocity": 118
+              },
+              {
+                "channel": 0,
+                "durationTick": 86,
+                "note": 46,
+                "startTick": 749,
+                "velocity": 117
+              },
+              {
+                "channel": 0,
+                "durationTick": 58,
+                "note": 46,
+                "startTick": 1142,
+                "velocity": 112
+              },
+              {
+                "channel": 0,
+                "durationTick": 67,
+                "note": 43,
+                "startTick": 1262,
+                "velocity": 115
+              },
+              {
+                "channel": 0,
+                "durationTick": 67,
+                "note": 41,
+                "startTick": 1555,
+                "velocity": 118
+              },
+              {
+                "channel": 0,
+                "durationTick": 106,
+                "note": 42,
+                "startTick": 1752,
+                "velocity": 101
+              },
+              {
+                "channel": 0,
+                "durationTick": 91,
+                "note": 60,
+                "startTick": 1934,
+                "velocity": 111
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 4.21875,
+          "srcStartSec": 0,
+          "timelineStartSec": 3
+        },
+        {
+          "clipType": "midi",
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "892cf7f0-2123-4f7a-99fe-2f75d4cdeeae",
+          "label": "MIDI \u00b7 Piano",
+          "laneId": "7f2ed340-fd8e-4c7d-a5b6-06cd61b3a0a8",
+          "midi": {
+            "bpm": 60,
+            "cc": [
+              {
+                "cc": 74,
+                "timeSec": 1.02,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 1.02,
+                "value": 108
+              },
+              {
+                "cc": 74,
+                "timeSec": 1.536,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 1.536,
+                "value": 115
+              },
+              {
+                "cc": 74,
+                "timeSec": 1.824,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 1.824,
+                "value": 117
+              },
+              {
+                "cc": 74,
+                "timeSec": 2.208,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 2.208,
+                "value": 87
+              },
+              {
+                "cc": 74,
+                "timeSec": 2.624,
+                "value": 127
+              },
+              {
+                "cc": 71,
+                "timeSec": 2.624,
+                "value": 108
+              },
+              {
+                "cc": 74,
+                "timeSec": 2.912,
+                "value": 0
+              },
+              {
+                "cc": 71,
+                "timeSec": 2.912,
+                "value": 74
+              },
+              {
+                "cc": 74,
+                "timeSec": 2.912,
+                "value": 0
+              },
+              {
+                "cc": 71,
+                "timeSec": 2.912,
+                "value": 74
+              },
+              {
+                "cc": 74,
+                "timeSec": 2.912,
+                "value": 0
+              },
+              {
+                "cc": 71,
+                "timeSec": 2.912,
+                "value": 74
+              }
+            ],
+            "instrument": "Piano",
+            "midiFileBase64": "TVRoZAAAAAYAAQABAeBNVHJrAAAAUQD/UQMPQkAA/1gEBAIYCINqkC44gViALgAfkC4yYoAuACmQMi5egDIAgiKQKzpGgCsARJApK4FhgCkAAJAqK4NMgCoAAJA8K4R0gDwAAP8vAA==",
+            "mode": "dubler_melody",
+            "notes": [
+              {
+                "channel": 0,
+                "durationTick": 216,
+                "note": 46,
+                "startTick": 490,
+                "velocity": 56
+              },
+              {
+                "channel": 0,
+                "durationTick": 98,
+                "note": 46,
+                "startTick": 737,
+                "velocity": 50
+              },
+              {
+                "channel": 0,
+                "durationTick": 94,
+                "note": 50,
+                "startTick": 876,
+                "velocity": 46
+              },
+              {
+                "channel": 0,
+                "durationTick": 70,
+                "note": 43,
+                "startTick": 1260,
+                "velocity": 58
+              },
+              {
+                "channel": 0,
+                "durationTick": 225,
+                "note": 41,
+                "startTick": 1398,
+                "velocity": 43
+              },
+              {
+                "channel": 0,
+                "durationTick": 460,
+                "note": 42,
+                "startTick": 1398,
+                "velocity": 43
+              },
+              {
+                "channel": 0,
+                "durationTick": 628,
+                "note": 60,
+                "startTick": 1398,
+                "velocity": 43
+              }
+            ],
+            "ppq": 480,
+            "timeSig": [
+              4,
+              4
+            ]
+          },
+          "sourceAssetId": null,
+          "srcEndSec": 4.220833333333333,
+          "srcStartSec": 0,
+          "timelineStartSec": 7.616666666666666
+        }
+      ],
+      "lanes": [
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "7f2ed340-fd8e-4c7d-a5b6-06cd61b3a0a8",
+          "instrument": "Piano",
+          "mute": false,
+          "name": "Piano 10:19:32 PM",
+          "order": 8,
+          "projectId": "aa8a78c8ca074d06a7e6551afeba4c10",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "2c32718c-1919-4335-aae6-caac9346a05f",
+          "instrument": "Piano",
+          "mute": false,
+          "name": "Piano 10:20:21 PM",
+          "order": 9,
+          "projectId": "aa8a78c8ca074d06a7e6551afeba4c10",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "7e09aed7-049c-4c69-b4c1-30b6287ffd11",
+          "instrument": "Piano",
+          "mute": false,
+          "name": "Piano 10:20:53 PM",
+          "order": 10,
+          "projectId": "aa8a78c8ca074d06a7e6551afeba4c10",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "4093c8b0-5bee-4fca-94a5-182ab9d85200",
+          "instrument": "Piano",
+          "mute": false,
+          "name": "Piano 10:21:21 PM",
+          "order": 11,
+          "projectId": "aa8a78c8ca074d06a7e6551afeba4c10",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        },
+        {
+          "color": "#6aa6ff",
+          "fx": {},
+          "gainDb": 0,
+          "id": "ba0b166f-6eb0-428f-aa27-2f32c452b5b7",
+          "instrument": "Piano",
+          "mute": false,
+          "name": "Piano 10:21:50 PM",
+          "order": 12,
+          "projectId": "aa8a78c8ca074d06a7e6551afeba4c10",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "midi"
+        }
+      ],
+      "metadata": {},
+      "project": {
+        "assetId": "e428a97b82454635b8f670ab0d67a6b5",
+        "bpm": 60,
+        "createdAt": "2026-02-12T22:18:07.692385",
+        "durationSec": 204.56,
+        "id": "aa8a78c8ca074d06a7e6551afeba4c10",
+        "key": null,
+        "sampleRate": 192000,
+        "timeSignature": null,
+        "updatedAt": "2026-02-13T00:08:42.686683"
+      }
+    }
+  }
+}

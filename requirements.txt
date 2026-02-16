@@ -2,6 +2,8 @@
 Flask==2.2.3
 Flask-Cors==3.0.10
 Werkzeug==2.2.3
+fastapi==0.110.0
+uvicorn[standard]==0.27.1
 
 # Audio processing
 numba==0.56.4
@@ -10,6 +12,9 @@ soundfile==0.12.1
 pydub==0.25.1
 numpy==1.23.5
 scipy==1.10.1
+aubio==0.4.9
+mido==1.3.2
+basic-pitch
 vocal
 noisereduce
 torchcrepe

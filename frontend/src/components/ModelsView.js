@@ -277,7 +277,11 @@ function ModelsView({
   const filteredLocalModels = useMemo(() => {
     if (!searchQuery.trim()) return localModelsMerged;
     const q = searchQuery.trim().toLowerCase();
-    return localModelsMerged.filter((model) => model.name?.toLowerCase().includes(q));
+    const qUnderscore = q.replace(/\s+/g, "_");
+    return localModelsMerged.filter((model) => {
+      const name = model.name?.toLowerCase() || "";
+      return name.includes(q) || name.includes(qUnderscore);
+    });
   }, [localModelsMerged, searchQuery]);
 
   const selectableLocalModels = useMemo(
@@ -561,6 +565,7 @@ function ModelsView({
                   leftIcon={<SearchIcon style={{ fontSize: 20 }} />}
                   rightNode={
                     <button
+                  
                       type="button"
                       title={isOnlineSearchEnabled ? "Disable online search" : "Enable online search"}
                       onClick={(e) => {
@@ -748,7 +753,7 @@ function ModelsView({
                       color: selectedCount > 0 ? "white" : t.subtext,
                     }}
                   >
-                    <DeleteIcon style={{ fontSize: 20 }} />
+                   <DeleteIcon style={{ fontSize: 20 }} />
                   </IconBtn>
 
                   {selectedCount > 0 && (
@@ -760,7 +765,7 @@ function ModelsView({
                         width: 22,
                         height: 22,
                         borderRadius: 999,
-                        background: t.danger,
+                        background: "red",
                         color: "white",
                         display: "grid",
                         placeItems: "center",

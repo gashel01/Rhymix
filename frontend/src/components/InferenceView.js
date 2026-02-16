@@ -3,6 +3,7 @@ import { useVolume } from "../contexts/VolumeContext";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import AudioTrackTable from "./AudioTrackTable/AudioTrackTable";
+import DeleteDialog from "./AudioTrackTable/InferenceResult/DeleteDialog";
 import ErrorBoundary from "./ErrorBoundary";
 import { useAudioPlayback } from "./InferenceView/useAudioPlayback";
 import { useTableActions } from "./InferenceView/useTableActions";
@@ -11,6 +12,7 @@ import { Alert } from './Homeview/Alert.js';
 import { Theme } from './Homeview/Theme.js';
 import Panel from './Homeview/Panel.js';
 import Btn from './Homeview/Btn.js';
+import { deleteInferenceRuns } from "../utils/apiService";
 
 function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToParams, onSelectionToModelSelection, onCoverWithTracks }) {
   const { volumeRef } = useVolume();
@@ -22,6 +24,8 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
   const [optimisticRuns, setOptimisticRuns] = useState([]);
   const [liveLoading, setLiveLoading] = useState(false);
   const [reactionPendingByRunId, setReactionPendingByRunId] = useState({});
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteState, setDeleteState] = useState({ loading: false, result: null });
   const pollingJobsRef = useRef(null);
   const liveStartedRef = useRef(false);
   const [pollingCount, setPollingCount] = useState(0);
@@ -210,6 +214,18 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
     return trackPairs.filter((pair) => selectedRows.includes(pair.id));
   }, [selectedRows, trackPairs]);
 
+  const selectedRunIds = useMemo(() => {
+    if (!selectedRows.length) return [];
+    const byId = new Map(trackPairs.map((pair) => [pair.id, pair]));
+    const runIds = [];
+    selectedRows.forEach((id) => {
+      const pair = byId.get(id);
+      const runId = pair?.runId || pair?.result?.runId || pair?.result?.id || null;
+      if (runId) runIds.push(runId);
+    });
+    return [...new Set(runIds)];
+  }, [selectedRows, trackPairs]);
+
   const uniqueModels = useMemo(() => {
     const models = new Map();
     selectedPairs.forEach((pair) => {
@@ -334,6 +350,42 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
   const hasRows = trackPairs.length > 0;
   const showSpinner = loading && !hasRows;
 
+  const handleOpenDelete = useCallback(() => {
+    if (!selectedRows.length) return;
+    if (!selectedRunIds.length) {
+      setError("No deletable inference results selected.");
+      return;
+    }
+    setDeleteDialogOpen(true);
+  }, [selectedRows.length, selectedRunIds.length, setError]);
+
+  const handleClearDeleteResult = useCallback(() => {
+    setDeleteState((prev) => ({ ...prev, result: null }));
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!selectedRunIds.length) {
+      setDeleteDialogOpen(false);
+      return;
+    }
+    setDeleteState({ loading: true, result: null });
+    try {
+      const res = await deleteInferenceRuns(selectedRunIds);
+      const runIdSet = new Set(selectedRunIds);
+      setServerRuns((prev) => prev.filter((run) => !runIdSet.has(run.runId || run.id)));
+      setOptimisticRuns((prev) => prev.filter((run) => !runIdSet.has(run.runId || run.id)));
+      setDeleteState({ loading: false, result: res });
+      setDeleteDialogOpen(false);
+      handleDeselectAllRows();
+      fetchInferenceResults();
+    } catch (err) {
+      setDeleteState({
+        loading: false,
+        result: { error: err?.message || "Failed to delete inference results" },
+      });
+    }
+  }, [fetchInferenceResults, handleDeselectAllRows, selectedRunIds, setOptimisticRuns, setServerRuns]);
+
   if (showSpinner) {
     return (
       <div style={{ minHeight: "100vh", background: t.pageBg, padding: "18px 0 32px 0" }}>
@@ -423,6 +475,9 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
               onRowSelect={handleRowSelect} // important
               onSelectAll={handleSelectAllRows} // important
               onDeselectAll={handleDeselectAllRows} // important
+              onDeleteSelected={handleOpenDelete}
+              externalDeleteResult={deleteState.result}
+              onClearDeleteResult={handleClearDeleteResult}
               enableGrouping
               onSetReaction={handleSetReaction}
               reactionPendingByRunId={reactionPendingByRunId}
@@ -477,6 +532,14 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
       <style>{`
           @keyframes spin{to{transform:rotate(360deg)}}
         `}</style>
+
+      <DeleteDialog
+        deleteDialogOpen={deleteDialogOpen}
+        setDeleteDialogOpen={setDeleteDialogOpen}
+        selectedRows={selectedRows}
+        isDeleting={deleteState.loading}
+        confirmDelete={confirmDelete}
+      />
 
 </>
   );

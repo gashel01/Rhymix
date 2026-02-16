@@ -330,6 +330,8 @@ def _download_and_install_model(payload: dict) -> dict:
     pths: list[Path] = []
     indexes: list[Path] = []
     source_url = model_url or ""
+    parsed_url = urllib.parse.urlparse(model_url or "")
+    url_ext = Path(parsed_url.path).suffix.lower()
 
     try:
         if files_info.get("zip") and model_id:
@@ -353,20 +355,21 @@ def _download_and_install_model(payload: dict) -> dict:
                 index_path = temp_root / Path(files_info["index"]).name
                 _download_file(index_url, index_path)
                 indexes = [index_path]
-        elif model_url.lower().endswith(".zip"):
+        elif url_ext == ".zip":
             zip_path = temp_root / "model.zip"
             _download_file(model_url, zip_path)
             extracted_root = temp_root / "extracted"
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(extracted_root)
             pths, indexes = _find_model_artifacts(extracted_root)
-        elif model_url.lower().endswith(".pth"):
+            source_url = model_url
+        elif url_ext == ".pth":
             filename = Path(urllib.parse.urlparse(model_url).path).name or "model.pth"
             pth_path = temp_root / filename
             _download_file(model_url, pth_path)
             pths = [pth_path]
             source_url = model_url
-        elif model_url.lower().endswith(".index"):
+        elif url_ext == ".index":
             filename = Path(urllib.parse.urlparse(model_url).path).name or "model.index"
             index_path = temp_root / filename
             _download_file(model_url, index_path)

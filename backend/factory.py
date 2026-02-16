@@ -27,6 +27,8 @@ def create_app():
     from backend.features.inference.routes import bp as inference_bp
     from backend.features.song_generation.routes import bp as song_generation_bp
     from backend.features.diarization.routes import bp as diarization_bp
+    from backend.features.studio.routes import bp as studio_bp
+    from backend.features.beatbox_wizard.routes import bp as beatbox_wizard_bp
 
     # Order: specific APIs first, catch-all frontend last
     app.register_blueprint(upload_bp)
@@ -38,6 +40,8 @@ def create_app():
     app.register_blueprint(inference_bp)
     app.register_blueprint(song_generation_bp)
     app.register_blueprint(diarization_bp)
+    app.register_blueprint(studio_bp)
+    app.register_blueprint(beatbox_wizard_bp)
 
     from backend.routes.base import bp as base_bp
 

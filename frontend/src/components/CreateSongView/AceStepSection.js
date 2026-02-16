@@ -18,25 +18,10 @@ const selectStyle = (t) => ({
 export function AceStepSection({
   ui,
   t,
+  advancedMode,
+  promptEngine,
   showAceStepAdvanced,
   setShowAceStepAdvanced,
-  promptEngine,
-  setPromptEngine,
-  useLmCodes,
-  setUseLmCodes,
-  setLmCodesTouched,
-  mergeMetaIntoCaption,
-  setMergeMetaIntoCaption,
-  constraintRapOnly,
-  setConstraintRapOnly,
-  constraintNoSinging,
-  setConstraintNoSinging,
-  constraintNoHook,
-  setConstraintNoHook,
-  useNegativePrompt,
-  setUseNegativePrompt,
-  negativePrompt,
-  setNegativePrompt,
   initializeLm,
   mainModelPath,
   setMainModelPath,
@@ -46,12 +31,6 @@ export function AceStepSection({
   setLmBackend,
   device,
   setDevice,
-  bpm,
-  setBpm,
-  keyscale,
-  setKeyscale,
-  timeSignature,
-  setTimeSignature,
   ditInferenceSteps,
   setDitInferenceSteps,
   shift,
@@ -67,123 +46,147 @@ export function AceStepSection({
   int8Quantization,
   setInt8Quantization,
 }) {
-  const { Panel, Pill, Input, CheckRow, Segmented } = ui;
-  return (
-    <div style={{ display: "grid", gap: 8 }}>
-      <div style={{ fontWeight: 950, letterSpacing: -0.2, color: t.text }}>Generation Model</div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <div style={{ fontWeight: 800, color: t.text }}>ACE-Step 1.5</div>
-        <Pill
-          tone={showAceStepAdvanced ? "primary" : "neutral"}
-          onClick={() => setShowAceStepAdvanced((v) => !v)}
-          title="Show advanced ACE-Step settings"
+  const { Pill, Input, CheckRow, Modal, Hairline } = ui;
+  const shortModel = String(mainModelPath || "").replace("acestep-", "").replace("v15-", "v1.5 ");
+  const summary = advancedMode
+    ? [
+      shortModel ? `Model ${shortModel}` : null,
+      initializeLm ? "LLM on" : "LLM off",
+      device ? `Device ${device}` : null,
+    ].filter(Boolean).join(" · ")
+    : (shortModel ? `Model ${shortModel}` : "Default model");
+  const showQualityLLM = promptEngine === "llm";
+  const Label = ({ text, tip }) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: t.subtext }}>
+      <span>{text}</span>
+      {tip && (
+        <span
+          title={tip}
+          style={{
+            width: 16,
+            height: 16,
+            borderRadius: 999,
+            border: `1px solid ${t.hairline}`,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 10,
+            fontWeight: 900,
+            color: t.subtext,
+            cursor: "help",
+          }}
         >
-          {showAceStepAdvanced ? "Advanced ✓" : "Advanced"}
-        </Pill>
-      </div>
-      <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
-        Defaults tuned for RTX 3070 Ti. Advanced options control LM, offload, and quantization.
-      </div>
-
-      <div style={{ display: "grid", gap: 8 }}>
-        <div style={{ fontWeight: 850, color: t.text }}>Prompt Engine</div>
-        <Segmented
-          value={promptEngine}
-          onChange={(v) => v && setPromptEngine(v)}
-          options={[
-            { value: "llm", label: "LLM (Best)" },
-            { value: "fast", label: "Fast (No LLM)" },
-            { value: "caption", label: "Direct Caption" },
-            { value: "assist", label: "LLM Assist" },
-            { value: "expand", label: "LLM Expand" },
-          ]}
-        />
-        <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
-          Fast and Direct Caption skip LLM init. Assist/Expand use LLM to rewrite your caption.
+          ?
+        </span>
+      )}
+    </div>
+  );
+  return (
+    <div style={{ display: "grid", gap: 6 }}>
+      <div
+        style={{
+          padding: "6px 12px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          cursor: "pointer",
+          borderRadius: t.radiusSm,
+          border: `1px solid ${t.hairline}`,
+          background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+          boxShadow: t.shadowSoft,
+        }}
+        onClick={() => setShowAceStepAdvanced(true)}
+      >
+        <div style={{ display: "grid", gap: 4 }}>
+          <div style={{ fontWeight: 850, color: t.text }}>ACE-Step 1.5</div>
+          <div style={{ fontSize: 10, fontWeight: 650, color: t.subtext }}>
+            {summary || "Default configuration"}
+          </div>
         </div>
       </div>
 
-      <CheckRow
-        label="Use LLM for audio codes (slower, more faithful)"
-        value={useLmCodes}
-        onChange={(v) => { setUseLmCodes(v); setLmCodesTouched(true); }}
-        hint="Enable if you want stronger semantic adherence, even in Direct Caption mode."
-      />
-      <CheckRow
-        label="Merge BPM/Key/Time/Genres into caption"
-        value={mergeMetaIntoCaption}
-        onChange={setMergeMetaIntoCaption}
-        hint="Appends your BPM/key/time/genres to the caption for stronger control."
-      />
-
-      <div style={{ fontWeight: 850, color: t.text, marginTop: 2 }}>Hard Constraints</div>
-      <CheckRow label="Rap vocals only" value={constraintRapOnly} onChange={setConstraintRapOnly} />
-      <CheckRow label="No singing / melodic chorus" value={constraintNoSinging} onChange={setConstraintNoSinging} />
-      <CheckRow label="No hooks / sung chorus" value={constraintNoHook} onChange={setConstraintNoHook} />
-
-      <div style={{ display: "grid", gap: 8 }}>
-        <div style={{ fontWeight: 850, color: t.text }}>Negative Prompt</div>
-        <CheckRow
-          label="Use negative prompt"
-          value={useNegativePrompt}
-          onChange={setUseNegativePrompt}
-          hint="Optional: tell the model what to avoid."
-        />
-        <Input
-          value={negativePrompt}
-          onChange={setNegativePrompt}
-          disabled={!useNegativePrompt}
-          placeholder="Avoid: singing, melodic chorus, pop hooks, female vocals..."
-        />
-        <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
-          Used for LLM CFG control when LLM codes are enabled.
-        </div>
-      </div>
-
-      {showAceStepAdvanced && (
-        <div style={{ display: "grid", gap: 10 }}>
+      <Modal
+        open={showAceStepAdvanced}
+        onClose={() => setShowAceStepAdvanced(false)}
+        title="Generation Model"
+        footer={
+          <Pill tone="primary" onClick={() => setShowAceStepAdvanced(false)}>
+            Done
+          </Pill>
+        }
+      >
+        <div style={{ display: "grid", gap: 12 }}>
+          {advancedMode ? (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
+                Tune how ACE-Step runs. Defaults are safe; only adjust what you need.
+              </div>
+              <Hairline style={{ margin: "2px 0 4px 0" }} />
+              <div style={{ fontWeight: 850, color: t.text }}>Models</div>
+            </>
+          ) : (
+            <div style={{ fontSize: 12, fontWeight: 650, color: t.subtext }}>
+              Pick the model used for generation.
+            </div>
+          )}
           <div className="cs-selectWrap">
+            <Label text="Main model" tip="Select the ACE-Step checkpoint used for generation." />
             <select value={mainModelPath} onChange={(e) => setMainModelPath(e.target.value)} style={selectStyle(t)}>
               {ACESTEP_MAIN_MODELS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
             <div className="cs-selectChevron">▾</div>
           </div>
-          <div className="cs-selectWrap">
-            <select value={lmModelPath} onChange={(e) => setLmModelPath(e.target.value)} disabled={!initializeLm} style={selectStyle(t)}>
-              {ACESTEP_LM_MODELS.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-            <div className="cs-selectChevron">▾</div>
-          </div>
-          <div className="cs-selectWrap">
-            <select value={lmBackend} onChange={(e) => setLmBackend(e.target.value)} disabled={!initializeLm} style={selectStyle(t)}>
-              <option value="vllm">vllm</option>
-              <option value="pt">pt</option>
-            </select>
-            <div className="cs-selectChevron">▾</div>
-          </div>
-          <div className="cs-selectWrap">
-            <select value={device} onChange={(e) => setDevice(e.target.value)} style={selectStyle(t)}>
-              <option value="auto">auto</option>
-              <option value="cuda">cuda</option>
-              <option value="cpu">cpu</option>
-            </select>
-            <div className="cs-selectChevron">▾</div>
-          </div>
-          <div style={{ display: "grid", gap: 8 }}>
-            <div style={{ fontWeight: 850, color: t.text }}>Generation Details</div>
-            <Input value={bpm} onChange={(v) => setBpm(String(v).replace(/[^\d.]/g, ""))} placeholder="BPM (optional)" />
-            <Input value={keyscale} onChange={setKeyscale} placeholder="Key scale (optional) e.g. C Major" />
-            <Input value={timeSignature} onChange={setTimeSignature} placeholder="Time signature (optional) e.g. 4" />
-            <Input value={ditInferenceSteps} onChange={(v) => setDitInferenceSteps(String(v).replace(/[^\d]/g, ""))} placeholder="DiT inference steps (optional)" />
-            <Input value={shift} onChange={(v) => setShift(String(v).replace(/[^\d.]/g, ""))} placeholder="Shift (optional)" />
-          </div>
-          <CheckRow label="Use flash attention" value={useFlashAttention} onChange={setUseFlashAttention} />
-          <CheckRow label="Offload to CPU" value={offloadToCpu} onChange={setOffloadToCpu} />
-          <CheckRow label="Offload DiT to CPU" value={offloadDitToCpu} onChange={setOffloadDitToCpu} />
-          <CheckRow label="Compile model" value={compileModel} onChange={setCompileModel} />
-          <CheckRow label="Int8 quantization" value={int8Quantization} onChange={setInt8Quantization} />
+          {showQualityLLM && (
+            <div className="cs-selectWrap">
+              <Label text="LLM model" tip="Text-to-semantic model used when LLM is enabled." />
+              <select value={lmModelPath} onChange={(e) => setLmModelPath(e.target.value)} disabled={!initializeLm} style={selectStyle(t)}>
+                {ACESTEP_LM_MODELS.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <div className="cs-selectChevron">▾</div>
+            </div>
+          )}
+          {advancedMode && (
+            <>
+              <div className="cs-selectWrap">
+                <Label text="LLM backend" tip="Backend used to run the LLM (vllm is recommended)." />
+                <select value={lmBackend} onChange={(e) => setLmBackend(e.target.value)} disabled={!initializeLm} style={selectStyle(t)}>
+                  <option value="vllm">vllm</option>
+                  <option value="pt">pt</option>
+                </select>
+                <div className="cs-selectChevron">▾</div>
+              </div>
+              <div className="cs-selectWrap">
+                <Label text="Device" tip="Auto picks GPU if available; CPU is slower." />
+                <select value={device} onChange={(e) => setDevice(e.target.value)} style={selectStyle(t)}>
+                  <option value="auto">auto</option>
+                  <option value="cuda">cuda</option>
+                  <option value="cpu">cpu</option>
+                </select>
+                <div className="cs-selectChevron">▾</div>
+              </div>
+              <Hairline style={{ margin: "6px 0" }} />
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ fontWeight: 850, color: t.text }}>Generation Details</div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <Label text="DiT inference steps" tip="More steps can improve quality but take longer." />
+                  <Input value={ditInferenceSteps} onChange={(v) => setDitInferenceSteps(String(v).replace(/[^\d]/g, ""))} placeholder="Optional" />
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <Label text="Shift" tip="Small adjustments to model conditioning; leave blank unless you know." />
+                  <Input value={shift} onChange={(v) => setShift(String(v).replace(/[^\d.]/g, ""))} placeholder="Optional" />
+                </div>
+              </div>
+              <Hairline style={{ margin: "6px 0" }} />
+              <CheckRow label="Use flash attention" value={useFlashAttention} onChange={setUseFlashAttention} hint="Faster attention on supported GPUs." />
+              <CheckRow label="Offload to CPU" value={offloadToCpu} onChange={setOffloadToCpu} hint="Reduces GPU memory use, slower." />
+              <CheckRow label="Offload DiT to CPU" value={offloadDitToCpu} onChange={setOffloadDitToCpu} hint="Extra memory savings for the DiT model." />
+              <CheckRow label="Compile model" value={compileModel} onChange={setCompileModel} hint="Compile for speed; may take longer to start." />
+              <CheckRow label="Int8 quantization" value={int8Quantization} onChange={setInt8Quantization} hint="Lower memory, possible quality tradeoff." />
+            </>
+          )}
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

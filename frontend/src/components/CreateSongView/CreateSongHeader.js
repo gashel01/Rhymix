@@ -1,6 +1,6 @@
 import React from "react";
 
-export function CreateSongHeader({ ui, t, isStuck, mode = "create" }) {
+export function CreateSongHeader({ ui, t, isStuck, mode = "create", actionNode = null }) {
   const { Glass } = ui;
   const isCoverMode = mode === "cover";
   return (
@@ -20,7 +20,8 @@ export function CreateSongHeader({ ui, t, isStuck, mode = "create" }) {
       }}
     >
       <Glass style={{ border: "none", boxShadow: "none", background: "transparent", backgroundColor: "transparent", borderRadius: 0, backdropFilter: "none", padding: "20px 24px" }}>
-        <div>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div>
           <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, letterSpacing: -0.5, color: t.text, lineHeight: 1.2 }}>
             {isCoverMode ? "Create Cover" : "Create a song"}
           </h1>
@@ -29,6 +30,12 @@ export function CreateSongHeader({ ui, t, isStuck, mode = "create" }) {
               ? "Use an existing song as source and generate a new cover version."
               : "Give it a name, describe the vibe or paste lyrics. We’ll handle the rest."}
           </p>
+          </div>
+          {actionNode && (
+            <div style={{ marginLeft: "auto", minWidth: 240, flex: "0 1 360px" }}>
+              {actionNode}
+            </div>
+          )}
         </div>
       </Glass>
     </div>

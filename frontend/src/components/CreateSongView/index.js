@@ -1,11 +1,12 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import {
   API_BASE,
   clamp,
   normalize,
   toKey,
   getBestAssetKey,
-  resolveAssetUrl,
 } from "./constants";
 import { getTheme } from "./theme";
 import { useThemedUI } from "./useThemedUI";
@@ -42,7 +43,7 @@ function CreateSongView({
   const [flowMode, setFlowMode] = useState(initialMode === "cover" ? "cover" : "create");
   const [mode, setMode] = useState("prompt");
   const [title, setTitle] = useState("");
-  const [prompt, setPrompt] = useState("");
+  const [describePrompt, setDescribePrompt] = useState("");
   const [lyrics, setLyrics] = useState("");
   const [genreText, setGenreText] = useState("");
   const [instrumentalOnly, setInstrumentalOnly] = useState(false);
@@ -52,15 +53,15 @@ function CreateSongView({
   const [loadingModels, setLoadingModels] = useState(true);
   const [duration, setDuration] = useState(180);
   const [durationInput, setDurationInput] = useState("180");
-  const [autoDuration, setAutoDuration] = useState(false);
+  const [autoDuration, setAutoDuration] = useState(true);
+  const [advancedMode, setAdvancedMode] = useState(false);
   const [enhanceVocals, setEnhanceVocals] = useState(true);
   const [mainModelPath, setMainModelPath] = useState("acestep-v15-turbo");
   const [lmModelPath, setLmModelPath] = useState("acestep-5Hz-lm-0.6B");
   const [lmBackend, setLmBackend] = useState("vllm");
   const [device, setDevice] = useState("auto");
   const [promptEngine, setPromptEngine] = useState("llm");
-  const [useLmCodes, setUseLmCodes] = useState(true);
-  const [lmCodesTouched, setLmCodesTouched] = useState(false);
+  const [engineMenuOpen, setEngineMenuOpen] = useState(false);
   const [useFlashAttention, setUseFlashAttention] = useState(true);
   const [offloadToCpu, setOffloadToCpu] = useState(true);
   const [offloadDitToCpu, setOffloadDitToCpu] = useState(true);
@@ -73,10 +74,6 @@ function CreateSongView({
   const [ditInferenceSteps, setDitInferenceSteps] = useState("");
   const [shift, setShift] = useState("");
   const [captionOverride, setCaptionOverride] = useState("");
-  const [mergeMetaIntoCaption, setMergeMetaIntoCaption] = useState(false);
-  const [constraintRapOnly, setConstraintRapOnly] = useState(false);
-  const [constraintNoSinging, setConstraintNoSinging] = useState(false);
-  const [constraintNoHook, setConstraintNoHook] = useState(false);
   const [negativePrompt, setNegativePrompt] = useState("");
   const [useNegativePrompt, setUseNegativePrompt] = useState(false);
 
@@ -113,7 +110,9 @@ function CreateSongView({
   const pollAbortRef = useRef(null);
   const pollInFlightRef = useRef(false);
   const progressRef = useRef({});
-  const audioRef = useRef(null);
+  const currentJobIdRef = useRef(null);
+  const engineMenuRef = useRef(null);
+  const engineMenuPopupRef = useRef(null);
   const sentinelRef = useRef(null);
   const [isStuck, setIsStuck] = useState(false);
 
@@ -128,8 +127,19 @@ function CreateSongView({
 
   const effectiveSourceSongId =
     sourceSongId || initialSourceSong?.sourceSongId || hashSourceSongId;
-  const isCaptionEngine = ["caption", "assist", "expand"].includes(promptEngine);
-  const initializeLm = useLmCodes || promptEngine === "assist" || promptEngine === "expand";
+  const isCaptionEngine = promptEngine === "caption";
+  const useLmCodes = promptEngine === "llm";
+  const initializeLm = promptEngine === "llm";
+  const engineLabel = promptEngine === "fast"
+    ? "Standard"
+    : promptEngine === "caption"
+      ? "Direct caption"
+      : "Quality";
+
+  const handleSelectEngine = (engine) => {
+    setPromptEngine(engine);
+    setEngineMenuOpen(false);
+  };
 
   useEffect(() => {
     setFlowMode(initialMode === "cover" ? "cover" : "create");
@@ -140,6 +150,21 @@ function CreateSongView({
   }, [initialSourceSong]);
 
   useEffect(() => {
+    if (mode === "prompt" && promptEngine === "caption") {
+      setPromptEngine("llm");
+    }
+    if (mode === "lyrics" && instrumentalOnly) {
+      setInstrumentalOnly(false);
+    }
+  }, [instrumentalOnly, mode, promptEngine, setPromptEngine]);
+
+  useEffect(() => {
+    if (advancedMode) return;
+    if (useNegativePrompt) setUseNegativePrompt(false);
+    if (promptEngine === "caption") setPromptEngine("llm");
+  }, [advancedMode, promptEngine, setPromptEngine, useNegativePrompt, setUseNegativePrompt]);
+
+  useEffect(() => {
     loadExistingSongs();
     loadAvailableModels();
     return () => {
@@ -148,11 +173,6 @@ function CreateSongView({
       if (pollAbortRef.current) pollAbortRef.current.abort();
     };
   }, []);
-
-  useEffect(() => {
-    if (lmCodesTouched) return;
-    setUseLmCodes(promptEngine === "llm");
-  }, [promptEngine, lmCodesTouched]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -243,11 +263,29 @@ function CreateSongView({
 
   const mapJobToSong = (job) => {
     const hasAssets = job && typeof job.assets === "object" && job.assets !== null;
+    const params = job?.params || {};
+    const paramsGenres = Array.isArray(params.genres) ? params.genres.filter(Boolean) : [];
+    let promptGenres = [];
+    if (!paramsGenres.length && typeof params.prompt === "string") {
+      const line = params.prompt.split("\n").find((l) => l.trim().toLowerCase().startsWith("genres:"));
+      if (line) {
+        promptGenres = line
+          .split(":")
+          .slice(1)
+          .join(":")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+    }
+    const genres = paramsGenres.length ? paramsGenres : promptGenres;
+    const personaName = job?.model_name || params?.model_name || null;
+    const enhanceVocals = params?.enhance_vocals ?? job?.enhance_vocals ?? null;
     return {
       id: job.id,
       title: job.title || "Untitled",
       duration: 0,
-      genres: [],
+      genres,
       createdAt: job.created_at || job.createdAt,
       audioUrl: job.audio_url,
       vocalsUrl: job.vocals_url,
@@ -255,6 +293,8 @@ function CreateSongView({
       processed: job.processed,
       inferenceCompleted: job.inference_completed,
       modelName: job.model_name,
+      personaName,
+      enhanceVocals,
       status: job.status,
       progress: job.progress,
       assets: hasAssets ? job.assets : undefined,
@@ -281,6 +321,7 @@ function CreateSongView({
         );
         if (runningJob) {
           setCurrentJobId(runningJob.id);
+          currentJobIdRef.current = runningJob.id;
           setGenerating(true);
           setProgress(runningJob.progress || 0);
           const pollType = runningJob.derivationType === "cover" ? "cover" : "create";
@@ -294,21 +335,18 @@ function CreateSongView({
     }
   };
 
-  const applyProgress = useCallback(
-    (jobId, next) => {
-      const prev = progressRef.current[jobId] ?? 0;
-      const safe = Math.max(prev, next || 0);
-      progressRef.current[jobId] = safe;
-      if (currentJobId === jobId) setProgress(safe);
-      return safe;
-    },
-    [currentJobId]
-  );
+  const applyProgress = useCallback((jobId, next) => {
+    const prev = progressRef.current[jobId] ?? 0;
+    const safe = Math.max(prev, next || 0);
+    progressRef.current[jobId] = safe;
+    if (currentJobIdRef.current === jobId) setProgress(safe);
+    return safe;
+  }, []);
 
   const handleJobUpdate = useCallback(
     (jobId, data) => {
       const nextProgress = applyProgress(jobId, data.progress ?? 0);
-      if (currentJobId === jobId) {
+      if (currentJobIdRef.current === jobId) {
         setStatusMessage(data.status_message || data.stage || data.status || "");
       }
       setSongs((prev) =>
@@ -336,7 +374,7 @@ function CreateSongView({
         })
       );
     },
-    [applyProgress, currentJobId]
+    [applyProgress]
   );
 
   const startPolling = useCallback(
@@ -380,6 +418,7 @@ function CreateSongView({
             pollRef.current = null;
             setGenerating(false);
             setCurrentJobId(null);
+            currentJobIdRef.current = null;
             applyProgress(jobId, 100);
             setTimeout(() => setProgress(0), 500);
           } else if (data.status === "failed") {
@@ -387,6 +426,7 @@ function CreateSongView({
             pollRef.current = null;
             setGenerating(false);
             setCurrentJobId(null);
+            currentJobIdRef.current = null;
             applyError(data.error || "Generation failed");
             setProgress(0);
             setSongs((prev) => prev.map((s) => (s.id === jobId ? { ...s, status: "failed" } : s)));
@@ -429,32 +469,17 @@ function CreateSongView({
 
   const buildPrompt = () => {
     const bits = [];
-    if (prompt.trim()) bits.push(prompt.trim());
-    if (genreTokens.length) bits.push(`Genres: ${genreTokens.join(", ")}`);
+    if (mode === "prompt" && describePrompt.trim()) bits.push(describePrompt.trim());
+    if (mode !== "prompt" && genreTokens.length) bits.push(`Genres: ${genreTokens.join(", ")}`);
     if (instrumentalOnly) bits.push("Instrumental only, no vocals");
     return bits.join("\n");
   };
 
   const buildCaptionInput = () => {
-    const base = isCaptionEngine ? captionOverride.trim() : buildPrompt();
-    if (!mergeMetaIntoCaption && !constraintRapOnly && !constraintNoSinging && !constraintNoHook) {
-      return base;
-    }
-    const extras = [];
-    if (mergeMetaIntoCaption) {
-      if (genreTokens.length) extras.push(`Genres: ${genreTokens.join(", ")}`);
-      if (String(bpm).trim()) extras.push(`BPM: ${bpm}`);
-      if (keyscale.trim()) extras.push(`Key: ${keyscale.trim()}`);
-      if (timeSignature.trim()) extras.push(`Time signature: ${timeSignature.trim()}`);
-    }
-    const constraints = [];
-    if (constraintRapOnly) constraints.push("Rap vocals only");
-    if (constraintNoSinging) constraints.push("No singing or melodic chorus");
-    if (constraintNoHook) constraints.push("No hooks or sung chorus");
-    if (constraints.length) extras.push(`Constraints: ${constraints.join("; ")}`);
-    if (!extras.length) return base;
-    if (!base) return extras.join("\n");
-    return `${base}\n${extras.join("\n")}`;
+    const basePrompt = buildPrompt();
+    if (!isCaptionEngine) return basePrompt;
+    const caption = captionOverride.trim();
+    return caption || basePrompt;
   };
 
   const buildInferParams = () => {
@@ -476,6 +501,7 @@ function CreateSongView({
       auto_duration: autoDuration,
       enhance_vocals: enhanceVocals,
       prompt: buildPrompt(),
+      genres: [...genreTokens],
       lyrics: instrumentalOnly ? "" : lyrics,
       caption_override: isCaptionEngine ? (captionInput || null) : null,
       prompt_engine: promptEngine,
@@ -529,10 +555,53 @@ function CreateSongView({
     if (coverStrongAudio) syncCoverStrength(1.0);
   }, [coverStrongAudio]);
 
-  const hasStylePrompt = prompt.trim().length > 0;
-  const hasCaptionInput = captionOverride.trim().length > 0 || buildCaptionInput().trim().length > 0;
-  const hasPromptOrCaption = isCaptionEngine ? hasCaptionInput : hasStylePrompt;
+  useEffect(() => {
+    currentJobIdRef.current = currentJobId;
+  }, [currentJobId]);
+
+  useEffect(() => {
+    if (!engineMenuOpen) return;
+    const handleClick = (e) => {
+      if (engineMenuRef.current && engineMenuRef.current.contains(e.target)) return;
+      if (engineMenuPopupRef.current && engineMenuPopupRef.current.contains(e.target)) return;
+      setEngineMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [engineMenuOpen]);
+
+  const [engineMenuPos, setEngineMenuPos] = useState(null);
+
+  useEffect(() => {
+    if (!engineMenuOpen) return;
+    const updatePos = () => {
+      if (!engineMenuRef.current) return;
+      const rect = engineMenuRef.current.getBoundingClientRect();
+      const width = 180;
+      const left = Math.min(
+        Math.max(8, rect.right - width),
+        (window.innerWidth || 0) - width - 8
+      );
+      const top = rect.bottom + 8;
+      setEngineMenuPos({ left, top, width });
+    };
+    updatePos();
+    window.addEventListener("resize", updatePos);
+    window.addEventListener("scroll", updatePos, true);
+    return () => {
+      window.removeEventListener("resize", updatePos);
+      window.removeEventListener("scroll", updatePos, true);
+    };
+  }, [engineMenuOpen]);
+
   const hasLyricsInput = instrumentalOnly || lyrics.trim().length > 0;
+  const hasDescribeInput = describePrompt.trim().length > 0;
+  const hasGenreInput = genreText.trim().length > 0;
+  const hasCaptionInput = mode === "lyrics" && captionOverride.trim().length > 0;
+  const hasBasePrompt = mode === "prompt"
+    ? hasDescribeInput
+    : (hasGenreInput || hasLyricsInput);
+  const hasPromptOrCaption = isCaptionEngine ? (hasCaptionInput || hasBasePrompt) : hasBasePrompt;
   const hasCoverSourceAudio = Boolean(
     sourceSong?.audioUrl || sourceSong?.instrumentalUrl || sourceSong?.vocalsUrl
   );
@@ -540,7 +609,7 @@ function CreateSongView({
   const canGenerateCreate =
     !generating &&
     title.trim().length > 0 &&
-    (mode === "prompt" ? hasPromptOrCaption : hasStylePrompt && hasLyricsInput);
+    (mode === "prompt" ? hasPromptOrCaption : hasPromptOrCaption && hasLyricsInput);
 
   const canGenerateCover =
     !generating &&
@@ -573,6 +642,7 @@ function CreateSongView({
     const data = await res.json();
     const jobId = data.job_id;
     setCurrentJobId(jobId);
+    currentJobIdRef.current = jobId;
     const newSong = {
       id: jobId,
       title: title.trim(),
@@ -581,6 +651,8 @@ function CreateSongView({
       createdAt: new Date().toISOString(),
       audioUrl: null,
       modelName: selectedModel?.name || null,
+      personaName: selectedModel?.name || null,
+      enhanceVocals,
       modelEpoch: selectedCheckpoint?.epochs || null,
       status: "queued",
       progress: 0,
@@ -612,6 +684,7 @@ function CreateSongView({
     const jobId = data.job_id;
     if (!jobId) throw new Error("Cover job did not return a job id");
     setCurrentJobId(jobId);
+    currentJobIdRef.current = jobId;
     const newSong = {
       id: jobId,
       title: title.trim(),
@@ -674,10 +747,6 @@ function CreateSongView({
           setSongs((prev) => prev.filter((s) => s.id !== songId));
           if (playingId === songId) {
             setPlayingId(null);
-            if (audioRef.current) {
-              audioRef.current.pause();
-              audioRef.current = null;
-            }
           }
         }
       } catch (e) {
@@ -689,26 +758,9 @@ function CreateSongView({
 
   const playPause = useCallback(
     (song) => {
-      if (playingId === song.id) {
-        if (audioRef.current) audioRef.current.pause();
-        setPlayingId(null);
-        return;
-      }
-      if (audioRef.current) audioRef.current.pause();
-      let playUrl = null;
-      if (song.hasAssets && song.assets) {
-        const key = song.selectedAssetKey || getBestAssetKey(song.assets);
-        playUrl = key ? resolveAssetUrl(song, key) : null;
-      }
-      if (!playUrl) playUrl = song.vocalsUrl || song.instrumentalUrl || song.audioUrl;
-      if (playUrl) {
-        audioRef.current = new Audio(`${API_BASE}${playUrl}`);
-        audioRef.current.play().catch((e) => console.error("Play error:", e));
-        audioRef.current.onended = () => setPlayingId(null);
-        setPlayingId(song.id);
-      }
+      setPlayingId((prev) => (prev === song.id ? null : song.id));
     },
-    [playingId]
+    []
   );
 
   const handleSelectAsset = useCallback((songId, assetKey) => {
@@ -720,23 +772,6 @@ function CreateSongView({
   const aceStepProps = {
     showAceStepAdvanced,
     setShowAceStepAdvanced,
-    promptEngine,
-    setPromptEngine,
-    useLmCodes,
-    setUseLmCodes,
-    setLmCodesTouched,
-    mergeMetaIntoCaption,
-    setMergeMetaIntoCaption,
-    constraintRapOnly,
-    setConstraintRapOnly,
-    constraintNoSinging,
-    setConstraintNoSinging,
-    constraintNoHook,
-    setConstraintNoHook,
-    useNegativePrompt,
-    setUseNegativePrompt,
-    negativePrompt,
-    setNegativePrompt,
     initializeLm,
     mainModelPath,
     setMainModelPath,
@@ -746,12 +781,6 @@ function CreateSongView({
     setLmBackend,
     device,
     setDevice,
-    bpm,
-    setBpm,
-    keyscale,
-    setKeyscale,
-    timeSignature,
-    setTimeSignature,
     ditInferenceSteps,
     setDitInferenceSteps,
     shift,
@@ -768,6 +797,125 @@ function CreateSongView({
     setInt8Quantization,
   };
 
+  const actionLabel = flowMode === "cover" ? "Create cover" : "Create song";
+  const createActionNode = (
+    <div style={{ position: "relative", width: "100%", maxWidth: 340, minWidth: 240 }} ref={engineMenuRef}>
+      <ui.Btn
+        variant="primary"
+        onClick={generate}
+        disabled={!canGenerate}
+        style={{
+          width: "100%",
+          minHeight: generating ? 86 : 64,
+          borderRadius: t.radiusMd,
+          fontSize: 16,
+          fontWeight: 700,
+          textTransform: "none",
+          paddingRight: 52,
+        }}
+      >
+        {generating ? (
+          <div style={{ width: "100%" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {statusMessage || "Creating…"}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.95)" }}>{progress}%</span>
+            </div>
+            <div style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,0.25)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, progress))}%`, background: "#fff", borderRadius: 999, transition: "width 0.2s ease" }} />
+            </div>
+          </div>
+        ) : (
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+              <AutoAwesomeIcon style={{ fontSize: 20 }} />
+              {actionLabel}
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.9)" }}>
+              {engineLabel}
+            </span>
+          </span>
+        )}
+      </ui.Btn>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (generating) return;
+          setEngineMenuOpen((v) => !v);
+        }}
+        style={{
+          position: "absolute",
+          top: 6,
+          bottom: 6,
+          right: 6,
+          width: 34,
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,0.35)",
+          background: "rgba(255,255,255,0.12)",
+          color: "rgba(255,255,255,0.95)",
+          cursor: generating ? "not-allowed" : "pointer",
+          display: "grid",
+          placeItems: "center",
+        }}
+        aria-label="Select generation mode"
+        title="Select generation mode"
+      >
+        <span style={{ fontSize: 14, lineHeight: 1, transform: engineMenuOpen ? "rotate(180deg)" : "none", transition: "transform 120ms ease" }}>
+          ▾
+        </span>
+      </button>
+    </div>
+  );
+
+  const engineMenuPortal =
+    engineMenuOpen && !generating && engineMenuPos && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={engineMenuPopupRef}
+            style={{
+              position: "absolute",
+              left: engineMenuPos.left,
+              top: engineMenuPos.top,
+              minWidth: engineMenuPos.width,
+              background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+              border: `1px solid ${t.hairline}`,
+              borderRadius: 12,
+              boxShadow: t.shadow,
+              zIndex: 3000,
+              overflow: "hidden",
+            }}
+          >
+            {[
+              { value: "llm", label: "Quality" },
+              { value: "fast", label: "Standard" },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleSelectEngine(opt.value)}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "10px 12px",
+                  background: "transparent",
+                  border: "none",
+                  color: t.text,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                <span style={{ opacity: promptEngine === opt.value ? 1 : 0.7 }}>
+                  {opt.label}
+                </span>
+              </button>
+            ))}
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
     <>
       <MissingDepsModal
@@ -778,9 +926,10 @@ function CreateSongView({
       />
       <div style={{ maxWidth: t.maxW, margin: "0 auto" }}>
         <div ref={sentinelRef} />
-        <CreateSongHeader ui={ui} t={t} isStuck={isStuck} mode={flowMode} />
-        <div className="cs-grid" style={{ margin: "20px 20px 0 20px" }}>
-          <div style={{ display: "grid", gap: 14 }}>
+        <CreateSongHeader ui={ui} t={t} isStuck={isStuck} mode={flowMode} actionNode={createActionNode} />
+        {engineMenuPortal}
+        <div className="cs-grid" style={{  }}>
+          <div className="cs-left" style={{ transition: "all 0.2s ease", height: isStuck ? "calc(100vh - 90px)" : "auto", display: "grid", gap: 14 ,margin: isStuck ? "0px 0px 0px 0px" : "20px 0px 20px 20px"}}>
             {flowMode === "cover" ? (
               <>
                 <SourceSongPanel
@@ -846,17 +995,30 @@ function CreateSongView({
                 syncDuration={syncDuration}
                 setDurationInput={setDurationInput}
                 setAutoDuration={setAutoDuration}
+                advancedMode={advancedMode}
+                setAdvancedMode={setAdvancedMode}
                 promptEngine={promptEngine}
+                setPromptEngine={setPromptEngine}
                 captionOverride={captionOverride}
                 setCaptionOverride={setCaptionOverride}
+                bpm={bpm}
+                setBpm={setBpm}
+                keyscale={keyscale}
+                setKeyscale={setKeyscale}
+                timeSignature={timeSignature}
+                setTimeSignature={setTimeSignature}
                 enhanceVocals={enhanceVocals}
                 setEnhanceVocals={setEnhanceVocals}
                 instrumentalOnly={instrumentalOnly}
                 setInstrumentalOnly={setInstrumentalOnly}
                 mode={mode}
                 setMode={setMode}
-                prompt={prompt}
-                setPrompt={setPrompt}
+                describePrompt={describePrompt}
+                setDescribePrompt={setDescribePrompt}
+                useNegativePrompt={useNegativePrompt}
+                setUseNegativePrompt={setUseNegativePrompt}
+                negativePrompt={negativePrompt}
+                setNegativePrompt={setNegativePrompt}
                 lyrics={lyrics}
                 setLyrics={setLyrics}
                 aceStepProps={aceStepProps}
@@ -866,26 +1028,21 @@ function CreateSongView({
                 usedGenreKeys={usedGenreKeys}
                 addGenreToken={addGenreToken}
                 removeGenreToken={removeGenreToken}
-                loadingModels={loadingModels}
                 availableModels={availableModels}
                 selectedModel={selectedModel}
                 selectedCheckpoint={selectedCheckpoint}
                 setSelectedModel={setSelectedModel}
                 setSelectedCheckpoint={setSelectedCheckpoint}
-                generating={generating}
-                progress={progress}
-                statusMessage={statusMessage}
-                canGenerate={canGenerate}
-                onGenerate={generate}
               />
             )}
           </div>
-          <div>
+          <div className="cs-right">
             <GeneratedPanel
               ui={ui}
               t={t}
               songs={songs}
               loadingSongs={loadingSongs}
+           
               error={error}
               playingId={playingId}
               onPlayPause={playPause}
@@ -905,8 +1062,19 @@ function CreateSongView({
           }
           @media (min-width: 1100px){
             .cs-grid{
-              grid-template-columns: 1.35fr 0.95fr;
+              grid-template-columns: 0.9fr 1.1fr;
               gap:16px;
+            }
+          }
+          .cs-left{
+            align-self:start;
+            position:sticky;
+            top:92px;
+          }
+          @media (max-width: 1099px){
+            .cs-left{
+              position:static;
+              top:auto;
             }
           }
           .cs-len{

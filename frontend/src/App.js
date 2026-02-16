@@ -38,6 +38,8 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import NavigationBar from "./components/NavigationBar";
 import { uploadFiles, startProcessing, getTrackStatuses, cleanDirectories } from "./utils/apiService";
 import { mergeProcessingUpdate, processingEquals, isTerminalProcessingState } from "./utils/processingStatus";
+import StudioPage from "./studio/StudioPage";
+import BeatboxCalibrationWizard from "./beatboxWizard/BeatboxCalibrationWizard";
 
 // Tesla/Apple-inspired theme system
 const createAppTheme = (mode) => createTheme({
@@ -244,6 +246,8 @@ const globalStylesInputProps = {
 };
 
 function App() {
+  const isBeatboxCalibrationRoute = window.location.pathname.startsWith("/beatbox-calibration");
+
   const [activeStep, setActiveStep] = useState(0);
   const [files, setFiles] = useState([]);
   const config = {
@@ -287,10 +291,24 @@ function App() {
     sourceSong: null,
   });
 
+  const getStudioAssetId = useCallback(() => {
+    const path = window.location.pathname || "";
+    const match = path.match(/^\/studio\/(.+)$/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }, []);
+
+  const [studioAssetId, setStudioAssetId] = useState(() => getStudioAssetId());
+
   const theme = createAppTheme(darkMode ? 'dark' : 'light');
 
   const [open, setOpen] = React.useState(!sidebarCollapsed);
   React.useEffect(() => { if (!sidebarCollapsed) setOpen(true); }, [sidebarCollapsed]);;
+
+  useEffect(() => {
+    const handlePopState = () => setStudioAssetId(getStudioAssetId());
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [getStudioAssetId]);
 
 
   const onVolumeChange = (v01) => setVolume(Math.max(0, Math.min(1, v01)));
@@ -1003,6 +1021,11 @@ function App() {
       <CssBaseline />
       <GlobalStyles {...globalStylesInputProps} />
       <VolumeProvider volume={volume}>
+      {isBeatboxCalibrationRoute ? (
+        <BeatboxCalibrationWizard />
+      ) : studioAssetId ? (
+        <StudioPage assetId={studioAssetId} />
+      ) : (
 
       <div style={{
         display: "flex",
@@ -1170,6 +1193,7 @@ function App() {
 
 
       </div>
+      )}
       </VolumeProvider>
     </ThemeProvider>
   );

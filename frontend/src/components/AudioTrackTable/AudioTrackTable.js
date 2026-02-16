@@ -240,6 +240,18 @@ const AudioTrackTable = (props) => {
     [onRowSelect, setSelectedRows]
   );
 
+  const handleOpenStudio = useCallback((pair) => {
+    const assetId = pair?.fileId || pair?.runId || pair?.id || pair?.trackId;
+    if (!assetId) return;
+    const url = `/studio/${encodeURIComponent(assetId)}`;
+    window.history.pushState({}, "", url);
+    try {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    } catch (err) {
+      window.dispatchEvent(new Event("popstate"));
+    }
+  }, []);
+
   const virtualizer = useVirtualizer({
     count: paginatedTrackPairs.length,
     getScrollElement: () => parentRef.current,
@@ -379,6 +391,7 @@ const AudioTrackTable = (props) => {
                       reactionPending={Boolean(reactionPendingByRunId?.[pair.runId])}
                       onToggleGroup={enableGrouping ? handleToggleGroup : undefined}
                       onSetReaction={onSetReaction}
+                      onOpenStudio={handleOpenStudio}
                       darkMode={darkMode}
                     />
                   );
