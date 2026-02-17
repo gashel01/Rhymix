@@ -84,13 +84,11 @@ function CreateSongView({
   const [coverPreserveTempo, setCoverPreserveTempo] = useState(true);
   const [coverOutputFormat, setCoverOutputFormat] = useState("wav");
   const [coverStrength, setCoverStrength] = useState(1.0);
-  const [coverStrengthInput, setCoverStrengthInput] = useState("1");
-  const [coverStrongAudio, setCoverStrongAudio] = useState(false);
   const [coverLyrics, setCoverLyrics] = useState("");
+  const [coverLyricsMode, setCoverLyricsMode] = useState("lyrics");
   const [coverTranscribing, setCoverTranscribing] = useState(false);
   const [coverTranscribeError, setCoverTranscribeError] = useState(null);
   const [coverTranscribeEngine, setCoverTranscribeEngine] = useState("whisperx");
-  const [coverMode, setCoverMode] = useState("full");
   const [sourceSong, setSourceSong] = useState(initialSourceSong || null);
   const [loadingSourceSong, setLoadingSourceSong] = useState(false);
   const [sourceSongError, setSourceSongError] = useState(null);
@@ -534,26 +532,10 @@ function CreateSongView({
     setDurationInput(String(v));
   };
 
-  const formatCoverStrength = (val) => String(Number(val.toFixed(2)));
   const syncCoverStrength = (val) => {
     const v = clamp(Number(val), 0.1, 1.0);
-    const normalized = Number(v.toFixed(2));
-    setCoverStrength(normalized);
-    setCoverStrengthInput(formatCoverStrength(normalized));
+    setCoverStrength(Number(v.toFixed(2)));
   };
-
-  const onCoverStrengthInputChange = (val) => {
-    const cleaned = String(val).replace(/[^\d.]/g, "");
-    setCoverStrengthInput(cleaned);
-    if (!cleaned || cleaned === ".") return;
-    const parsed = Number(cleaned);
-    if (Number.isNaN(parsed)) return;
-    syncCoverStrength(parsed);
-  };
-
-  useEffect(() => {
-    if (coverStrongAudio) syncCoverStrength(1.0);
-  }, [coverStrongAudio]);
 
   useEffect(() => {
     currentJobIdRef.current = currentJobId;
@@ -673,12 +655,11 @@ function CreateSongView({
       target_voice: coverSelectedModel?.name || null,
       pitch_shift: Number.isFinite(Number(coverPitchShift)) ? Number(coverPitchShift) : 0,
       style_prompt: coverStylePrompt.trim() || null,
-      lyrics: coverLyrics.trim() || null,
-      cover_mode: coverMode,
+      lyrics: coverLyricsMode === "lyrics" ? (coverLyrics.trim() || null) : null,
+      cover_mode: "full",
       preserve_tempo: !!coverPreserveTempo,
       output_format: coverOutputFormat || "wav",
       audio_cover_strength: coverStrength,
-      strong_audio_conditioning: !!coverStrongAudio,
     };
     const data = await startCoverGeneration(params);
     const jobId = data.job_id;
@@ -944,12 +925,14 @@ function CreateSongView({
       />
       <div style={{ maxWidth: t.maxW, margin: "0 auto" }}>
         <div ref={sentinelRef} />
-        <CreateSongHeader ui={ui} t={t} isStuck={isStuck} mode={flowMode} actionNode={createActionNode} />
-        {engineMenuPortal}
-        <div className="cs-grid" style={{  }}>
-          <div className="cs-left" style={{ transition: "all 0.2s ease", height: isStuck ? "calc(100vh - 90px)" : "auto", display: "grid", gap: 14 ,margin: isStuck ? "0px 0px 0px 0px" : "20px 0px 20px 20px"}}>
-            {flowMode === "cover" ? (
-              <>
+        <CreateSongHeader
+          ui={ui}
+          t={t}
+          isStuck={isStuck}
+          mode={flowMode}
+          actionNode={createActionNode}
+          asideNode={flowMode === "cover"
+            ? (
                 <SourceSongPanel
                   ui={ui}
                   t={t}
@@ -957,50 +940,53 @@ function CreateSongView({
                   loading={loadingSourceSong}
                   error={sourceSongError}
                 />
-                <CoverFormPanel
-                  ui={ui}
-                  t={t}
-                  title={title}
-                  setTitle={setTitle}
-                  pitchShift={coverPitchShift}
-                  setPitchShift={setCoverPitchShift}
-                  coverStrength={coverStrength}
-                  coverStrengthInput={coverStrengthInput}
-                  onCoverStrengthChange={syncCoverStrength}
-                  onCoverStrengthInputChange={onCoverStrengthInputChange}
-                  strongAudioConditioning={coverStrongAudio}
-                  setStrongAudioConditioning={setCoverStrongAudio}
-                  lyrics={coverLyrics}
-                  setLyrics={setCoverLyrics}
-                  onTranscribe={transcribeCoverLyrics}
-                  transcribing={coverTranscribing}
-                  transcribeError={coverTranscribeError}
-                  canTranscribe={!!effectiveSourceSongId && hasCoverSourceAudio && !loadingSourceSong}
-                  transcribeEngine={coverTranscribeEngine}
-                  setTranscribeEngine={setCoverTranscribeEngine}
-                  coverMode={coverMode}
-                  setCoverMode={setCoverMode}
-                  stylePrompt={coverStylePrompt}
-                  setStylePrompt={setCoverStylePrompt}
-                  preserveTempo={coverPreserveTempo}
-                  setPreserveTempo={setCoverPreserveTempo}
-                  loadingModels={loadingModels}
-                  availableModels={availableModels}
-                  selectedModel={coverSelectedModel}
-                  selectedCheckpoint={coverSelectedCheckpoint}
-                  onSelectModel={setCoverSelectedModel}
-                  onSelectCheckpoint={setCoverSelectedCheckpoint}
-                  onClearPersona={() => {
-                    setCoverSelectedModel(null);
-                    setCoverSelectedCheckpoint(null);
-                  }}
-                  generating={generating}
-                  progress={progress}
-                  statusMessage={statusMessage}
-                  canGenerate={canGenerate}
-                  onGenerate={generate}
-                />
-              </>
+              )
+            : null}
+        />
+        {engineMenuPortal}
+        <div className="cs-grid" style={{  }}>
+          <div className="cs-left" style={{ transition: "all 0.2s ease", height: isStuck ? "calc(100vh - 90px)" : "auto", display: "grid", gap: 14 ,margin: isStuck ? "0px 0px 0px 0px" : "20px 0px 20px 20px"}}>
+            {flowMode === "cover" ? (
+              <CoverFormPanel
+                ui={ui}
+                t={t}
+                isStuck={isStuck}
+                title={title}
+                setTitle={setTitle}
+                pitchShift={coverPitchShift}
+                setPitchShift={setCoverPitchShift}
+                coverStrength={coverStrength}
+                onCoverStrengthChange={syncCoverStrength}
+                lyrics={coverLyrics}
+                setLyrics={setCoverLyrics}
+                lyricsMode={coverLyricsMode}
+                setLyricsMode={setCoverLyricsMode}
+                onTranscribe={transcribeCoverLyrics}
+                transcribing={coverTranscribing}
+                transcribeError={coverTranscribeError}
+                canTranscribe={coverLyricsMode === "lyrics" && !!effectiveSourceSongId && hasCoverSourceAudio && !loadingSourceSong}
+                transcribeEngine={coverTranscribeEngine}
+                setTranscribeEngine={setCoverTranscribeEngine}
+                stylePrompt={coverStylePrompt}
+                setStylePrompt={setCoverStylePrompt}
+                preserveTempo={coverPreserveTempo}
+                setPreserveTempo={setCoverPreserveTempo}
+                loadingModels={loadingModels}
+                availableModels={availableModels}
+                selectedModel={coverSelectedModel}
+                selectedCheckpoint={coverSelectedCheckpoint}
+                onSelectModel={setCoverSelectedModel}
+                onSelectCheckpoint={setCoverSelectedCheckpoint}
+                onClearPersona={() => {
+                  setCoverSelectedModel(null);
+                  setCoverSelectedCheckpoint(null);
+                }}
+                generating={generating}
+                progress={progress}
+                statusMessage={statusMessage}
+                canGenerate={canGenerate}
+                onGenerate={generate}
+              />
             ) : (
               <CreateSongFormPanel
                 ui={ui}

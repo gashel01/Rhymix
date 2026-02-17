@@ -1,8 +1,16 @@
 import React from "react";
 
-export function CreateSongHeader({ ui, t, isStuck, mode = "create", actionNode = null }) {
+export function CreateSongHeader({
+  ui,
+  t,
+  isStuck,
+  mode = "create",
+  actionNode = null,
+  asideNode = null,
+}) {
   const { Glass } = ui;
   const isCoverMode = mode === "cover";
+  const hasAside = Boolean(actionNode || asideNode);
   return (
     <div
       style={{
@@ -31,10 +39,30 @@ export function CreateSongHeader({ ui, t, isStuck, mode = "create", actionNode =
               : "Give it a name, describe the vibe or paste lyrics. We’ll handle the rest."}
           </p>
           </div>
-          {actionNode && (
-            <div style={{ marginLeft: "auto", minWidth: 240, flex: "0 1 360px" }}>
+         
+          {hasAside && (
+            <>
+            
+            <div
+              style={{
+                marginLeft: "auto",
+               
+                display: "flex",
+                gap: 12,
+                justifyContent: "flex-end",
+                justifyItems: "stretch",
+                flexDirection: "row",
+              }}
+            >
+              {asideNode && (
+              <div style={{  display: "flex", justifyContent: "flex-end", minWidth: "fit-content" }}>
+                {asideNode}
+              </div>
+            )}
               {actionNode}
+              
             </div>
+            </>
           )}
         </div>
       </Glass>

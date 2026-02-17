@@ -498,7 +498,6 @@ def run_cover_generation_thread(job_id: str, params: dict):
             "pitch_shift": params.get("pitch_shift"),
             "style_prompt": params.get("style_prompt"),
             "lyrics": params.get("lyrics"),
-            "cover_mode": params.get("cover_mode"),
             "preserve_tempo": params.get("preserve_tempo"),
             "audio_cover_strength": params.get("audio_cover_strength"),
             "strong_audio_conditioning": params.get("strong_audio_conditioning"),
@@ -512,7 +511,6 @@ def run_cover_generation_thread(job_id: str, params: dict):
         target_voice = str(params.get("target_voice") or "").strip()
         style_prompt = str(params.get("style_prompt") or "").strip()
         cover_lyrics = str(params.get("lyrics") or "").strip()
-        cover_mode = str(params.get("cover_mode") or "full").strip().lower()
         audio_cover_strength = float(params.get("audio_cover_strength") or 1.0)
         strong_audio_conditioning = _coerce_bool(params.get("strong_audio_conditioning"), False)
         if strong_audio_conditioning:
@@ -555,7 +553,7 @@ def run_cover_generation_thread(job_id: str, params: dict):
             base_params = {
                 "title": job.get("title") or "cover",
                 "task_type": "cover",
-                "src_audio": str(source_vocal if cover_mode == "vocal_only" and source_vocal and source_vocal.exists() else native_src_audio),
+                "src_audio": str(native_src_audio),
                 "audio_cover_strength": audio_cover_strength,
                 "instruction": instruction,
                 "prompt": cover_prompt,
@@ -639,26 +637,6 @@ def run_cover_generation_thread(job_id: str, params: dict):
             logger.warning("[cover:%s] no local source audio path available for native cover; using fallback mix path", job_id)
 
         if native_cover_ok:
-            if cover_mode == "vocal_only":
-                try:
-                    vocals_file, instrumental_file, _ = _run_separation(job, job_id, native_cover_output)
-                    generated_vocals = _asset_path(job_id, "vocals_raw")
-                    source_inst = source.get("instrumental_path")
-                    if source_inst and source_inst.exists() and generated_vocals.exists():
-                        remix_path = _asset_path(job_id, "full_mix")
-                        if _mix_audio(source_inst, generated_vocals, remix_path):
-                            _set_asset_ready(job, job_id, "full_mix", remix_path)
-                            job["audio_url"] = f"/api/song-generation/{job_id}/audio/full_mix"
-                            logger.info(
-                                "[cover:%s] vocal-only remix complete instrumental=%s vocals=%s",
-                                job_id,
-                                _path_for_log(source_inst),
-                                _path_for_log(generated_vocals),
-                            )
-                except Exception as vocal_only_err:
-                    logger.exception("[cover:%s] vocal-only remix failed", job_id)
-                    job["status_message"] = f"Vocal-only remix failed: {vocal_only_err}"
-
             if target_voice:
                 logger.info("[cover:%s] target_voice=%s selected; running persona inference", job_id, target_voice)
                 try:
