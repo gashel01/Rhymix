@@ -31,6 +31,15 @@ const Timeline = ({
   assets,
   selection,
   currentTime,
+  lyricsMap,
+  canTranscribeSelection,
+  onTranscribeSelection,
+  onResynthesizeSelection,
+  onClearSelection,
+  selectionLyricsEntry,
+  onUpdateLyricsText,
+  onDeleteLyricsEntry,
+  onRestoreLyricsEntry,
   zoom,
   snap,
   gridSec,
@@ -67,6 +76,8 @@ const Timeline = ({
   const [trimPreview, setTrimPreview] = useState(null);
   const [dragPlayhead, setDragPlayhead] = useState(false);
   const [dropLaneId, setDropLaneId] = useState(null);
+  const [selectionMenuOpen, setSelectionMenuOpen] = useState(false);
+  const selectionDragRef = useRef(false);
 
   const pxPerSec = 80 * zoom;
   const snapEnabled = Boolean(snap);
@@ -82,6 +93,30 @@ const Timeline = ({
   }, [project, clips]);
 
   const timelineWidth = durationSec * pxPerSec + 200;
+
+  const selectionBox = useMemo(() => {
+    if (!selection?.range) return null;
+    const start = Number(selection.range.start ?? 0);
+    const end = Number(selection.range.end ?? 0);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+    const left = Math.min(start, end) * pxPerSec;
+    const width = Math.max(6, Math.abs(end - start) * pxPerSec);
+    let top = 0;
+    let height = lanes.length * LANE_HEIGHT;
+    if (Array.isArray(selection.laneIds) && selection.laneIds.length) {
+      const indices = selection.laneIds
+        .map((id) => lanes.findIndex((lane) => lane.id === id))
+        .filter((idx) => idx >= 0);
+      if (indices.length) {
+        const minIndex = Math.min(...indices);
+        const maxIndex = Math.max(...indices);
+        top = minIndex * LANE_HEIGHT;
+        height = (maxIndex - minIndex + 1) * LANE_HEIGHT;
+      }
+    }
+    return { left, width, top, height };
+  }, [selection, lanes, pxPerSec]);
+  const selectionIsTranscribing = selectionLyricsEntry?.status === "transcribing";
 
   const timeMarks = useMemo(() => {
     const marks = [];
@@ -179,6 +214,15 @@ const Timeline = ({
   const handleMouseDown = (event) => {
     if (event.button !== 0) return;
     if (clipDrag) return;
+    if (
+      event.target.closest(".studio-clip-lyrics-edit")
+      || event.target.closest(".studio-clip-lyrics-edit-wrap")
+      || event.target.closest(".studio-clip-lyrics-edit-actions")
+    ) {
+      return;
+    }
+    setSelectionMenuOpen(false);
+    selectionDragRef.current = false;
     const time = getTimeFromEvent(event);
     const laneId = getLaneFromEvent(event);
     setDragging(true);
@@ -195,16 +239,28 @@ const Timeline = ({
     const time = getTimeFromEvent(event);
     const dist = Math.abs(event.clientX - dragStartX);
     if (dist < 4) return;
+    selectionDragRef.current = true;
     const selection = { range: { start: dragStart, end: time }, laneIds: dragLaneId ? [dragLaneId] : null };
     onSelectRange?.(selection);
   };
 
   const handleMouseUp = () => {
+    const shouldOpenMenu = dragging && selectionDragRef.current && selection?.range && canTranscribeSelection;
     setDragging(false);
     setDragStart(null);
     setDragStartX(0);
     setDragLaneId(null);
+    selectionDragRef.current = false;
+    if (shouldOpenMenu) {
+      setSelectionMenuOpen(true);
+    }
   };
+
+  React.useEffect(() => {
+    if (!selection?.range || !canTranscribeSelection) {
+      setSelectionMenuOpen(false);
+    }
+  }, [selection?.range, canTranscribeSelection]);
 
   React.useEffect(() => {
     if (!dragPlayhead) return undefined;
@@ -385,6 +441,40 @@ const Timeline = ({
             lanes={lanes}
             laneIds={selection?.laneIds}
           />
+          {selectionBox && selectionMenuOpen && canTranscribeSelection && (
+            <div
+              className="studio-selection-menu"
+              style={{
+                left: selectionBox.left + selectionBox.width - 6,
+                top: selectionBox.top + 6,
+              }}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+            >
+              <button
+                type="button"
+                className="studio-selection-btn"
+                onClick={() => onTranscribeSelection?.()}
+                disabled={!canTranscribeSelection || selectionIsTranscribing}
+                title={canTranscribeSelection ? "Transcribe lyrics from selection" : "Select a vocal range to transcribe"}
+              >
+                {selectionIsTranscribing ? "Transcribing..." : "Transcribe lyrics"}
+                {selectionIsTranscribing && <span className="studio-spinner" />}
+              </button>
+              <button
+                type="button"
+                className="studio-selection-btn ghost"
+                onClick={() => {
+                  onClearSelection?.();
+                  setSelectionMenuOpen(false);
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          )}
           <div className="studio-playhead" style={{ left: currentTime * pxPerSec }} />
           {lanes.map((lane, laneIndex) => {
             const laneClips = clips.filter((clip) => {
@@ -422,6 +512,14 @@ const Timeline = ({
                       isSelected={selection?.clipIds?.includes(clip.id)}
                       pxPerSec={pxPerSec}
                       bpm={bpm}
+                      currentTime={currentTime}
+                      lyricsEntries={lyricsMap ? lyricsMap[clip.id] : null}
+                      selectionRange={selection?.range || null}
+                      selectionLaneIds={selection?.laneIds || null}
+                      onUpdateLyricsText={onUpdateLyricsText}
+                      onDeleteLyricsEntry={onDeleteLyricsEntry}
+                      onRestoreLyricsEntry={onRestoreLyricsEntry}
+                      onResynthesizeSelection={onResynthesizeSelection}
                       previewClip={preview}
                       isDragging={dragPreview?.clipId === clip.id}
                       laneFxActive={fxActive}

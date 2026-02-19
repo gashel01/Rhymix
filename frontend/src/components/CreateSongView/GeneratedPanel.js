@@ -44,7 +44,7 @@ export const GeneratedPanel = React.memo(function GeneratedPanel({
   return (
     <Panel style={{ minHeight: 380, padding: 24 ,margin: "20px 20px 20px 0px"}}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: -0.2, color: t.text }}>Your songs</h2>
+        {/* <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: -0.2, color: t.text }}>Your songs</h2> */}
         {loadingSongs && <Spinner size={14} />}
       </div>
 

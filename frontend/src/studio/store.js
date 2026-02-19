@@ -87,6 +87,26 @@ const applyEdlChange = (state, nextEdl) => {
   };
 };
 
+const shiftLyricsEntries = (entries, delta) => {
+  if (!entries || !Number.isFinite(delta) || Math.abs(delta) < 1e-6) return entries;
+  const list = Array.isArray(entries) ? entries : [entries];
+  const next = list.map((entry) => {
+    if (!entry || typeof entry !== "object") return entry;
+    const out = { ...entry };
+    if (entry.range && Number.isFinite(entry.range.start) && Number.isFinite(entry.range.end)) {
+      out.range = {
+        start: Number(entry.range.start) + delta,
+        end: Number(entry.range.end) + delta,
+      };
+    }
+    if (entry.clipStartAtTranscribe != null && Number.isFinite(Number(entry.clipStartAtTranscribe))) {
+      out.clipStartAtTranscribe = Number(entry.clipStartAtTranscribe) + delta;
+    }
+    return out;
+  });
+  return Array.isArray(entries) ? next : next[0];
+};
+
 const studioReducer = (state, action) => {
   switch (action.type) {
     case "SET_PROJECT": {
@@ -117,6 +137,12 @@ const studioReducer = (state, action) => {
         ...state,
         selection: { ...state.selection, ...action.payload },
       };
+    case "UPDATE_METADATA": {
+      return {
+        ...state,
+        metadata: { ...(state.metadata || {}), ...(action.payload || {}) },
+      };
+    }
     case "SET_UI":
       return {
         ...state,
@@ -245,12 +271,32 @@ const studioReducer = (state, action) => {
       return applyEdlChange(state, { clips });
     }
     case "MOVE_CLIP": {
+      const prevClip = state.clips.find((clip) => clip.id === action.payload.clipId);
+      const prevStartSec = Number(prevClip?.timelineStartSec);
       const clips = moveClip(state.clips, action.payload.clipId, action.payload.newTimelineStartSec, {
         snap: state.ui.snap,
         gridSec: state.ui.gridSec,
         laneId: action.payload.laneId,
       });
-      return applyEdlChange(state, { clips });
+      let metadata = state.metadata;
+      if (prevClip && Number.isFinite(prevStartSec)) {
+        const nextClip = clips.find((clip) => clip.id === action.payload.clipId);
+        const nextStartSec = Number(nextClip?.timelineStartSec);
+        if (Number.isFinite(nextStartSec)) {
+          const delta = nextStartSec - prevStartSec;
+          const lyricsReplacement = state.metadata?.lyricsReplacement;
+          if (Math.abs(delta) > 1e-6 && lyricsReplacement && lyricsReplacement[prevClip.id]) {
+            metadata = {
+              ...(state.metadata || {}),
+              lyricsReplacement: {
+                ...lyricsReplacement,
+                [prevClip.id]: shiftLyricsEntries(lyricsReplacement[prevClip.id], delta),
+              },
+            };
+          }
+        }
+      }
+      return applyEdlChange(state, { clips, metadata });
     }
     case "DELETE_SELECTION": {
       const clips = deleteSelection(
@@ -347,6 +393,7 @@ export const useStudioActions = () => {
     () => ({
       setProject: (payload) => dispatch({ type: "SET_PROJECT", payload }),
       updateProject: (patch) => dispatch({ type: "UPDATE_PROJECT", payload: patch }),
+      updateMetadata: (patch) => dispatch({ type: "UPDATE_METADATA", payload: patch }),
       setSelection: (payload) => dispatch({ type: "SET_SELECTION", payload }),
       setUi: (payload) => dispatch({ type: "SET_UI", payload }),
       setTransport: (payload) => dispatch({ type: "SET_TRANSPORT", payload }),

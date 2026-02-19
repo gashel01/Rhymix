@@ -33,6 +33,9 @@ const Inspector = ({
   transport,
   studioActions,
   metadata,
+  lyricsSelection,
+  lyricsEntry,
+  onUpdateLyricsText,
   playheadTime,
   onRefreshProject,
 }) => {
@@ -69,6 +72,20 @@ const Inspector = ({
   const [weirdness, setWeirdness] = useState(20);
   const [styleInfluence, setStyleInfluence] = useState(70);
   const [audioInfluence, setAudioInfluence] = useState(50);
+  const [lyricsDraft, setLyricsDraft] = useState("");
+
+  useEffect(() => {
+    if (!lyricsSelection?.clip?.id) {
+      setLyricsDraft("");
+      return;
+    }
+    setLyricsDraft(lyricsEntry?.text || "");
+  }, [
+    lyricsSelection?.clip?.id,
+    lyricsSelection?.range?.start,
+    lyricsSelection?.range?.end,
+    lyricsEntry?.text,
+  ]);
 
   useEffect(() => {
     if (selection?.range) {
@@ -342,6 +359,48 @@ const Inspector = ({
 
       {tab === "ai" && (
         <div className="studio-panel-content">
+          <div className="studio-meta-block">
+            <div className="studio-panel-title">Lyrics Replacement</div>
+            {!lyricsSelection ? (
+              <div className="studio-empty">Select a vocal range in the timeline to transcribe lyrics.</div>
+            ) : (
+              <>
+                <div className="studio-subtext" style={{ marginBottom: 6 }}>
+                  Range: {Math.min(lyricsSelection.range.start, lyricsSelection.range.end).toFixed(2)}s
+                  {" · "}
+                  {Math.max(lyricsSelection.range.start, lyricsSelection.range.end).toFixed(2)}s
+                </div>
+                <div className="studio-field">
+                  <label>Lyrics (editable)</label>
+                  <textarea
+                    value={lyricsDraft}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setLyricsDraft(next);
+                      onUpdateLyricsText?.(lyricsSelection.clip.id, next, {
+                        range: lyricsSelection.range,
+                        rangeClip: lyricsEntry?.rangeClip || null,
+                      });
+                    }}
+                    rows={4}
+                    placeholder="Transcription will appear here..."
+                  />
+                </div>
+                {lyricsEntry?.status === "transcribing" && (
+                  <div className="studio-subtext">Transcribing selection...</div>
+                )}
+                {lyricsEntry?.status === "error" && (
+                  <div className="studio-empty">Transcription failed: {lyricsEntry?.error || "Unknown error"}</div>
+                )}
+                <div className="studio-actions-row">
+                  <button className="studio-btn accent" disabled title="Resynthesis will be added later.">
+                    Resynthesize (coming soon)
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
           <div className="studio-field">
             <label>Prompt</label>
             <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} />

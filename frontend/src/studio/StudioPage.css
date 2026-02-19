@@ -680,6 +680,128 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.studio-clip-lyrics-length {
+  font-size: 10px;
+  color: var(--studio-subtext);
+  flex-shrink: 0;
+  position: absolute;
+  right: 0;
+  top: 4px;
+  pointer-events: none;
+}
+
+.studio-clip-lyrics-edit {
+  position: absolute;
+  top: 0;
+  min-height: 24px;
+  resize: none;
+  border-radius: 8px;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(10, 16, 22, 0.7);
+  color: var(--studio-text);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 8px;
+  outline: none;
+}
+
+.studio-clip-lyrics-edit-wrap {
+  position: relative;
+  height: 28px;
+}
+
+.studio-clip-lyrics-edit-actions {
+  position: absolute;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  z-index: 2;
+}
+
+.studio-clip-lyrics-edit-btn {
+  border-radius: 999px;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--studio-text);
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.studio-clip-lyrics-edit-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.studio-clip-lyrics-edit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.studio-clip-lyrics-edit-btn.danger {
+  color: #ffb3b3;
+  border-color: rgba(255, 179, 179, 0.4);
+  background: rgba(255, 179, 179, 0.12);
+}
+
+.studio-clip-lyrics-track {
+  position: relative;
+  height: 24px;
+  margin-top: 4px;
+}
+
+.studio-clip-lyrics-entry {
+  position: absolute;
+  top: 0;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 12, 16, 0.7);
+  color: var(--studio-subtext);
+  font-size: 10px;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.studio-clip-lyrics-entry.active {
+  color: var(--studio-text);
+  border-color: rgba(0, 194, 255, 0.45);
+  background: rgba(0, 194, 255, 0.18);
+}
+
+.studio-clip-lyrics-entry-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studio-clip-lyrics-edit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.studio-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: rgba(255, 255, 255, 0.9);
+  animation: studio-spin 0.9s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes studio-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .studio-midi-surface {
   position: absolute;
   inset: 0;
@@ -893,6 +1015,45 @@
   border: 1px dashed rgba(0, 194, 255, 0.5);
   pointer-events: none;
   z-index: 5;
+}
+
+.studio-selection-menu {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(8, 12, 16, 0.92);
+  border: 1px solid var(--studio-panel-border);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  z-index: 12;
+  transform: translate(-100%, 0);
+  pointer-events: auto;
+}
+
+.studio-selection-btn {
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--studio-text);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.studio-selection-btn.ghost {
+  background: transparent;
+  color: var(--studio-subtext);
+}
+
+.studio-selection-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .studio-playhead {

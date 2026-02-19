@@ -1,11 +1,21 @@
 import json
+import subprocess
 import time
 import uuid
+from datetime import datetime
+from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
 from backend.features.studio.assets import detect_asset_source, resolve_inference_asset, resolve_upload_assets
-from backend.features.studio.jobs import create_job, run_ai_job, run_render_job, start_job_thread
+from backend.features.song_generation.cover import transcribe_audio_path
+from backend.features.studio.jobs import (
+    create_job,
+    run_ai_job,
+    run_render_job,
+    run_soulx_resing_job,
+    start_job_thread,
+)
 from backend.features.studio.storage import (
     get_job,
     get_project,
@@ -15,6 +25,7 @@ from backend.features.studio.storage import (
     update_project,
 )
 from backend.storage.inference_runs import load_inference_run_metadata
+from backend.paths.manager import paths
 
 bp = Blueprint("studio", __name__)
 
@@ -171,6 +182,48 @@ def _build_project(asset_id: str):
     }
 
 
+def _resolve_project_asset_path(project_record: dict, asset_id: str) -> Path | None:
+    assets = project_record.get("assets") if isinstance(project_record.get("assets"), dict) else {}
+    asset = assets.get(asset_id) if isinstance(assets, dict) else None
+    if not asset:
+        return None
+    raw_path = asset.get("path")
+    if not raw_path:
+        return None
+    try:
+        path = Path(raw_path)
+    except Exception:
+        return None
+    return path if path.exists() else None
+
+
+def _extract_audio_segment(source_path: Path, start_sec: float, end_sec: float) -> Path:
+    paths.TEMP_WAV_DIR.mkdir(parents=True, exist_ok=True)
+    safe_start = max(0.0, float(start_sec or 0.0))
+    safe_end = max(0.0, float(end_sec or 0.0))
+    duration = max(0.01, safe_end - safe_start)
+    out_path = paths.TEMP_WAV_DIR / f"studio_transcribe_{uuid.uuid4().hex}.wav"
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-ss",
+        str(safe_start),
+        "-t",
+        str(duration),
+        "-i",
+        str(source_path),
+        "-ac",
+        "1",
+        "-ar",
+        "48000",
+        str(out_path),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if result.returncode != 0 or not out_path.exists():
+        raise RuntimeError(result.stderr.strip() or "Failed to extract audio segment")
+    return out_path
+
+
 @bp.route("/api/studio/projects", methods=["POST"])
 def create_project():
     data = request.get_json() or {}
@@ -224,12 +277,74 @@ def render_project(project_id):
     return jsonify({"jobId": job["id"]})
 
 
+@bp.route("/api/studio/projects/<project_id>/reset", methods=["POST"])
+def reset_project(project_id):
+    existing = get_project(project_id)
+    if not existing:
+        return jsonify({"error": "Project not found"}), 404
+    asset_id = existing.get("project", {}).get("assetId")
+    if not asset_id:
+        return jsonify({"error": "Project assetId is missing"}), 400
+    record = _build_project(asset_id)
+    record_project = record.get("project", {})
+    record_project["id"] = project_id
+    record_project["createdAt"] = existing.get("project", {}).get("createdAt", record_project.get("createdAt"))
+    record_project["updatedAt"] = datetime.now().isoformat()
+    record["project"] = record_project
+    save_project(record, asset_id=asset_id)
+    return jsonify(public_project_payload(record))
+
+
 @bp.route("/api/studio/projects/<project_id>/jobs/<job_type>", methods=["POST"])
 def start_ai_job(project_id, job_type):
     payload = request.get_json() or {}
     job = create_job(job_type, project_id, payload)
-    start_job_thread(run_ai_job, (job["id"], project_id, job_type, payload))
+    if job_type == "resynthesize":
+        start_job_thread(run_soulx_resing_job, (job["id"], project_id, payload))
+    else:
+        start_job_thread(run_ai_job, (job["id"], project_id, job_type, payload))
     return jsonify({"jobId": job["id"]})
+
+
+@bp.route("/api/studio/projects/<project_id>/transcribe", methods=["POST"])
+def transcribe_studio_segment(project_id):
+    data = request.get_json() or {}
+    asset_id = str(data.get("assetId") or data.get("sourceAssetId") or "").strip()
+    if not asset_id:
+        return jsonify({"error": "assetId is required"}), 400
+
+    project = get_project(project_id)
+    if not project:
+        return jsonify({"error": "Project not found"}), 404
+
+    source_path = _resolve_project_asset_path(project, asset_id)
+    if not source_path:
+        return jsonify({"error": "Asset audio not found"}), 404
+
+    start_sec = data.get("startSec")
+    end_sec = data.get("endSec")
+    engine = str(data.get("engine") or "whisperx").strip().lower()
+
+    clip_path = None
+    try:
+        if start_sec is not None and end_sec is not None:
+            try:
+                start_val = float(start_sec)
+                end_val = float(end_sec)
+            except Exception:
+                return jsonify({"error": "Invalid startSec or endSec"}), 400
+            if end_val > start_val:
+                clip_path = _extract_audio_segment(source_path, start_val, end_val)
+        text = transcribe_audio_path(clip_path or source_path, engine=engine)
+        return jsonify({"text": text})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        if clip_path:
+            try:
+                clip_path.unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
 @bp.route("/api/jobs/<job_id>", methods=["GET"])

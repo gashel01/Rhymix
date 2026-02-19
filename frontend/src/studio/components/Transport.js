@@ -16,6 +16,7 @@ const Transport = ({
   onUndo,
   onRedo,
   onRender,
+  onReset,
   jobStatus,
   contextActions = [],
 }) => {
@@ -57,6 +58,11 @@ const Transport = ({
         <button className="studio-btn ghost" onClick={onRedo}>
           Redo
         </button>
+        {onReset ? (
+          <button className="studio-btn ghost" onClick={onReset}>
+            Reset
+          </button>
+        ) : null}
         <button className="studio-btn accent" onClick={onRender}>
           Export
         </button>

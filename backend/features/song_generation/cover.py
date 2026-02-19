@@ -152,6 +152,16 @@ def _run_whisper_transcribe(audio_path: Path) -> str:
     return str(result.get("text") or "").strip()
 
 
+def transcribe_audio_path(audio_path: Path, engine: str = "whisperx") -> str:
+    if not audio_path or not audio_path.exists():
+        raise ValueError("Audio path is missing or does not exist")
+
+    engine = str(engine or "whisperx").strip().lower()
+    if engine == "whisper":
+        return _run_whisper_transcribe(audio_path)
+    return _run_whisperx_transcribe(audio_path)
+
+
 def _pick_transcribe_source(source: dict) -> Path | None:
     p = source.get("vocals_path")
     if p and isinstance(p, Path) and p.exists():

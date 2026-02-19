@@ -29,9 +29,22 @@ export const startRender = async (projectId) => {
   return response.data;
 };
 
+export const resetProject = async (projectId) => {
+  const response = await axios.post(`${API_BASE}/api/studio/projects/${projectId}/reset`);
+  return response.data;
+};
+
 export const startAiJob = async (projectId, jobType, payload) => {
   const response = await axios.post(
     `${API_BASE}/api/studio/projects/${projectId}/jobs/${jobType}`,
+    payload || {}
+  );
+  return response.data;
+};
+
+export const transcribeStudioSelection = async (projectId, payload) => {
+  const response = await axios.post(
+    `${API_BASE}/api/studio/projects/${projectId}/transcribe`,
     payload || {}
   );
   return response.data;

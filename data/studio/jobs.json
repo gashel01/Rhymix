@@ -118,6 +118,119 @@
       "type": "stem_extract_uvr",
       "updatedAt": "2026-02-11T15:45:52.233537"
     },
+    "1515f22cf40245039c06855d46329ea9": {
+      "createdAt": "2026-02-18T17:28:29.213985",
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\gaeli\\AppData\\Local\\Programs\\Python\\Python310\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Users\\gaeli\\AppData\\Local\\Programs\\Python\\Python310\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 14, in <module>\n    from preprocess.utils import SegmentMetadata, convert_metadata\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\utils.py\", line 9, in <module>\n    from preprocess.tools.g2p import g2p_transform\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\g2p.py\", line 3, in <module>\n    import ToJyutping\nModuleNotFoundError: No module named 'ToJyutping'",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T17:28:29.241373",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T17:28:29.299575",
+          "type": "status"
+        },
+        {
+          "error": "Traceback (most recent call last):\n  File \"C:\\Users\\gaeli\\AppData\\Local\\Programs\\Python\\Python310\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Users\\gaeli\\AppData\\Local\\Programs\\Python\\Python310\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 14, in <module>\n    from preprocess.utils import SegmentMetadata, convert_metadata\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\utils.py\", line 9, in <module>\n    from preprocess.tools.g2p import g2p_transform\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\g2p.py\", line 3, in <module>\n    import ToJyutping\nModuleNotFoundError: No module named 'ToJyutping'",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-18T17:28:38.290293",
+          "type": "status"
+        }
+      ],
+      "id": "1515f22cf40245039c06855d46329ea9",
+      "payload": {
+        "clipId": "cb07d37081a348c6a8b2d944d986f6f4",
+        "endSec": 47.32083320617676,
+        "language": "English",
+        "lyrics": "hey terry my firend how are you my dude",
+        "originalLyrics": "My Terry folds Grab my Terry folds Touch my holy flaps",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 47.32083320617676,
+        "sourceStartSec": 40.00833320617676,
+        "startSec": 40.00833320617676
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T17:28:38.290293"
+    },
+    "21e370807cc345dbbce4dd9f73ed8ea8": {
+      "createdAt": "2026-02-18T18:16:24.793299",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T18:16:24.825178",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T18:16:24.903445",
+          "type": "status"
+        }
+      ],
+      "id": "21e370807cc345dbbce4dd9f73ed8ea8",
+      "payload": {
+        "sourceAssetId": "instrumental:24f0c8fb9df744dd975a4435875b4376"
+      },
+      "progress": 0,
+      "projectId": "d9398cc797014bfabc8a5d568c528ed6",
+      "result": null,
+      "status": "running",
+      "statusMessage": "Running AI job...",
+      "type": "stem_extract",
+      "updatedAt": "2026-02-18T18:16:24.903445"
+    },
+    "2790dc1bad2e464aad511cb67d58b376": {
+      "createdAt": "2026-02-17T20:21:53.528215",
+      "error": "AI bridge returned invalid JSON",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T20:21:53.562630",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T20:21:53.620401",
+          "type": "status"
+        },
+        {
+          "error": "AI bridge returned invalid JSON",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-17T20:25:47.163817",
+          "type": "status"
+        }
+      ],
+      "id": "2790dc1bad2e464aad511cb67d58b376",
+      "payload": {
+        "durationSec": 10,
+        "endSec": 149.22083282470703,
+        "prompt": "yeah its pickle rick ",
+        "sourceAssetId": "soulx_resing:a650fe029a4c4047bdc5247310ef23f8",
+        "startSec": 144.39583282470704
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Running AI job...",
+      "type": "repaint",
+      "updatedAt": "2026-02-17T20:25:47.163817"
+    },
     "2a2dbfd496d94789a8db9c567a32e50e": {
       "createdAt": "2026-02-11T13:13:26.016915",
       "error": "AI bridge returned invalid JSON",
@@ -157,6 +270,290 @@
       "statusMessage": "Running AI job...",
       "type": "stem_extract",
       "updatedAt": "2026-02-11T13:27:42.314382"
+    },
+    "31580f313dad497c886d7640bc674064": {
+      "createdAt": "2026-02-17T18:09:26.166239",
+      "error": "WARNING:root:trust_remote_code: False\nTraceback (most recent call last):\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 136, in __init__\n    import nemo.collections.asr as nemo_asr  # type: ignore\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr import data, losses, models, modules\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr.losses.angularloss import AngularSoftmaxLoss\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\angularloss.py\", line 18, in <module>\n    from nemo.core.classes import Loss, Typing, typecheck\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\__init__.py\", line 16, in <module>\n    from nemo.core.classes import *\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\__init__.py\", line 17, in <module>\n    import lightning.pytorch\nModuleNotFoundError: No module named 'lightning'\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 175, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 106, in main\n    pipeline.run(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\pipeline.py\", line 90, in run\n    words, durs = self.lyric_transcriber.process(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 252, in process\n    self.en_model = _ASREnModel(model_path=self.en_model_path, device=self.device)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 138, in __init__\n    raise ImportError(\nImportError: NeMo (nemo_toolkit) is required for ASR English but is not available in this Python env. Install it in the active environment, then retry.",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T18:09:26.192665",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T18:09:26.244096",
+          "type": "status"
+        },
+        {
+          "error": "WARNING:root:trust_remote_code: False\nTraceback (most recent call last):\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 136, in __init__\n    import nemo.collections.asr as nemo_asr  # type: ignore\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr import data, losses, models, modules\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr.losses.angularloss import AngularSoftmaxLoss\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\angularloss.py\", line 18, in <module>\n    from nemo.core.classes import Loss, Typing, typecheck\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\__init__.py\", line 16, in <module>\n    from nemo.core.classes import *\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\__init__.py\", line 17, in <module>\n    import lightning.pytorch\nModuleNotFoundError: No module named 'lightning'\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 175, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 106, in main\n    pipeline.run(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\pipeline.py\", line 90, in run\n    words, durs = self.lyric_transcriber.process(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 252, in process\n    self.en_model = _ASREnModel(model_path=self.en_model_path, device=self.device)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 138, in __init__\n    raise ImportError(\nImportError: NeMo (nemo_toolkit) is required for ASR English but is not available in this Python env. Install it in the active environment, then retry.",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-17T18:10:40.615366",
+          "type": "status"
+        }
+      ],
+      "id": "31580f313dad497c886d7640bc674064",
+      "payload": {
+        "endSec": 36.38333282470703,
+        "language": "English",
+        "lyrics": "Grab my wololoa",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 15.383332824707033,
+        "sourceStartSec": 13.083332824707028,
+        "startSec": 34.08333282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T18:10:40.615366"
+    },
+    "3bc47822b24f4bd8853836b43ff13fb2": {
+      "createdAt": "2026-02-17T18:35:27.948519",
+      "error": "Traceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 196, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 155, in main\n    edited_meta = [convert_metadata(segment)]\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\utils.py\", line 157, in convert_metadata\n    g2p_transform(item.note_text, item.language)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\g2p.py\", line 53, in g2p_transform\n    w = EN_FLAG + \"-\".join(g2p_english(w.lower()))\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\g2p.py\", line 35, in g2p_english\n    return g2p_en(word)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\g2p_en\\g2p.py\", line 162, in __call__\n    tokens = pos_tag(words)  # tuples of (word, tag)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nltk\\tag\\__init__.py\", line 168, in pos_tag\n    tagger = _get_tagger(lang)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nltk\\tag\\__init__.py\", line 110, in _get_tagger\n    tagger = PerceptronTagger()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nltk\\tag\\perceptron.py\", line 180, in __init__\n    self.load_from_json(lang, loc)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nltk\\tag\\perceptron.py\", line 277, in load_from_json\n    loc = find(f\"taggers/averaged_perceptron_tagger_{lang}\")\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nltk\\data.py\", line 579, in find\n    raise LookupError(resource_not_found)\nLookupError: \n**********************************************************************\n  Resource \u001b[93maveraged_perceptron_tagger_eng\u001b[0m not found.\n  Please use the NLTK Downloader to obtain the resource:\n\n  \u001b[31m>>> import nltk\n  >>> nltk.download('averaged_perceptron_tagger_eng')\n  \u001b[0m\n  For more information see: https://www.nltk.org/data.html\n\n  Attempted to load \u001b[93mtaggers/averaged_perceptron_tagger_eng\u001b[0m\n\n  Searched in:\n    - 'C:\\\\Users\\\\gaeli/nltk_data'\n    - 'C:\\\\Users\\\\gaeli\\\\Downloads\\\\Rhymix\\\\SoulX-Singer\\\\.venv\\\\nltk_data'\n    - 'C:\\\\Users\\\\gaeli\\\\Downloads\\\\Rhymix\\\\SoulX-Singer\\\\.venv\\\\share\\\\nltk_data'\n    - 'C:\\\\Users\\\\gaeli\\\\Downloads\\\\Rhymix\\\\SoulX-Singer\\\\.venv\\\\lib\\\\nltk_data'\n    - 'C:\\\\Users\\\\gaeli\\\\AppData\\\\Roaming\\\\nltk_data'\n    - 'C:\\\\nltk_data'\n    - 'D:\\\\nltk_data'\n    - 'E:\\\\nltk_data'\n**********************************************************************",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T18:35:27.976679",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T18:35:28.039949",
+          "type": "status"
+        },
+        {
+          "error": "Traceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 196, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 155, in main\n    edited_meta = [convert_metadata(segment)]\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\utils.py\", line 157, in convert_metadata\n    g2p_transform(item.note_text, item.language)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\g2p.py\", line 53, in g2p_transform\n    w = EN_FLAG + \"-\".join(g2p_english(w.lower()))\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\g2p.py\", line 35, in g2p_english\n    return g2p_en(word)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\g2p_en\\g2p.py\", line 162, in __call__\n    tokens = pos_tag(words)  # tuples of (word, tag)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nltk\\tag\\__init__.py\", line 168, in pos_tag\n    tagger = _get_tagger(lang)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nltk\\tag\\__init__.py\", line 110, in _get_tagger\n    tagger = PerceptronTagger()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nltk\\tag\\perceptron.py\", line 180, in __init__\n    self.load_from_json(lang, loc)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nltk\\tag\\perceptron.py\", line 277, in load_from_json\n    loc = find(f\"taggers/averaged_perceptron_tagger_{lang}\")\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nltk\\data.py\", line 579, in find\n    raise LookupError(resource_not_found)\nLookupError: \n**********************************************************************\n  Resource \u001b[93maveraged_perceptron_tagger_eng\u001b[0m not found.\n  Please use the NLTK Downloader to obtain the resource:\n\n  \u001b[31m>>> import nltk\n  >>> nltk.download('averaged_perceptron_tagger_eng')\n  \u001b[0m\n  For more information see: https://www.nltk.org/data.html\n\n  Attempted to load \u001b[93mtaggers/averaged_perceptron_tagger_eng\u001b[0m\n\n  Searched in:\n    - 'C:\\\\Users\\\\gaeli/nltk_data'\n    - 'C:\\\\Users\\\\gaeli\\\\Downloads\\\\Rhymix\\\\SoulX-Singer\\\\.venv\\\\nltk_data'\n    - 'C:\\\\Users\\\\gaeli\\\\Downloads\\\\Rhymix\\\\SoulX-Singer\\\\.venv\\\\share\\\\nltk_data'\n    - 'C:\\\\Users\\\\gaeli\\\\Downloads\\\\Rhymix\\\\SoulX-Singer\\\\.venv\\\\lib\\\\nltk_data'\n    - 'C:\\\\Users\\\\gaeli\\\\AppData\\\\Roaming\\\\nltk_data'\n    - 'C:\\\\nltk_data'\n    - 'D:\\\\nltk_data'\n    - 'E:\\\\nltk_data'\n**********************************************************************",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-17T18:36:04.545003",
+          "type": "status"
+        }
+      ],
+      "id": "3bc47822b24f4bd8853836b43ff13fb2",
+      "payload": {
+        "endSec": 36.38333282470703,
+        "language": "English",
+        "lyrics": "Grab my wololoa",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 15.383332824707033,
+        "sourceStartSec": 13.083332824707028,
+        "startSec": 34.08333282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T18:36:04.545003"
+    },
+    "3d46c0cd79ee442ba3e5d91a9c15db57": {
+      "createdAt": "2026-02-17T18:25:11.662720",
+      "error": "WARNING:root:trust_remote_code: False\nTraceback (most recent call last):\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 136, in __init__\n    import nemo.collections.asr as nemo_asr  # type: ignore\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr import data, losses, models, modules\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr.losses.angularloss import AngularSoftmaxLoss\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\angularloss.py\", line 18, in <module>\n    from nemo.core.classes import Loss, Typing, typecheck\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\__init__.py\", line 16, in <module>\n    from nemo.core.classes import *\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\__init__.py\", line 33, in <module>\n    from nemo.core.classes.modelPT import ModelPT\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\modelPT.py\", line 51, in <module>\n    from nemo.lightning.callback_group import CallbackGroup\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\__init__.py\", line 26, in <module>\n    from nemo.lightning.fabric.fabric import Fabric\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\fabric\\fabric.py\", line 26, in <module>\n    from nemo.lightning.io.mixin import IOMixin, serialization, track_io\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\io\\__init__.py\", line 1, in <module>\n    from nemo.lightning.io import registry  # noqa: F401\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\io\\registry.py\", line 17, in <module>\n    from nemo.lightning.io.mixin import track_io\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\io\\mixin.py\", line 31, in <module>\n    from cloudpickle import dump\nModuleNotFoundError: No module named 'cloudpickle'\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 175, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 106, in main\n    pipeline.run(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\pipeline.py\", line 90, in run\n    words, durs = self.lyric_transcriber.process(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 252, in process\n    self.en_model = _ASREnModel(model_path=self.en_model_path, device=self.device)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 138, in __init__\n    raise ImportError(\nImportError: NeMo (nemo_toolkit) is required for ASR English but is not available in this Python env. Install it in the active environment, then retry.",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T18:25:11.689250",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T18:25:11.744764",
+          "type": "status"
+        },
+        {
+          "error": "WARNING:root:trust_remote_code: False\nTraceback (most recent call last):\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 136, in __init__\n    import nemo.collections.asr as nemo_asr  # type: ignore\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr import data, losses, models, modules\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr.losses.angularloss import AngularSoftmaxLoss\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\angularloss.py\", line 18, in <module>\n    from nemo.core.classes import Loss, Typing, typecheck\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\__init__.py\", line 16, in <module>\n    from nemo.core.classes import *\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\__init__.py\", line 33, in <module>\n    from nemo.core.classes.modelPT import ModelPT\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\modelPT.py\", line 51, in <module>\n    from nemo.lightning.callback_group import CallbackGroup\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\__init__.py\", line 26, in <module>\n    from nemo.lightning.fabric.fabric import Fabric\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\fabric\\fabric.py\", line 26, in <module>\n    from nemo.lightning.io.mixin import IOMixin, serialization, track_io\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\io\\__init__.py\", line 1, in <module>\n    from nemo.lightning.io import registry  # noqa: F401\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\io\\registry.py\", line 17, in <module>\n    from nemo.lightning.io.mixin import track_io\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\io\\mixin.py\", line 31, in <module>\n    from cloudpickle import dump\nModuleNotFoundError: No module named 'cloudpickle'\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 175, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 106, in main\n    pipeline.run(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\pipeline.py\", line 90, in run\n    words, durs = self.lyric_transcriber.process(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 252, in process\n    self.en_model = _ASREnModel(model_path=self.en_model_path, device=self.device)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 138, in __init__\n    raise ImportError(\nImportError: NeMo (nemo_toolkit) is required for ASR English but is not available in this Python env. Install it in the active environment, then retry.",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-17T18:25:56.715839",
+          "type": "status"
+        }
+      ],
+      "id": "3d46c0cd79ee442ba3e5d91a9c15db57",
+      "payload": {
+        "endSec": 36.38333282470703,
+        "language": "English",
+        "lyrics": "Grab my wololoa",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 15.383332824707033,
+        "sourceStartSec": 13.083332824707028,
+        "startSec": 34.08333282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T18:25:56.715839"
+    },
+    "443e8ae000824d109f6e75c3a2415375": {
+      "createdAt": "2026-02-17T18:32:15.379776",
+      "error": "Traceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 193, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 129, in main\n    note_meta = note_transcriber.process(item, segment_info=segment_info, verbose=False)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\note_transcription\\model.py\", line 426, in process\n    rosvot_out = infer_sample(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\utils\\_contextlib.py\", line 115, in decorate_context\n    return func(*args, **kwargs)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\note_transcription\\model.py\", line 213, in infer_sample\n    word_bd_np = outputs['word_bd_pred'][0].detach().cpu().numpy()[:real_len]\nKeyError: 'word_bd_pred'",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T18:32:15.498342",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T18:32:15.668540",
+          "type": "status"
+        },
+        {
+          "error": "Traceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 193, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 129, in main\n    note_meta = note_transcriber.process(item, segment_info=segment_info, verbose=False)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\note_transcription\\model.py\", line 426, in process\n    rosvot_out = infer_sample(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\utils\\_contextlib.py\", line 115, in decorate_context\n    return func(*args, **kwargs)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\note_transcription\\model.py\", line 213, in infer_sample\n    word_bd_np = outputs['word_bd_pred'][0].detach().cpu().numpy()[:real_len]\nKeyError: 'word_bd_pred'",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-17T18:32:53.791814",
+          "type": "status"
+        }
+      ],
+      "id": "443e8ae000824d109f6e75c3a2415375",
+      "payload": {
+        "endSec": 36.38333282470703,
+        "language": "English",
+        "lyrics": "Grab my wololoa",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 15.383332824707033,
+        "sourceStartSec": 13.083332824707028,
+        "startSec": 34.08333282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T18:32:53.791814"
+    },
+    "45c2158d5b87419a853ac318796cc9eb": {
+      "createdAt": "2026-02-17T17:41:21.010574",
+      "error": "Traceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 175, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 99, in main\n    pipeline = PreprocessPipeline(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\pipeline.py\", line 36, in __init__\n    self.f0_extractor = F0Extractor(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\f0_extraction.py\", line 414, in __init__\n    self.model = RMVPE(model_path, is_half=is_half, device=device)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\f0_extraction.py\", line 303, in __init__\n    ckpt = torch.load(model_path, map_location=self.device)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\serialization.py\", line 998, in load\n    with _open_file_like(f, 'rb') as opened_file:\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\serialization.py\", line 445, in _open_file_like\n    return _open_file(name_or_buffer, mode)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\serialization.py\", line 426, in __init__\n    super().__init__(open(name, mode))\nFileNotFoundError: [Errno 2] No such file or directory: 'pretrained_models/SoulX-Singer-Preprocess/rmvpe/rmvpe.pt'",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T17:41:21.033517",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T17:41:21.084842",
+          "type": "status"
+        },
+        {
+          "error": "Traceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 175, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 99, in main\n    pipeline = PreprocessPipeline(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\pipeline.py\", line 36, in __init__\n    self.f0_extractor = F0Extractor(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\f0_extraction.py\", line 414, in __init__\n    self.model = RMVPE(model_path, is_half=is_half, device=device)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\f0_extraction.py\", line 303, in __init__\n    ckpt = torch.load(model_path, map_location=self.device)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\serialization.py\", line 998, in load\n    with _open_file_like(f, 'rb') as opened_file:\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\serialization.py\", line 445, in _open_file_like\n    return _open_file(name_or_buffer, mode)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\serialization.py\", line 426, in __init__\n    super().__init__(open(name, mode))\nFileNotFoundError: [Errno 2] No such file or directory: 'pretrained_models/SoulX-Singer-Preprocess/rmvpe/rmvpe.pt'",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-17T17:43:00.387708",
+          "type": "status"
+        }
+      ],
+      "id": "45c2158d5b87419a853ac318796cc9eb",
+      "payload": {
+        "endSec": 36.38333282470703,
+        "language": "English",
+        "lyrics": "Grab my wololoa",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 15.383332824707033,
+        "sourceStartSec": 13.083332824707028,
+        "startSec": 34.08333282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T17:43:00.387708"
+    },
+    "46f7ee285042442a9b428e501dfb4cd9": {
+      "createdAt": "2026-02-18T18:12:19.711776",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T18:12:19.750242",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T18:12:19.821738",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-18T18:13:53.649105",
+          "type": "status"
+        }
+      ],
+      "id": "46f7ee285042442a9b428e501dfb4cd9",
+      "payload": {
+        "sourceAssetId": "instrumental:24f0c8fb9df744dd975a4435875b4376"
+      },
+      "progress": 100,
+      "projectId": "d9398cc797014bfabc8a5d568c528ed6",
+      "result": {
+        "stems": [
+          {
+            "assetId": "uvr_stem:a64180aca9df421b8d7a46ad0f40517e",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_drums_fcbce5b8a71c4b43b0dccd6f994d518f.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_drums_fcbce5b8a71c4b43b0dccd6f994d518f.wav",
+            "durationSec": 192.052245,
+            "label": "Drums",
+            "sampleRate": 44100,
+            "trackName": "drums"
+          },
+          {
+            "assetId": "uvr_stem:89ab61687cac48d5b4de37b3f4a1aa26",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_bass_11f875fad7ef4c58bfd0506652496c73.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_bass_11f875fad7ef4c58bfd0506652496c73.wav",
+            "durationSec": 192.052245,
+            "label": "Bass",
+            "sampleRate": 44100,
+            "trackName": "bass"
+          },
+          {
+            "assetId": "uvr_stem:d91129a2ee244fd19cfe702ec72b462f",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_mids_e0baf47bf7b44e0a8bf02a2e46702179.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_mids_e0baf47bf7b44e0a8bf02a2e46702179.wav",
+            "durationSec": 192.052245,
+            "label": "Mids",
+            "sampleRate": 44100,
+            "trackName": "mids"
+          },
+          {
+            "assetId": "uvr_stem:23d055d2a8b64a2dbb533faf42fb7bd1",
+            "assetPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\uvr_stem_highs_97f5828698a2416d85117217180086c9.wav",
+            "assetUrl": "/api/download/exports/uvr_stem_highs_97f5828698a2416d85117217180086c9.wav",
+            "durationSec": 192.052245,
+            "label": "Highs",
+            "sampleRate": 44100,
+            "trackName": "highs"
+          }
+        ]
+      },
+      "status": "completed",
+      "statusMessage": "Running AI job...",
+      "type": "stem_extract_uvr",
+      "updatedAt": "2026-02-18T18:13:53.649105"
     },
     "4758b0a932cd40e29b4ea40fc9c1e5d6": {
       "createdAt": "2026-02-11T12:44:26.565431",
@@ -198,6 +595,95 @@
       "type": "stem_extract",
       "updatedAt": "2026-02-11T12:44:26.683881"
     },
+    "4b5b526faad6472f96db995ffc9c2ee8": {
+      "createdAt": "2026-02-18T17:42:35.159108",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T17:42:35.194638",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T17:42:35.252091",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-18T17:44:15.915977",
+          "type": "status"
+        }
+      ],
+      "id": "4b5b526faad6472f96db995ffc9c2ee8",
+      "payload": {
+        "clipId": "cb07d37081a348c6a8b2d944d986f6f4",
+        "endSec": 47.32083320617676,
+        "language": "English",
+        "lyrics": "hey terry my firend how are you my dude",
+        "originalLyrics": "My Terry folds Grab my Terry folds Touch my holy flaps",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 47.32083320617676,
+        "sourceStartSec": 40.00833320617676,
+        "startSec": 40.00833320617676
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": {
+        "assetId": "soulx_resing:d06ab8e9d7354d408d20aad855cba3d4"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T17:44:15.915977"
+    },
+    "4f67bc660d3242c19f490309384ce80d": {
+      "createdAt": "2026-02-18T17:21:50.257871",
+      "error": "SoulX-Singer venv python not found at C:\\Users\\gaeli\\Downloads\\Rhymix\u000benv\\Scripts\\python.exe",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T17:21:50.289380",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T17:21:50.350756",
+          "type": "status"
+        },
+        {
+          "error": "SoulX-Singer venv python not found at C:\\Users\\gaeli\\Downloads\\Rhymix\u000benv\\Scripts\\python.exe",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-18T17:21:50.572301",
+          "type": "status"
+        }
+      ],
+      "id": "4f67bc660d3242c19f490309384ce80d",
+      "payload": {
+        "clipId": "cb07d37081a348c6a8b2d944d986f6f4",
+        "endSec": 47.32083320617676,
+        "language": "English",
+        "lyrics": "hey terry my firend how are you my dude",
+        "originalLyrics": "My Terry folds Grab my Terry folds Touch my holy flaps",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 47.32083320617676,
+        "sourceStartSec": 40.00833320617676,
+        "startSec": 40.00833320617676
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T17:21:50.572301"
+    },
     "54689ee3c55746a69de5fba232b01477": {
       "createdAt": "2026-02-11T12:38:10.213896",
       "error": "AI backend not configured. Set STUDIO_AI_ADAPTER=local and STUDIO_AI_BRIDGE to a Python bridge entrypoint.",
@@ -237,6 +723,223 @@
       "statusMessage": "Running AI job...",
       "type": "stem_extract",
       "updatedAt": "2026-02-11T12:38:10.332401"
+    },
+    "5f3921e4da99423898676a87ccfcf07c": {
+      "createdAt": "2026-02-17T20:14:11.413903",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T20:14:11.446312",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T20:14:11.517035",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-17T20:19:21.885582",
+          "type": "status"
+        }
+      ],
+      "id": "5f3921e4da99423898676a87ccfcf07c",
+      "payload": {
+        "clipId": "187a8d83bfd248f6b7713d88830c06bc",
+        "endSec": 149.22083282470703,
+        "language": "English",
+        "lyrics": "gonna live the life for real . dont you agree with me ?",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 149.22083282470703,
+        "sourceStartSec": 144.39583282470704,
+        "startSec": 144.39583282470704
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": {
+        "assetId": "soulx_resing:a650fe029a4c4047bdc5247310ef23f8"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T20:19:21.885582"
+    },
+    "5fe70385834042a789e6ee37b695b155": {
+      "createdAt": "2026-02-18T18:00:56.831129",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T18:00:56.861024",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T18:00:56.923127",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-18T18:02:04.534176",
+          "type": "status"
+        }
+      ],
+      "id": "5fe70385834042a789e6ee37b695b155",
+      "payload": {
+        "clipId": "cd7d2cc3c25f4491be81dbeb3bc8610a",
+        "endSec": 49.920832824707034,
+        "language": "English",
+        "lyrics": "But every day I love you just a bit more.",
+        "originalLyrics": "But every day I hate you just a little more.",
+        "sourceAssetId": "vocal:24f0c8fb9df744dd975a4435875b4376",
+        "sourceEndSec": 49.920832824707034,
+        "sourceStartSec": 46.25833282470703,
+        "startSec": 46.25833282470703
+      },
+      "progress": 100,
+      "projectId": "d9398cc797014bfabc8a5d568c528ed6",
+      "result": {
+        "assetId": "soulx_resing:1d8fefa694914cce8fbefd6e08c4d396"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T18:02:04.534176"
+    },
+    "61388231002e4479826f8466d19eefd5": {
+      "createdAt": "2026-02-17T18:38:28.979525",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T18:38:29.009429",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T18:38:29.064713",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-17T18:41:39.311625",
+          "type": "status"
+        }
+      ],
+      "id": "61388231002e4479826f8466d19eefd5",
+      "payload": {
+        "endSec": 36.38333282470703,
+        "language": "English",
+        "lyrics": "Grab my wololoa",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 15.383332824707033,
+        "sourceStartSec": 13.083332824707028,
+        "startSec": 34.08333282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": {
+        "assetId": "soulx_resing:05a5b3e2b68544959d1bb59091c11507"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T18:41:39.311625"
+    },
+    "615b431545474749a47306b7fb50d0da": {
+      "createdAt": "2026-02-17T19:34:43.100106",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T19:34:43.134557",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T19:34:43.187289",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-17T19:40:07.903334",
+          "type": "status"
+        }
+      ],
+      "id": "615b431545474749a47306b7fb50d0da",
+      "payload": {
+        "endSec": 31.73333282470703,
+        "language": "English",
+        "lyrics": "Yeah , listen to this bro     its fucking sick",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 31.73333282470703,
+        "sourceStartSec": 26.85833282470703,
+        "startSec": 26.85833282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": {
+        "assetId": "soulx_resing:2bfc15cb034f44e2976bb3b595ce9fe8"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T19:40:07.903334"
+    },
+    "63217d357b324de082b16c70e6d2b71a": {
+      "createdAt": "2026-02-17T18:19:27.335684",
+      "error": "WARNING:root:trust_remote_code: False\nTraceback (most recent call last):\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 136, in __init__\n    import nemo.collections.asr as nemo_asr  # type: ignore\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr import data, losses, models, modules\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr.losses.angularloss import AngularSoftmaxLoss\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\angularloss.py\", line 18, in <module>\n    from nemo.core.classes import Loss, Typing, typecheck\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\__init__.py\", line 16, in <module>\n    from nemo.core.classes import *\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\__init__.py\", line 33, in <module>\n    from nemo.core.classes.modelPT import ModelPT\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\modelPT.py\", line 51, in <module>\n    from nemo.lightning.callback_group import CallbackGroup\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\__init__.py\", line 26, in <module>\n    from nemo.lightning.fabric.fabric import Fabric\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\fabric\\fabric.py\", line 19, in <module>\n    import fiddle as fdl\nModuleNotFoundError: No module named 'fiddle'\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 175, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 106, in main\n    pipeline.run(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\pipeline.py\", line 90, in run\n    words, durs = self.lyric_transcriber.process(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 252, in process\n    self.en_model = _ASREnModel(model_path=self.en_model_path, device=self.device)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 138, in __init__\n    raise ImportError(\nImportError: NeMo (nemo_toolkit) is required for ASR English but is not available in this Python env. Install it in the active environment, then retry.",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T18:19:27.367312",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T18:19:27.429339",
+          "type": "status"
+        },
+        {
+          "error": "WARNING:root:trust_remote_code: False\nTraceback (most recent call last):\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 136, in __init__\n    import nemo.collections.asr as nemo_asr  # type: ignore\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr import data, losses, models, modules\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr.losses.angularloss import AngularSoftmaxLoss\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\angularloss.py\", line 18, in <module>\n    from nemo.core.classes import Loss, Typing, typecheck\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\__init__.py\", line 16, in <module>\n    from nemo.core.classes import *\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\__init__.py\", line 33, in <module>\n    from nemo.core.classes.modelPT import ModelPT\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\modelPT.py\", line 51, in <module>\n    from nemo.lightning.callback_group import CallbackGroup\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\__init__.py\", line 26, in <module>\n    from nemo.lightning.fabric.fabric import Fabric\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\fabric\\fabric.py\", line 19, in <module>\n    import fiddle as fdl\nModuleNotFoundError: No module named 'fiddle'\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 175, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 106, in main\n    pipeline.run(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\pipeline.py\", line 90, in run\n    words, durs = self.lyric_transcriber.process(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 252, in process\n    self.en_model = _ASREnModel(model_path=self.en_model_path, device=self.device)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 138, in __init__\n    raise ImportError(\nImportError: NeMo (nemo_toolkit) is required for ASR English but is not available in this Python env. Install it in the active environment, then retry.",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-17T18:20:24.684945",
+          "type": "status"
+        }
+      ],
+      "id": "63217d357b324de082b16c70e6d2b71a",
+      "payload": {
+        "endSec": 36.38333282470703,
+        "language": "English",
+        "lyrics": "Grab my wololoa",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 15.383332824707033,
+        "sourceStartSec": 13.083332824707028,
+        "startSec": 34.08333282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T18:20:24.684945"
     },
     "7024adb296fc4429beff551634b5cd6d": {
       "createdAt": "2026-02-11T12:54:52.486878",
@@ -278,6 +981,135 @@
       "type": "stem_extract",
       "updatedAt": "2026-02-11T12:54:52.611276"
     },
+    "7239e9cb454544259a1ffca12cd08df4": {
+      "createdAt": "2026-02-17T19:08:44.974674",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T19:08:45.008940",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T19:08:45.069595",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-17T19:14:08.546523",
+          "type": "status"
+        }
+      ],
+      "id": "7239e9cb454544259a1ffca12cd08df4",
+      "payload": {
+        "endSec": 31.73333282470703,
+        "language": "English",
+        "lyrics": "Yeah , listen to this bro     its fucking sick",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 31.73333282470703,
+        "sourceStartSec": 26.85833282470703,
+        "startSec": 26.85833282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": {
+        "assetId": "soulx_resing:a66aec1ae1c240ff91de229abf350235"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T19:14:08.546523"
+    },
+    "7521caec6dd3444c9a51c4fff76348b8": {
+      "createdAt": "2026-02-17T18:32:15.381719",
+      "error": "Traceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 193, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 129, in main\n    note_meta = note_transcriber.process(item, segment_info=segment_info, verbose=False)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\note_transcription\\model.py\", line 426, in process\n    rosvot_out = infer_sample(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\utils\\_contextlib.py\", line 115, in decorate_context\n    return func(*args, **kwargs)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\note_transcription\\model.py\", line 213, in infer_sample\n    word_bd_np = outputs['word_bd_pred'][0].detach().cpu().numpy()[:real_len]\nKeyError: 'word_bd_pred'",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T18:32:15.527630",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T18:32:15.693741",
+          "type": "status"
+        },
+        {
+          "error": "Traceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 193, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 129, in main\n    note_meta = note_transcriber.process(item, segment_info=segment_info, verbose=False)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\note_transcription\\model.py\", line 426, in process\n    rosvot_out = infer_sample(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\utils\\_contextlib.py\", line 115, in decorate_context\n    return func(*args, **kwargs)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\note_transcription\\model.py\", line 213, in infer_sample\n    word_bd_np = outputs['word_bd_pred'][0].detach().cpu().numpy()[:real_len]\nKeyError: 'word_bd_pred'",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-17T18:32:53.566101",
+          "type": "status"
+        }
+      ],
+      "id": "7521caec6dd3444c9a51c4fff76348b8",
+      "payload": {
+        "endSec": 36.38333282470703,
+        "language": "English",
+        "lyrics": "Grab my wololoa",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 15.383332824707033,
+        "sourceStartSec": 13.083332824707028,
+        "startSec": 34.08333282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T18:32:53.566101"
+    },
+    "7d052c8abdc2420d9b3c9d9f4501e929": {
+      "createdAt": "2026-02-18T17:54:01.356971",
+      "error": "Inferring segments:   0%|          | 0/1 [00:00<?, ?it/s]\nInferring segments:   0%|          | 0/1 [00:07<?, ?it/s]\nTraceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 239, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 227, in main\n    svs_process(args_infer, config, model)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\inference.py\", line 110, in process\n    generated_merged[start_sample_idx : start_sample_idx + generated_audio.shape[0]] = generated_audio\nValueError: could not broadcast input array from shape (88800,) into shape (87888,)",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T17:54:01.394571",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T17:54:01.477938",
+          "type": "status"
+        },
+        {
+          "error": "Inferring segments:   0%|          | 0/1 [00:00<?, ?it/s]\nInferring segments:   0%|          | 0/1 [00:07<?, ?it/s]\nTraceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 239, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 227, in main\n    svs_process(args_infer, config, model)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\inference.py\", line 110, in process\n    generated_merged[start_sample_idx : start_sample_idx + generated_audio.shape[0]] = generated_audio\nValueError: could not broadcast input array from shape (88800,) into shape (87888,)",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-18T17:55:11.586720",
+          "type": "status"
+        }
+      ],
+      "id": "7d052c8abdc2420d9b3c9d9f4501e929",
+      "payload": {
+        "clipId": "cd7d2cc3c25f4491be81dbeb3bc8610a",
+        "endSec": 49.920832824707034,
+        "language": "English",
+        "lyrics": "But every day I love you just a bit more.",
+        "originalLyrics": "But every day I hate you just a little more.",
+        "sourceAssetId": "vocal:24f0c8fb9df744dd975a4435875b4376",
+        "sourceEndSec": 49.920832824707034,
+        "sourceStartSec": 46.25833282470703,
+        "startSec": 46.25833282470703
+      },
+      "progress": 100,
+      "projectId": "d9398cc797014bfabc8a5d568c528ed6",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T17:55:11.586720"
+    },
     "8b7ec3692e5545c994acf09622cadd84": {
       "createdAt": "2026-02-11T15:51:03.325520",
       "error": "AI bridge returned invalid JSON",
@@ -317,6 +1149,183 @@
       "statusMessage": "Running AI job...",
       "type": "vocal2bgm",
       "updatedAt": "2026-02-11T16:02:11.038625"
+    },
+    "9516f9143c7848f98299e33e44cb6779": {
+      "createdAt": "2026-02-18T17:58:13.997774",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T17:58:14.034730",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T17:58:14.101314",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-18T17:59:23.167330",
+          "type": "status"
+        }
+      ],
+      "id": "9516f9143c7848f98299e33e44cb6779",
+      "payload": {
+        "clipId": "cd7d2cc3c25f4491be81dbeb3bc8610a",
+        "endSec": 49.920832824707034,
+        "language": "English",
+        "lyrics": "But every day I love you just a bit more.",
+        "originalLyrics": "But every day I hate you just a little more.",
+        "sourceAssetId": "vocal:24f0c8fb9df744dd975a4435875b4376",
+        "sourceEndSec": 49.920832824707034,
+        "sourceStartSec": 46.25833282470703,
+        "startSec": 46.25833282470703
+      },
+      "progress": 100,
+      "projectId": "d9398cc797014bfabc8a5d568c528ed6",
+      "result": {
+        "assetId": "soulx_resing:56716de2cb074e3da96bb42c6e389b52"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T17:59:23.167330"
+    },
+    "99856eb8635a4fa59feb262220c543b1": {
+      "createdAt": "2026-02-17T18:27:26.727453",
+      "error": "WARNING:root:trust_remote_code: False\n[NeMo W 2026-02-17 18:28:07 megatron_init:62] Megatron num_microbatches_calculator not found, using Apex version.\nTraceback (most recent call last):\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 136, in __init__\n    import nemo.collections.asr as nemo_asr  # type: ignore\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr import data, losses, models, modules\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr.losses.angularloss import AngularSoftmaxLoss\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\angularloss.py\", line 18, in <module>\n    from nemo.core.classes import Loss, Typing, typecheck\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\__init__.py\", line 16, in <module>\n    from nemo.core.classes import *\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\__init__.py\", line 33, in <module>\n    from nemo.core.classes.modelPT import ModelPT\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\modelPT.py\", line 51, in <module>\n    from nemo.lightning.callback_group import CallbackGroup\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\__init__.py\", line 28, in <module>\n    from nemo.lightning.fabric.strategies import FabricMegatronStrategy\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\fabric\\strategies.py\", line 70, in <module>\n    from nemo.lightning.pytorch.strategies import MegatronStrategy\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\pytorch\\strategies\\__init__.py\", line 15, in <module>\n    from nemo.lightning.pytorch.strategies.fsdp2_strategy import FSDP2Strategy\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\pytorch\\strategies\\fsdp2_strategy.py\", line 33, in <module>\n    from torch.distributed.tensor.parallel import ColwiseParallel, RowwiseParallel, SequenceParallel\nImportError: cannot import name 'SequenceParallel' from 'torch.distributed.tensor.parallel' (C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\distributed\\tensor\\parallel\\__init__.py)\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 175, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 106, in main\n    pipeline.run(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\pipeline.py\", line 90, in run\n    words, durs = self.lyric_transcriber.process(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 252, in process\n    self.en_model = _ASREnModel(model_path=self.en_model_path, device=self.device)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 138, in __init__\n    raise ImportError(\nImportError: NeMo (nemo_toolkit) is required for ASR English but is not available in this Python env. Install it in the active environment, then retry.",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T18:27:26.758893",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T18:27:26.805871",
+          "type": "status"
+        },
+        {
+          "error": "WARNING:root:trust_remote_code: False\n[NeMo W 2026-02-17 18:28:07 megatron_init:62] Megatron num_microbatches_calculator not found, using Apex version.\nTraceback (most recent call last):\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 136, in __init__\n    import nemo.collections.asr as nemo_asr  # type: ignore\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr import data, losses, models, modules\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\__init__.py\", line 15, in <module>\n    from nemo.collections.asr.losses.angularloss import AngularSoftmaxLoss\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\collections\\asr\\losses\\angularloss.py\", line 18, in <module>\n    from nemo.core.classes import Loss, Typing, typecheck\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\__init__.py\", line 16, in <module>\n    from nemo.core.classes import *\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\__init__.py\", line 33, in <module>\n    from nemo.core.classes.modelPT import ModelPT\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\core\\classes\\modelPT.py\", line 51, in <module>\n    from nemo.lightning.callback_group import CallbackGroup\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\__init__.py\", line 28, in <module>\n    from nemo.lightning.fabric.strategies import FabricMegatronStrategy\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\fabric\\strategies.py\", line 70, in <module>\n    from nemo.lightning.pytorch.strategies import MegatronStrategy\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\pytorch\\strategies\\__init__.py\", line 15, in <module>\n    from nemo.lightning.pytorch.strategies.fsdp2_strategy import FSDP2Strategy\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\nemo\\lightning\\pytorch\\strategies\\fsdp2_strategy.py\", line 33, in <module>\n    from torch.distributed.tensor.parallel import ColwiseParallel, RowwiseParallel, SequenceParallel\nImportError: cannot import name 'SequenceParallel' from 'torch.distributed.tensor.parallel' (C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\distributed\\tensor\\parallel\\__init__.py)\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 175, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 106, in main\n    pipeline.run(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\pipeline.py\", line 90, in run\n    words, durs = self.lyric_transcriber.process(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 252, in process\n    self.en_model = _ASREnModel(model_path=self.en_model_path, device=self.device)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\lyric_transcription.py\", line 138, in __init__\n    raise ImportError(\nImportError: NeMo (nemo_toolkit) is required for ASR English but is not available in this Python env. Install it in the active environment, then retry.",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-17T18:28:10.918300",
+          "type": "status"
+        }
+      ],
+      "id": "99856eb8635a4fa59feb262220c543b1",
+      "payload": {
+        "endSec": 36.38333282470703,
+        "language": "English",
+        "lyrics": "Grab my wololoa",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 15.383332824707033,
+        "sourceStartSec": 13.083332824707028,
+        "startSec": 34.08333282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T18:28:10.918300"
+    },
+    "9dbce89808254c349c1bf5f5b9f407a4": {
+      "createdAt": "2026-02-18T18:06:52.833413",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T18:06:52.870266",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T18:06:52.945386",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-18T18:08:00.185882",
+          "type": "status"
+        }
+      ],
+      "id": "9dbce89808254c349c1bf5f5b9f407a4",
+      "payload": {
+        "clipId": "cd7d2cc3c25f4491be81dbeb3bc8610a",
+        "endSec": 49.920832824707034,
+        "language": "English",
+        "lyrics": "but i really think dany should fuck himself",
+        "originalLyrics": "But every day I hate you just a little more.",
+        "sourceAssetId": "vocal:24f0c8fb9df744dd975a4435875b4376",
+        "sourceEndSec": 49.920832824707034,
+        "sourceStartSec": 46.25833282470703,
+        "startSec": 46.25833282470703
+      },
+      "progress": 100,
+      "projectId": "d9398cc797014bfabc8a5d568c528ed6",
+      "result": {
+        "assetId": "soulx_resing:bb63b924455d47f79a26218d6abcf1c7"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T18:08:00.185882"
+    },
+    "a1bf65dda26c49c6a61e2a9f52d424c5": {
+      "createdAt": "2026-02-18T18:09:54.489441",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T18:09:54.511981",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T18:09:54.573193",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-18T18:11:00.896542",
+          "type": "status"
+        }
+      ],
+      "id": "a1bf65dda26c49c6a61e2a9f52d424c5",
+      "payload": {
+        "clipId": "cd7d2cc3c25f4491be81dbeb3bc8610a",
+        "endSec": 49.920832824707034,
+        "language": "English",
+        "lyrics": "but i really think Dany should go fuck himself",
+        "originalLyrics": "But every day I hate you just a little more.",
+        "sourceAssetId": "vocal:24f0c8fb9df744dd975a4435875b4376",
+        "sourceEndSec": 49.920832824707034,
+        "sourceStartSec": 46.25833282470703,
+        "startSec": 46.25833282470703
+      },
+      "progress": 100,
+      "projectId": "d9398cc797014bfabc8a5d568c528ed6",
+      "result": {
+        "assetId": "soulx_resing:8c5b87a59b474ddb8a1cde3b7f64c56c"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T18:11:00.896542"
     },
     "a675e882280f4c7db059be4fbb22ddce": {
       "createdAt": "2026-02-12T12:37:16.101537",
@@ -393,6 +1402,49 @@
       "type": "stem_extract_uvr",
       "updatedAt": "2026-02-12T12:38:19.285356"
     },
+    "aab80863c403467cadc4835185a8d795": {
+      "createdAt": "2026-02-17T18:57:38.924320",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T18:57:38.959357",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T18:57:39.027994",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-17T19:03:01.641367",
+          "type": "status"
+        }
+      ],
+      "id": "aab80863c403467cadc4835185a8d795",
+      "payload": {
+        "endSec": 31.73333282470703,
+        "language": "English",
+        "lyrics": "Yeah , listen to this bro     its fucking sick",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 31.73333282470703,
+        "sourceStartSec": 26.85833282470703,
+        "startSec": 26.85833282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": {
+        "assetId": "soulx_resing:cf5f86ae91f34f99bd89b2c153b19d66"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T19:03:01.641367"
+    },
     "af77ee02568a484fbfee41a9be66190b": {
       "createdAt": "2026-02-11T12:37:47.960967",
       "error": "AI backend not configured. Set STUDIO_AI_ADAPTER=local and STUDIO_AI_BRIDGE to a Python bridge entrypoint.",
@@ -433,6 +1485,50 @@
       "type": "stem_extract",
       "updatedAt": "2026-02-11T12:37:48.114849"
     },
+    "b363337cad9249c0bf01ed78291e985e": {
+      "createdAt": "2026-02-18T16:15:50.033399",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T16:15:50.062286",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T16:15:50.123315",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-18T16:25:43.127666",
+          "type": "status"
+        }
+      ],
+      "id": "b363337cad9249c0bf01ed78291e985e",
+      "payload": {
+        "clipId": "cb07d37081a348c6a8b2d944d986f6f4",
+        "endSec": 47.32083320617676,
+        "language": "English",
+        "lyrics": "My Terry folds Grab my Terry folds hello terry how are you ?",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 47.32083320617676,
+        "sourceStartSec": 40.00833320617676,
+        "startSec": 40.00833320617676
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": {
+        "assetId": "soulx_resing:4426a77bd06340cab039d6dff862c74f"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T16:25:43.127666"
+    },
     "c3c7a4f2bda8472e8441d3bd8f29b3d2": {
       "createdAt": "2026-02-11T16:06:24.924844",
       "error": "AI bridge returned invalid JSON",
@@ -472,6 +1568,50 @@
       "statusMessage": "Running AI job...",
       "type": "add_layer",
       "updatedAt": "2026-02-11T16:07:30.965215"
+    },
+    "c5fef42e13e241c79c5bedc06e565234": {
+      "createdAt": "2026-02-17T20:03:27.632193",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T20:03:27.687817",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T20:03:27.752717",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-17T20:08:21.197376",
+          "type": "status"
+        }
+      ],
+      "id": "c5fef42e13e241c79c5bedc06e565234",
+      "payload": {
+        "clipId": "a155c946c0c243cb80f4b0c13814f15a",
+        "endSec": 15.383332824707033,
+        "language": "English",
+        "lyrics": "Grab my wololoa",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 15.383332824707033,
+        "sourceStartSec": 13.083332824707028,
+        "startSec": 13.083332824707028
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": {
+        "assetId": "soulx_resing:286c8a99245940188193a5430e672323"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T20:08:21.197376"
     },
     "d0cae14fa2f64c68aabcfe8586a7bb09": {
       "createdAt": "2026-02-11T22:08:37.539308",
@@ -547,6 +1687,273 @@
       "type": "stem_extract_uvr",
       "updatedAt": "2026-02-11T22:09:42.515425"
     },
+    "d69632075fe94709898f19b963cc2a70": {
+      "createdAt": "2026-02-18T17:07:30.888417",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T17:07:30.929145",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T17:07:30.993565",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-18T17:15:08.149248",
+          "type": "status"
+        }
+      ],
+      "id": "d69632075fe94709898f19b963cc2a70",
+      "payload": {
+        "clipId": "cb07d37081a348c6a8b2d944d986f6f4",
+        "endSec": 47.32083320617676,
+        "language": "English",
+        "lyrics": "hey terry my firend how are you my dude",
+        "originalLyrics": "My Terry folds Grab my Terry folds Touch my holy flaps",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 47.32083320617676,
+        "sourceStartSec": 40.00833320617676,
+        "startSec": 40.00833320617676
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": {
+        "assetId": "soulx_resing:b20fd2e50268435dbb3afdaeadf7fa0e"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T17:15:08.149248"
+    },
+    "e2354b5c3e4344e9a3f780792065acd8": {
+      "createdAt": "2026-02-18T12:38:40.186220",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T12:38:40.229486",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T12:38:40.284566",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-18T12:58:49.058917",
+          "type": "status"
+        }
+      ],
+      "id": "e2354b5c3e4344e9a3f780792065acd8",
+      "payload": {
+        "clipId": "6b12f70f-2d94-48e4-99a7-19212fb1297a",
+        "endSec": 144.33333320617675,
+        "language": "English",
+        "lyrics": "a flap before the flap dance dance dance dance dance dance dance yeah! we're going to the Terry fold dance you and me gonna go to the Terry fold place it's gonna be a night out gonna have",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 144.33333320617675,
+        "sourceStartSec": 128.3041706085205,
+        "startSec": 128.3041706085205
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": {
+        "assetId": "soulx_resing:341a498413974d17903c8aed7fd94207"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T12:58:49.058917"
+    },
+    "e50dd368941645548b0a5727638f9c3e": {
+      "createdAt": "2026-02-18T17:56:02.957236",
+      "error": "Inferring segments:   0%|          | 0/1 [00:00<?, ?it/s]\nInferring segments:   0%|          | 0/1 [00:04<?, ?it/s]\nTraceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 239, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 227, in main\n    svs_process(args_infer, config, model)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\inference.py\", line 110, in process\n    generated_merged[start_sample_idx : start_sample_idx + generated_audio.shape[0]] = generated_audio\nValueError: could not broadcast input array from shape (88800,) into shape (87888,)",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T17:56:02.993906",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T17:56:03.055295",
+          "type": "status"
+        },
+        {
+          "error": "Inferring segments:   0%|          | 0/1 [00:00<?, ?it/s]\nInferring segments:   0%|          | 0/1 [00:04<?, ?it/s]\nTraceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 239, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 227, in main\n    svs_process(args_infer, config, model)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\inference.py\", line 110, in process\n    generated_merged[start_sample_idx : start_sample_idx + generated_audio.shape[0]] = generated_audio\nValueError: could not broadcast input array from shape (88800,) into shape (87888,)",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-18T17:56:54.261993",
+          "type": "status"
+        }
+      ],
+      "id": "e50dd368941645548b0a5727638f9c3e",
+      "payload": {
+        "clipId": "cd7d2cc3c25f4491be81dbeb3bc8610a",
+        "endSec": 49.920832824707034,
+        "language": "English",
+        "lyrics": "But every day I love you just a bit more.",
+        "originalLyrics": "But every day I hate you just a little more.",
+        "sourceAssetId": "vocal:24f0c8fb9df744dd975a4435875b4376",
+        "sourceEndSec": 49.920832824707034,
+        "sourceStartSec": 46.25833282470703,
+        "startSec": 46.25833282470703
+      },
+      "progress": 100,
+      "projectId": "d9398cc797014bfabc8a5d568c528ed6",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T17:56:54.261993"
+    },
+    "e55bab3338854b83abe0e8d81e60552c": {
+      "createdAt": "2026-02-18T16:56:01.435676",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T16:56:01.471280",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T16:56:01.535547",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-18T17:04:20.956218",
+          "type": "status"
+        }
+      ],
+      "id": "e55bab3338854b83abe0e8d81e60552c",
+      "payload": {
+        "clipId": "cb07d37081a348c6a8b2d944d986f6f4",
+        "endSec": 47.32083320617676,
+        "language": "English",
+        "lyrics": "My Terry folds Grab my Terry folds hello terry how are you ?",
+        "originalLyrics": "My Terry folds Grab my Terry folds Touch my holy flaps",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 47.32083320617676,
+        "sourceStartSec": 40.00833320617676,
+        "startSec": 40.00833320617676
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": {
+        "assetId": "soulx_resing:77f77231448d454cb4bc5c94cbd3f280"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T17:04:20.956218"
+    },
+    "f3cb41076b7f43279c8f856b8a1ba051": {
+      "createdAt": "2026-02-18T17:26:15.834120",
+      "error": "SoulX-Singer venv python not found at C:\\Users\\gaeli\\Downloads\\Rhymix\u000benv\\Scripts\\python.exe",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T17:26:15.869516",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T17:26:15.940436",
+          "type": "status"
+        },
+        {
+          "error": "SoulX-Singer venv python not found at C:\\Users\\gaeli\\Downloads\\Rhymix\u000benv\\Scripts\\python.exe",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-18T17:26:16.102137",
+          "type": "status"
+        }
+      ],
+      "id": "f3cb41076b7f43279c8f856b8a1ba051",
+      "payload": {
+        "clipId": "cb07d37081a348c6a8b2d944d986f6f4",
+        "endSec": 47.32083320617676,
+        "language": "English",
+        "lyrics": "hey terry my firend how are you my dude",
+        "originalLyrics": "My Terry folds Grab my Terry folds Touch my holy flaps",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 47.32083320617676,
+        "sourceStartSec": 40.00833320617676,
+        "startSec": 40.00833320617676
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T17:26:16.102137"
+    },
+    "f58d25503d19467487341daad4f00433": {
+      "createdAt": "2026-02-18T18:04:21.615955",
+      "error": null,
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-18T18:04:21.648318",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-18T18:04:21.707943",
+          "type": "status"
+        },
+        {
+          "progress": 100,
+          "status": "completed",
+          "ts": "2026-02-18T18:05:28.588905",
+          "type": "status"
+        }
+      ],
+      "id": "f58d25503d19467487341daad4f00433",
+      "payload": {
+        "clipId": "cd7d2cc3c25f4491be81dbeb3bc8610a",
+        "endSec": 49.920832824707034,
+        "language": "English",
+        "lyrics": "But every day I love you just a bit more.",
+        "originalLyrics": "But every day I hate you just a little more.",
+        "sourceAssetId": "vocal:24f0c8fb9df744dd975a4435875b4376",
+        "sourceEndSec": 49.920832824707034,
+        "sourceStartSec": 46.25833282470703,
+        "startSec": 46.25833282470703
+      },
+      "progress": 100,
+      "projectId": "d9398cc797014bfabc8a5d568c528ed6",
+      "result": {
+        "assetId": "soulx_resing:06c2fb06a4fe41a5a1a5a1241587ab2e"
+      },
+      "status": "completed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-18T18:05:28.588905"
+    },
     "f6558cb60c724b80a0bd55f4ce0e3e80": {
       "createdAt": "2026-02-11T13:27:46.988029",
       "error": "AI bridge returned invalid JSON",
@@ -586,6 +1993,90 @@
       "statusMessage": "Running AI job...",
       "type": "stem_extract",
       "updatedAt": "2026-02-11T14:40:59.207596"
+    },
+    "f908549311d3439b92448898432d8529": {
+      "createdAt": "2026-02-17T18:06:18.059809",
+      "error": "Traceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 14, in <module>\n    from cli.inference import build_model, process as svs_process\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\inference.py\", line 12, in <module>\n    from soulxsinger.models.soulxsinger import SoulXSinger\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\soulxsinger\\models\\soulxsinger.py\", line 9, in <module>\n    from soulxsinger.models.modules.decoder import CFMDecoder\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\soulxsinger\\models\\modules\\decoder.py\", line 4, in <module>\n    from soulxsinger.models.modules.flow_matching import FlowMatchingTransformer\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\soulxsinger\\models\\modules\\flow_matching.py\", line 12, in <module>\n    from .llama import DiffLlama\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\soulxsinger\\models\\modules\\llama.py\", line 1, in <module>\n    from transformers import LlamaConfig, LlamaModel\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\transformers\\__init__.py\", line 26, in <module>\n    from . import dependency_versions_check\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\transformers\\dependency_versions_check.py\", line 57, in <module>\n    require_version_core(deps[pkg])\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\transformers\\utils\\versions.py\", line 117, in require_version_core\n    return require_version(requirement, hint)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\transformers\\utils\\versions.py\", line 111, in require_version\n    _compare_versions(op, got_ver, want_ver, requirement, pkg, hint)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\transformers\\utils\\versions.py\", line 44, in _compare_versions\n    raise ImportError(\nImportError: huggingface-hub>=0.23.0,<1.0 is required for a normal functioning of this module, but found huggingface-hub==1.4.1.\nTry: `pip install transformers -U` or `pip install -e '.[dev]'` if you're working with git main",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T18:06:18.091929",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T18:06:18.141645",
+          "type": "status"
+        },
+        {
+          "error": "Traceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 14, in <module>\n    from cli.inference import build_model, process as svs_process\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\inference.py\", line 12, in <module>\n    from soulxsinger.models.soulxsinger import SoulXSinger\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\soulxsinger\\models\\soulxsinger.py\", line 9, in <module>\n    from soulxsinger.models.modules.decoder import CFMDecoder\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\soulxsinger\\models\\modules\\decoder.py\", line 4, in <module>\n    from soulxsinger.models.modules.flow_matching import FlowMatchingTransformer\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\soulxsinger\\models\\modules\\flow_matching.py\", line 12, in <module>\n    from .llama import DiffLlama\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\soulxsinger\\models\\modules\\llama.py\", line 1, in <module>\n    from transformers import LlamaConfig, LlamaModel\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\transformers\\__init__.py\", line 26, in <module>\n    from . import dependency_versions_check\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\transformers\\dependency_versions_check.py\", line 57, in <module>\n    require_version_core(deps[pkg])\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\transformers\\utils\\versions.py\", line 117, in require_version_core\n    return require_version(requirement, hint)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\transformers\\utils\\versions.py\", line 111, in require_version\n    _compare_versions(op, got_ver, want_ver, requirement, pkg, hint)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\transformers\\utils\\versions.py\", line 44, in _compare_versions\n    raise ImportError(\nImportError: huggingface-hub>=0.23.0,<1.0 is required for a normal functioning of this module, but found huggingface-hub==1.4.1.\nTry: `pip install transformers -U` or `pip install -e '.[dev]'` if you're working with git main",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-17T18:07:00.997387",
+          "type": "status"
+        }
+      ],
+      "id": "f908549311d3439b92448898432d8529",
+      "payload": {
+        "endSec": 36.38333282470703,
+        "language": "English",
+        "lyrics": "Grab my wololoa",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 15.383332824707033,
+        "sourceStartSec": 13.083332824707028,
+        "startSec": 34.08333282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T18:07:00.997387"
+    },
+    "fbb2f095ebdf411988a602c66da8f691": {
+      "createdAt": "2026-02-17T18:32:15.376772",
+      "error": "Traceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 193, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 129, in main\n    note_meta = note_transcriber.process(item, segment_info=segment_info, verbose=False)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\note_transcription\\model.py\", line 426, in process\n    rosvot_out = infer_sample(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\utils\\_contextlib.py\", line 115, in decorate_context\n    return func(*args, **kwargs)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\note_transcription\\model.py\", line 213, in infer_sample\n    word_bd_np = outputs['word_bd_pred'][0].detach().cpu().numpy()[:real_len]\nKeyError: 'word_bd_pred'",
+      "events": [
+        {
+          "progress": 0,
+          "status": "queued",
+          "ts": "2026-02-17T18:32:15.464697",
+          "type": "status"
+        },
+        {
+          "progress": 0,
+          "status": "running",
+          "ts": "2026-02-17T18:32:15.638879",
+          "type": "status"
+        },
+        {
+          "error": "Traceback (most recent call last):\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 196, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.10_3.10.3056.0_x64__qbz5n2kfra8p0\\lib\\runpy.py\", line 86, in _run_code\n    exec(code, run_globals)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 193, in <module>\n    main()\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\cli\\studio_resing.py\", line 129, in main\n    note_meta = note_transcriber.process(item, segment_info=segment_info, verbose=False)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\note_transcription\\model.py\", line 426, in process\n    rosvot_out = infer_sample(\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\.venv\\lib\\site-packages\\torch\\utils\\_contextlib.py\", line 115, in decorate_context\n    return func(*args, **kwargs)\n  File \"C:\\Users\\gaeli\\Downloads\\Rhymix\\SoulX-Singer\\preprocess\\tools\\note_transcription\\model.py\", line 213, in infer_sample\n    word_bd_np = outputs['word_bd_pred'][0].detach().cpu().numpy()[:real_len]\nKeyError: 'word_bd_pred'",
+          "progress": 100,
+          "status": "failed",
+          "ts": "2026-02-17T18:32:53.512200",
+          "type": "status"
+        }
+      ],
+      "id": "fbb2f095ebdf411988a602c66da8f691",
+      "payload": {
+        "endSec": 36.38333282470703,
+        "language": "English",
+        "lyrics": "Grab my wololoa",
+        "sourceAssetId": "vocal:95f20397246c466a8d5bf5e724b1cd70",
+        "sourceEndSec": 15.383332824707033,
+        "sourceStartSec": 13.083332824707028,
+        "startSec": 34.08333282470703
+      },
+      "progress": 100,
+      "projectId": "195aaf17a4a54518ab3d508d8b499307",
+      "result": null,
+      "status": "failed",
+      "statusMessage": "Resynthesizing vocals...",
+      "type": "resynthesize",
+      "updatedAt": "2026-02-17T18:32:53.512200"
     }
   }
 }

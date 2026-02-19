@@ -50,12 +50,110 @@ const ClipView = ({
   onUndo,
   onRedo,
   laneColor,
+  currentTime,
+  lyricsEntries,
+  selectionRange,
+  selectionLaneIds,
+  onUpdateLyricsText,
+  onDeleteLyricsEntry,
+  onRestoreLyricsEntry,
+  onResynthesizeSelection,
 }) => {
   const effectiveClip = previewClip || clip;
   const lengthSec = Math.max(0.01, (effectiveClip.srcEndSec ?? 0) - (effectiveClip.srcStartSec ?? 0));
   const width = Math.max(80, lengthSec * pxPerSec);
   const left = (effectiveClip.timelineStartSec ?? 0) * pxPerSec;
-  const waveformHeight = 48;
+  const entries = Array.isArray(lyricsEntries)
+    ? lyricsEntries.filter(Boolean)
+    : lyricsEntries && typeof lyricsEntries === "object"
+      ? [lyricsEntries]
+      : [];
+  const clipStartSec = effectiveClip.timelineStartSec ?? 0;
+  const clipEndSec = clipStartSec + lengthSec;
+  const resolveEntryTimelineRange = (entry) => {
+    if (!entry) return null;
+    if (entry.rangeClip && Number.isFinite(entry.rangeClip.start) && Number.isFinite(entry.rangeClip.end)) {
+      return {
+        start: clipStartSec + Number(entry.rangeClip.start),
+        end: clipStartSec + Number(entry.rangeClip.end),
+      };
+    }
+    if (
+      entry.clipStartAtTranscribe != null
+      && entry.range
+      && Number.isFinite(entry.range.start)
+      && Number.isFinite(entry.range.end)
+    ) {
+      const offsetStart = Number(entry.range.start) - Number(entry.clipStartAtTranscribe);
+      const offsetEnd = Number(entry.range.end) - Number(entry.clipStartAtTranscribe);
+      return {
+        start: clipStartSec + offsetStart,
+        end: clipStartSec + offsetEnd,
+      };
+    }
+    if (entry.range && Number.isFinite(entry.range.start) && Number.isFinite(entry.range.end)) {
+      return {
+        start: Number(entry.range.start),
+        end: Number(entry.range.end),
+      };
+    }
+    return null;
+  };
+
+  const entriesWithRange = entries
+    .map((entry) => ({ entry, timelineRange: resolveEntryTimelineRange(entry) }))
+    .filter((item) => {
+      if (!item.timelineRange) return false;
+      const { start, end } = item.timelineRange;
+      return end > clipStartSec && start < clipEndSec;
+    });
+  const hasLyrics = entriesWithRange.length > 0;
+  const isAudioClip = clip.clipType !== "midi";
+  const showLyrics = isAudioClip && hasLyrics;
+  const waveformHeight = showLyrics ? 28 : 48;
+  const canEditLyrics = showLyrics && entriesWithRange.length > 0;
+  const selectionStartRaw = selectionRange
+    ? Math.min(Number(selectionRange.start ?? 0), Number(selectionRange.end ?? 0))
+    : null;
+  const selectionEndRaw = selectionRange
+    ? Math.max(Number(selectionRange.start ?? 0), Number(selectionRange.end ?? 0))
+    : null;
+  const selectionLaneOk = !Array.isArray(selectionLaneIds) || selectionLaneIds.length === 0 || selectionLaneIds.includes(clip.laneId);
+  const selectionOverlapsClip = selectionLaneOk
+    && selectionStartRaw != null
+    && selectionEndRaw != null
+    && selectionEndRaw > clipStartSec
+    && selectionStartRaw < clipEndSec;
+  const selectionStartInClip = selectionOverlapsClip
+    ? clamp(selectionStartRaw - clipStartSec, 0, lengthSec)
+    : 0;
+  const selectionEndInClip = selectionOverlapsClip
+    ? clamp(selectionEndRaw - clipStartSec, 0, lengthSec)
+    : 0;
+  const selectionWidthSec = selectionOverlapsClip ? Math.max(0.001, selectionEndInClip - selectionStartInClip) : 0;
+  const selectionLeftPx = selectionOverlapsClip ? selectionStartInClip * pxPerSec : 0;
+  const selectionWidthPx = selectionOverlapsClip ? Math.max(1, selectionWidthSec * pxPerSec) : 0;
+  const selectionMatchesEntry = (timelineRange) =>
+    Boolean(
+      timelineRange
+        && selectionStartRaw != null
+        && selectionEndRaw != null
+        && Math.abs(Number(timelineRange.start ?? 0) - selectionStartRaw) < 0.05
+        && Math.abs(Number(timelineRange.end ?? 0) - selectionEndRaw) < 0.05
+    );
+  const matchedEntry = entriesWithRange.find((item) => selectionMatchesEntry(item.timelineRange));
+  const showEditor = canEditLyrics && selectionOverlapsClip && Boolean(matchedEntry);
+  const clipHeight = showLyrics ? (showEditor ? 132 : 112) : 90;
+  const matchedOriginal = matchedEntry?.entry?.originalText;
+  const canRestoreLyrics =
+    matchedOriginal != null && String(matchedOriginal || "") !== String(matchedEntry?.entry?.text || "");
+  const isLyricsTranscribing = matchedEntry?.entry?.status === "transcribing";
+  const canResynthesizeLyrics =
+    Boolean(matchedEntry?.entry?.text && String(matchedEntry.entry.text).trim().length > 0)
+    && !isLyricsTranscribing;
+  const actionsLeftPx = showEditor
+    ? Math.min(selectionLeftPx + selectionWidthPx + 8, Math.max(0, width - 110))
+    : 0;
   const label =
     clip.label ||
     asset?.label ||
@@ -373,6 +471,7 @@ const ClipView = ({
       className={`studio-clip ${isSelected ? "selected" : ""} ${isDragging ? "dragging" : ""}`}
       style={{
         width,
+        height: clipHeight,
         transform: `translateX(${left}px)`,
         "--lane-clip-bg": clipBg || undefined,
         "--lane-clip-border": clipBorder || undefined,
@@ -383,11 +482,15 @@ const ClipView = ({
         if (e.target.closest(".studio-clip-actions")) return;
         if (e.target.closest(".studio-clip-handle")) return;
         if (e.target.closest(".studio-midi-note")) return;
+        if (e.target.closest(".studio-clip-lyrics-edit")) return;
+        if (e.target.closest(".studio-clip-wave")) return;
+        if (clip.clipType !== "midi" && !e.target.closest(".studio-clip-header")) return;
         e.stopPropagation();
         onDragStart?.(e, clip);
       }}
       onClick={(e) => {
         e.stopPropagation();
+        if (e.target.closest(".studio-clip-wave")) return;
         onSelect?.(clip.id);
       }}
       onDoubleClick={(e) => {
@@ -480,7 +583,7 @@ const ClipView = ({
           onTrimStart?.(e, clip, "right");
         }}
       />
-      <div className="studio-clip-wave">
+      <div className="studio-clip-wave" style={showLyrics ? { height: 44 } : undefined}>
         {clip.clipType === "midi" ? (
           <div className="studio-midi-surface" />
         ) : asset?.url ? (
@@ -524,13 +627,141 @@ const ClipView = ({
             }}
             onPreviewEnd={() => onStopPreviewMidiNote?.()}
           />
-        ) : clip.clipType === "midi" ? (
-          <div className="studio-clip-placeholder studio-midi-empty">
-            MIDI Clip · {clip.midi?.notes?.length || 0} notes
-          </div>
-        ) : null}
+      ) : clip.clipType === "midi" ? (
+        <div className="studio-clip-placeholder studio-midi-empty">
+          MIDI Clip · {clip.midi?.notes?.length || 0} notes
+        </div>
+      ) : null}
       </div>
-      <div className="studio-clip-length">{lengthSec.toFixed(2)}s</div>
+      {showLyrics ? (
+        <div className="studio-clip-lyrics-track">
+          {entriesWithRange.map((item, index) => {
+            const entry = item.entry;
+            const entryStartRaw = Number(item.timelineRange.start ?? 0);
+            const entryEndRaw = Number(item.timelineRange.end ?? 0);
+            const entryStartInClip = clamp(entryStartRaw - clipStartSec, 0, lengthSec);
+            const entryEndInClip = clamp(entryEndRaw - clipStartSec, 0, lengthSec);
+            const entryWidthSec = Math.max(0.001, entryEndInClip - entryStartInClip);
+            const entryLeftPx = entryStartInClip * pxPerSec;
+            const entryWidthPx = Math.max(24, entryWidthSec * pxPerSec);
+            const isActive = Number.isFinite(currentTime) && currentTime >= entryStartRaw && currentTime <= entryEndRaw;
+            return (
+              <div
+                key={`${clip.id}-lyric-${index}`}
+                className={`studio-clip-lyrics-entry${isActive ? " active" : ""}`}
+                style={{
+                  left: entryLeftPx,
+                  width: Math.min(entryWidthPx, Math.max(24, width - entryLeftPx)),
+                }}
+                title={entry.text || "Lyrics"}
+                onMouseDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelectRange?.({
+                    range: { start: entryStartRaw, end: entryEndRaw },
+                    laneIds: [clip.laneId],
+                  });
+                }}
+              >
+                <span className="studio-clip-lyrics-entry-text">
+                  {entry.text || (entry.status === "transcribing" ? "Transcribing..." : "Lyrics")}
+                </span>
+                {entry.status === "transcribing" && <span className="studio-spinner" />}
+              </div>
+            );
+          })}
+          <span className="studio-clip-lyrics-length">{lengthSec.toFixed(2)}s</span>
+        </div>
+      ) : (
+        <div className="studio-clip-length">{lengthSec.toFixed(2)}s</div>
+      )}
+      {showEditor && (
+        <div
+          className="studio-clip-lyrics-edit-wrap"
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <textarea
+            className="studio-clip-lyrics-edit"
+            style={{
+              left: selectionLeftPx,
+              width: Math.max(1, Math.min(selectionWidthPx, Math.max(1, width - selectionLeftPx))),
+            }}
+            value={matchedEntry?.entry?.text || ""}
+            onChange={(event) =>
+              onUpdateLyricsText?.(clip.id, event.target.value, {
+                range: {
+                  start: selectionStartRaw,
+                  end: selectionEndRaw,
+                },
+                rangeClip: matchedEntry?.entry?.rangeClip || null,
+                clipStartAtTranscribe: matchedEntry?.entry?.clipStartAtTranscribe ?? null,
+              })
+            }
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+            placeholder={matchedEntry?.entry?.status === "transcribing" ? "Transcribing..." : "Edit lyrics..."}
+            disabled={matchedEntry?.entry?.status === "transcribing"}
+            rows={1}
+          />
+          <div
+            className="studio-clip-lyrics-edit-actions"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+            style={{ left: actionsLeftPx }}
+          >
+            <button
+              type="button"
+              className="studio-clip-lyrics-edit-btn"
+              disabled={!canResynthesizeLyrics}
+              onClick={() =>
+                onResynthesizeSelection?.({
+                  clip,
+                  range: {
+                    start: selectionStartRaw,
+                    end: selectionEndRaw,
+                  },
+                  text: matchedEntry?.entry?.text || "",
+                  rangeClip: matchedEntry?.entry?.rangeClip || null,
+                })
+              }
+              title={canResynthesizeLyrics ? "Resynthesize vocals" : "Add lyrics to resynthesize"}
+            >
+              Resing
+            </button>
+            {canRestoreLyrics && (
+              <button
+                type="button"
+                className="studio-clip-lyrics-edit-btn"
+                disabled={isLyricsTranscribing}
+                onClick={() =>
+                  onRestoreLyricsEntry?.(clip.id, {
+                    range: { start: selectionStartRaw, end: selectionEndRaw },
+                    rangeClip: matchedEntry?.entry?.rangeClip || null,
+                  })
+                }
+                title="Restore original transcript"
+              >
+                Restore
+              </button>
+            )}
+            <button
+              type="button"
+              className="studio-clip-lyrics-edit-btn danger"
+              disabled={isLyricsTranscribing}
+              onClick={() =>
+                onDeleteLyricsEntry?.(clip.id, {
+                  range: { start: selectionStartRaw, end: selectionEndRaw },
+                  rangeClip: matchedEntry?.entry?.rangeClip || null,
+                })
+              }
+              title="Delete this transcript"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
       {editorOpen &&
         createPortal(
           <div
