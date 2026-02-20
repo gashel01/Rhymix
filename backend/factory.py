@@ -1,3 +1,6 @@
+import os
+import threading
+
 from flask import Flask
 from flask_cors import CORS
 
@@ -46,5 +49,10 @@ def create_app():
     from backend.routes.base import bp as base_bp
 
     app.register_blueprint(base_bp)
+
+    if os.getenv("RHYMIX_WARMUP_ON_STARTUP", "").lower() in {"1", "true", "yes", "y", "on"}:
+        from backend.routes.maintenance import warmup_models
+
+        threading.Thread(target=warmup_models, daemon=True).start()
 
     return app

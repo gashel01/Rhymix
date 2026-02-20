@@ -228,16 +228,13 @@ def _quality(payload: dict) -> dict:
     return {"score": 0.5, "notes": "Quality scoring not configured yet."}
 
 
-def main():
-    raw = sys.stdin.read()
+def _handle_request(raw: str) -> dict:
     if not raw:
-        print(json.dumps({"error": "No input provided"}))
-        return
+        return {"error": "No input provided"}
     try:
         request = json.loads(raw)
     except json.JSONDecodeError:
-        print(json.dumps({"error": "Invalid JSON payload"}))
-        return
+        return {"error": "Invalid JSON payload"}
 
     method = request.get("method")
     payload = request.get("payload") or {}
@@ -263,7 +260,21 @@ def main():
     finally:
         sys.stdout = original_stdout
 
-    print(json.dumps(response), file=original_stdout)
+    return response
+
+
+def main():
+    saw_request = False
+    for raw in sys.stdin:
+        raw = raw.strip()
+        if not raw:
+            continue
+        saw_request = True
+        response = _handle_request(raw)
+        print(json.dumps(response), file=sys.stdout, flush=True)
+
+    if not saw_request:
+        print(json.dumps({"error": "No input provided"}), file=sys.stdout, flush=True)
 
 
 if __name__ == "__main__":

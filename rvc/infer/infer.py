@@ -6,6 +6,8 @@ import torch
 import librosa
 import logging
 import traceback
+import threading
+from collections import OrderedDict
 import numpy as np
 import soundfile as sf
 import noisereduce as nr
@@ -60,6 +62,72 @@ class VoiceConverter:
         self.n_spk = None  # Number of speakers in the model
         self.use_f0 = None  # Whether the model uses F0
         self.loaded_model = None
+        self._model_cache = OrderedDict()
+        self._model_cache_lock = threading.Lock()
+        self._model_cache_size = max(
+            1, int(os.environ.get("RVC_MODEL_CACHE_SIZE", "2") or 2)
+        )
+
+    def _bundle_state(self) -> dict:
+        return {
+            "net_g": self.net_g,
+            "vc": self.vc,
+            "cpt": self.cpt,
+            "tgt_sr": self.tgt_sr,
+            "version": self.version,
+            "n_spk": self.n_spk,
+            "use_f0": self.use_f0,
+            "vocoder": self.vocoder,
+            "text_enc_hidden_dim": self.text_enc_hidden_dim,
+        }
+
+    def _restore_state(self, bundle: dict, weight_root: str) -> None:
+        self.net_g = bundle.get("net_g")
+        self.vc = bundle.get("vc")
+        self.cpt = bundle.get("cpt")
+        self.tgt_sr = bundle.get("tgt_sr")
+        self.version = bundle.get("version")
+        self.n_spk = bundle.get("n_spk")
+        self.use_f0 = bundle.get("use_f0")
+        self.vocoder = bundle.get("vocoder")
+        self.text_enc_hidden_dim = bundle.get("text_enc_hidden_dim")
+        self.loaded_model = weight_root
+
+    def _dispose_bundle(self, bundle: dict) -> None:
+        try:
+            net_g = bundle.get("net_g")
+            if net_g is not None:
+                try:
+                    net_g.to("cpu")
+                except Exception:
+                    pass
+            for key in list(bundle.keys()):
+                bundle[key] = None
+        finally:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+    def _cache_get(self, weight_root: str) -> dict | None:
+        with self._model_cache_lock:
+            bundle = self._model_cache.get(weight_root)
+            if bundle is not None:
+                self._model_cache.move_to_end(weight_root)
+            return bundle
+
+    def _cache_put(self, weight_root: str, bundle: dict) -> None:
+        with self._model_cache_lock:
+            if self._model_cache_size <= 1:
+                for _, old in list(self._model_cache.items()):
+                    self._dispose_bundle(old)
+                self._model_cache.clear()
+                self._model_cache[weight_root] = bundle
+                return
+
+            self._model_cache[weight_root] = bundle
+            self._model_cache.move_to_end(weight_root)
+            while len(self._model_cache) > self._model_cache_size:
+                _, old = self._model_cache.popitem(last=False)
+                self._dispose_bundle(old)
 
     def load_hubert(self, embedder_model: str, embedder_model_custom: str = None):
         """
@@ -433,6 +501,12 @@ class VoiceConverter:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
+        cached = self._cache_get(weight_root)
+        if cached is not None:
+            print(f"Using cached model: {weight_root}")
+            self._restore_state(cached, weight_root)
+            return
+
         if not self.loaded_model or self.loaded_model != weight_root:
             print(f"Loading model weights from: {weight_root}")
             self.load_model(weight_root)
@@ -446,6 +520,7 @@ class VoiceConverter:
                     self.setup_vc_instance()
                     self.loaded_model = weight_root
                     print(f"VC instance created: {self.vc is not None}")
+                    self._cache_put(weight_root, self._bundle_state())
                 except Exception as e:
                     print(f"ERROR during VC setup: {e}")
                     import traceback
@@ -461,6 +536,11 @@ class VoiceConverter:
         """
         Cleans up the model and releases resources.
         """
+        with self._model_cache_lock:
+            for _, bundle in list(self._model_cache.items()):
+                self._dispose_bundle(bundle)
+            self._model_cache.clear()
+
         if self.hubert_model is not None:
             del self.net_g, self.n_spk, self.vc, self.hubert_model, self.tgt_sr
             self.hubert_model = self.net_g = self.n_spk = self.vc = self.tgt_sr = None

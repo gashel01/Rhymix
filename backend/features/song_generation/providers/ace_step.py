@@ -659,6 +659,30 @@ class AceStepPersistentWorker:
 
                 job_id = payload.get("job_id") or "unknown"
                 params = payload.get("params") or {}
+                if payload.get("warmup"):
+                    try:
+                        p = dict(params or {})
+                        for key, value in ACESTEP15_DEFAULTS.items():
+                            if p.get(key) in (None, ""):
+                                p[key] = value
+
+                        use_flash_attention = _coerce_bool(p.get("use_flash_attention"), True)
+                        missing = _ensure_deps(use_flash_attention)
+                        if missing:
+                            msg = "Missing packages: " + ", ".join(sorted(set(missing)))
+                            _print("WARMUP_ERROR:" + msg)
+                            continue
+
+                        dit_handler = _init_dit(p)
+                        initialize_lm = _coerce_bool(p.get("initialize_lm"), True)
+                        if initialize_lm:
+                            _init_lm(p, dit_handler)
+                        _print("WARMUP_OK")
+                    except Exception as e:
+                        _print("WARMUP_ERROR:" + str(e))
+                        traceback.print_exc()
+                    continue
+
                 output_path = payload.get("output_path")
                 if not output_path:
                     _print("JOB_END:{}:ERROR:Missing output_path".format(job_id))
@@ -786,6 +810,37 @@ class AceStepPersistentWorker:
                 error_msg = "\n".join(error_output) if error_output else "Persistent worker failed"
                 raise RuntimeError(error_msg)
 
+    def warmup(self, params: dict) -> None:
+        with self.lock:
+            self._ensure_process()
+            if not self.process or self.process.poll() is not None:
+                raise RuntimeError("ACE-Step worker not available")
+
+            payload = {"job_id": "warmup", "params": params, "warmup": True}
+            self.process.stdin.write(json.dumps(payload) + "\n")
+            self.process.stdin.flush()
+
+            error_output = []
+            while True:
+                line = self.process.stdout.readline()
+                if not line:
+                    if self.process.poll() is not None:
+                        break
+                    continue
+                line = line.rstrip("\n\r")
+                print(f"[ACE-Step] {line}", flush=True)
+
+                if line.startswith("WARMUP_OK"):
+                    return
+                if line.startswith("WARMUP_ERROR"):
+                    error_output.append(line)
+                    break
+
+            if self.process and self.process.poll() is not None:
+                raise RuntimeError("ACE-Step worker exited unexpectedly")
+            error_msg = "\n".join(error_output) if error_output else "Persistent worker warmup failed"
+            raise RuntimeError(error_msg)
+
 
 def _get_persistent_worker() -> AceStepPersistentWorker:
     global _PERSISTENT_WORKER
@@ -793,6 +848,20 @@ def _get_persistent_worker() -> AceStepPersistentWorker:
         if _PERSISTENT_WORKER is None:
             _PERSISTENT_WORKER = AceStepPersistentWorker()
         return _PERSISTENT_WORKER
+
+
+def warmup_acestep(params: dict | None = None) -> dict:
+    if not USE_PERSISTENT_WORKER:
+        return {"status": "skipped", "reason": "persistent_worker_disabled"}
+
+    warm_params = _normalize_acestep15_params(params or {})
+    start = time.time()
+    try:
+        worker = _get_persistent_worker()
+        worker.warmup(warm_params)
+        return {"status": "ok", "duration_sec": round(time.time() - start, 2)}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
 
 
 def _run_acestep15_generation(job: dict, job_id: str, infer_params: dict, output_path: Path) -> None:

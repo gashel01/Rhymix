@@ -5,6 +5,7 @@
     "5133625c076f404a965a2887f7a39d69": "26f73b13fded4d669be008122152698d",
     "5c699c603ba24bccaf69742395364168": "8ca4231663bf4d65bd454b1a982dfdb5",
     "7dc76610cf944cf5b52aab83acd5b426": "323c01d9798748b1a4afa0b2d0a4b021",
+    "815f78a5425b46b092dda71582f3f7c8": "db1175b376ad4de8af1a78953650c5b8",
     "8466717eaba44cdf92df9802466673fd": "1bd81050e7354ca0b97cf615f97ebb99",
     "95f20397246c466a8d5bf5e724b1cd70": "195aaf17a4a54518ab3d508d8b499307",
     "a5a12c1b4d0e4abb8c8961e910f2e622": "c54afca15c9e4f2fa383efc2c61ce154",
@@ -5363,6 +5364,128 @@
         "sampleRate": 192000,
         "timeSignature": null,
         "updatedAt": "2026-02-18T18:16:23.555295"
+      }
+    },
+    "db1175b376ad4de8af1a78953650c5b8": {
+      "assets": {
+        "instrumental:815f78a5425b46b092dda71582f3f7c8": {
+          "durationSec": 182.0,
+          "fileType": "instrumental",
+          "id": "instrumental:815f78a5425b46b092dda71582f3f7c8",
+          "kind": "instrumental",
+          "label": "Instrumental",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\instrumentals\\815f78a5425b46b092dda71582f3f7c8_instrumental.wav",
+          "sampleRate": 44100,
+          "url": "/api/download/instrumental/815f78a5425b46b092dda71582f3f7c8"
+        },
+        "vocal:815f78a5425b46b092dda71582f3f7c8": {
+          "durationSec": 182.0,
+          "fileType": "processed_vocals",
+          "id": "vocal:815f78a5425b46b092dda71582f3f7c8",
+          "kind": "vocal",
+          "label": "Vocals",
+          "path": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\vocals\\processed\\815f78a5425b46b092dda71582f3f7c8_vocals.wav",
+          "sampleRate": 192000,
+          "url": "/api/download/processed_vocals/815f78a5425b46b092dda71582f3f7c8"
+        }
+      },
+      "clips": [
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "42ad12e60505498e97aba72f7f389bfb",
+          "laneId": "19680b8a9f3e42ffa27ee42a6de004ae",
+          "sourceAssetId": "instrumental:815f78a5425b46b092dda71582f3f7c8",
+          "srcEndSec": 182,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        },
+        {
+          "fadeInSec": 0,
+          "fadeOutSec": 0,
+          "gainDb": 0,
+          "id": "bfbd8a8a3b26478db8d84597de888c92",
+          "laneId": "c67309b4caac473e88fbfb084b6a7609",
+          "sourceAssetId": "vocal:815f78a5425b46b092dda71582f3f7c8",
+          "srcEndSec": 182,
+          "srcStartSec": 0,
+          "timelineStartSec": 0
+        }
+      ],
+      "lanes": [
+        {
+          "color": "#2a6f97",
+          "gainDb": 0,
+          "id": "e23dd24d594349b4882fbfdc142c77bb",
+          "mute": false,
+          "name": "Mix",
+          "order": 1,
+          "projectId": "db1175b376ad4de8af1a78953650c5b8",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "mix"
+        },
+        {
+          "color": "#ff7a59",
+          "gainDb": 0,
+          "id": "c67309b4caac473e88fbfb084b6a7609",
+          "mute": false,
+          "name": "Vocals",
+          "order": 2,
+          "projectId": "db1175b376ad4de8af1a78953650c5b8",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "vocal"
+        },
+        {
+          "color": "#6fbf73",
+          "gainDb": 0,
+          "id": "19680b8a9f3e42ffa27ee42a6de004ae",
+          "mute": false,
+          "name": "Instrumental",
+          "order": 3,
+          "projectId": "db1175b376ad4de8af1a78953650c5b8",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "instrumental"
+        },
+        {
+          "color": "#b084f5",
+          "gainDb": 0,
+          "id": "857a810837574087980c135bced97199",
+          "mute": false,
+          "name": "Stems",
+          "order": 4,
+          "projectId": "db1175b376ad4de8af1a78953650c5b8",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "stem"
+        },
+        {
+          "color": "#ffb454",
+          "gainDb": 0,
+          "id": "ab331ca50f9247659b73655609a1d5c1",
+          "mute": false,
+          "name": "Generated Layers",
+          "order": 5,
+          "projectId": "db1175b376ad4de8af1a78953650c5b8",
+          "solo": false,
+          "sourceAssetId": null,
+          "type": "generated"
+        }
+      ],
+      "metadata": {},
+      "project": {
+        "assetId": "815f78a5425b46b092dda71582f3f7c8",
+        "bpm": null,
+        "createdAt": "2026-02-20T18:14:15.216547",
+        "durationSec": 182,
+        "id": "db1175b376ad4de8af1a78953650c5b8",
+        "key": null,
+        "sampleRate": 192000,
+        "timeSignature": null,
+        "updatedAt": "2026-02-20T18:14:16.176946"
       }
     }
   }
