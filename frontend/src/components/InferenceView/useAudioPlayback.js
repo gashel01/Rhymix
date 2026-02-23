@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useCallback, useEffect, useMemo } from 'react';
 
 import { downloadFile } from "../../utils/audioUtils";
 
@@ -54,7 +54,7 @@ const buildGroupKey = (run, fileId) => {
   return run?.runId || run?.id || fileId || "unknown";
 };
 
-const buildTrackPairFromRun = (run, vocalMode) => {
+const buildTrackPairFromRun = (run) => {
   const runId = getRunId(run);
   const tempId = run?.tempId || run?.jobId || null;
   const fileId = getFileId(run);
@@ -77,9 +77,8 @@ const buildTrackPairFromRun = (run, vocalMode) => {
   const convertedUrl =
     run?.outputUrl || (runId ? `/api/download/inference/${encodeURIComponent(runId)}` : null);
   const originalVocalUrl = fileId ? `/api/download/${vocalFileType}/${fileId}` : null;
-  const useConverted = vocalMode === "converted";
-  const vocalUrl = useConverted ? convertedUrl || originalVocalUrl : originalVocalUrl || convertedUrl;
-  const vocalPath = useConverted ? (runId || fileId) : fileId || runId;
+  const vocalUrl = convertedUrl || originalVocalUrl;
+  const vocalPath = runId || fileId;
 
   const displayId = runId || tempId || fileId || displayName;
   const createdAt = run?.createdAt || null;
@@ -100,7 +99,10 @@ const buildTrackPairFromRun = (run, vocalMode) => {
     instrumentalKey: `${displayId}-instrumental`,
     vocalKey: `${displayId}-vocal`,
     instrumentalUrl: fileId ? `/api/download/instrumental/${fileId}` : null,
+    originalVocalId: fileId || null,
+    convertedVocalId: runId || fileId || null,
     originalVocalUrl,
+    convertedVocalUrl: convertedUrl,
     vocalUrl,
     status: normalizeStatus(run?.status || "completed"),
     result: run,
@@ -125,12 +127,6 @@ export const useAudioPlayback = ({
   liveResults = [], 
 }) => {
   const resultsRef = useRef([]);
-  const [vocalMode, setVocalMode] = useState("converted");
-
-  const handleVocalModeChange = useCallback((event, newMode) => {
-    if (!newMode) return;
-    setVocalMode(newMode);
-  }, []);
 
   const handleDownload = useCallback(async (type, path, downloadName) => {
     try {
@@ -184,8 +180,8 @@ export const useAudioPlayback = ({
   }, [inferenceResults, liveResults]);
 
   const trackPairs = useMemo(
-    () => mergedRuns.map((run) => buildTrackPairFromRun(run, vocalMode)),
-    [mergedRuns, vocalMode]
+    () => mergedRuns.map((run) => buildTrackPairFromRun(run)),
+    [mergedRuns]
   );
 
   useEffect(() => {
@@ -219,9 +215,7 @@ export const useAudioPlayback = ({
 
   return {
     trackPairs,
-    handleVocalModeChange,
     handleDownload,
-    vocalMode,
     fetchInferenceResults,
   };
 };

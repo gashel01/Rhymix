@@ -1,0 +1,77 @@
+.pillCount {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    font-weight: 950;
+    font-size: 12px;
+}
+
+.btnBase {
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 12px;
+    font-weight: 900;
+    font-size: 12px;
+    letter-spacing: -0.1px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    user-select: none;
+}
+
+.smallIcon {
+    display: grid;
+    place-items: center;
+}
+
+.stickyHeader {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.ataGrid {
+    display: grid;
+    gap: 10px;
+    align-items: center;
+    margin-top: 12px;
+    padding: 0 12px;
+}
+
+.leftFlex {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.minWidthZero {
+    min-width: 0;
+}
+
+.selectedText {
+    font-weight: 950;
+    letter-spacing: -0.2px;
+    line-height: 1.1;
+}
+
+.defaultText {
+    font-weight: 400;
+}
+
+.middleActions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.rightFlex {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}

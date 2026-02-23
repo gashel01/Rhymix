@@ -8,6 +8,7 @@ import { useWaveformSync } from "../../hooks/useWaveformSync";
 import { downloadMergedAudio } from "../../utils/audioUtils";
 import { safeSetMuted, getCleanFileName } from "./utils";
 import { deleteFiles } from "../../utils/apiService";
+import { Theme } from "../Homeview/Theme";
 import styles from "./AudioTrackTable.module.css";
 
 const parseCreatedAt = (value) => {
@@ -22,7 +23,7 @@ const AudioTrackTable = (props) => {
     trackPairs = [],
     pageSize: pageSizeProp = 10,
     vocalMode = "raw",
-    
+
     vocalsFileType = "processed_vocals",
     volume,
     playingBoth: playingBothProp,
@@ -30,13 +31,18 @@ const AudioTrackTable = (props) => {
     vocalModeType,
     handleDownload,
     showVocalToggle,
+    enablePerFileVocalToggle = false,
     showDatasetButton,
     showInferenceButton,
     handleTrainWithDataset,
     handleInferenceWithTracks,
     showInferenceResultsActions,
+    showHeaderWorkflowActions,
+    hideActionBar,
     onReturnToModelSelection,
+    onRowModelSelection,
     onReturnToInferenceParams,
+    onRowInferenceParams,
     externalSelectedRows,
     onRowSelect,
     onSelectAll,
@@ -52,11 +58,15 @@ const AudioTrackTable = (props) => {
     onSetReaction,
     reactionPendingByRunId,
     darkMode,
+    vocalModeByGroupKey = {},
+    onGroupVocalModeChange,
   } = props;
 
   const resolvedVocalsFileType =
     typeof vocalsFileType === "function" ? vocalsFileType(vocalMode) : vocalsFileType;
   const effectiveVocalsFileType = resolvedVocalsFileType || "processed_vocals";
+
+  const { t } = Theme({ darkMode });
 
   const [mutes, setMutes] = useState({ instrumental: {}, vocal: {} });
   const [playingBoth, setPlayingBoth] = useState(playingBothProp);
@@ -96,6 +106,7 @@ const AudioTrackTable = (props) => {
 
   const displayTrackPairs = useMemo(() => {
     if (!enableGrouping) return trackPairs;
+    const isInferenceMode = vocalModeType === "inference";
     const groups = new Map();
     const order = [];
 
@@ -119,13 +130,13 @@ const AudioTrackTable = (props) => {
       const isExpanded = expandedGroups.has(key);
       output.push({
         ...latest,
-        isGroupHeader: versions.length > 1,
-        isGroupExpanded: isExpanded,
+        isGroupHeader: !isInferenceMode && versions.length > 1,
+        isGroupExpanded: !isInferenceMode && isExpanded,
         groupKey: key,
         versionCount: versions.length,
         favoriteCount,
       });
-      if (isExpanded && versions.length > 1) {
+      if (!isInferenceMode && isExpanded && versions.length > 1) {
         versions.slice(1).forEach((version, index) => {
           output.push({
             ...version,
@@ -139,7 +150,24 @@ const AudioTrackTable = (props) => {
     });
 
     return output;
-  }, [enableGrouping, expandedGroups, trackPairs]);
+  }, [enableGrouping, expandedGroups, trackPairs, vocalModeType]);
+
+  const versionsByGroupKey = useMemo(() => {
+    const groups = new Map();
+    (trackPairs || []).forEach((pair) => {
+      const key = pair?.groupKey || pair?.runId || pair?.id;
+      if (!key) return;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(pair);
+    });
+    groups.forEach((versions, key) => {
+      groups.set(
+        key,
+        [...versions].sort((a, b) => parseCreatedAt(b?.createdAt) - parseCreatedAt(a?.createdAt))
+      );
+    });
+    return groups;
+  }, [trackPairs]);
 
   const selectableTrackPairs = useMemo(
     () => displayTrackPairs.filter((pair) => pair.status !== "processing" && pair.status !== "failed"),
@@ -166,6 +194,41 @@ const AudioTrackTable = (props) => {
     const start = (page - 1) * pageSize;
     return displayTrackPairs.slice(start, start + pageSize);
   }, [displayTrackPairs, page, pageSize]);
+
+  const handleSelectAllAction = useCallback(() => {
+    if (onSelectAll) {
+      onSelectAll();
+      return;
+    }
+    setSelectedRows(selectableTrackPairs.map((p) => p.id));
+  }, [onSelectAll, selectableTrackPairs, setSelectedRows]);
+
+  const handleClearAction = useCallback(() => {
+    if (onDeselectAll) {
+      onDeselectAll();
+      return;
+    }
+    setSelectedRows([]);
+  }, [onDeselectAll, setSelectedRows]);
+
+  const handleDeleteAction = useCallback(() => {
+    if (onDeleteSelected) {
+      onDeleteSelected();
+      return;
+    }
+    setDeleteState((prev) => ({ ...prev, open: true }));
+  }, [onDeleteSelected]);
+
+  const resolvedHeader =
+    typeof header === "function"
+      ? header({
+        selectedRows,
+        selectedCount: selectedRows.length,
+        onSelectAll: handleSelectAllAction,
+        onClear: handleClearAction,
+        onDelete: handleDeleteAction,
+      })
+      : header;
 
   const getWaveform = (type, pair) => {
     const key = type === "instrumental" ? pair.instrumentalKey : pair.vocalKey;
@@ -252,6 +315,135 @@ const AudioTrackTable = (props) => {
     }
   }, []);
 
+  const resolveVocalSourceForRow = useCallback(
+    (pair) => {
+      const groupKey = pair?.groupKey || pair?.runId || pair?.id;
+      const requested = vocalModeByGroupKey?.[groupKey];
+      if (vocalModeType === "inference") {
+        const versions =
+          versionsByGroupKey.get(groupKey) ||
+          (pair ? [pair] : []);
+        const originalType = pair?.vocalFileType || effectiveVocalsFileType || "processed_vocals";
+        const originalId = pair?.originalVocalId || pair?.fileId || pair?.result?.inputFileId || null;
+        const originalUrl =
+          pair?.originalVocalUrl ||
+          (originalId ? `/api/download/${originalType}/${originalId}` : null);
+
+        if (requested === "original") {
+          const inferredOptions = versions
+            .filter((v) => (v?.runId || v?.id))
+            .map((v, idx) => ({
+              value: v?.runId || v?.id,
+              label: v?.modelName || `Inferred ${idx + 1}`,
+            }));
+          return {
+            vocalMode: "original",
+            vocalsFileType: originalType,
+            vocalPath: originalId || pair?.vocal || pair?.runId || null,
+            vocalUrl: originalUrl || pair?.vocalUrl || null,
+            activeMetadataPair: pair,
+            selectedVocalSource: "original",
+            activeConvertedLabel: null,
+            vocalSourceOptions: inferredOptions.length
+              ? inferredOptions
+              : [
+                {
+                  value: pair?.runId || pair?.id || "inferred",
+                  label: pair?.modelName || "Inferred",
+                },
+              ],
+            showToggle: enablePerFileVocalToggle,
+          };
+        }
+
+        let selectedVersion = versions[0] || pair;
+        if (requested && requested !== "converted") {
+          const match = versions.find((v) => String(v?.runId || v?.id) === String(requested));
+          if (match) selectedVersion = match;
+        }
+
+        const convertedPath =
+          selectedVersion?.convertedVocalId ||
+          selectedVersion?.runId ||
+          selectedVersion?.vocal ||
+          pair?.convertedVocalId ||
+          pair?.runId ||
+          pair?.vocal ||
+          null;
+        const convertedUrl =
+          selectedVersion?.convertedVocalUrl ||
+          selectedVersion?.vocalUrl ||
+          pair?.convertedVocalUrl ||
+          pair?.vocalUrl ||
+          null;
+
+        return {
+          vocalMode: "converted",
+          vocalsFileType: "inference",
+          vocalPath: convertedPath,
+          vocalUrl: convertedUrl,
+          activeMetadataPair: selectedVersion || pair,
+          selectedVocalSource: selectedVersion?.runId || selectedVersion?.id || "converted",
+          activeConvertedLabel: selectedVersion?.modelName || pair?.modelName || "Inferred",
+          vocalSourceOptions: versions
+            .filter((v) => (v?.runId || v?.id))
+            .map((v, idx) => ({
+              value: v?.runId || v?.id,
+              label: v?.modelName || `Inferred ${idx + 1}`,
+            })),
+          showToggle: enablePerFileVocalToggle,
+        };
+      }
+
+      const rawVocalUrl =
+        pair?.rawVocalUrl ||
+        pair?.originalVocalUrl ||
+        null;
+      const processedVocalUrl =
+        pair?.processedVocalUrl ||
+        pair?.convertedVocalUrl ||
+        pair?.vocalUrl ||
+        null;
+      const rawVocalPath =
+        pair?.rawVocalPath ||
+        pair?.originalVocalId ||
+        pair?.fileId ||
+        null;
+      const processedVocalPath =
+        pair?.processedVocalPath ||
+        pair?.convertedVocalId ||
+        pair?.fileId ||
+        null;
+      const hasRaw = Boolean(rawVocalUrl || rawVocalPath);
+      const hasProcessed = Boolean(processedVocalUrl || processedVocalPath);
+      const canToggle = Boolean(enablePerFileVocalToggle && hasRaw && hasProcessed);
+      const defaultSource = requested || (vocalMode === "processed" ? "processed" : "original");
+      let selectedSource = defaultSource;
+      if (selectedSource === "original" && !hasRaw && hasProcessed) selectedSource = "processed";
+      if (selectedSource === "processed" && !hasProcessed && hasRaw) selectedSource = "original";
+      if (!hasRaw && !hasProcessed) selectedSource = "original";
+      const isOriginal = selectedSource === "original";
+      const activeUrl = isOriginal ? rawVocalUrl : processedVocalUrl;
+      const activePath = isOriginal ? rawVocalPath : processedVocalPath;
+      const activeType = isOriginal ? "raw_vocals" : "processed_vocals";
+
+      return {
+        vocalMode: isOriginal ? "original" : "converted",
+        vocalsFileType: activeType,
+        vocalPath: activePath || pair?.vocal || pair?.fileId || null,
+        vocalUrl: activeUrl || pair?.vocalUrl || null,
+        activeMetadataPair: pair,
+        selectedVocalSource: isOriginal ? "original" : "processed",
+        activeConvertedLabel: "processed",
+        vocalSourceOptions: hasProcessed
+          ? [{ value: "processed", label: "processed" }]
+          : [],
+        showToggle: canToggle,
+      };
+    },
+    [effectiveVocalsFileType, enablePerFileVocalToggle, versionsByGroupKey, vocalMode, vocalModeByGroupKey, vocalModeType]
+  );
+
   const virtualizer = useVirtualizer({
     count: paginatedTrackPairs.length,
     getScrollElement: () => parentRef.current,
@@ -275,13 +467,12 @@ const AudioTrackTable = (props) => {
   return (
     <Box className={styles.container} style={{ border: "none" }} >
       <AudioTableActions
+        darkMode={darkMode}
         selectedRows={selectedRows}
         trackPairs={selectableTrackPairs}
-        onSelectAll={() =>
-          onSelectAll ? onSelectAll() : setSelectedRows(selectableTrackPairs.map((p) => p.id))
-        }
-        onClear={() => (onDeselectAll ? onDeselectAll() : setSelectedRows([]))}
-        onDelete={() => (onDeleteSelected ? onDeleteSelected() : setDeleteState((p) => ({ ...p, open: true })))}
+        onSelectAll={handleSelectAllAction}
+        onClear={handleClearAction}
+        onDelete={handleDeleteAction}
         vocalMode={vocalMode}
         handleVocalModeChange={handleVocalModeChange}
         showVocalToggle={showVocalToggle}
@@ -293,6 +484,8 @@ const AudioTrackTable = (props) => {
         handleInferenceWithTracks={handleInferenceWithTracks}
         handleCoverWithTracks={handleCoverWithTracks}
         showInferenceResultsActions={showInferenceResultsActions}
+        showHeaderWorkflowActions={showHeaderWorkflowActions}
+        hideActionBar={hideActionBar}
         onReturnToModelSelection={onReturnToModelSelection}
         onReturnToInferenceParams={onReturnToInferenceParams}
         defaultLabel={defaultLabel}
@@ -305,7 +498,7 @@ const AudioTrackTable = (props) => {
         />
         }
 
-        header={header}
+        header={resolvedHeader}
       />
 
 
@@ -335,7 +528,13 @@ const AudioTrackTable = (props) => {
             className={styles.tableContainer}
             ref={parentRef}
             sx={{
-              overflow: 'auto',
+              overflowX: "auto",
+              overflowY: "scroll",
+
+              border: "none",
+              boxShadow: "none",
+              background: "transparent",
+
             }}
           >
             <Table className={styles.table} stickyHeader>
@@ -352,6 +551,21 @@ const AudioTrackTable = (props) => {
                   const globalIndex = (page - 1) * pageSize + virtualRow.index;
                   const pairId = pair.id;
                   const isPlaying = playingBoth?.id === pairId;
+                  const groupKey = pair?.groupKey || pair?.runId || pair?.id;
+                  const vocalSource = resolveVocalSourceForRow(pair);
+                  const activeMeta = vocalSource.activeMetadataPair || pair;
+                  const trackForCover =
+                    pair?.result?.track ||
+                    pair?.track ||
+                    (pair?.fileId
+                      ? {
+                        fileId: pair.fileId,
+                        id: pair.fileId,
+                        displayName: pair?.displayName || pair?.name || null,
+                        originalName: pair?.originalName || null,
+                        vocalFileType: vocalSource.vocalsFileType || pair?.vocalFileType || pair?.result?.vocalFileType || null,
+                      }
+                      : null);
                   return (
                     <AudioTrackRow
                       key={pair.id || globalIndex}
@@ -359,17 +573,32 @@ const AudioTrackTable = (props) => {
                       index={globalIndex}
                       status={pair.status || "completed"}
                       name={pair.displayName || pair.name || (vocalModeType === "inference" ? "Unknown Track" : getCleanFileName(pair.instrumental))}
-                      modelUsed={vocalModeType === "inference" ? (pair.modelName ?? null) : null}
+                      modelUsed={
+                        vocalModeType === "inference"
+                          ? (vocalSource.activeConvertedLabel || activeMeta.modelName || pair.modelName || null)
+                          : null
+                      }
                       instrumentalUrl={pair.instrumentalUrl || (pair.fileId ? `/api/download/instrumental/${pair.fileId}` : undefined)}
-                      vocalUrl={pair.vocalUrl || (pair.fileId ? `/api/download/${effectiveVocalsFileType}/${pair.fileId}` : undefined)}
+                      vocalUrl={vocalSource.vocalUrl || pair.vocalUrl || (pair.fileId ? `/api/download/${effectiveVocalsFileType}/${pair.fileId}` : undefined)}
                       playingBoth={playingBoth}
-                      vocalMode={vocalMode}
+                      vocalMode={vocalSource.vocalMode}
                       vocalModeType={vocalModeType}
-                      vocalsFileType={effectiveVocalsFileType}
+                      vocalsFileType={vocalSource.vocalsFileType || effectiveVocalsFileType}
+                      showPerFileVocalToggle={Boolean(vocalSource.showToggle)}
+                      vocalPathOverride={vocalSource.vocalPath}
+                      vocalUrlOverride={vocalSource.vocalUrl}
+                      vocalSourceOptions={vocalSource.vocalSourceOptions}
+                      selectedVocalSource={vocalSource.selectedVocalSource}
+                      activeConvertedLabel={vocalSource.activeConvertedLabel}
+                      onVocalSourceChange={
+                        vocalSource.showToggle && onGroupVocalModeChange
+                          ? (nextSource) => onGroupVocalModeChange(groupKey, nextSource)
+                          : undefined
+                      }
                       isInstrumentalPlaying={isPlaying || playingFile?.name === pair.instrumentalKey}
                       isVocalPlaying={isPlaying || playingFile?.name === pair.vocalKey}
                       internalMutedInstrumentals={mutes.instrumental}
-                      internalMutedVocals={ mutes.vocal}
+                      internalMutedVocals={mutes.vocal}
                       volume={volume}
                       handlePlayPauseModified={handlePlayPauseModified}
                       handlePlayBothModified={handlePlayBothInternal}
@@ -378,20 +607,40 @@ const AudioTrackTable = (props) => {
                       isSelected={selectedRows.includes(pair.id)}
                       onRowSelect={handleRowSelect}
                       isNew={pair.isNew}
-                      paramsSummary={pair.paramsSummary}
+                      paramsSummary={activeMeta.paramsSummary || pair.paramsSummary}
                       processing={pair.processing}
-                      createdAt={pair.createdAt}
+                      createdAt={activeMeta.createdAt || pair.createdAt}
                       groupKey={pair.groupKey}
                       isGroupHeader={pair.isGroupHeader}
                       isGroupExpanded={pair.isGroupExpanded}
                       isGroupedVersion={pair.isGroupedVersion}
                       versionCount={pair.versionCount}
                       favoriteCount={pair.favoriteCount}
-                      reaction={pair.reaction || "none"}
-                      reactionPending={Boolean(reactionPendingByRunId?.[pair.runId])}
+                      reaction={activeMeta.reaction || pair.reaction || "none"}
+                      reactionRunId={activeMeta.runId || pair.runId || null}
+                      reactionPending={Boolean(reactionPendingByRunId?.[activeMeta.runId || pair.runId])}
                       onToggleGroup={enableGrouping ? handleToggleGroup : undefined}
                       onSetReaction={onSetReaction}
                       onOpenStudio={handleOpenStudio}
+                      onMenuModelSelection={
+                        onRowModelSelection
+                          ? () => onRowModelSelection(pair, vocalSource)
+                          : onReturnToModelSelection
+                      }
+                      onMenuInferenceParams={
+                        onRowInferenceParams
+                          ? () => onRowInferenceParams(pair)
+                          : onReturnToInferenceParams
+                      }
+                      onMenuCover={trackForCover && handleCoverWithTracks ? () => handleCoverWithTracks([trackForCover]) : undefined}
+                      onMenuDelete={() => {
+                        handleRowSelect(pair.id, true);
+                        if (onDeleteSelected) {
+                          onDeleteSelected();
+                          return;
+                        }
+                        setDeleteState((prev) => ({ ...prev, open: true }));
+                      }}
                       darkMode={darkMode}
                     />
                   );
@@ -405,13 +654,21 @@ const AudioTrackTable = (props) => {
         </div>
 
         {displayTrackPairs.length > pageSize && (
-          <div className={styles.paginationOverlay} role="navigation" aria-label="Audio track pagination">
+          <div
+            role="navigation"
+            aria-label="Audio track pagination"
+            className={styles.paginationOverlay}
+            style={{
+              border: `1px solid ${t.hairline}`,
+              background: t.isDark ? "rgba(20, 20, 22, 0.72)" : "rgba(255, 255, 255, 0.4)",
+            }}
+          >
             <Button
               size="small"
               variant="text"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className={styles.paginationBtn}
+              sx={{ minWidth: 0, color: t.text }}
             >
               Prev
             </Button>
@@ -419,7 +676,11 @@ const AudioTrackTable = (props) => {
             <div className={styles.paginationPages} aria-label={`Page ${page} of ${totalPages}`}>
               {pageItems.map((it, idx) =>
                 it === "…" ? (
-                  <span key={`ellipsis-${idx}`} className={styles.paginationEllipsis}>
+                  <span
+                    key={`ellipsis-${idx}`}
+                    className={styles.paginationEllipsis}
+                    style={{ color: t.subtext }}
+                  >
                     …
                   </span>
                 ) : (
@@ -427,7 +688,15 @@ const AudioTrackTable = (props) => {
                     key={it}
                     type="button"
                     onClick={() => setPage(it)}
-                    className={`${styles.pageBtn} ${it === page ? styles.pageBtnActive : ""}`}
+                    className={styles.pageBtn}
+                    style={{
+                      border: `1px solid ${it === page ? (t.isDark ? "rgba(255, 255, 255, 0.28)" : t.primaryWash) : t.hairline}`,
+                      background: it === page
+                        ? (t.isDark ? "rgba(255, 255, 255, 0.22)" : "rgba(255,255,255,0.9)")
+                        : t.isDark ? "rgba(255, 255, 255, 0.08)" : t.cardB,
+                      color: t.text,
+                      fontWeight: it === page ? 700 : 500,
+                    }}
                     aria-current={it === page ? "page" : undefined}
                   >
                     {it}
@@ -441,7 +710,7 @@ const AudioTrackTable = (props) => {
               variant="text"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className={styles.paginationBtn}
+              sx={{ minWidth: 0, color: t.text }}
             >
               Next
             </Button>

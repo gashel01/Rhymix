@@ -35,8 +35,20 @@ export const useAudioPlayback = ({ rawVocals, availableFiles, vocalMode, optimis
       const processing = normalizeProcessing(base.processing);
       const displayName =
         base.displayName || base.safeDisplayName || base.originalName || `Track ${index + 1}`;
-      const vocalUrl = vocalMode === "processed" ? procItem?.vocalUrl : rawItem?.vocalUrl;
-      const vocalFileType = vocalMode === "processed" ? "processed_vocals" : "raw_vocals";
+      const rawVocalUrl = rawItem?.vocalUrl || null;
+      const processedVocalUrl = procItem?.vocalUrl || null;
+      const rawVocalPath = rawItem?.vocalPath || null;
+      const processedVocalPath = procItem?.vocalPath || null;
+      const hasRawVocal = Boolean(rawVocalUrl || rawVocalPath);
+      const hasProcessedVocal = Boolean(processedVocalUrl || processedVocalPath);
+      const preferProcessed = vocalMode === "processed" && hasProcessedVocal;
+      const vocalUrl = preferProcessed
+        ? processedVocalUrl
+        : (rawVocalUrl || processedVocalUrl || null);
+      const vocalPath = preferProcessed
+        ? processedVocalPath
+        : (rawVocalPath || processedVocalPath || null);
+      const vocalFileType = preferProcessed ? "processed_vocals" : "raw_vocals";
 
       return {
         id: fileId || `row-${index}`,
@@ -54,7 +66,13 @@ export const useAudioPlayback = ({ rawVocals, availableFiles, vocalMode, optimis
         instrumentalUrl: base.instrumentalUrl || undefined,
         vocalUrl,
         instrumentalPath: base.instrumentalPath || null,
-        vocalPath: vocalMode === "processed" ? procItem?.vocalPath : rawItem?.vocalPath,
+        vocalPath,
+        rawVocalUrl,
+        processedVocalUrl,
+        rawVocalPath,
+        processedVocalPath,
+        hasRawVocal,
+        hasProcessedVocal,
         processing,
         status: statusFromProcessing(processing),
         createdAt: base.createdAt || null,
@@ -93,6 +111,12 @@ export const useAudioPlayback = ({ rawVocals, availableFiles, vocalMode, optimis
         vocalUrl: null,
         instrumentalPath: null,
         vocalPath: null,
+        rawVocalUrl: null,
+        processedVocalUrl: null,
+        rawVocalPath: null,
+        processedVocalPath: null,
+        hasRawVocal: false,
+        hasProcessedVocal: false,
         processing,
         status: statusFromProcessing(processing),
         createdAt: track.createdAt || null,

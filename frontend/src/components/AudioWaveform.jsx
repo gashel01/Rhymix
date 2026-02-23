@@ -81,14 +81,14 @@ const AudioWaveform = (
       : false;
 
   const t = {
-    text: isDark ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.90)",
-    subtext: isDark ? "rgba(255,255,255,0.62)" : "rgba(0,0,0,0.55)",
-    hairline: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)",
+    text: isDark ? "rgba(255,255,255,0.92)" : "#0F172A",
+    subtext: isDark ? "rgba(255,255,255,0.62)" : "#64748B",
+    hairline: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)",
     glass: isDark ? "rgba(18,18,20,0.50)" : "rgba(255,255,255,0.60)",
     glass2: isDark ? "rgba(18,18,20,0.30)" : "rgba(255,255,255,0.35)",
-    shadow: isDark ? "0 10px 24px rgba(0,0,0,0.35)" : "0 12px 26px rgba(0,0,0,0.10)",
+    shadow: isDark ? "0 10px 24px rgba(0,0,0,0.35)" : "0 8px 24px rgba(15,23,42,0.04)",
     radius: 14,
-    bg: backgroundColor ?? (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)"),
+    bg: backgroundColor ?? (isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF"),
   };
 
   // decide which mute state to display/use

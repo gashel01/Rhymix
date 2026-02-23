@@ -1,0 +1,200 @@
+.pageContainer {
+  min-height: 100vh;
+}
+
+.contentWrapper {
+  margin: 0 auto;
+}
+
+.spinnerContainer {
+  display: grid;
+  place-items: center;
+  padding: 48px 12px;
+  text-align: center;
+}
+
+.loadingTitle {
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.loadingSubtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.tableContainer {
+  overflow: visible;
+  padding: 0;
+}
+
+.headerWrapper {
+  padding: 10px;
+}
+
+.headerFlex {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 0px 0px 10px 0px;
+}
+
+.createDatasetBtn {
+  height: 40px;
+  padding: 0 14px;
+  align-items: center;
+  display: flex;
+  justify-content: center;
+}
+
+.searchSection {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.searchCard {
+  padding: 8px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+
+.searchFlexCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.searchFlexRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.searchInputWrapperOuter {
+  position: relative;
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.searchInputWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  transition: border-color 180ms, background 180ms;
+}
+
+.searchInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.clearSearchBtn {
+  padding: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+}
+
+.actionsRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selectAllBtn {
+  height: 40px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.clearSelectionBtn {
+  height: 40px;
+  padding: 0 14px;
+}
+
+.clearSelectionWrapper {
+  overflow: hidden;
+  transition: all 180ms ease;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+}
+
+.deleteBtnOuter {
+  position: relative;
+}
+
+.deleteBadge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: red;
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.emptyStateContainer {
+  text-align: center;
+  padding: 44px 12px;
+}
+
+.emptyStateIcon {
+  width: 84px;
+  height: 84px;
+  border-radius: 999px;
+  margin: 0 auto 14px auto;
+  display: grid;
+  place-items: center;
+}
+
+.emptyStateTitle {
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.emptyStateMessage {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  max-width: 520px;
+  margin-inline: auto;
+}
+
+.emptyStateAction {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.emptyStateBtn {
+  height: 44px;
+  padding: 0 16px;
+}
+
+.emptyStateBtnInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
