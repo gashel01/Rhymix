@@ -232,3 +232,11 @@ rvc/models/embedders/contentvec/pytorch_model.bin
 rvc/models/predictors/fcpe.pt
 rvc/models/predictors/rmvpe.pt
 rvc/models/formant/stftpitchshift.exe
+
+# Local runtime / workstation artifacts
+flask_app.log
+processing.log
+None
+*.bak
+data/studio/projects.json
+

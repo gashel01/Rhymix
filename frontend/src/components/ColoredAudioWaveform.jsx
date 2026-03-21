@@ -190,13 +190,6 @@ const ColoredAudioWaveform = forwardRef(
 
             // Only apply zoom if it's different enough from current
             if (Math.abs(newZoom - currentZoom) > 0.2) {
-              // More sensitive threshold
-              console.log(
-                `Zooming from ${currentZoom.toFixed(1)} to ${newZoom.toFixed(
-                  1
-                )}`
-              );
-
               // Apply zoom
               wavesurferRef.current.zoom(newZoom);
               setZoom(newZoom);
@@ -236,14 +229,8 @@ const ColoredAudioWaveform = forwardRef(
     // Initialize wavesurfer
     useEffect(() => {
       if (!containerRef.current || !url) {
-        console.log("Container ref or URL missing:", {
-          containerExists: !!containerRef.current,
-          url,
-        });
         return;
       }
-
-      console.log("Initializing WaveSurfer with URL:", url);
 
       // Create wavesurfer instance with additional configuration
       const wavesurfer = WaveSurfer.create({
@@ -292,7 +279,6 @@ const ColoredAudioWaveform = forwardRef(
 
       // Try to load the audio with better error handling
       try {
-        console.log("Loading audio from URL:", url);
         wavesurfer.load(url);
       } catch (e) {
         console.error("Exception loading audio:", e);
@@ -302,10 +288,6 @@ const ColoredAudioWaveform = forwardRef(
 
       // Event handlers
       wavesurfer.on("ready", () => {
-        console.log(
-          "Wavesurfer ready with duration:",
-          wavesurfer.getDuration()
-        );
         setReady(true);
         setLoading(false);
         addRegions(wavesurfer);
@@ -335,7 +317,6 @@ const ColoredAudioWaveform = forwardRef(
       });
 
       wavesurfer.on("duration-changed", () => {
-        console.log("Duration changed to:", wavesurfer.getDuration());
         // Reapply regions with the new duration
         addRegions(wavesurfer);
       });
@@ -368,16 +349,11 @@ const ColoredAudioWaveform = forwardRef(
     // Add regions for speakers
     const addRegions = (wavesurfer) => {
       if (!segments || segments.length === 0) {
-        console.log("No segments to display");
         return;
       }
 
-      console.log("Adding regions for segments:", segments);
-
       // First, check if we have gaps between segments
       const sortedSegments = [...segments].sort((a, b) => a.start - b.start);
-      const fullDuration = wavesurfer.getDuration();
-      console.log("Full audio duration:", fullDuration);
 
       // Note: Unknown segments are positioned based on their actual timestamps
       // which are extracted from the filename (format: part{number}_{start}-{end}.wav)
@@ -385,51 +361,12 @@ const ColoredAudioWaveform = forwardRef(
       // They represent silence or non-speech portions of the audio.
       const completeSegments = sortedSegments;
 
-      // Log all unknown segments for debugging placement issues
-      const unknownSegments = completeSegments.filter(
-        (s) => s.speaker === "Unknown"
-      );
-      if (unknownSegments.length > 0) {
-        console.log(
-          "Unknown segments in timeline:",
-          unknownSegments.map((s) => ({
-            id: s.id,
-            start: s.start.toFixed(3),
-            end: s.end.toFixed(3),
-            duration: (s.end - s.start).toFixed(3),
-          }))
-        );
-      }
-
       // Clear any existing regions
       wavesurfer.clearRegions();
       regionsRef.current = {};
 
-      // Add right after we receive completeSegments array
-      console.log("Filtering with speakers:", filteredSpeakers);
-      console.log(
-        "Actual segment speakers:",
-        completeSegments.map((s) => s.speaker)
-      );
-
-      // Count how many segments match our filter criteria
-      let matchingSegments = 0;
-      let unknownSegmentsCount = 0;
-
-      // Debug output to see the actual names being used
-      console.log("Speaker Color Map:", speakerColorMap);
-      console.log("All Speaker Names:", [
-        ...new Set(segments.map((s) => s.speaker)),
-      ]);
-      console.log("Filter Speakers:", filteredSpeakers);
-
       // Create regions from all segments (no longer including gaps)
       completeSegments.forEach((segment, index) => {
-        // Count unknown segments if present
-        if (segment.speaker === "Unknown") {
-          unknownSegmentsCount++;
-        }
-
         // Determine if this segment should be shown:
         // 1. When no filtering is applied (show all speakers)
         // 2. When this is an Unknown/gap segment (always show these)
@@ -438,18 +375,8 @@ const ColoredAudioWaveform = forwardRef(
 
         // Skip creating regions for non-selected speakers
         if (!isSelected) {
-          console.log(
-            `Skipping segment ${index} with speaker "${segment.speaker}" (not selected)`
-          );
           return;
         }
-
-        matchingSegments++;
-
-        // Rest of the function remains the same
-        console.log(
-          `Creating region for segment ${index} with speaker "${segment.speaker}"`
-        );
 
         // Determine the region color
         let regionColor;
@@ -544,12 +471,6 @@ const ColoredAudioWaveform = forwardRef(
         }
       });
 
-      console.log(
-        `Found ${matchingSegments} matching segments out of ${completeSegments.length} total segments`
-      );
-      console.log(`${unknownSegmentsCount} unknown segments`);
-
-      console.log(`Added ${matchingSegments} regions`);
     };
 
     // Helper to adjust color opacity
@@ -625,8 +546,6 @@ const ColoredAudioWaveform = forwardRef(
     useEffect(() => {
       // When the component mounts, ensure the filteredSpeakers state is properly handled
       if (ready && wavesurferRef.current) {
-        console.log("Initial render with filtered speakers:", filteredSpeakers);
-
         // Clear and re-add all regions to ensure proper rendering
         wavesurferRef.current.clearRegions();
         regionsRef.current = {};

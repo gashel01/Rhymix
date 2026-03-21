@@ -741,13 +741,6 @@ function App() {
   };
 
   const handleTrainWithDataset = useCallback((selectedVocals) => {
-    console.log("Training with selected vocals:", selectedVocals);
-
-    // If metadata is available, this is coming from diarization
-    if (selectedVocals.metadata) {
-      console.log("Training with diarization data:", selectedVocals.metadata);
-    }
-
     setSelectedVocalsForTraining(selectedVocals);
     setCurrentView("training");
     setShowHomeView(false);

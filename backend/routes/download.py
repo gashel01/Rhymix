@@ -13,6 +13,7 @@ from backend.storage.inference_runs import load_inference_run_metadata
 from backend.storage.metadata import get_upload_base_name
 
 bp = Blueprint("download", __name__)
+logger = logging.getLogger(__name__)
 
 
 def _sanitize_download_name(value, fallback):
@@ -25,9 +26,8 @@ def _sanitize_download_name(value, fallback):
 @bp.route("/api/download/<file_type>/<path:filename>")
 def download_file(file_type, filename):
     try:
-        print(f"Download request - Type: {file_type}, Filename: {filename}")
+        logger.debug("Download request type=%s filename=%s", file_type, filename)
         filename = os.path.basename(urllib.parse.unquote(filename))
-        print(f"Sanitized filename: {filename}")
         requested_download_name = request.args.get("downloadName")
 
         dir_map = {
@@ -37,21 +37,17 @@ def download_file(file_type, filename):
             "instrumental": paths.INSTRUMENTAL_DIR,
         }
         if file_type not in dir_map:
-            print(f"Invalid file type: {file_type}")
             return jsonify({"error": f"Invalid file type: {file_type}"}), 400
 
         target_dir = dir_map[file_type]
-        print(f"Looking in directory: {target_dir}")
 
         if not target_dir.exists():
-            print(f"Directory does not exist: {target_dir}")
             return (
                 jsonify({"error": f"Directory {file_type} does not exist", "directory": str(target_dir)}),
                 404,
             )
 
         existing = [f.name for f in target_dir.glob("*.wav")]
-        print(f"Files in directory ({len(existing)}): {existing[:5]}...")
 
         file_path = target_dir / filename
         file_id = filename
@@ -65,10 +61,7 @@ def download_file(file_type, filename):
                 filename = f"{base_name}_vocals.wav"
             file_path = target_dir / filename
 
-        print(f"Full file path: {file_path}")
-
         if not file_path.exists():
-            print(f"File not found: {file_path}")
             matches = [f for f in existing if filename.lower() in f.lower() or f.lower() in filename.lower()]
             return (
                 jsonify(
@@ -82,17 +75,13 @@ def download_file(file_type, filename):
                 404,
             )
 
-        print(f"File found, sending: {file_path}")
         download_name = _sanitize_download_name(requested_download_name, filename)
         return send_file(file_path, mimetype="audio/wav", as_attachment=True, download_name=download_name)
 
     except Exception as e:
-        print(f"Error in download_file: {e}")
-        import traceback
-
-        traceback.print_exc()
+        logger.exception("Error in download_file")
         return (
-            jsonify({"error": f"Internal server error: {e}", "file_type": file_type, "filename": filename}),
+            jsonify({"error": "Internal server error", "file_type": file_type, "filename": filename}),
             500,
         )
 
