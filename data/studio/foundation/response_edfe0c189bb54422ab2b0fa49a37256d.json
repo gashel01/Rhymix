@@ -1,0 +1,23 @@
+{
+  "provider": "foundation_one",
+  "modelId": "RoyalCities/Foundation-1",
+  "mode": "generate",
+  "prompt": "melodic solo",
+  "bars": 4,
+  "bpm": 95.7,
+  "key": "A minor",
+  "variants": [
+    {
+      "audioPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\RC-stable-audio-tools\\generations\\melodic_solo_A_minor_4_bars_95BPM_1831025851.wav",
+      "midiPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\RC-stable-audio-tools\\generations\\melodic_solo_A_minor_4_bars_95BPM_1831025851_basic_pitch.mid",
+      "bpm": 95,
+      "key": "A minor",
+      "instrumentFamily": "Strings",
+      "styleTags": [],
+      "fxTags": [
+        "echo"
+      ],
+      "label": "Strings"
+    }
+  ]
+}

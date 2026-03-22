@@ -291,13 +291,20 @@ function App() {
     sourceSong: null,
   });
 
-  const getStudioAssetId = useCallback(() => {
+  const getStudioRouteInfo = useCallback(() => {
     const path = window.location.pathname || "";
     const match = path.match(/^\/studio\/(.+)$/);
-    return match ? decodeURIComponent(match[1]) : null;
+    if (!match) return null;
+    const assetId = decodeURIComponent(match[1]);
+    const search = window.location.search || "";
+    const params = new URLSearchParams(search);
+    const sourceFileId = params.get("sourceFileId") || null;
+    return { assetId, sourceFileId };
   }, []);
 
-  const [studioAssetId, setStudioAssetId] = useState(() => getStudioAssetId());
+  const [studioRouteInfo, setStudioRouteInfo] = useState(() => getStudioRouteInfo());
+  // Keep legacy studioAssetId alias for remaining references
+  const studioAssetId = studioRouteInfo?.assetId || null;
 
   const theme = createAppTheme(darkMode ? 'dark' : 'light');
 
@@ -305,10 +312,10 @@ function App() {
   React.useEffect(() => { if (!sidebarCollapsed) setOpen(true); }, [sidebarCollapsed]);;
 
   useEffect(() => {
-    const handlePopState = () => setStudioAssetId(getStudioAssetId());
+    const handlePopState = () => setStudioRouteInfo(getStudioRouteInfo());
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [getStudioAssetId]);
+  }, [getStudioRouteInfo]);
 
 
   const onVolumeChange = (v01) => setVolume(Math.max(0, Math.min(1, v01)));

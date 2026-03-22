@@ -86,6 +86,49 @@ def get_project_by_asset(asset_id: str):
         return store.get("projects", {}).get(project_id)
 
 
+def list_projects_by_asset(asset_id: str) -> list:
+    """Return all projects that reference the given assetId, sorted newest first."""
+    with _storage_lock:
+        store = load_projects_store()
+        all_projects = store.get("projects", {})
+        results = [
+            p for p in all_projects.values()
+            if isinstance(p, dict) and p.get("project", {}).get("assetId") == asset_id
+        ]
+        results.sort(
+            key=lambda p: p.get("project", {}).get("updatedAt") or p.get("project", {}).get("createdAt") or "",
+            reverse=True,
+        )
+        return results
+
+
+def delete_project(project_id: str) -> bool:
+    """Delete a project record and remove it from the byAsset index."""
+    with _storage_lock:
+        store = load_projects_store()
+        projects = store.get("projects", {})
+        if project_id not in projects:
+            return False
+        record = projects.pop(project_id)
+        asset_id = record.get("project", {}).get("assetId")
+        # Remove from byAsset index if it points to this project
+        by_asset = store.get("byAsset", {})
+        if asset_id and by_asset.get(asset_id) == project_id:
+            # Point to another project for the same asset, if one exists
+            alternates = [
+                p_id for p_id, p in projects.items()
+                if p.get("project", {}).get("assetId") == asset_id
+            ]
+            if alternates:
+                by_asset[asset_id] = alternates[0]
+            else:
+                by_asset.pop(asset_id, None)
+        store["projects"] = projects
+        store["byAsset"] = by_asset
+        save_projects_store(store)
+        return True
+
+
 def get_project(project_id: str):
     with _storage_lock:
         store = load_projects_store()

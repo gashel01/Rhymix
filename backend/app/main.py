@@ -1,5 +1,7 @@
 import json
 import uuid
+import asyncio
+import logging
 
 try:
     from backend.env_bootstrap import bootstrap_env
@@ -12,9 +14,88 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from .dubler_drums import reset_calibration, train_and_save_model
 
+from .live_inference import StudioLiveInferenceSession
 from .session import TranscriptionSession
 
 app = FastAPI(title="Voice to MIDI")
+
+
+@app.websocket("/ws/studio_live_infer")
+async def studio_live_infer_ws(websocket: WebSocket):
+    await websocket.accept()
+    session = None
+    sender_task = None
+    pending_full_dry_upload = False
+    pending_full_dry_sample_rate = None
+    try:
+        while True:
+            message = await websocket.receive()
+            if "text" in message and message["text"] is not None:
+                payload = json.loads(message["text"])
+                msg_type = payload.get("type")
+                if msg_type == "start":
+                    await websocket.send_json({"type": "status", "state": "loading_model", "progress": 0.02})
+                    session = await asyncio.to_thread(StudioLiveInferenceSession, payload)
+                    await session.start()
+
+                    async def sender():
+                        while True:
+                            item = await session.output_queue.get()
+                            if item is None:
+                                break
+                            if item.get("type") == "audio":
+                                await websocket.send_bytes(item.get("data") or b"")
+                            else:
+                                await websocket.send_json(item)
+
+                    sender_task = asyncio.create_task(sender())
+                    await websocket.send_json({"type": "status", "state": "recording", "progress": 0.0})
+                elif msg_type == "full_dry_audio_begin":
+                    pending_full_dry_upload = True
+                    pending_full_dry_sample_rate = payload.get("sampleRate")
+                elif msg_type == "stop":
+                    if not session:
+                        await websocket.send_json({"type": "error", "message": "No active session"})
+                        continue
+                    await websocket.send_json({"type": "status", "state": "processing", "progress": 0.8})
+                    result = await session.stop()
+                    if sender_task:
+                        await sender_task
+                    await websocket.send_json({"type": "final", "commit": result})
+                    await websocket.send_json({"type": "status", "state": "done", "progress": 1.0})
+                    break
+                elif msg_type == "cancel":
+                    if session:
+                        await session.cancel()
+                    if sender_task:
+                        await sender_task
+                    await websocket.send_json({"type": "status", "state": "done", "progress": 1.0})
+                    break
+            elif "bytes" in message and message["bytes"] is not None:
+                if session:
+                    if pending_full_dry_upload:
+                        session.set_uploaded_dry_audio(message["bytes"], pending_full_dry_sample_rate)
+                        pending_full_dry_upload = False
+                        pending_full_dry_sample_rate = None
+                    else:
+                        await session.enqueue_bytes(message["bytes"])
+            else:
+                await websocket.send_json({"type": "error", "message": "Unsupported message"})
+    except WebSocketDisconnect:
+        if session:
+            await session.cancel()
+        if sender_task:
+            sender_task.cancel()
+    except Exception as exc:
+        logging.exception("studio_live_infer websocket failed")
+        try:
+            await websocket.send_json({"type": "error", "message": str(exc)})
+        except Exception:
+            pass
+        if session:
+            await session.cancel()
+        if sender_task:
+            sender_task.cancel()
 
 
 @app.websocket("/ws/voice_to_midi")

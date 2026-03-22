@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
+import FoundationPanel from "./FoundationPanel";
+import LiveInferencePanel from "./LiveInferencePanel";
+import StageDrumsPanel from "./StageDrumsPanel";
 import VoiceToMidiPanel from "./VoiceToMidiPanel";
 
 const SOUND_FONT_OPTIONS = [
@@ -49,6 +52,37 @@ const Inspector = ({
     () => lanes?.find((lane) => lane.id === selectedLaneId),
     [lanes, selectedLaneId]
   );
+  const foundationPairClips = useMemo(() => {
+    if (!selectedClip?.foundationPairId) return [];
+    return clips.filter((clip) => clip.foundationPairId === selectedClip.foundationPairId);
+  }, [clips, selectedClip]);
+  const foundationAudioClip = useMemo(
+    () => foundationPairClips.find((clip) => clip.clipType !== "midi") || null,
+    [foundationPairClips]
+  );
+  const foundationMidiClip = useMemo(
+    () => foundationPairClips.find((clip) => clip.clipType === "midi") || null,
+    [foundationPairClips]
+  );
+  const analyzeClip = useMemo(() => {
+    if (selectedClip?.sourceAssetId) return selectedClip;
+    const range = selection?.range;
+    if (range) {
+      const start = Math.min(range.start ?? 0, range.end ?? 0);
+      const end = Math.max(range.start ?? 0, range.end ?? 0);
+      const laneIds = Array.isArray(selection?.laneIds) ? selection.laneIds : null;
+      const rangedClip = clips.find((clip) => {
+        if (clip.clipType === "midi" || !clip.sourceAssetId) return false;
+        if (laneIds?.length && !laneIds.includes(clip.laneId)) return false;
+        const clipStart = clip.timelineStartSec ?? 0;
+        const clipEnd = clipStart + Math.max(0.01, (clip.srcEndSec ?? 0) - (clip.srcStartSec ?? 0));
+        return end > clipStart && start < clipEnd;
+      });
+      if (rangedClip) return rangedClip;
+    }
+    return clips.find((clip) => clip.clipType !== "midi" && clip.sourceAssetId) || null;
+  }, [clips, selectedClip, selection]);
+  const canAnalyze = Boolean(analyzeClip?.sourceAssetId);
 
   const [clipForm, setClipForm] = useState({
     timelineStartSec: 0,
@@ -66,7 +100,6 @@ const Inspector = ({
   }, [selectedClip]);
 
   const [prompt, setPrompt] = useState("");
-  const [durationSec, setDurationSec] = useState(10);
   const [startSec, setStartSec] = useState(selection?.range?.start ?? 0);
   const [endSec, setEndSec] = useState(selection?.range?.end ?? 5);
   const [weirdness, setWeirdness] = useState(20);
@@ -94,6 +127,14 @@ const Inspector = ({
     }
   }, [selection]);
 
+  useEffect(() => {
+    if (selection?.range || !selectedClip) return;
+    const clipStart = selectedClip.timelineStartSec ?? 0;
+    const clipEnd = clipStart + Math.max(0.01, (selectedClip.srcEndSec ?? 0) - (selectedClip.srcStartSec ?? 0));
+    setStartSec(clipStart);
+    setEndSec(clipEnd);
+  }, [selectedClip, selection?.range]);
+
   return (
     <div className="studio-inspector">
       <div className="studio-panel-title">Details & Modifiers</div>
@@ -101,6 +142,9 @@ const Inspector = ({
         {[
           { id: "details", label: "Details" },
           { id: "ai", label: "AI Actions" },
+          { id: "stage_drums", label: "Drums" },
+          { id: "foundation", label: "Foundation" },
+          { id: "live_infer", label: "Live VC" },
           { id: "voice_midi", label: "Voice → MIDI" },
           { id: "fx", label: "FX" },
           { id: "meta", label: "Metadata" },
@@ -337,6 +381,45 @@ const Inspector = ({
                   />
                 </div>
               </div>
+
+              {selectedClip.foundationPairId && (
+                <div className="studio-meta-block">
+                  <div className="studio-panel-title">Foundation Pair</div>
+                  <div className="studio-subtext" style={{ marginBottom: 8 }}>
+                    Audio and MIDI were placed on fresh lanes. Choose which version stays active.
+                  </div>
+                  <div className="studio-actions-row">
+                    <button
+                      className="studio-btn ghost"
+                      disabled={!foundationAudioClip}
+                      onClick={() => {
+                        if (foundationAudioClip) {
+                          onUpdateLane?.(foundationAudioClip.laneId, { mute: false, solo: false });
+                        }
+                        if (foundationMidiClip) {
+                          onUpdateLane?.(foundationMidiClip.laneId, { mute: true, solo: false });
+                        }
+                      }}
+                    >
+                      Use Audio
+                    </button>
+                    <button
+                      className="studio-btn ghost"
+                      disabled={!foundationMidiClip}
+                      onClick={() => {
+                        if (foundationAudioClip) {
+                          onUpdateLane?.(foundationAudioClip.laneId, { mute: true, solo: false });
+                        }
+                        if (foundationMidiClip) {
+                          onUpdateLane?.(foundationMidiClip.laneId, { mute: false, solo: false });
+                        }
+                      }}
+                    >
+                      Use MIDI
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -392,11 +475,6 @@ const Inspector = ({
                 {lyricsEntry?.status === "error" && (
                   <div className="studio-empty">Transcription failed: {lyricsEntry?.error || "Unknown error"}</div>
                 )}
-                <div className="studio-actions-row">
-                  <button className="studio-btn accent" disabled title="Resynthesis will be added later.">
-                    Resynthesize (coming soon)
-                  </button>
-                </div>
               </>
             )}
           </div>
@@ -422,41 +500,23 @@ const Inspector = ({
               />
             </div>
           </div>
-          <div className="studio-field">
-            <label>Duration (s)</label>
-            <input
-              type="number"
-              step="0.1"
-              value={durationSec}
-              onChange={(e) => setDurationSec(Number(e.target.value))}
-            />
-          </div>
           <div className="studio-actions-grid">
             {[
-              { id: "repaint", label: "Repaint / Inpaint" },
-              { id: "add_layer", label: "Add Layer" },
-              { id: "replace_section", label: "Replace Section" },
-              { id: "extend", label: "Extend / Continue" },
-              { id: "cover", label: "Cover" },
-              { id: "vocal2bgm", label: "Vocal to BGM" },
-              { id: "stem_extract_uvr", label: "UVR Multi-Stem (Fast)" },
-              { id: "stem_extract", label: "Stem Extract (Instrumental)" },
               { id: "understand", label: "Analyze (BPM/Key)" },
-              { id: "lrc", label: "Generate LRC" },
-              { id: "quality_score", label: "Quality Score" },
             ].map((action) => (
               <button
                 key={action.id}
                 className="studio-btn accent"
+                disabled={!canAnalyze}
+                title={canAnalyze ? "Analyze the selected clip or range" : "Select an audio clip or range first"}
                 onClick={() =>
                   onStartAiJob(action.id, {
                     prompt,
                     startSec,
                     endSec,
-                    durationSec,
                   })
                 }
-              >
+                >
                 {action.label}
               </button>
             ))}
@@ -471,6 +531,37 @@ const Inspector = ({
           transport={transport}
           selection={selection}
           actions={studioActions}
+          onRefreshProject={onRefreshProject}
+        />
+      )}
+
+      {tab === "foundation" && (
+        <FoundationPanel
+          lanes={lanes}
+          clips={clips}
+          selection={selection}
+          project={project}
+          transport={transport}
+          onStartAiJob={onStartAiJob}
+          onRefreshProject={onRefreshProject}
+        />
+      )}
+
+      {tab === "stage_drums" && (
+        <StageDrumsPanel
+          clips={clips}
+          selection={selection}
+          project={project}
+          onStartAiJob={onStartAiJob}
+        />
+      )}
+
+      {tab === "live_infer" && (
+        <LiveInferencePanel
+          lanes={lanes}
+          project={project}
+          selection={selection}
+          transport={transport}
           onRefreshProject={onRefreshProject}
         />
       )}

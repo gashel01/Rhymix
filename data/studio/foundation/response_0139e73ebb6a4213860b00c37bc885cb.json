@@ -1,0 +1,31 @@
+{
+  "provider": "foundation_one",
+  "modelId": "RoyalCities/Foundation-1",
+  "mode": "generate",
+  "prompt": "warm  bass , light texture",
+  "bars": 4,
+  "bpm": 95.7,
+  "key": "A minor",
+  "variants": [
+    {
+      "audioPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\RC-stable-audio-tools\\generations\\warm__bass__light_texture_A_minor_4_bars_95BPM_769499182.wav",
+      "midiPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\RC-stable-audio-tools\\generations\\warm__bass__light_texture_A_minor_4_bars_95BPM_769499182_basic_pitch.mid",
+      "bpm": 95,
+      "key": "A minor",
+      "instrumentFamily": "Synth",
+      "styleTags": [],
+      "fxTags": [],
+      "label": "Synth"
+    },
+    {
+      "audioPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\RC-stable-audio-tools\\generations\\warm__bass__light_texture_A_minor_4_bars_95BPM_769499183.wav",
+      "midiPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\RC-stable-audio-tools\\generations\\warm__bass__light_texture_A_minor_4_bars_95BPM_769499183_basic_pitch.mid",
+      "bpm": 95,
+      "key": "A minor",
+      "instrumentFamily": "Synth",
+      "styleTags": [],
+      "fxTags": [],
+      "label": "Synth"
+    }
+  ]
+}

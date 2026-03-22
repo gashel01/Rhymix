@@ -14,6 +14,16 @@ export const createProject = async (assetId) => {
   return response.data;
 };
 
+export const getProjectsByAssetList = async (assetId) => {
+  const response = await axios.get(`${API_BASE}/api/studio/projects/by-asset/${encodeURIComponent(assetId)}/list`);
+  return response.data;
+};
+
+export const deleteProject = async (projectId) => {
+  const response = await axios.delete(`${API_BASE}/api/studio/projects/${projectId}`);
+  return response.data;
+};
+
 export const updateProject = async (projectId, payload) => {
   const response = await axios.patch(`${API_BASE}/api/studio/projects/${projectId}`, payload);
   return response.data;
@@ -38,6 +48,24 @@ export const startAiJob = async (projectId, jobType, payload) => {
   const response = await axios.post(
     `${API_BASE}/api/studio/projects/${projectId}/jobs/${jobType}`,
     payload || {}
+  );
+  return response.data;
+};
+
+export const importFoundationVoiceInput = async (projectId, { blob, filename, insertSec, label, laneName } = {}) => {
+  const formData = new FormData();
+  formData.append("audio", blob, filename || "foundation-voice-input.webm");
+  formData.append("insertSec", String(Number(insertSec) || 0));
+  if (label) formData.append("label", label);
+  if (laneName) formData.append("laneName", laneName);
+  const response = await axios.post(
+    `${API_BASE}/api/studio/projects/${projectId}/foundation-voice-input`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
   );
   return response.data;
 };

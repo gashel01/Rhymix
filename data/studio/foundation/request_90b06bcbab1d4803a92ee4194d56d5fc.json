@@ -1,0 +1,19 @@
+{
+  "mode": "restyle",
+  "prompt": "light flute ,  light texture , echo ,low pass",
+  "bars": 4,
+  "bpm": 95.7,
+  "key": "A minor",
+  "timeSignature": null,
+  "instrumentFamily": "Synth",
+  "styleTags": [
+    "pulsing"
+  ],
+  "fxTags": [
+    "sidechain"
+  ],
+  "variantCount": 1,
+  "sourceAudioPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\exports\\foundation_57e233cc36a14d9a83e01ddd18f68784.wav",
+  "startSec": 0.0,
+  "endSec": 10.105261
+}

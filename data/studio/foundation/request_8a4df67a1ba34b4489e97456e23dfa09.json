@@ -1,0 +1,15 @@
+{
+  "mode": "generate",
+  "prompt": "warm  bass , light texture",
+  "bars": 4,
+  "bpm": 95.7,
+  "key": "A minor",
+  "timeSignature": null,
+  "instrumentFamily": "Synth",
+  "styleTags": [],
+  "fxTags": [],
+  "variantCount": 2,
+  "sourceAudioPath": null,
+  "startSec": null,
+  "endSec": null
+}

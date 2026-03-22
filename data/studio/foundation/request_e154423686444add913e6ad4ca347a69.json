@@ -1,0 +1,17 @@
+{
+  "mode": "generate",
+  "prompt": "grand piano  scale",
+  "bars": 4,
+  "bpm": 95.7,
+  "key": "A minor",
+  "timeSignature": null,
+  "instrumentFamily": "Synth",
+  "styleTags": [],
+  "fxTags": [
+    "echo"
+  ],
+  "variantCount": 1,
+  "sourceAudioPath": null,
+  "startSec": null,
+  "endSec": null
+}

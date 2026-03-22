@@ -367,7 +367,7 @@ def create_pipeline(
     model_path: str = None,
     index_path: str = None,
     f0_method: str = "rmvpe",
-    embedder_model: str = None,
+    embedder_model: str = "contentvec",
     embedder_model_custom: str = None,
     # device: str = "cuda",
     sid: int = 0,
@@ -377,16 +377,18 @@ def create_pipeline(
     """
 
     vc = RealtimeVoiceConverter(model_path)
-    index, big_npy = load_faiss_index(
-        index_path.strip()
+    normalized_index_path = (
+        str(index_path or "")
+        .strip()
         .strip('"')
         .strip("\n")
         .strip('"')
         .strip()
         .replace("trained", "added")
     )
+    index, big_npy = load_faiss_index(normalized_index_path)
 
-    hubert_model = load_embedding(embedder_model, embedder_model_custom)
+    hubert_model = load_embedding(embedder_model or "contentvec", embedder_model_custom)
     hubert_model = hubert_model.to(vc.config.device).float()
     hubert_model.eval()
 

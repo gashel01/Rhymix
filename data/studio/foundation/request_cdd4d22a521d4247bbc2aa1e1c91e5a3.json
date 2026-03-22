@@ -1,0 +1,17 @@
+{
+  "mode": "generate",
+  "prompt": "melodic solo",
+  "bars": 4,
+  "bpm": 95.7,
+  "key": "A minor",
+  "timeSignature": null,
+  "instrumentFamily": "Strings",
+  "styleTags": [],
+  "fxTags": [
+    "echo"
+  ],
+  "variantCount": 1,
+  "sourceAudioPath": null,
+  "startSec": null,
+  "endSec": null
+}

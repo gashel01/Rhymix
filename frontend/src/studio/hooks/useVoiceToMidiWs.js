@@ -6,7 +6,8 @@ const getWsUrl = () => {
   const envUrl = process.env.REACT_APP_VOICE_MIDI_WS;
   if (envUrl) return envUrl;
   const host = window.location.hostname || "localhost";
-  return `ws://${host}:8002/ws/voice_to_midi`;
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  return `${protocol}://${host}:8002/ws/voice_to_midi`;
 };
 
 export const useVoiceToMidiWs = ({ onFinal } = {}) => {

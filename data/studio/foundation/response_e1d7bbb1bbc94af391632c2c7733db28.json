@@ -1,0 +1,23 @@
+{
+  "provider": "foundation_one",
+  "modelId": "RoyalCities/Foundation-1",
+  "mode": "generate",
+  "prompt": "grand piano  scale",
+  "bars": 4,
+  "bpm": 95.7,
+  "key": "A minor",
+  "variants": [
+    {
+      "audioPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\RC-stable-audio-tools\\generations\\grand_piano__scale_A_minor_4_bars_95BPM_861974143.wav",
+      "midiPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\RC-stable-audio-tools\\generations\\grand_piano__scale_A_minor_4_bars_95BPM_861974143_basic_pitch.mid",
+      "bpm": 95,
+      "key": "A minor",
+      "instrumentFamily": "Synth",
+      "styleTags": [],
+      "fxTags": [
+        "echo"
+      ],
+      "label": "Synth"
+    }
+  ]
+}

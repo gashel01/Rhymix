@@ -50,6 +50,7 @@ class Realtime:
         **kwargs,
         # device: str = "cuda",
     ):
+        self.pipeline = None
         self.sample_rate = SAMPLE_RATE
         self.convert_buffer = None
         self.pitch_buffer = None
@@ -323,7 +324,12 @@ class Realtime:
         return audio_out, vol
 
     def __del__(self):
-        del self.pipeline
+        pipeline = getattr(self, "pipeline", None)
+        if pipeline is not None:
+            try:
+                del self.pipeline
+            except Exception:
+                pass
 
 
 class VoiceChanger:

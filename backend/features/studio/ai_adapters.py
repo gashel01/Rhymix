@@ -130,6 +130,29 @@ class LocalPythonAdapter(AiAudioAdapter):
                 noise.append(line)
                 continue
 
+    def _parse_response_text(self, text: str) -> dict:
+        raw = str(text or "").strip()
+        if not raw:
+            raise RuntimeError("AI bridge returned empty output")
+        noise = []
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                response = json.loads(line)
+                if not isinstance(response, dict):
+                    raise RuntimeError("AI bridge returned unexpected response")
+                return response
+            except json.JSONDecodeError:
+                noise.append(line)
+                continue
+        detail = "\n".join(noise[-10:]) if noise else ""
+        msg = "AI bridge returned invalid JSON"
+        if detail:
+            msg = f"{msg}: {detail}"
+        raise RuntimeError(msg)
+
     def _invoke_persistent(self, method: str, payload: dict) -> dict:
         with self._lock:
             self._ensure_process()
@@ -167,10 +190,7 @@ class LocalPythonAdapter(AiAudioAdapter):
         )
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or "AI bridge failed")
-        try:
-            response = json.loads(result.stdout or "{}")
-        except json.JSONDecodeError as exc:
-            raise RuntimeError("AI bridge returned invalid JSON") from exc
+        response = self._parse_response_text(result.stdout)
         if isinstance(response, dict) and response.get("error"):
             raise RuntimeError(response.get("error"))
         if not isinstance(response, dict):

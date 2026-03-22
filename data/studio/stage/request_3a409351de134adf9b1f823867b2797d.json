@@ -1,0 +1,10 @@
+{
+  "mode": "drums",
+  "prompt": "smooth drums",
+  "bpm": 120.0,
+  "seed": 20,
+  "durationSec": 8.0,
+  "conditioningAudioPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\temp\\stage_context_ca509fb2adfa4387b2e749bc77d1642a.wav",
+  "addClick": false,
+  "label": "STAGE Drums"
+}

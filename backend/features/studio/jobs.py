@@ -6,7 +6,9 @@ from pathlib import Path
 
 from backend.features.studio.ai_adapters import get_ai_adapter
 from backend.features.studio.assets import probe_audio
+from backend.features.studio.foundation_one import run_foundation_studio_job
 from backend.features.studio.render import render_mixdown
+from backend.features.studio.stage_drums import run_stage_drums_job
 from backend.features.studio.uvr_stems import extract_uvr_multi_stems
 from backend.features.studio.storage import (
     append_job_event,
@@ -65,7 +67,14 @@ def _ensure_lane(project_record: dict, lane_type: str, name: str):
     return lane
 
 
-def _create_lane(project_record: dict, lane_type: str, name: str, source_asset_id: str | None = None):
+def _create_lane(
+    project_record: dict,
+    lane_type: str,
+    name: str,
+    source_asset_id: str | None = None,
+    *,
+    muted: bool = False,
+):
     lanes = project_record.get("lanes") or []
     lane = {
         "id": uuid.uuid4().hex,
@@ -73,7 +82,7 @@ def _create_lane(project_record: dict, lane_type: str, name: str, source_asset_i
         "type": lane_type,
         "name": name,
         "sourceAssetId": source_asset_id,
-        "mute": False,
+        "mute": bool(muted),
         "solo": False,
         "gainDb": 0.0,
         "order": len(lanes) + 1,
@@ -94,6 +103,47 @@ def _append_clip(project_record: dict, lane_id: str, asset_id: str, start_sec: f
         "fadeInSec": 0.0,
         "fadeOutSec": 0.0,
         "gainDb": 0.0,
+    }
+    clips = project_record.get("clips") or []
+    clips.append(clip)
+    project_record["clips"] = clips
+    return clip
+
+
+def _ticks_to_sec(ticks: float, bpm: float | None, ppq: float | None):
+    safe_bpm = float(bpm or 120.0)
+    safe_ppq = float(ppq or 480.0)
+    ticks_per_sec = (safe_bpm * safe_ppq) / 60.0
+    if ticks_per_sec <= 0:
+        return 0.0
+    return float(ticks or 0.0) / ticks_per_sec
+
+
+def _append_midi_clip(project_record: dict, lane_id: str, midi_clip: dict, start_sec: float):
+    resolved_bpm = float(midi_clip.get("bpm") or project_record.get("project", {}).get("bpm") or 120.0)
+    resolved_ppq = float(midi_clip.get("ppq") or 480.0)
+    notes = midi_clip.get("notes") if isinstance(midi_clip.get("notes"), list) else []
+    max_tick = 0
+    for note in notes:
+        if not isinstance(note, dict):
+            continue
+        end_tick = int(note.get("startTick") or 0) + int(note.get("durationTick") or 0)
+        max_tick = max(max_tick, end_tick)
+
+    duration_sec = max(0.01, _ticks_to_sec(max_tick, resolved_bpm, resolved_ppq))
+    clip = {
+        "id": uuid.uuid4().hex,
+        "laneId": lane_id,
+        "sourceAssetId": None,
+        "srcStartSec": 0.0,
+        "srcEndSec": duration_sec,
+        "timelineStartSec": max(0.0, float(start_sec or 0.0)),
+        "fadeInSec": 0.0,
+        "fadeOutSec": 0.0,
+        "gainDb": 0.0,
+        "clipType": "midi",
+        "midi": midi_clip,
+        "label": midi_clip.get("instrument") or "MIDI Clip",
     }
     clips = project_record.get("clips") or []
     clips.append(clip)
@@ -280,14 +330,331 @@ def _record_stem_result(project_record: dict, payload: dict, result: dict):
         _append_clip(project_record, lane["id"], asset_id, 0.0, asset.get("durationSec", 0.0))
 
 
+def _resolve_audio_clip_candidates(project_record: dict, payload: dict):
+    clips = project_record.get("clips") or []
+    selected_ids = {
+        str(item)
+        for item in (payload.get("clipIds") or [])
+        if str(item).strip()
+    }
+    if selected_ids:
+        resolved = [
+            clip for clip in clips
+            if clip.get("id") in selected_ids and clip.get("clipType") != "midi" and clip.get("sourceAssetId")
+        ]
+        if resolved:
+            return resolved
+
+    lane_ids = {
+        str(item)
+        for item in (payload.get("laneIds") or [])
+        if str(item).strip()
+    }
+    try:
+        range_start = float(payload.get("startSec")) if payload.get("startSec") is not None else None
+        range_end = float(payload.get("endSec")) if payload.get("endSec") is not None else None
+    except Exception:
+        range_start = None
+        range_end = None
+    if range_start is not None and range_end is not None:
+        range_start, range_end = min(range_start, range_end), max(range_start, range_end)
+        resolved = []
+        for clip in clips:
+            if clip.get("clipType") == "midi" or not clip.get("sourceAssetId"):
+                continue
+            if lane_ids and clip.get("laneId") not in lane_ids:
+                continue
+            clip_start = float(clip.get("timelineStartSec") or 0.0)
+            clip_len = max(
+                0.01,
+                float(clip.get("srcEndSec") or 0.0) - float(clip.get("srcStartSec") or 0.0),
+            )
+            clip_end = clip_start + clip_len
+            if range_end > clip_start and range_start < clip_end:
+                resolved.append(clip)
+        if resolved:
+            return resolved
+
+    source_asset_id = payload.get("sourceAssetId")
+    if source_asset_id:
+        return [
+            clip for clip in clips
+            if clip.get("clipType") != "midi" and clip.get("sourceAssetId") == source_asset_id
+        ]
+    return []
+
+
+def _render_stage_conditioning_mix(project_record: dict, payload: dict) -> tuple[Path, float, float]:
+    candidate_clips = _resolve_audio_clip_candidates(project_record, payload)
+    if not candidate_clips:
+        raise RuntimeError("Select one or more audio clips or a timeline range before generating drums")
+
+    try:
+        range_start = float(payload.get("startSec")) if payload.get("startSec") is not None else None
+        range_end = float(payload.get("endSec")) if payload.get("endSec") is not None else None
+    except Exception:
+        range_start = None
+        range_end = None
+
+    if range_start is None or range_end is None or range_end <= range_start:
+        starts = []
+        ends = []
+        for clip in candidate_clips:
+            clip_start = float(clip.get("timelineStartSec") or 0.0)
+            clip_len = max(0.01, float(clip.get("srcEndSec") or 0.0) - float(clip.get("srcStartSec") or 0.0))
+            starts.append(clip_start)
+            ends.append(clip_start + clip_len)
+        if not starts or not ends:
+            raise RuntimeError("Selected clips do not have a valid audio duration")
+        range_start = min(starts)
+        range_end = max(ends)
+    else:
+        range_start, range_end = min(range_start, range_end), max(range_start, range_end)
+
+    lanes = project_record.get("lanes") or []
+    lane_gain = {lane.get("id"): float(lane.get("gainDb") or 0.0) for lane in lanes}
+    assets = project_record.get("assets") if isinstance(project_record.get("assets"), dict) else {}
+
+    inputs = []
+    filters = []
+    labels = []
+
+    for _idx, clip in enumerate(candidate_clips):
+        asset = assets.get(clip.get("sourceAssetId")) if isinstance(assets, dict) else None
+        asset_path = asset.get("path") if isinstance(asset, dict) else None
+        if not asset_path:
+            continue
+        path = Path(asset_path)
+        if not path.exists():
+            continue
+
+        clip_start = float(clip.get("timelineStartSec") or 0.0)
+        clip_src_start = float(clip.get("srcStartSec") or 0.0)
+        clip_src_end = float(clip.get("srcEndSec") or 0.0)
+        clip_len = max(0.01, clip_src_end - clip_src_start)
+        clip_end = clip_start + clip_len
+        overlap_start = max(range_start, clip_start)
+        overlap_end = min(range_end, clip_end)
+        if overlap_end <= overlap_start:
+            continue
+
+        trim_start = clip_src_start + (overlap_start - clip_start)
+        trim_end = clip_src_start + (overlap_end - clip_start)
+        delay_ms = int(max(0.0, overlap_start - range_start) * 1000)
+        gain = 10 ** ((lane_gain.get(clip.get("laneId"), 0.0) + float(clip.get("gainDb") or 0.0)) / 20.0)
+        input_index = len(inputs)
+        label = f"sc{input_index}"
+
+        inputs.append(str(path))
+        labels.append(label)
+
+        filter_parts = [f"[{input_index}:a]atrim=start={trim_start:.6f}:end={trim_end:.6f}", "asetpts=PTS-STARTPTS"]
+        if gain != 1.0:
+            filter_parts.append(f"volume={gain:.8f}")
+        if delay_ms > 0:
+            filter_parts.append(f"adelay={delay_ms}")
+        filters.append(f"{','.join(part for part in filter_parts if part)}[{label}]")
+
+    if not inputs or not labels:
+        raise RuntimeError("No valid audio sources found for STAGE conditioning")
+
+    mix_label = "stage_mix"
+    if len(labels) == 1:
+        filters.append(f"[{labels[0]}]anull[{mix_label}]")
+    else:
+        joined = "".join(f"[{label}]" for label in labels)
+        filters.append(f"{joined}amix=inputs={len(labels)}:normalize=0:dropout_transition=0[{mix_label}]")
+
+    output_path = paths.TEMP_WAV_DIR / f"stage_context_{uuid.uuid4().hex}.wav"
+    paths.TEMP_WAV_DIR.mkdir(parents=True, exist_ok=True)
+    cmd = ["ffmpeg", "-y"]
+    for inp in inputs:
+        cmd += ["-i", inp]
+    cmd += [
+        "-filter_complex",
+        ";".join(part for part in filters if part),
+        "-map",
+        f"[{mix_label}]",
+        "-ac",
+        "1",
+        "-ar",
+        "32000",
+        str(output_path),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
+    if result.returncode != 0 or not output_path.exists():
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "Failed to render STAGE conditioning mix")
+    return output_path, range_start, range_end
+
+
+def _resolve_foundation_audio_lane(project_record: dict, payload: dict, label: str, variant_index: int, variant_total: int):
+    lane_name = f"{label} Audio"
+    if variant_total > 1:
+        lane_name = f"{lane_name} {variant_index + 1}"
+    return _create_lane(project_record, "generated", lane_name)
+
+
+def _resolve_foundation_midi_lane(project_record: dict, payload: dict, label: str, variant_index: int, variant_total: int):
+    name = f"{label} MIDI"
+    if variant_total > 1:
+        name = f"{label} MIDI {variant_index + 1}"
+    return _create_lane(project_record, "midi", name, muted=True)
+
+
+def _record_foundation_result(project_record: dict, payload: dict, result: dict):
+    commit_mode = str(payload.get("commitMode") or "both").strip().lower()
+    commit_audio = commit_mode in {"both", "audio"}
+    commit_midi = commit_mode in {"both", "midi"}
+    start_sec = float(payload.get("timelineStartSec") or payload.get("insertSec") or 0.0)
+    pair_group_id = uuid.uuid4().hex
+    variants = result.get("variants") if isinstance(result.get("variants"), list) else []
+    variant_total = max(1, len(variants))
+    project = project_record.get("project") or {}
+    metadata = project_record.get("metadata") or {}
+    foundation_runs = metadata.get("foundationOne") if isinstance(metadata.get("foundationOne"), list) else []
+    if payload.get("applyProjectTempo") and not project.get("bpm") and result.get("bpm"):
+        project["bpm"] = result.get("bpm")
+    if payload.get("applyProjectTempo") and not project.get("key") and result.get("key"):
+        project["key"] = result.get("key")
+
+    for index, variant in enumerate(variants):
+        if not isinstance(variant, dict):
+            continue
+        label = str(variant.get("label") or "Foundation").strip() or "Foundation"
+        pair_id = uuid.uuid4().hex
+        asset_id = None
+
+        if commit_audio and variant.get("audioPath"):
+            asset_id = variant.get("assetId") or f"foundation:{uuid.uuid4().hex}"
+            asset = {
+                "id": asset_id,
+                "kind": "generated",
+                "label": label,
+                "url": variant.get("audioUrl"),
+                "path": variant.get("audioPath"),
+                "durationSec": variant.get("durationSec", 0.0),
+                "sampleRate": variant.get("sampleRate"),
+                "source": "foundation_one",
+                "pairId": pair_id,
+            }
+            _register_asset(project_record, asset)
+            lane = _resolve_foundation_audio_lane(project_record, payload, label, index, variant_total)
+            clip = _append_clip(project_record, lane["id"], asset_id, start_sec, asset.get("durationSec", 0.0))
+            clip["foundationPairId"] = pair_id
+            clip["foundationGroupId"] = pair_group_id
+            clip["foundationMode"] = result.get("mode")
+
+        midi_data = variant.get("midiData") if isinstance(variant.get("midiData"), dict) else None
+        if commit_midi and midi_data:
+            if not project.get("bpm") and midi_data.get("bpm"):
+                project["bpm"] = midi_data.get("bpm")
+            lane = _resolve_foundation_midi_lane(project_record, payload, label, index, variant_total)
+            midi_clip = {
+                **midi_data,
+                "instrument": midi_data.get("instrument") or variant.get("instrumentFamily") or "Foundation MIDI",
+                "source": "foundation_one",
+                "pairId": pair_id,
+            }
+            clip = _append_midi_clip(project_record, lane["id"], midi_clip, start_sec)
+            clip["foundationPairId"] = pair_id
+            clip["foundationGroupId"] = pair_group_id
+            clip["foundationMode"] = result.get("mode")
+
+        foundation_runs.append(
+            {
+                "pairId": pair_id,
+                "groupId": pair_group_id,
+                "mode": result.get("mode"),
+                "label": label,
+                "prompt": result.get("prompt") or payload.get("prompt"),
+                "bars": result.get("bars") or payload.get("bars"),
+                "bpm": variant.get("bpm") or result.get("bpm") or payload.get("bpm"),
+                "key": variant.get("key") or result.get("key") or payload.get("key"),
+                "instrumentFamily": variant.get("instrumentFamily") or payload.get("instrumentFamily"),
+                "styleTags": variant.get("styleTags") or payload.get("styleTags") or [],
+                "fxTags": variant.get("fxTags") or payload.get("fxTags") or [],
+                "audioAssetId": asset_id,
+                "hasMidi": bool(midi_data),
+                "sourceAssetId": payload.get("sourceAssetId"),
+            }
+        )
+
+    metadata["foundationOne"] = foundation_runs[-24:]
+    project_record["metadata"] = metadata
+    project_record["project"] = project
+
+
+def _record_stage_result(project_record: dict, payload: dict, result: dict):
+    start_sec = float(payload.get("timelineStartSec") or payload.get("insertSec") or 0.0)
+    variants = result.get("variants") if isinstance(result.get("variants"), list) else []
+    if not variants:
+        return
+
+    project = project_record.get("project") or {}
+    metadata = project_record.get("metadata") or {}
+    stage_runs = metadata.get("stageDrums") if isinstance(metadata.get("stageDrums"), list) else []
+
+    for index, variant in enumerate(variants):
+        if not isinstance(variant, dict) or not variant.get("audioPath"):
+            continue
+        label = str(variant.get("label") or "STAGE Drums").strip() or "STAGE Drums"
+        if len(variants) > 1:
+            label = f"{label} {index + 1}"
+        asset_id = variant.get("assetId") or f"stage:{uuid.uuid4().hex}"
+        asset = {
+            "id": asset_id,
+            "kind": "generated",
+            "label": label,
+            "url": variant.get("audioUrl"),
+            "path": variant.get("audioPath"),
+            "durationSec": variant.get("durationSec", 0.0),
+            "sampleRate": variant.get("sampleRate"),
+            "source": "stage",
+        }
+        _register_asset(project_record, asset)
+        lane = _create_lane(project_record, "generated", label)
+        clip = _append_clip(project_record, lane["id"], asset_id, start_sec, asset.get("durationSec", 0.0))
+        clip["stageMode"] = result.get("mode") or "drums"
+        stage_runs.append(
+            {
+                "assetId": asset_id,
+                "label": label,
+                "prompt": result.get("prompt") or payload.get("prompt"),
+                "bpm": result.get("bpm") or payload.get("bpm"),
+                "startSec": start_sec,
+                "durationSec": variant.get("durationSec", 0.0),
+                "sourceClipIds": payload.get("clipIds") or [],
+            }
+        )
+
+    metadata["stageDrums"] = stage_runs[-24:]
+    project_record["metadata"] = metadata
+    project_record["project"] = project
+
+
 def _record_result(project_record: dict, job_type: str, payload: dict, result: dict):
     if job_type in {"understand", "lrc", "quality_score"}:
         metadata = project_record.get("metadata") or {}
         metadata[job_type] = result
         project_record["metadata"] = metadata
+        if job_type == "understand":
+            project = project_record.get("project") or {}
+            if result.get("bpm") is not None:
+                project["bpm"] = result.get("bpm")
+            if result.get("key"):
+                project["key"] = result.get("key")
+            if result.get("timeSignature"):
+                project["timeSignature"] = result.get("timeSignature")
+            project_record["project"] = project
         return
     if job_type in {"stem_extract", "stem_extract_uvr"}:
         _record_stem_result(project_record, payload, result)
+        return
+    if job_type in {"foundation_generate", "foundation_restyle", "foundation_extend"}:
+        _record_foundation_result(project_record, payload, result)
+        return
+    if job_type == "stage_drums_generate":
+        _record_stage_result(project_record, payload, result)
         return
 
     asset_id = result.get("assetId") or uuid.uuid4().hex
@@ -461,7 +828,7 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
         append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
         return
 
-    adapter = get_ai_adapter()
+    stage_conditioning_path = None
     try:
         assets = project_record.get("assets") if isinstance(project_record.get("assets"), dict) else {}
         if isinstance(payload, dict):
@@ -474,6 +841,21 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
             if job_type == "cover" and not payload.get("referenceAssetPath"):
                 if source_id and assets.get(source_id) and assets[source_id].get("path"):
                     payload["referenceAssetPath"] = assets[source_id]["path"]
+
+        adapter = None
+        if job_type in {
+            "repaint",
+            "add_layer",
+            "replace_section",
+            "extend",
+            "cover",
+            "vocal2bgm",
+            "stem_extract",
+            "understand",
+            "lrc",
+            "quality_score",
+        }:
+            adapter = get_ai_adapter()
 
         if job_type == "repaint":
             result = adapter.repaint(payload)
@@ -499,6 +881,24 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
             result = adapter.lrc(payload)
         elif job_type == "quality_score":
             result = adapter.quality_score(payload)
+        elif job_type == "foundation_generate":
+            update_job(job_id, statusMessage="Running Foundation-1 generate...")
+            result = run_foundation_studio_job("generate", payload)
+        elif job_type == "foundation_restyle":
+            update_job(job_id, statusMessage="Running Foundation-1 restyle...")
+            result = run_foundation_studio_job("restyle", payload)
+        elif job_type == "foundation_extend":
+            update_job(job_id, statusMessage="Running Foundation-1 extend...")
+            result = run_foundation_studio_job("extend", payload)
+        elif job_type == "stage_drums_generate":
+            update_job(job_id, statusMessage="Preparing STAGE conditioning mix...")
+            stage_conditioning_path, mix_start, mix_end = _render_stage_conditioning_mix(project_record, payload)
+            payload["conditioningAudioPath"] = str(stage_conditioning_path)
+            payload["timelineStartSec"] = float(payload.get("timelineStartSec") or payload.get("insertSec") or mix_start)
+            payload["insertSec"] = float(payload.get("insertSec") or mix_start)
+            payload["durationSec"] = max(0.5, float(payload.get("durationSec") or (mix_end - mix_start)))
+            update_job(job_id, statusMessage="Running STAGE drums...")
+            result = run_stage_drums_job(payload)
         else:
             raise RuntimeError(f"Unknown job type: {job_type}")
 
@@ -512,6 +912,12 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
     except Exception as exc:
         update_job(job_id, status="failed", progress=100, error=str(exc))
         append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
+    finally:
+        if stage_conditioning_path:
+            try:
+                Path(stage_conditioning_path).unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
 def start_job_thread(target, args):

@@ -304,9 +304,19 @@ const AudioTrackTable = (props) => {
   );
 
   const handleOpenStudio = useCallback((pair) => {
-    const assetId = pair?.fileId || pair?.runId || pair?.id || pair?.trackId;
+    // For inference rows: use `run:<runId>` so the backend resolves the inferred vocal,
+    // and pass the original upload's fileId so the instrumental can be resolved too.
+    let assetId;
+    let searchParams = "";
+    if (pair?.runId) {
+      assetId = `run:${pair.runId}`;
+      const sourceFileId = pair?.fileId || pair?.result?.inputFileId || pair?.result?.fileId || null;
+      if (sourceFileId) searchParams = `?sourceFileId=${encodeURIComponent(sourceFileId)}`;
+    } else {
+      assetId = pair?.fileId || pair?.id || pair?.trackId;
+    }
     if (!assetId) return;
-    const url = `/studio/${encodeURIComponent(assetId)}`;
+    const url = `/studio/${encodeURIComponent(assetId)}${searchParams}`;
     window.history.pushState({}, "", url);
     try {
       window.dispatchEvent(new PopStateEvent("popstate"));
