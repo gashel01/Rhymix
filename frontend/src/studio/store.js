@@ -41,8 +41,16 @@ const initialState = {
     gridDiv: 1,
     metronome: false,
     loop: false,
-    showCreatePanel: true,
-    showLibraryPanel: true,
+    workspaceSection: "edit",
+    inspectorSection: "clip",
+    focusMode: false,
+    rightPanelContext: "nothing",
+    expandedAiCard: "live",
+    drawerTool: "foundation",
+    drawerOpen: false,
+    activityFilter: "all",
+    showCreatePanel: false,
+    showLibraryPanel: false,
     showDetailsPanel: true,
     railCollapsed: false,
     midiEditorOpen: false,
@@ -258,6 +266,16 @@ const studioReducer = (state, action) => {
     case "REMOVE_ALL_LANES": {
       return applyEdlChange(state, { lanes: [], clips: [], selection: { clipIds: [], range: null, laneIds: null } });
     }
+    case "REMOVE_ASSET": {
+      const assetId = action.payload?.assetId;
+      if (!assetId || !state.assets?.[assetId]) return state;
+      const assets = { ...(state.assets || {}) };
+      delete assets[assetId];
+      return {
+        ...state,
+        assets,
+      };
+    }
     case "SPLIT_CLIP": {
       const clips = splitClip(state.clips, action.payload.clipId, action.payload.atTimeSec);
       return applyEdlChange(state, { clips });
@@ -421,6 +439,7 @@ export const useStudioActions = () => {
         dispatch({ type: "DUPLICATE_SELECTION", payload: { range, laneIds, pasteTimeSec } }),
       duplicateLane: (laneId) => dispatch({ type: "DUPLICATE_LANE", payload: { laneId } }),
       deleteAllLanes: () => dispatch({ type: "REMOVE_ALL_LANES" }),
+      removeAsset: (assetId) => dispatch({ type: "REMOVE_ASSET", payload: { assetId } }),
       undo: () => dispatch({ type: "UNDO" }),
       redo: () => dispatch({ type: "REDO" }),
     }),

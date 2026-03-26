@@ -16,6 +16,7 @@ import { MissingDepsModal } from "./MissingDepsModal";
 import { CreateSongFormPanel } from "./CreateSongFormPanel";
 import { SourceSongPanel } from "./SourceSongPanel";
 import { CoverFormPanel } from "./CoverFormPanel";
+import { requestGroqAutofill } from "../../utils/groqAutofill";
 import {
   getCoverGenerationStatus,
   getCoverSourceSong,
@@ -102,6 +103,24 @@ function CreateSongView({
   const [songs, setSongs] = useState([]);
   const [playingId, setPlayingId] = useState(null);
   const [loadingSongs, setLoadingSongs] = useState(true);
+  const [assistLoading, setAssistLoading] = useState({
+    describe: false,
+    lyrics: false,
+    genre: false,
+    coverStyle: false,
+  });
+  const [assistError, setAssistError] = useState({
+    describe: "",
+    lyrics: "",
+    genre: "",
+    coverStyle: "",
+  });
+  const [assistSuggestion, setAssistSuggestion] = useState({
+    describe: "",
+    lyrics: "",
+    genre: "",
+    coverStyle: "",
+  });
 
   const timerRef = useRef(null);
   const pollRef = useRef(null);
@@ -465,6 +484,52 @@ function CreateSongView({
     );
   };
 
+  const runAssist = useCallback(async (slot, task, context) => {
+    setAssistLoading((prev) => ({ ...prev, [slot]: true }));
+    setAssistError((prev) => ({ ...prev, [slot]: "" }));
+    setAssistSuggestion((prev) => ({ ...prev, [slot]: "" }));
+    try {
+      const data = await requestGroqAutofill(task, context);
+      const suggestion =
+        data?.suggestion?.describePrompt
+        || data?.suggestion?.lyrics
+        || data?.suggestion?.genreText
+        || data?.suggestion?.stylePrompt
+        || "";
+      if (!String(suggestion).trim()) {
+        throw new Error("Groq returned an empty suggestion.");
+      }
+      setAssistSuggestion((prev) => ({ ...prev, [slot]: String(suggestion).trim() }));
+    } catch (err) {
+      setAssistSuggestion((prev) => ({ ...prev, [slot]: "" }));
+      setAssistError((prev) => ({ ...prev, [slot]: err?.message || "Autofill failed." }));
+    } finally {
+      setAssistLoading((prev) => ({ ...prev, [slot]: false }));
+    }
+  }, []);
+
+  const clearAssist = useCallback((slot) => {
+    setAssistSuggestion((prev) => ({ ...prev, [slot]: "" }));
+    setAssistError((prev) => ({ ...prev, [slot]: "" }));
+  }, []);
+
+  const applyAssistReplace = useCallback((slot, setter) => {
+    const nextValue = String(assistSuggestion[slot] || "").trim();
+    if (!nextValue) return;
+    setter(nextValue);
+    clearAssist(slot);
+  }, [assistSuggestion, clearAssist]);
+
+  const applyAssistAppendLyrics = useCallback(() => {
+    const nextValue = String(assistSuggestion.lyrics || "").trim();
+    if (!nextValue) return;
+    setLyrics((prev) => {
+      const current = String(prev || "").trim();
+      return current ? `${current}\n\n${nextValue}` : nextValue;
+    });
+    clearAssist("lyrics");
+  }, [assistSuggestion.lyrics, clearAssist]);
+
   const buildPrompt = () => {
     const bits = [];
     if (mode === "prompt" && describePrompt.trim()) bits.push(describePrompt.trim());
@@ -602,6 +667,61 @@ function CreateSongView({
     !sourceSongError;
 
   const canGenerate = flowMode === "cover" ? canGenerateCover : canGenerateCreate;
+
+  const requestDescribeAssist = useCallback(() => {
+    runAssist("describe", "create_describe_prompt", {
+      title,
+      genreTokens,
+      bpm,
+      keyscale,
+      timeSignature,
+      instrumentalOnly,
+      personaName: selectedModel?.name || "",
+    });
+  }, [
+    bpm,
+    genreTokens,
+    instrumentalOnly,
+    keyscale,
+    runAssist,
+    selectedModel?.name,
+    timeSignature,
+    title,
+  ]);
+
+  const requestLyricsAssist = useCallback(() => {
+    runAssist("lyrics", "create_lyrics", {
+      title,
+      genreTokens,
+      describePrompt,
+      instrumentalOnly,
+    });
+  }, [describePrompt, genreTokens, instrumentalOnly, runAssist, title]);
+
+  const requestGenreAssist = useCallback(() => {
+    runAssist("genre", "create_genre_style", {
+      title,
+      genreTokens,
+      describePrompt,
+      lyrics,
+      instrumentalOnly,
+    });
+  }, [describePrompt, genreTokens, instrumentalOnly, lyrics, runAssist, title]);
+
+  const requestCoverStyleAssist = useCallback(() => {
+    runAssist("coverStyle", "cover_style_prompt", {
+      stylePrompt: coverStylePrompt,
+      preserveTempo: coverPreserveTempo,
+      pitchShift: coverPitchShift,
+      sourceSong: sourceSong
+        ? {
+            title: sourceSong.title || "",
+            artist: sourceSong.artist || "",
+          }
+        : null,
+      sourceTitle: sourceSong?.title || "",
+    });
+  }, [coverPitchShift, coverPreserveTempo, coverStylePrompt, runAssist, sourceSong]);
 
   const generateCreate = async () => {
     const params = buildInferParams();
@@ -986,6 +1106,14 @@ function CreateSongView({
                 statusMessage={statusMessage}
                 canGenerate={canGenerate}
                 onGenerate={generate}
+                styleAssist={{
+                  loading: assistLoading.coverStyle,
+                  error: assistError.coverStyle,
+                  suggestion: assistSuggestion.coverStyle,
+                  onRequest: requestCoverStyleAssist,
+                  onUse: () => applyAssistReplace("coverStyle", setCoverStylePrompt),
+                  onCancel: () => clearAssist("coverStyle"),
+                }}
               />
             ) : (
               <CreateSongFormPanel
@@ -1038,6 +1166,31 @@ function CreateSongView({
                 setSelectedModel={setSelectedModel}
                 setSelectedCheckpoint={setSelectedCheckpoint}
                 isStuck={isStuck}
+                describeAssist={{
+                  loading: assistLoading.describe,
+                  error: assistError.describe,
+                  suggestion: assistSuggestion.describe,
+                  onRequest: requestDescribeAssist,
+                  onUse: () => applyAssistReplace("describe", setDescribePrompt),
+                  onCancel: () => clearAssist("describe"),
+                }}
+                lyricsAssist={{
+                  loading: assistLoading.lyrics,
+                  error: assistError.lyrics,
+                  suggestion: assistSuggestion.lyrics,
+                  onRequest: requestLyricsAssist,
+                  onReplace: () => applyAssistReplace("lyrics", setLyrics),
+                  onAppend: applyAssistAppendLyrics,
+                  onCancel: () => clearAssist("lyrics"),
+                }}
+                genreAssist={{
+                  loading: assistLoading.genre,
+                  error: assistError.genre,
+                  suggestion: assistSuggestion.genre,
+                  onRequest: requestGenreAssist,
+                  onUse: () => applyAssistReplace("genre", setGenreText),
+                  onCancel: () => clearAssist("genre"),
+                }}
               />
             )}
           </div>

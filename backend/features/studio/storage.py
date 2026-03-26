@@ -102,6 +102,20 @@ def list_projects_by_asset(asset_id: str) -> list:
         return results
 
 
+def list_projects() -> list:
+    with _storage_lock:
+        store = load_projects_store()
+        results = [
+            p for p in (store.get("projects", {}) or {}).values()
+            if isinstance(p, dict) and isinstance(p.get("project"), dict)
+        ]
+        results.sort(
+            key=lambda p: p.get("project", {}).get("updatedAt") or p.get("project", {}).get("createdAt") or "",
+            reverse=True,
+        )
+        return results
+
+
 def delete_project(project_id: str) -> bool:
     """Delete a project record and remove it from the byAsset index."""
     with _storage_lock:
@@ -148,7 +162,15 @@ def save_project(project_record: dict, *, asset_id: str | None = None):
     return project_record
 
 
-def update_project(project_id: str, *, project: dict | None = None, lanes: list | None = None, clips: list | None = None, metadata: dict | None = None):
+def update_project(
+    project_id: str,
+    *,
+    project: dict | None = None,
+    lanes: list | None = None,
+    clips: list | None = None,
+    assets: dict | None = None,
+    metadata: dict | None = None,
+):
     with _storage_lock:
         store = load_projects_store()
         existing = store.get("projects", {}).get(project_id)
@@ -163,6 +185,8 @@ def update_project(project_id: str, *, project: dict | None = None, lanes: list 
             existing["lanes"] = lanes
         if clips is not None:
             existing["clips"] = clips
+        if assets is not None:
+            existing["assets"] = assets
         if metadata is not None:
             existing["metadata"] = metadata
         store["projects"][project_id] = existing
@@ -233,4 +257,3 @@ def public_project_payload(project_record: dict):
         "assets": public_assets,
         "metadata": project_record.get("metadata") or {},
     }
-

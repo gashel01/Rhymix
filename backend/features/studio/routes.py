@@ -17,6 +17,7 @@ from backend.features.song_generation.cover import transcribe_audio_path
 from backend.features.studio.jobs import (
     create_job,
     run_ai_job,
+    run_orchestrate_song_job,
     run_render_job,
     run_soulx_resing_job,
     start_job_thread,
@@ -26,6 +27,7 @@ from backend.features.studio.storage import (
     get_job,
     get_project,
     get_project_by_asset,
+    list_projects,
     list_projects_by_asset,
     public_project_payload,
     save_project,
@@ -253,12 +255,16 @@ def _create_project_lane(project: dict, lane_type: str, name: str):
 def create_project():
     data = request.get_json() or {}
     asset_id = str(data.get("assetId") or "").strip()
-    if not asset_id:
-        return jsonify({"error": "assetId is required"}), 400
     # Always create a fresh project — do not reuse an existing one
     record = _build_project(asset_id)
-    save_project(record, asset_id=asset_id)
+    save_project(record, asset_id=asset_id or None)
     return jsonify(public_project_payload(record))
+
+
+@bp.route("/api/studio/projects", methods=["GET"])
+def list_all_projects():
+    records = list_projects()
+    return jsonify([public_project_payload(r) for r in records])
 
 
 @bp.route("/api/studio/projects/by-asset/<path:asset_id>/list", methods=["GET"])
@@ -305,8 +311,9 @@ def patch_project(project_id):
     project = data.get("project")
     lanes = data.get("lanes")
     clips = data.get("clips")
+    assets = data.get("assets")
     metadata = data.get("metadata")
-    updated = update_project(project_id, project=project, lanes=lanes, clips=clips, metadata=metadata)
+    updated = update_project(project_id, project=project, lanes=lanes, clips=clips, assets=assets, metadata=metadata)
     if not updated:
         return jsonify({"error": "Project not found"}), 404
     return jsonify(public_project_payload(updated))
@@ -343,6 +350,8 @@ def start_ai_job(project_id, job_type):
     job = create_job(job_type, project_id, payload)
     if job_type == "resynthesize":
         start_job_thread(run_soulx_resing_job, (job["id"], project_id, payload))
+    elif job_type == "orchestrate_song":
+        start_job_thread(run_orchestrate_song_job, (job["id"], project_id, payload))
     else:
         start_job_thread(run_ai_job, (job["id"], project_id, job_type, payload))
     return jsonify({"jobId": job["id"]})

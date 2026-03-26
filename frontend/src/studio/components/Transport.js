@@ -19,6 +19,13 @@ const Transport = ({
   onReset,
   jobStatus,
   contextActions = [],
+  jobCount = 0,
+  bpm = 120,
+  snap = false,
+  loop = false,
+  zoom = 1,
+  workspaceLabel = "Edit",
+  selectionSummary = "No active selection",
 }) => {
   return (
     <div className="studio-bottom-bar">
@@ -29,10 +36,8 @@ const Transport = ({
         <button className="studio-btn ghost" onClick={onStop}>
           Stop
         </button>
-        <button className="studio-btn ghost" disabled>
-          Record
-        </button>
         <div className="studio-time">{formatTime(currentTime)}</div>
+        <div className="studio-transport-pill">{workspaceLabel}</div>
       </div>
 
       <div className="studio-bottom-center">
@@ -47,11 +52,17 @@ const Transport = ({
             </button>
           ))
         ) : (
-          <div className="studio-context-hint">Drop clips or open the library to begin.</div>
+          <div className="studio-context-hint">{selectionSummary}</div>
         )}
       </div>
 
       <div className="studio-bottom-right">
+        <div className="studio-transport-stats">
+          <span className="studio-transport-pill">BPM {bpm}</span>
+          <span className={`studio-transport-pill ${snap ? "active" : ""}`}>Snap {snap ? "On" : "Off"}</span>
+          <span className={`studio-transport-pill ${loop ? "active" : ""}`}>Loop {loop ? "On" : "Off"}</span>
+          <span className="studio-transport-pill">Zoom {zoom.toFixed(1)}x</span>
+        </div>
         <button className="studio-btn ghost" onClick={onUndo}>
           Undo
         </button>
@@ -66,8 +77,10 @@ const Transport = ({
         <button className="studio-btn accent" onClick={onRender}>
           Export
         </button>
-        <div className="studio-credits">Credits: --</div>
-        <div className="studio-job-status">{jobStatus || "Idle"}</div>
+        <div className="studio-job-status">
+          {jobCount ? `${jobCount} active · ` : ""}
+          {jobStatus || "Idle"}
+        </div>
       </div>
     </div>
   );

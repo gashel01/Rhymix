@@ -24,6 +24,7 @@ import { GlobalStyles } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
 import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
+import SpaceDashboardIcon from "@mui/icons-material/SpaceDashboard";
 import FileUpload from "./components/FileUpload";
 // import DownloadResults from "./components/DownloadResults";
 import HomeView from "./components/HomeView";
@@ -293,13 +294,21 @@ function App() {
 
   const getStudioRouteInfo = useCallback(() => {
     const path = window.location.pathname || "";
+    if (path === "/studio" || path === "/studio/") {
+      const params = new URLSearchParams(window.location.search || "");
+      return {
+        assetId: null,
+        projectId: params.get("projectId") || null,
+        sourceFileId: params.get("sourceFileId") || null,
+      };
+    }
     const match = path.match(/^\/studio\/(.+)$/);
     if (!match) return null;
     const assetId = decodeURIComponent(match[1]);
     const search = window.location.search || "";
     const params = new URLSearchParams(search);
     const sourceFileId = params.get("sourceFileId") || null;
-    return { assetId, sourceFileId };
+    return { assetId, projectId: params.get("projectId") || null, sourceFileId };
   }, []);
 
   const [studioRouteInfo, setStudioRouteInfo] = useState(() => getStudioRouteInfo());
@@ -411,6 +420,11 @@ function App() {
   };
 
   const handleNavigation = useCallback((view) => {
+    if (view === "studio") {
+      window.history.pushState({}, "", "/studio");
+      setStudioRouteInfo(getStudioRouteInfo());
+      return;
+    }
     setCurrentView(view);
     setShowHomeView(view === "home");
     setSelectedVocalsForTraining(null);
@@ -434,7 +448,7 @@ function App() {
     } else {
       window.history.replaceState(null, '', window.location.pathname);
     }
-  }, []);
+  }, [getStudioRouteInfo]);
 
   const toCoverSourceId = useCallback((track, source) => {
     if (!track || typeof track !== "object") return null;
@@ -805,6 +819,12 @@ function App() {
       icon: <AudioFileIcon />,
       description: 'View past inference results'
     },
+    {
+      id: 'studio',
+      label: 'Studio',
+      icon: <SpaceDashboardIcon />,
+      description: 'Open and manage Studio projects'
+    },
   ];
 
 
@@ -1029,8 +1049,8 @@ function App() {
       <VolumeProvider volume={volume}>
         {isBeatboxCalibrationRoute ? (
           <BeatboxCalibrationWizard />
-        ) : studioAssetId ? (
-          <StudioPage assetId={studioAssetId} />
+        ) : studioRouteInfo ? (
+          <StudioPage assetId={studioRouteInfo?.assetId || null} projectId={studioRouteInfo?.projectId || null} />
         ) : (
 
           <div style={{

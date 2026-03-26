@@ -14,6 +14,8 @@ const getClipBounds = (clip) => {
   return { start, end: start + duration, duration };
 };
 
+const makeRandomSeed = () => Math.floor(Math.random() * 1000000000);
+
 const StageDrumsPanel = ({ clips, selection, project, onStartAiJob }) => {
   const [prompt, setPrompt] = useState("");
   const [seed, setSeed] = useState(42);
@@ -126,7 +128,12 @@ const StageDrumsPanel = ({ clips, selection, project, onStartAiJob }) => {
           />
         </div>
         <div className="studio-field">
-          <label>Seed</label>
+          <div className="studio-field-head">
+            <label>Seed</label>
+            <button className="studio-mini" type="button" onClick={() => setSeed(makeRandomSeed())}>
+              Randomize
+            </button>
+          </div>
           <input
             type="number"
             step="1"

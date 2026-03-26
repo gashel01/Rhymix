@@ -3,6 +3,7 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import PersonIcon from "@mui/icons-material/Person";
 import { GENRE_RECS, normalize, toKey } from "./constants";
 import { Segmented } from "../Homeview/Segmented";
+import { AssistActionRow, AssistSuggestionCard } from "./AssistSuggestionCard";
 
 export function CoverFormPanel({
   ui,
@@ -40,6 +41,7 @@ export function CoverFormPanel({
   statusMessage,
   canGenerate,
   onGenerate,
+  styleAssist,
 }) {
   const { Panel, Btn, Input, Slider, Alert, Modal, Pill } = ui;
   const [personaModalOpen, setPersonaModalOpen] = useState(false);
@@ -258,9 +260,12 @@ export function CoverFormPanel({
           </div>
 
           <div style={{ display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: t.text }}>Genre &amp; style</div>
-            </div>
+            <AssistActionRow
+              t={t}
+              label="Genre & style"
+              loading={styleAssist?.loading}
+              onRequest={styleAssist?.onRequest}
+            />
             <div style={{ display: "flex", flexWrap: "nowrap", overflowX: "auto", gap: 8 }}>
               {GENRE_RECS.filter((r) => !usedGenreKeys.has(toKey(r))).map((r) => (
                 <Pill key={r} tone="primary" onClick={() => addGenreToken(r)} title="Add genre">
@@ -272,6 +277,14 @@ export function CoverFormPanel({
               value={stylePrompt}
               onChange={setStylePrompt}
               placeholder="Type genres/styles… e.g., Synthwave, Electro-pop"
+            />
+            <AssistSuggestionCard
+              ui={ui}
+              t={t}
+              value={styleAssist?.suggestion}
+              error={styleAssist?.error}
+              onUse={styleAssist?.onUse}
+              onCancel={styleAssist?.onCancel}
             />
           </div>
 

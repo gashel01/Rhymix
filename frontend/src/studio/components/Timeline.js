@@ -63,6 +63,8 @@ const Timeline = ({
   onDeleteClip,
   onTrimClip,
   onTrimClipRight,
+  onDeleteSelection,
+  onDuplicateSelection,
 }) => {
   const bodyRef = useRef(null);
   const rulerRef = useRef(null);
@@ -78,6 +80,7 @@ const Timeline = ({
   const [dropLaneId, setDropLaneId] = useState(null);
   const [selectionMenuOpen, setSelectionMenuOpen] = useState(false);
   const selectionDragRef = useRef(false);
+  const suppressBodyScrollRef = useRef(false);
 
   const pxPerSec = 80 * zoom;
   const snapEnabled = Boolean(snap);
@@ -312,7 +315,12 @@ const Timeline = ({
     if (typeof scrollTopSync !== "number") return;
     if (!bodyRef.current) return;
     if (Math.abs(bodyRef.current.scrollTop - scrollTopSync) < 1) return;
+    suppressBodyScrollRef.current = true;
     bodyRef.current.scrollTop = scrollTopSync;
+    const reset = window.requestAnimationFrame(() => {
+      suppressBodyScrollRef.current = false;
+    });
+    return () => window.cancelAnimationFrame(reset);
   }, [scrollTopSync]);
 
   React.useEffect(() => {
@@ -430,6 +438,7 @@ const Timeline = ({
           if (rulerRef.current && bodyRef.current) {
             rulerRef.current.scrollLeft = bodyRef.current.scrollLeft;
           }
+          if (suppressBodyScrollRef.current) return;
           onScrollY?.(bodyRef.current?.scrollTop || 0);
         }}
         ref={bodyRef}
@@ -462,6 +471,26 @@ const Timeline = ({
               >
                 {selectionIsTranscribing ? "Transcribing..." : "Transcribe lyrics"}
                 {selectionIsTranscribing && <span className="studio-spinner" />}
+              </button>
+              <button
+                type="button"
+                className="studio-selection-btn ghost"
+                onClick={() => {
+                  onDuplicateSelection?.(selection?.range, selection?.laneIds, Math.max(selection?.range?.start ?? 0, selection?.range?.end ?? 0));
+                  setSelectionMenuOpen(false);
+                }}
+              >
+                Duplicate
+              </button>
+              <button
+                type="button"
+                className="studio-selection-btn ghost"
+                onClick={() => {
+                  onDeleteSelection?.(selection?.range, selection?.laneIds, selection?.clipIds);
+                  setSelectionMenuOpen(false);
+                }}
+              >
+                Delete
               </button>
               <button
                 type="button"

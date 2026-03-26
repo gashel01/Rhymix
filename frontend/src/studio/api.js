@@ -9,8 +9,15 @@ export const getOrCreateProjectByAsset = async (assetId) => {
   return response.data;
 };
 
-export const createProject = async (assetId) => {
-  const response = await axios.post(`${API_BASE}/api/studio/projects`, { assetId });
+export const createProject = async (assetId = null) => {
+  const payload = {};
+  if (assetId) payload.assetId = assetId;
+  const response = await axios.post(`${API_BASE}/api/studio/projects`, payload);
+  return response.data;
+};
+
+export const getAllProjects = async () => {
+  const response = await axios.get(`${API_BASE}/api/studio/projects`);
   return response.data;
 };
 

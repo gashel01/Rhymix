@@ -32,7 +32,6 @@ def _as_float(value, default=None):
         return default
     return number
 
-
 def _candidate_runtime_roots():
     candidates = []
     for raw in (

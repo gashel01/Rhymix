@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./StudioPage.css";
 import { StudioProvider, useStudioStore } from "./store";
 import {
@@ -8,24 +8,63 @@ import {
   startAiJob,
   startRender,
   subscribeJobEvents,
-  transcribeStudioSelection,
   updateProject,
 } from "./api";
 import Transport from "./components/Transport";
 import TrackList from "./components/TrackList";
 import Timeline from "./components/Timeline";
 import Inspector from "./components/Inspector";
-import CreationDashboard from "./components/CreationDashboard";
-import LibraryPanel from "./components/LibraryPanel";
 import JobToasts from "./components/JobToasts";
+import LibraryPanel from "./components/LibraryPanel";
+import OrchestratorModal from "./components/OrchestratorModal";
 import ProjectManagerModal from "./components/ProjectManagerModal";
 
 import { useStudioPlayback } from './hooks/useStudioPlayback';
 import { useLyricsActions } from './hooks/useLyricsActions';
 import { useStudioKeyboardShortcuts } from './hooks/useStudioKeyboardShortcuts';
-const StudioPageInner = ({ assetId }) => {
+
+const JOB_TYPE_LABELS = {
+  understand: "Analyze",
+  orchestrate_song: "AI Orchestrator",
+  foundation_generate: "Foundation Generate",
+  foundation_restyle: "Foundation Restyle",
+  foundation_extend: "Foundation Extend",
+  stage_drums_generate: "STAGE Drums",
+  stem_extract: "Stem Extract",
+  stem_extract_uvr: "UVR Stem Extract",
+  render: "Export",
+};
+
+const summarizeJob = (job) => {
+  if (!job) return "Idle";
+  const label = JOB_TYPE_LABELS[job.type] || String(job.type || "job").replace(/_/g, " ");
+  return `${label} · ${job.statusMessage || job.error || job.status || "idle"}`;
+};
+
+const getUiStorageKey = (projectId) => `rhymix:studio-ui:${projectId}`;
+
+const readUiPrefs = (projectId) => {
+  if (!projectId || typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(getUiStorageKey(projectId));
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+};
+
+const writeUiPrefs = (projectId, prefs) => {
+  if (!projectId || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(getUiStorageKey(projectId), JSON.stringify(prefs));
+  } catch (error) {
+    // Ignore storage failures.
+  }
+};
+const StudioPageInner = ({ assetId, projectId }) => {
   const { state, actions } = useStudioStore();
   const [showProjectManager, setShowProjectManager] = useState(false);
+  const [showOrchestrator, setShowOrchestrator] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [jobs, setJobs] = useState([]);
@@ -37,9 +76,25 @@ const StudioPageInner = ({ assetId }) => {
   const [libraryQuery, setLibraryQuery] = useState("");
   const [timelineScrollTop, setTimelineScrollTop] = useState(0);
   const trackScrollRef = useRef(null);
-  const transcribeTokenRef = useRef(0);
+  const suppressTrackHeaderScrollRef = useRef(false);
+  const focusMode = Boolean(state.ui.focusMode);
 
   const playback = useStudioPlayback(state, actions);
+  const isDirectStudioEntry = !assetId;
+
+  const handleBack = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    window.history.replaceState(null, "", "/");
+    try {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    } catch (error) {
+      window.dispatchEvent(new Event("popstate"));
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -47,7 +102,19 @@ const StudioPageInner = ({ assetId }) => {
       setLoading(true);
       setError(null);
       try {
-        const data = await getOrCreateProjectByAsset(assetId);
+        let data = null;
+        if (projectId) {
+          data = await getProjectById(projectId);
+        } else if (assetId) {
+          data = await getOrCreateProjectByAsset(assetId);
+        }
+        if (!data) {
+          if (mounted) {
+            setLoading(false);
+            setShowProjectManager(true);
+          }
+          return;
+        }
         if (!mounted) return;
         actions.setProject(data);
       } catch (err) {
@@ -57,11 +124,44 @@ const StudioPageInner = ({ assetId }) => {
         if (mounted) setLoading(false);
       }
     };
-    if (assetId) loadProject();
+    loadProject();
     return () => {
       mounted = false;
     };
-  }, [assetId, actions]);
+  }, [assetId, projectId, actions]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById("root");
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      htmlHeight: html.style.height,
+      bodyOverflow: body.style.overflow,
+      bodyHeight: body.style.height,
+      rootOverflow: root?.style.overflow ?? "",
+      rootHeight: root?.style.height ?? "",
+    };
+    html.style.overflow = "hidden";
+    html.style.height = "100%";
+    body.style.overflow = "hidden";
+    body.style.height = "100%";
+    if (root) {
+      root.style.overflow = "hidden";
+      root.style.height = "100%";
+    }
+    return () => {
+      html.style.overflow = prev.htmlOverflow;
+      html.style.height = prev.htmlHeight;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.height = prev.bodyHeight;
+      if (root) {
+        root.style.overflow = prev.rootOverflow;
+        root.style.height = prev.rootHeight;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -71,9 +171,53 @@ const StudioPageInner = ({ assetId }) => {
   }, []);
 
   useEffect(() => {
+    if (!state.project?.id) return;
+    const prefs = readUiPrefs(state.project.id);
+    if (!prefs) return;
+    actions.setUi({
+      railCollapsed: prefs.railCollapsed ?? state.ui.railCollapsed,
+      workspaceSection: "edit",
+      inspectorSection: prefs.inspectorSection ?? state.ui.inspectorSection,
+      focusMode: prefs.focusMode ?? state.ui.focusMode,
+      expandedAiCard: prefs.expandedAiCard ?? state.ui.expandedAiCard,
+      drawerTool: prefs.drawerTool ?? state.ui.drawerTool,
+      activityFilter: prefs.activityFilter ?? state.ui.activityFilter,
+      showCreatePanel: false,
+      showLibraryPanel: false,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.project?.id]);
+
+  useEffect(() => {
+    if (!state.project?.id) return;
+    writeUiPrefs(state.project.id, {
+      railCollapsed: state.ui.railCollapsed,
+      workspaceSection: "edit",
+      inspectorSection: state.ui.inspectorSection,
+      focusMode: Boolean(state.ui.focusMode),
+      expandedAiCard: state.ui.expandedAiCard,
+      drawerTool: state.ui.drawerTool,
+      activityFilter: state.ui.activityFilter,
+    });
+  }, [
+    state.project?.id,
+    state.ui.railCollapsed,
+    state.ui.inspectorSection,
+    state.ui.focusMode,
+    state.ui.expandedAiCard,
+    state.ui.drawerTool,
+    state.ui.activityFilter,
+  ]);
+
+  useEffect(() => {
     if (!trackScrollRef.current) return;
     if (Math.abs(trackScrollRef.current.scrollTop - timelineScrollTop) < 1) return;
+    suppressTrackHeaderScrollRef.current = true;
     trackScrollRef.current.scrollTop = timelineScrollTop;
+    const reset = window.requestAnimationFrame(() => {
+      suppressTrackHeaderScrollRef.current = false;
+    });
+    return () => window.cancelAnimationFrame(reset);
   }, [timelineScrollTop]);
 
   useEffect(() => {
@@ -83,13 +227,19 @@ const StudioPageInner = ({ assetId }) => {
         project: state.project,
         lanes: state.lanes,
         clips: state.clips,
+        assets: state.assets,
         metadata: state.metadata,
       }).catch((err) => console.error("Failed to save project", err));
     }, 800);
     return () => clearTimeout(timeout);
-  }, [state.project, state.lanes, state.clips, state.metadata]);
+  }, [state.project, state.lanes, state.clips, state.assets, state.metadata]);
 
   useStudioKeyboardShortcuts(playback);
+
+  const createPrompt = useMemo(
+    () => [style, lyrics].filter(Boolean).join("\n").trim(),
+    [style, lyrics]
+  );
 
   const assetList = useMemo(
     () =>
@@ -108,11 +258,6 @@ const StudioPageInner = ({ assetId }) => {
       return label.includes(query);
     });
   }, [assetList, libraryQuery]);
-
-  const createPrompt = useMemo(
-    () => [style, lyrics].filter(Boolean).join("\n").trim(),
-    [style, lyrics]
-  );
 
   const selectedClip = useMemo(
     () => state.clips.find((clip) => state.selection?.clipIds?.[0] === clip.id),
@@ -143,6 +288,71 @@ const StudioPageInner = ({ assetId }) => {
     return state.clips.find((clip) => clip.clipType !== "midi" && clip.sourceAssetId) || null;
   }, [state.clips, state.lanes]);
 
+  const selectedLane = useMemo(() => {
+    const selectedLaneId = state.selection?.laneIds?.[0] || selectedClip?.laneId;
+    return state.lanes.find((lane) => lane.id === selectedLaneId) || null;
+  }, [state.lanes, state.selection?.laneIds, selectedClip]);
+
+  const activeJobs = useMemo(
+    () => jobs.filter((job) => !["completed", "failed", "cancelled"].includes(job.status)),
+    [jobs]
+  );
+
+  const currentJob = useMemo(() => activeJobs[activeJobs.length - 1] || jobs[jobs.length - 1] || null, [activeJobs, jobs]);
+
+  const selectionSummary = useMemo(() => {
+    if (selectedClip) {
+      const clipLen = Math.max(0, (selectedClip.srcEndSec ?? 0) - (selectedClip.srcStartSec ?? 0));
+      return `Clip · ${selectedClip.label || selectedClip.name || selectedClip.id} · ${clipLen.toFixed(2)}s`;
+    }
+    if (state.selection?.range) {
+      const start = Math.min(state.selection.range.start ?? 0, state.selection.range.end ?? 0);
+      const end = Math.max(state.selection.range.start ?? 0, state.selection.range.end ?? 0);
+      const laneCount = Array.isArray(state.selection?.laneIds) ? state.selection.laneIds.length : state.lanes.length;
+      return `Range · ${start.toFixed(2)}s to ${end.toFixed(2)}s · ${laneCount} lane${laneCount === 1 ? "" : "s"}`;
+    }
+    if (selectedLane) {
+      return `Lane · ${selectedLane.name}`;
+    }
+    if (!state.clips.length) {
+      return "No clips yet. Use the create tools in the right panel or add clips to begin.";
+    }
+    return "No active selection";
+  }, [selectedClip, selectedLane, state.selection, state.lanes.length, state.clips.length]);
+
+  const currentWorkspaceLabel = "Studio";
+  const shortcutHints = useMemo(
+    () => [
+      "Space Play/Pause",
+      "Del Delete",
+      "S Split",
+      "Drag Trim/Move",
+    ],
+    []
+  );
+
+  const syncStudioRoute = useCallback(
+    (nextProjectData) => {
+      if (typeof window === "undefined") return;
+      const nextProjectId = nextProjectData?.project?.id || null;
+      let nextUrl = "/studio";
+      if (!isDirectStudioEntry && assetId) {
+        nextUrl = `/studio/${encodeURIComponent(assetId)}`;
+      }
+      if (nextProjectId) {
+        const joiner = nextUrl.includes("?") ? "&" : "?";
+        nextUrl = `${nextUrl}${joiner}projectId=${encodeURIComponent(nextProjectId)}`;
+      }
+      window.history.replaceState({}, "", nextUrl);
+      try {
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      } catch (error) {
+        window.dispatchEvent(new Event("popstate"));
+      }
+    },
+    [assetId, isDirectStudioEntry]
+  );
+
 
   const subscribeJob = (jobId) => {
     if (jobSubscriptionsRef.current.has(jobId)) return;
@@ -157,7 +367,13 @@ const StudioPageInner = ({ assetId }) => {
           : [...prev, { id: jobId, ...event }];
         return next;
       });
-      if (event?.status === "completed" && projectId) {
+      if (event?.type === "project_updated" && projectId) {
+        getProjectById(projectId)
+          .then((data) => actions.setProject(data))
+          .catch((err) => console.error("Failed to refresh project", err));
+        return;
+      }
+      if (["completed", "failed"].includes(event?.status) && projectId) {
         getProjectById(projectId)
           .then((data) => actions.setProject(data))
           .catch((err) => console.error("Failed to refresh project", err));
@@ -264,13 +480,13 @@ const StudioPageInner = ({ assetId }) => {
     });
     setJobs((prev) => [...prev, { id: response.jobId, type: jobType, status: "queued", progress: 0 }]);
     subscribeJob(response.jobId);
+    return response.jobId;
   };
 
   const {
     lyricsMap,
     lyricsSelection,
     selectionLyricsEntry,
-    buildSegmentsFromText,
     updateLyricsText,
     removeLyricsEntry,
     restoreLyricsEntry,
@@ -316,21 +532,6 @@ const StudioPageInner = ({ assetId }) => {
 
   const transportActions = useMemo(() => {
     const list = [];
-    if (!state.clips.length) {
-      list.push({
-        id: "open-library",
-        label: "Open Library",
-        variant: "ghost",
-        onClick: () => actions.setUi({ showLibraryPanel: true }),
-      });
-      list.push({
-        id: "create-song",
-        label: "Create Song",
-        variant: "accent",
-        onClick: () => actions.setUi({ showCreatePanel: true }),
-      });
-      return list;
-    }
     if (selectedClip?.sourceAssetId) {
       list.push({
         id: "extract-stems",
@@ -356,11 +557,11 @@ const StudioPageInner = ({ assetId }) => {
       });
     }
     return list;
-  }, [state.clips, state.selection, selectedClip, actions, handleStartJob]);
+  }, [state.selection, selectedClip, actions, handleStartJob]);
 
   const lyricsEntry = selectionLyricsEntry;
 
-  const jobStatus = jobs.length ? `${jobs[jobs.length - 1].type}: ${jobs[jobs.length - 1].status}` : "Idle";
+  const jobStatus = summarizeJob(currentJob);
 
   if (loading) {
     return <div className="studio-page">Loading Studio...</div>;
@@ -370,70 +571,105 @@ const StudioPageInner = ({ assetId }) => {
     return <div className="studio-page">Error: {error}</div>;
   }
 
+  if (!state.project) {
+    return (
+      <div className="studio-page">
+        <div className="studio-shell">
+          <div className="studio-workspace">
+            <div className="studio-center-column">
+              <div className="studio-panel studio-empty-shell">
+                <div className="studio-context-heading">
+                  <button className="studio-mini studio-back-button" onClick={handleBack}>
+                    Back
+                  </button>
+                  <div className="studio-context-eyebrow">{currentWorkspaceLabel}</div>
+                </div>
+                <div className="studio-panel-title">Open or Create a Studio Project</div>
+                <div className="studio-subtext">
+                  Pick an existing project, start a new one from a track, or create a blank project.
+                </div>
+                <div className="studio-actions-row" style={{ marginTop: 16 }}>
+                  <button className="studio-btn" onClick={() => setShowProjectManager(true)}>
+                    Open Project Switcher
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <ProjectManagerModal
+          open={showProjectManager}
+          onClose={() => setShowProjectManager(false)}
+          assetId={assetId}
+          currentProjectId={state.project?.id}
+          scope={isDirectStudioEntry ? "all" : "asset"}
+          onSwitchProject={(newProjectData) => {
+            actions.setProject(newProjectData);
+            syncStudioRoute(newProjectData);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="studio-page">
       <div className="studio-shell">
-        <div className={`studio-rail ${state.ui.railCollapsed ? "collapsed" : ""}`}>
-          <button
-            className="studio-rail-toggle"
-            onClick={() => actions.setUi({ railCollapsed: !state.ui.railCollapsed })}
-          >
-            ☰
-          </button>
-          <button
-            className={`studio-rail-btn ${state.ui.showCreatePanel ? "active" : ""}`}
-            onClick={() => actions.setUi({ showCreatePanel: !state.ui.showCreatePanel })}
-          >
-            Create
-          </button>
-          <button className="studio-rail-btn active">Studio</button>
-          <button
-            className={`studio-rail-btn ${state.ui.showLibraryPanel ? "active" : ""}`}
-            onClick={() => actions.setUi({ showLibraryPanel: !state.ui.showLibraryPanel })}
-          >
-            Library
-          </button>
-        </div>
-
-        <div className="studio-workspace">
-          {(state.ui.showCreatePanel || state.ui.showLibraryPanel) && (
-            <div className="studio-left-column">
-              {state.ui.showCreatePanel && (
-                <CreationDashboard
-                  createMode={createMode}
-                  setCreateMode={setCreateMode}
-                  lyrics={lyrics}
-                  setLyrics={setLyrics}
-                  style={style}
-                  setStyle={setStyle}
-                  model={model}
-                  setModel={setModel}
-                  createPrompt={createPrompt}
-                  handleStartJob={handleStartJob}
-                />
-              )}
-
-              {state.ui.showLibraryPanel && (
-                <LibraryPanel
-                  libraryQuery={libraryQuery}
-                  setLibraryQuery={setLibraryQuery}
-                  filteredAssets={filteredAssets}
-                  lanes={state.lanes}
-                  actions={actions}
-                  currentTime={state.transport.currentTime}
-                  onOpenProjectManager={() => setShowProjectManager(true)}
-                />
-              )}
-            </div>
-          )}
+        <div className={`studio-workspace ${focusMode ? "focus-mode" : ""}`}>
+          <div className="studio-left-column">
+                  <LibraryPanel
+                    libraryQuery={libraryQuery}
+                    setLibraryQuery={setLibraryQuery}
+                    filteredAssets={filteredAssets}
+                    clips={state.clips}
+                    lanes={state.lanes}
+                    actions={actions}
+                    currentTime={state.transport.currentTime}
+              onOpenProjectManager={() => setShowProjectManager(true)}
+            />
+          </div>
 
           <div className="studio-center-column">
+            <div className="studio-panel studio-context-strip">
+              <div className="studio-context-main">
+                <div className="studio-context-heading">
+                  <button className="studio-mini studio-back-button" onClick={handleBack}>
+                    Back
+                  </button>
+                  <div className="studio-context-eyebrow">{currentWorkspaceLabel}</div>
+                </div>
+                <div className="studio-panel-title">Current Context</div>
+                <div className="studio-subtext">{selectionSummary}</div>
+              </div>
+              <div className="studio-context-meta">
+                <button className="studio-mini" onClick={() => setShowOrchestrator(true)}>
+                  AI Orchestrator
+                </button>
+                <div className="studio-context-chip">
+                  {activeJobs.length ? `${activeJobs.length} active job${activeJobs.length === 1 ? "" : "s"}` : "No active jobs"}
+                </div>
+                <button
+                  className={`studio-mini ${focusMode ? "active" : ""}`}
+                  onClick={() => actions.setUi({ focusMode: !focusMode })}
+                >
+                  {focusMode ? "Exit Focus" : "Focus Mode"}
+                </button>
+              </div>
+              {/* <div className="studio-shortcut-row">
+                {shortcutHints.map((hint) => (
+                  <span key={hint} className="studio-context-chip subtle">
+                    {hint}
+                  </span>
+                ))}
+              </div> */}
+            </div>
+
             <div className="studio-panel studio-timeline-panel">
               <div className="studio-timeline-toolbar">
                 <div className="studio-toolbar-left">
                   <div className="studio-panel-title">Multitrack Timeline</div>
                   <div className="studio-subtext">
-                    Bars & Beats · {state.project?.bpm || 120} BPM
+                    {state.project?.bpm || 120} BPM · {state.project?.key || "Key unset"} · {state.project?.timeSignature || "4/4"}
                   </div>
                 </div>
                 <div className="studio-toolbar-right">
@@ -453,22 +689,24 @@ const StudioPageInner = ({ assetId }) => {
                       <option value={8}>1/32</option>
                     </select>
                   </div>
-                  <label className="studio-toggle">
-                    <input type="checkbox" checked={state.ui.snap} onChange={() => actions.setUi({ snap: !state.ui.snap })} />
+                  <button
+                    className={`studio-mini ${state.ui.snap ? "active" : ""}`}
+                    onClick={() => actions.setUi({ snap: !state.ui.snap })}
+                  >
                     Snap
-                  </label>
-                  <label className="studio-toggle">
-                    <input
-                      type="checkbox"
-                      checked={state.ui.metronome}
-                      onChange={() => actions.setUi({ metronome: !state.ui.metronome })}
-                    />
+                  </button>
+                  <button
+                    className={`studio-mini ${state.ui.metronome ? "active" : ""}`}
+                    onClick={() => actions.setUi({ metronome: !state.ui.metronome })}
+                  >
                     Metronome
-                  </label>
-                  <label className="studio-toggle">
-                    <input type="checkbox" checked={state.ui.loop} onChange={() => actions.setUi({ loop: !state.ui.loop })} />
+                  </button>
+                  <button
+                    className={`studio-mini ${state.ui.loop ? "active" : ""}`}
+                    onClick={() => actions.setUi({ loop: !state.ui.loop })}
+                  >
                     Loop
-                  </label>
+                  </button>
                   <div className="studio-zoom">
                     <span>Zoom</span>
                     <input
@@ -487,7 +725,10 @@ const StudioPageInner = ({ assetId }) => {
                 <div
                   className="studio-track-headers"
                   ref={trackScrollRef}
-                  onScroll={() => setTimelineScrollTop(trackScrollRef.current?.scrollTop || 0)}
+                  onScroll={() => {
+                    if (suppressTrackHeaderScrollRef.current) return;
+                    setTimelineScrollTop(trackScrollRef.current?.scrollTop || 0);
+                  }}
                 >
                   <TrackList
                     lanes={state.lanes}
@@ -568,6 +809,8 @@ const StudioPageInner = ({ assetId }) => {
                     onDeleteClip={actions.deleteSelection}
                     onTrimClip={actions.trimClipLeft}
                     onTrimClipRight={actions.trimClipRight}
+                    onDeleteSelection={actions.deleteSelection}
+                    onDuplicateSelection={actions.duplicateSelection}
                   />
                 </div>
               </div>
@@ -577,32 +820,48 @@ const StudioPageInner = ({ assetId }) => {
           {state.ui.showDetailsPanel && (
             <div className="studio-right-column">
               <div className="studio-panel studio-details-panel">
-        <Inspector
-          project={state.project}
-          lanes={state.lanes}
-          clips={state.clips}
-          selection={state.selection}
-          metadata={state.metadata}
-          lyricsSelection={lyricsSelection}
-          lyricsEntry={lyricsEntry}
-          playheadTime={state.transport.currentTime}
-          transport={state.transport}
-          onSplit={actions.splitClip}
-          onTrimLeft={actions.trimClipLeft}
-          onTrimRight={actions.trimClipRight}
-          onMoveClip={actions.moveClip}
-          onDeleteSelection={actions.deleteSelection}
-          onDuplicateSelection={actions.duplicateSelection}
-          onStartAiJob={handleStartJob}
-          onUpdateLane={actions.updateLane}
-          onUpdateClip={actions.updateClip}
-          onUpdateProject={handleProjectUpdate}
-          onUpdateLyricsText={updateLyricsText}
-          studioActions={actions}
-          onRefreshProject={refreshProject}
-        />
-              </div>
+                <Inspector
+                  project={state.project}
+                  lanes={state.lanes}
+                  clips={state.clips}
+                  selection={state.selection}
+                  metadata={state.metadata}
+                  lyricsSelection={lyricsSelection}
+                  lyricsEntry={lyricsEntry}
+                  playheadTime={state.transport.currentTime}
+                  transport={state.transport}
+                  onSplit={actions.splitClip}
+                  onTrimLeft={actions.trimClipLeft}
+                  onTrimRight={actions.trimClipRight}
+                  onMoveClip={actions.moveClip}
+                  onDeleteSelection={actions.deleteSelection}
+                  onDuplicateSelection={actions.duplicateSelection}
+                  onStartAiJob={handleStartJob}
+                  onUpdateLane={actions.updateLane}
+                  onUpdateClip={actions.updateClip}
+                  onUpdateProject={handleProjectUpdate}
+                  onUpdateLyricsText={updateLyricsText}
+                  studioActions={actions}
+                onRefreshProject={refreshProject}
+                activeWorkspaceLabel={currentWorkspaceLabel}
+                jobs={jobs}
+                uiState={state.ui}
+                createDashboard={{
+                  createMode,
+                  setCreateMode,
+                  lyrics,
+                  setLyrics,
+                  style,
+                  setStyle,
+                  model,
+                  setModel,
+                  createPrompt,
+                  handleStartJob,
+                  onOpenOrchestrator: () => setShowOrchestrator(true),
+                }}
+              />
             </div>
+          </div>
           )}
         </div>
       </div>
@@ -619,6 +878,13 @@ const StudioPageInner = ({ assetId }) => {
         onReset={handleResetProject}
         jobStatus={jobStatus}
         contextActions={transportActions}
+        jobCount={activeJobs.length}
+        bpm={state.project?.bpm || 120}
+        snap={state.ui.snap}
+        loop={state.ui.loop}
+        zoom={state.ui.zoom}
+        workspaceLabel={currentWorkspaceLabel}
+        selectionSummary={selectionSummary}
       />
 
 
@@ -627,8 +893,31 @@ const StudioPageInner = ({ assetId }) => {
         onClose={() => setShowProjectManager(false)}
         assetId={assetId}
         currentProjectId={state.project?.id}
+        scope={isDirectStudioEntry ? "all" : "asset"}
         onSwitchProject={(newProjectData) => {
           actions.setProject(newProjectData);
+          syncStudioRoute(newProjectData);
+        }}
+      />
+
+      <OrchestratorModal
+        open={showOrchestrator}
+        onClose={() => setShowOrchestrator(false)}
+        transport={state.transport}
+        jobs={jobs}
+        onStartAiJob={handleStartJob}
+        onFocusResult={(result) => {
+          const laneIds = [
+            ...(Array.isArray(result?.audioLaneIds) ? result.audioLaneIds : []),
+            ...(Array.isArray(result?.midiLaneIds) ? result.midiLaneIds : []),
+          ];
+          if (laneIds.length) {
+            actions.setSelection({ range: null, laneIds, clipIds: [] });
+          }
+          if (result?.insertSec != null) {
+            playback.seek(Number(result.insertSec) || 0);
+          }
+          setShowOrchestrator(false);
         }}
       />
 
@@ -645,9 +934,9 @@ const StudioPageInner = ({ assetId }) => {
   );
 };
 
-const StudioPage = ({ assetId }) => (
+const StudioPage = ({ assetId, projectId }) => (
   <StudioProvider>
-    <StudioPageInner assetId={assetId} />
+    <StudioPageInner assetId={assetId} projectId={projectId} />
   </StudioProvider>
 );
 

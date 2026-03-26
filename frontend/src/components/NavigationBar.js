@@ -28,6 +28,12 @@ import MenuIcon from "@mui/icons-material/Menu";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { BrushCleaning } from "lucide-react";
 import  Theme  from "./Homeview/Theme.js";
+import {
+  clearStoredGroqApiKey,
+  getStoredGroqApiKey,
+  looksLikeGroqApiKey,
+  setStoredGroqApiKey,
+} from "../utils/groqSettings";
 
 /**
  * NavigationBar (no MUI)
@@ -115,6 +121,37 @@ function NavigationBar({
   }, [darkMode, sidebarCollapsed]);
 
   const pct = Math.max(0, Math.min(100, Math.round((volume ?? 0) * 100)));
+  const [groqApiKey, setGroqApiKey] = useState("");
+  const [groqSettingsError, setGroqSettingsError] = useState("");
+  const [groqSettingsMessage, setGroqSettingsMessage] = useState("");
+
+  useEffect(() => {
+    setGroqApiKey(getStoredGroqApiKey());
+  }, []);
+
+  const handleSaveGroqKey = () => {
+    const nextValue = String(groqApiKey || "").trim();
+    setGroqSettingsError("");
+    setGroqSettingsMessage("");
+    if (!nextValue) {
+      setGroqSettingsError("Enter a Groq API key.");
+      return;
+    }
+    if (!looksLikeGroqApiKey(nextValue)) {
+      setGroqSettingsError("That Groq API key does not look valid.");
+      return;
+    }
+    setStoredGroqApiKey(nextValue);
+    setGroqApiKey(nextValue);
+    setGroqSettingsMessage("Groq API key saved.");
+  };
+
+  const handleClearGroqKey = () => {
+    clearStoredGroqApiKey();
+    setGroqApiKey("");
+    setGroqSettingsError("");
+    setGroqSettingsMessage("Groq API key cleared.");
+  };
 
   const Brand = ({ compact = false }) => (
     <div style={{ display: "flex", alignItems: "center",  minWidth: 0 }}>
@@ -480,17 +517,17 @@ function NavigationBar({
                   </div>
 
                   <div
-                    style={{
-                      maxHeight: open ? 220 : 0,
-                      opacity: open ? 1 : 0,
-                      transform: open ? "translateY(0)" : "translateY(4px)",
-                      transition: "max-height 220ms ease, opacity 200ms ease, transform 200ms ease",
+                      style={{
+                        maxHeight: open ? 360 : 0,
+                        opacity: open ? 1 : 0,
+                        transform: open ? "translateY(0)" : "translateY(4px)",
+                        transition: "max-height 220ms ease, opacity 200ms ease, transform 200ms ease",
                       overflow: "hidden",
                     }}
                   >
                     <Hairline />
 
-                    <div style={{ padding: 12, display: "grid", gap: 10 }}>
+                      <div style={{ padding: 12, display: "grid", gap: 10 }}>
                       {/* Theme row */}
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <div style={{ color: tokens.subtext, fontWeight: 650, fontSize: 12, letterSpacing: 0.4 }}>
@@ -507,7 +544,7 @@ function NavigationBar({
                       </div>
 
                       {/* Volume row */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <IconCircleButton
                           onClick={() => onVolumeChange(muted ? 0.8 : 0)}
                           title={muted ? "Unmute" : "Mute"}
@@ -522,11 +559,85 @@ function NavigationBar({
                             value={pct}
                             onChange={(v) => onVolumeChange(v / 100)}
                           />
+                          </div>
+                        </div>
+
+                        <Hairline />
+
+                        <div style={{ display: "grid", gap: 8 }}>
+                          <div style={{ color: tokens.subtext, fontWeight: 650, fontSize: 12, letterSpacing: 0.4 }}>
+                            Groq API Key
+                          </div>
+                          <input
+                            type="password"
+                            value={groqApiKey}
+                            onChange={(e) => {
+                              setGroqApiKey(e.target.value);
+                              if (groqSettingsError) setGroqSettingsError("");
+                              if (groqSettingsMessage) setGroqSettingsMessage("");
+                            }}
+                            placeholder="gsk_..."
+                            style={{
+                              width: "100%",
+                              borderRadius: 12,
+                              border: `1px solid ${tokens.hairline}`,
+                              background: "transparent",
+                              color: tokens.text,
+                              padding: "10px 12px",
+                              outline: "none",
+                              fontSize: 13,
+                              fontWeight: 650,
+                              boxSizing: "border-box",
+                            }}
+                          />
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              type="button"
+                              onClick={handleSaveGroqKey}
+                              style={{
+                                flex: 1,
+                                borderRadius: 12,
+                                border: `1px solid ${tokens.hairline}`,
+                                background: tokens.primaryWash,
+                                color: tokens.text,
+                                padding: "10px 12px",
+                                fontWeight: 750,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleClearGroqKey}
+                              style={{
+                                flex: 1,
+                                borderRadius: 12,
+                                border: `1px solid ${tokens.hairline}`,
+                                background: "transparent",
+                                color: tokens.subtext,
+                                padding: "10px 12px",
+                                fontWeight: 750,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Clear
+                            </button>
+                          </div>
+                          {groqSettingsError ? (
+                            <div style={{ color: "rgba(255,107,107,0.95)", fontSize: 12, fontWeight: 650 }}>
+                              {groqSettingsError}
+                            </div>
+                          ) : null}
+                          {groqSettingsMessage ? (
+                            <div style={{ color: tokens.subtext, fontSize: 12, fontWeight: 650 }}>
+                              {groqSettingsMessage}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
               </div>
             </GlassPanel>
           </div>

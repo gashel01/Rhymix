@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { importFoundationVoiceInput } from "../api";
+import { requestGroqAutofill } from "../../utils/groqAutofill";
+import { StudioAssistButton, StudioAssistSuggestion } from "./GroqAssist";
 
 const BARS_OPTIONS = [4, 8];
 const VARIANT_OPTIONS = [1, 2, 3, 4];
@@ -37,8 +39,10 @@ const parseNumberOr = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartAiJob, onRefreshProject }) => {
-  const [mode, setMode] = useState("generate");
+const makeRandomSeed = () => Math.floor(Math.random() * 1000000000);
+
+const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartAiJob, onRefreshProject, initialMode = "generate" }) => {
+  const [mode, setMode] = useState(initialMode);
   const [prompt, setPrompt] = useState("");
   const [bars, setBars] = useState(4);
   const [bpm, setBpm] = useState(project?.bpm || 120);
@@ -59,6 +63,21 @@ const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartA
   const [voiceStatus, setVoiceStatus] = useState("idle");
   const [voiceError, setVoiceError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [assistLoading, setAssistLoading] = useState({
+    prompt: false,
+    styleTags: false,
+    fxTags: false,
+  });
+  const [assistError, setAssistError] = useState({
+    prompt: "",
+    styleTags: "",
+    fxTags: "",
+  });
+  const [assistSuggestion, setAssistSuggestion] = useState({
+    prompt: "",
+    styleTags: "",
+    fxTags: "",
+  });
 
   const recorderRef = useRef(null);
   const streamRef = useRef(null);
@@ -101,6 +120,18 @@ const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartA
   const canRestyle = Boolean(sourceClip?.sourceAssetId && sourceRange);
   const canRunVoiceRestyle = Boolean(voiceBlob || importedVoiceRef.current);
 
+  const sourceSummary = useMemo(() => {
+    if (mode === "voice_to_midi") {
+      return canRunVoiceRestyle
+        ? `Recorded voice idea, ${formatSeconds(voiceDurationSec || importedVoiceRef.current?.durationSec)}`
+        : "Recorded voice input";
+    }
+    if (canRestyle && sourceRange) {
+      return `${sourceClip?.sourceAssetId || "Selected clip"} from ${sourceRange.start.toFixed(2)}s to ${sourceRange.end.toFixed(2)}s`;
+    }
+    return "No active source";
+  }, [canRestyle, canRunVoiceRestyle, mode, sourceClip?.sourceAssetId, sourceRange, voiceDurationSec]);
+
   useEffect(() => {
     setBpm(project?.bpm || 120);
   }, [project?.bpm]);
@@ -108,6 +139,11 @@ const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartA
   useEffect(() => {
     setKeySignature(project?.key || "");
   }, [project?.key]);
+
+  useEffect(() => {
+    if (!initialMode) return;
+    setMode(initialMode);
+  }, [initialMode]);
 
   useEffect(() => {
     return () => {
@@ -213,6 +249,61 @@ const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartA
     await onRefreshProject?.(project.id);
     return importedVoiceRef.current;
   };
+
+  const runAssist = useCallback(async (slot, task, context) => {
+    setAssistLoading((prev) => ({ ...prev, [slot]: true }));
+    setAssistError((prev) => ({ ...prev, [slot]: "" }));
+    setAssistSuggestion((prev) => ({ ...prev, [slot]: "" }));
+    try {
+      const data = await requestGroqAutofill(task, context);
+      const suggestion =
+        data?.suggestion?.prompt
+        || data?.suggestion?.styleTags
+        || data?.suggestion?.fxTags
+        || "";
+      if (!String(suggestion).trim()) {
+        throw new Error("Groq returned an empty suggestion.");
+      }
+      setAssistSuggestion((prev) => ({ ...prev, [slot]: String(suggestion).trim() }));
+    } catch (error) {
+      setAssistError((prev) => ({ ...prev, [slot]: error?.message || "Autofill failed." }));
+    } finally {
+      setAssistLoading((prev) => ({ ...prev, [slot]: false }));
+    }
+  }, []);
+
+  const clearAssist = useCallback((slot) => {
+    setAssistError((prev) => ({ ...prev, [slot]: "" }));
+    setAssistSuggestion((prev) => ({ ...prev, [slot]: "" }));
+  }, []);
+
+  const buildAssistContext = useCallback(() => ({
+    mode,
+    prompt,
+    bars,
+    bpm,
+    key: keySignature,
+    instrumentFamily,
+    styleTags,
+    fxTags,
+    sourceSummary,
+  }), [bars, bpm, fxTags, instrumentFamily, keySignature, mode, prompt, sourceSummary, styleTags]);
+
+  const requestPromptAssist = useCallback(() => {
+    runAssist(
+      "prompt",
+      mode === "generate" ? "studio_foundation_generate_prompt" : "studio_foundation_restyle_prompt",
+      buildAssistContext()
+    );
+  }, [buildAssistContext, mode, runAssist]);
+
+  const requestStyleTagsAssist = useCallback(() => {
+    runAssist("styleTags", "studio_foundation_style_tags", buildAssistContext());
+  }, [buildAssistContext, runAssist]);
+
+  const requestFxTagsAssist = useCallback(() => {
+    runAssist("fxTags", "studio_foundation_fx_tags", buildAssistContext());
+  }, [buildAssistContext, runAssist]);
 
   const handleSubmit = async () => {
     const playheadSec = Number(transport?.currentTime ?? 0);
@@ -373,12 +464,28 @@ const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartA
       )}
 
       <div className="studio-field">
-        <label>Prompt</label>
+        <div className="studio-field-head">
+          <label>Prompt</label>
+          <StudioAssistButton
+            onRequest={requestPromptAssist}
+            loading={assistLoading.prompt}
+          />
+        </div>
         <textarea
           rows={4}
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
           placeholder="Warm analog synth loop, sidechained, dreamy, late-night city texture"
+        />
+        <StudioAssistSuggestion
+          value={assistSuggestion.prompt}
+          error={assistError.prompt}
+          onUse={() => {
+            if (!assistSuggestion.prompt) return;
+            setPrompt(assistSuggestion.prompt);
+            clearAssist("prompt");
+          }}
+          onCancel={() => clearAssist("prompt")}
         />
       </div>
 
@@ -429,22 +536,54 @@ const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartA
       </div>
 
       <div className="studio-field">
-        <label>Style Tags</label>
+        <div className="studio-field-head">
+          <label>Style Tags</label>
+          <StudioAssistButton
+            onRequest={requestStyleTagsAssist}
+            loading={assistLoading.styleTags}
+          />
+        </div>
         <input
           type="text"
           value={styleTags}
           onChange={(event) => setStyleTags(event.target.value)}
           placeholder="lo-fi, dusty, cinematic, pulsing"
         />
+        <StudioAssistSuggestion
+          value={assistSuggestion.styleTags}
+          error={assistError.styleTags}
+          onUse={() => {
+            if (!assistSuggestion.styleTags) return;
+            setStyleTags(assistSuggestion.styleTags);
+            clearAssist("styleTags");
+          }}
+          onCancel={() => clearAssist("styleTags")}
+        />
       </div>
 
       <div className="studio-field">
-        <label>FX Tags</label>
+        <div className="studio-field-head">
+          <label>FX Tags</label>
+          <StudioAssistButton
+            onRequest={requestFxTagsAssist}
+            loading={assistLoading.fxTags}
+          />
+        </div>
         <input
           type="text"
           value={fxTags}
           onChange={(event) => setFxTags(event.target.value)}
           placeholder="tape, chorus, shimmer, sidechain"
+        />
+        <StudioAssistSuggestion
+          value={assistSuggestion.fxTags}
+          error={assistError.fxTags}
+          onUse={() => {
+            if (!assistSuggestion.fxTags) return;
+            setFxTags(assistSuggestion.fxTags);
+            clearAssist("fxTags");
+          }}
+          onCancel={() => clearAssist("fxTags")}
         />
       </div>
 
@@ -465,7 +604,12 @@ const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartA
         <div className="studio-panel-title">Generation Settings</div>
         <div className="studio-inline">
           <div className="studio-field">
-            <label>Seed</label>
+            <div className="studio-field-head">
+              <label>Seed</label>
+              <button className="studio-mini" type="button" onClick={() => setSeed(makeRandomSeed())}>
+                Randomize
+              </button>
+            </div>
             <input
               type="number"
               step="1"

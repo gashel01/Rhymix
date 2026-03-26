@@ -28,6 +28,7 @@ def create_app():
 
     from backend.features.processing.routes import bp as processing_bp
     from backend.features.inference.routes import bp as inference_bp
+    from backend.features.llm.routes import bp as llm_bp
     from backend.features.song_generation.routes import bp as song_generation_bp
     from backend.features.diarization.routes import bp as diarization_bp
     from backend.features.studio.routes import bp as studio_bp
@@ -41,6 +42,7 @@ def create_app():
     app.register_blueprint(training_bp)
     app.register_blueprint(processing_bp)
     app.register_blueprint(inference_bp)
+    app.register_blueprint(llm_bp)
     app.register_blueprint(song_generation_bp)
     app.register_blueprint(diarization_bp)
     app.register_blueprint(studio_bp)

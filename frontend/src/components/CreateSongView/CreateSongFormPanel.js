@@ -6,6 +6,7 @@ import { AceStepSection } from "./AceStepSection";
 import { CustomizeContent } from "./OptionsBlock";
 import { GENRE_RECS, toKey } from "./constants";
 import { Segmented } from "../Homeview/Segmented";
+import { AssistActionRow, AssistSuggestionCard } from "./AssistSuggestionCard";
 export function CreateSongFormPanel({
   ui,
   t,
@@ -56,6 +57,9 @@ export function CreateSongFormPanel({
   setSelectedModel,
   setSelectedCheckpoint,
   isStuck,
+  describeAssist,
+  lyricsAssist,
+  genreAssist,
 }) {
   const { Panel, Input, Modal, Pill } = ui;
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -142,6 +146,12 @@ export function CreateSongFormPanel({
 
             {mode === "prompt" ? (
               <div>
+                 <AssistActionRow
+                  t={t}
+                  label="Describe"
+                  loading={describeAssist?.loading}
+                  onRequest={describeAssist?.onRequest}
+                />
                  <div
                   style={{
                     borderRadius: 16,
@@ -240,11 +250,25 @@ export function CreateSongFormPanel({
                     </>
                   )}
                 </div>
+                <AssistSuggestionCard
+                  ui={ui}
+                  t={t}
+                  value={describeAssist?.suggestion}
+                  error={describeAssist?.error}
+                  onUse={describeAssist?.onUse}
+                  onCancel={describeAssist?.onCancel}
+                />
               </div>
             ) : (
               <div style={{ display: "grid", gap: 14 }}>
                 <div>
-              
+                  <AssistActionRow
+                    t={t}
+                    label="Lyrics"
+                    loading={lyricsAssist?.loading}
+                    onRequest={lyricsAssist?.onRequest}
+                  />
+               
                   <div
                     style={{
                       borderRadius: 16,
@@ -324,6 +348,15 @@ export function CreateSongFormPanel({
                       </>
                     )}
                   </div>
+                  <AssistSuggestionCard
+                    ui={ui}
+                    t={t}
+                    value={lyricsAssist?.suggestion}
+                    error={lyricsAssist?.error}
+                    onReplace={lyricsAssist?.onReplace}
+                    onAppend={lyricsAssist?.onAppend}
+                    onCancel={lyricsAssist?.onCancel}
+                  />
                 </div>
               </div>
             )}
@@ -354,6 +387,12 @@ export function CreateSongFormPanel({
                 />
               ) : (
                 <>
+                  <AssistActionRow
+                    t={t}
+                    label="Genre & style"
+                    loading={genreAssist?.loading}
+                    onRequest={genreAssist?.onRequest}
+                  />
                   {/* {genreTokens.length > 0 && (
                     <div style={{ display: "flex", flexWrap: "nowrap", overflowX: "auto", gap: 8 }}>
                       {genreTokens.map((g) => (
@@ -374,6 +413,14 @@ export function CreateSongFormPanel({
                     value={genreText}
                     onChange={setGenreText}
                     placeholder="Type genres/styles… e.g., Synthwave, Electro-pop"
+                  />
+                  <AssistSuggestionCard
+                    ui={ui}
+                    t={t}
+                    value={genreAssist?.suggestion}
+                    error={genreAssist?.error}
+                    onUse={genreAssist?.onUse}
+                    onCancel={genreAssist?.onCancel}
                   />
                 </>
               )}

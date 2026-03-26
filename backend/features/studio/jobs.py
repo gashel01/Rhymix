@@ -19,6 +19,35 @@ from backend.features.studio.storage import (
 )
 from backend.paths.manager import paths
 
+ORCHESTRATOR_FX_PRESETS = {
+    "clean": {},
+    "wide_pop": {
+        "chorus": {"enabled": True, "rate": 0.7, "depth": 0.01, "mix": 0.22},
+        "reverb": {"enabled": True, "decay": 2.2, "mix": 0.18},
+    },
+    "dream_wash": {
+        "reverb": {"enabled": True, "decay": 5.5, "mix": 0.35},
+        "chorus": {"enabled": True, "rate": 0.4, "depth": 0.018, "mix": 0.28},
+        "lowpass": {"enabled": True, "cutoff": 9800},
+    },
+    "echo_trail": {
+        "echo": {"enabled": True, "time": 0.32, "feedback": 0.38, "mix": 0.22},
+        "reverb": {"enabled": True, "decay": 2.8, "mix": 0.16},
+    },
+    "grit_drive": {
+        "distortion": {"enabled": True, "drive": 24},
+        "lowpass": {"enabled": True, "cutoff": 9000},
+    },
+    "dark_filter": {
+        "lowpass": {"enabled": True, "cutoff": 3600},
+        "reverb": {"enabled": True, "decay": 2.0, "mix": 0.12},
+    },
+    "chorus_shimmer": {
+        "chorus": {"enabled": True, "rate": 1.1, "depth": 0.014, "mix": 0.32},
+        "reverb": {"enabled": True, "decay": 3.2, "mix": 0.2},
+    },
+}
+
 
 def _now_iso():
     from datetime import datetime
@@ -90,6 +119,50 @@ def _create_lane(
     lanes.append(lane)
     project_record["lanes"] = lanes
     return lane
+
+
+def _get_lane_by_id(project_record: dict, lane_id: str | None):
+    if not lane_id:
+        return None
+    for lane in project_record.get("lanes") or []:
+        if lane.get("id") == lane_id:
+            return lane
+    return None
+
+
+def _should_skip_missing_target_lane(payload: dict | None) -> bool:
+    return bool(isinstance(payload, dict) and payload.get("skipIfTargetLaneMissing"))
+
+
+def _reload_project_for_async_write(project_id: str, fallback_record: dict) -> dict:
+    latest = get_project(project_id)
+    if not isinstance(latest, dict):
+        return fallback_record
+    return latest
+
+
+def _apply_orchestrator_project_settings(project_record: dict, global_plan: dict):
+    project = project_record.get("project") or {}
+    project["bpm"] = global_plan["bpm"]
+    project["key"] = _format_key_signature(global_plan["keyNote"], global_plan["scale"])
+    project_record["project"] = project
+
+
+def _apply_lane_fx_preset(project_record: dict, lane_id: str, preset_name: str | None):
+    lane = _get_lane_by_id(project_record, lane_id)
+    if not lane:
+        return
+    preset_key = str(preset_name or "clean").strip() or "clean"
+    preset = ORCHESTRATOR_FX_PRESETS.get(preset_key, ORCHESTRATOR_FX_PRESETS["clean"])
+    lane["fx"] = dict(preset)
+
+
+def _format_key_signature(key_note: str | None, scale: str | None):
+    note = str(key_note or "").strip() or "C"
+    mode = str(scale or "").strip().lower() or "major"
+    if mode not in {"major", "minor"}:
+        mode = "major"
+    return f"{note} {mode}"
 
 
 def _append_clip(project_record: dict, lane_id: str, asset_id: str, start_sec: float, duration_sec: float):
@@ -488,6 +561,12 @@ def _render_stage_conditioning_mix(project_record: dict, payload: dict) -> tuple
 
 
 def _resolve_foundation_audio_lane(project_record: dict, payload: dict, label: str, variant_index: int, variant_total: int):
+    target_lane_id = payload.get("targetAudioLaneId") if isinstance(payload, dict) else None
+    target_lane = _get_lane_by_id(project_record, target_lane_id)
+    if target_lane:
+        return target_lane
+    if target_lane_id and _should_skip_missing_target_lane(payload):
+        return None
     lane_name = f"{label} Audio"
     if variant_total > 1:
         lane_name = f"{lane_name} {variant_index + 1}"
@@ -495,6 +574,12 @@ def _resolve_foundation_audio_lane(project_record: dict, payload: dict, label: s
 
 
 def _resolve_foundation_midi_lane(project_record: dict, payload: dict, label: str, variant_index: int, variant_total: int):
+    target_lane_id = payload.get("targetMidiLaneId") if isinstance(payload, dict) else None
+    target_lane = _get_lane_by_id(project_record, target_lane_id)
+    if target_lane:
+        return target_lane
+    if target_lane_id and _should_skip_missing_target_lane(payload):
+        return None
     name = f"{label} MIDI"
     if variant_total > 1:
         name = f"{label} MIDI {variant_index + 1}"
@@ -517,6 +602,7 @@ def _record_foundation_result(project_record: dict, payload: dict, result: dict)
     if payload.get("applyProjectTempo") and not project.get("key") and result.get("key"):
         project["key"] = result.get("key")
 
+    inserted_count = 0
     for index, variant in enumerate(variants):
         if not isinstance(variant, dict):
             continue
@@ -525,40 +611,44 @@ def _record_foundation_result(project_record: dict, payload: dict, result: dict)
         asset_id = None
 
         if commit_audio and variant.get("audioPath"):
-            asset_id = variant.get("assetId") or f"foundation:{uuid.uuid4().hex}"
-            asset = {
-                "id": asset_id,
-                "kind": "generated",
-                "label": label,
-                "url": variant.get("audioUrl"),
-                "path": variant.get("audioPath"),
-                "durationSec": variant.get("durationSec", 0.0),
-                "sampleRate": variant.get("sampleRate"),
-                "source": "foundation_one",
-                "pairId": pair_id,
-            }
-            _register_asset(project_record, asset)
             lane = _resolve_foundation_audio_lane(project_record, payload, label, index, variant_total)
-            clip = _append_clip(project_record, lane["id"], asset_id, start_sec, asset.get("durationSec", 0.0))
-            clip["foundationPairId"] = pair_id
-            clip["foundationGroupId"] = pair_group_id
-            clip["foundationMode"] = result.get("mode")
+            if lane is not None:
+                asset_id = variant.get("assetId") or f"foundation:{uuid.uuid4().hex}"
+                asset = {
+                    "id": asset_id,
+                    "kind": "generated",
+                    "label": label,
+                    "url": variant.get("audioUrl"),
+                    "path": variant.get("audioPath"),
+                    "durationSec": variant.get("durationSec", 0.0),
+                    "sampleRate": variant.get("sampleRate"),
+                    "source": "foundation_one",
+                    "pairId": pair_id,
+                }
+                _register_asset(project_record, asset)
+                clip = _append_clip(project_record, lane["id"], asset_id, start_sec, asset.get("durationSec", 0.0))
+                clip["foundationPairId"] = pair_id
+                clip["foundationGroupId"] = pair_group_id
+                clip["foundationMode"] = result.get("mode")
+                inserted_count += 1
 
         midi_data = variant.get("midiData") if isinstance(variant.get("midiData"), dict) else None
         if commit_midi and midi_data:
             if not project.get("bpm") and midi_data.get("bpm"):
                 project["bpm"] = midi_data.get("bpm")
             lane = _resolve_foundation_midi_lane(project_record, payload, label, index, variant_total)
-            midi_clip = {
-                **midi_data,
-                "instrument": midi_data.get("instrument") or variant.get("instrumentFamily") or "Foundation MIDI",
-                "source": "foundation_one",
-                "pairId": pair_id,
-            }
-            clip = _append_midi_clip(project_record, lane["id"], midi_clip, start_sec)
-            clip["foundationPairId"] = pair_id
-            clip["foundationGroupId"] = pair_group_id
-            clip["foundationMode"] = result.get("mode")
+            if lane is not None:
+                midi_clip = {
+                    **midi_data,
+                    "instrument": midi_data.get("instrument") or variant.get("instrumentFamily") or "Foundation MIDI",
+                    "source": "foundation_one",
+                    "pairId": pair_id,
+                }
+                clip = _append_midi_clip(project_record, lane["id"], midi_clip, start_sec)
+                clip["foundationPairId"] = pair_id
+                clip["foundationGroupId"] = pair_group_id
+                clip["foundationMode"] = result.get("mode")
+                inserted_count += 1
 
         foundation_runs.append(
             {
@@ -582,6 +672,7 @@ def _record_foundation_result(project_record: dict, payload: dict, result: dict)
     metadata["foundationOne"] = foundation_runs[-24:]
     project_record["metadata"] = metadata
     project_record["project"] = project
+    return inserted_count
 
 
 def _record_stage_result(project_record: dict, payload: dict, result: dict):
@@ -594,12 +685,19 @@ def _record_stage_result(project_record: dict, payload: dict, result: dict):
     metadata = project_record.get("metadata") or {}
     stage_runs = metadata.get("stageDrums") if isinstance(metadata.get("stageDrums"), list) else []
 
+    inserted_count = 0
     for index, variant in enumerate(variants):
         if not isinstance(variant, dict) or not variant.get("audioPath"):
             continue
         label = str(variant.get("label") or "STAGE Drums").strip() or "STAGE Drums"
         if len(variants) > 1:
             label = f"{label} {index + 1}"
+        target_lane_id = payload.get("targetLaneId") if isinstance(payload, dict) else None
+        lane = _get_lane_by_id(project_record, target_lane_id)
+        if not lane:
+            if target_lane_id and _should_skip_missing_target_lane(payload):
+                continue
+            lane = _create_lane(project_record, "generated", label)
         asset_id = variant.get("assetId") or f"stage:{uuid.uuid4().hex}"
         asset = {
             "id": asset_id,
@@ -612,9 +710,9 @@ def _record_stage_result(project_record: dict, payload: dict, result: dict):
             "source": "stage",
         }
         _register_asset(project_record, asset)
-        lane = _create_lane(project_record, "generated", label)
         clip = _append_clip(project_record, lane["id"], asset_id, start_sec, asset.get("durationSec", 0.0))
         clip["stageMode"] = result.get("mode") or "drums"
+        inserted_count += 1
         stage_runs.append(
             {
                 "assetId": asset_id,
@@ -630,6 +728,372 @@ def _record_stage_result(project_record: dict, payload: dict, result: dict):
     metadata["stageDrums"] = stage_runs[-24:]
     project_record["metadata"] = metadata
     project_record["project"] = project
+    return inserted_count
+
+
+def _append_job_progress(job_id: str, *, progress: int, status_message: str, stage: str, current_step_label: str | None = None, completed_steps: list | None = None, total_steps: int | None = None):
+    update_job(job_id, status="running", progress=progress, statusMessage=status_message)
+    append_job_event(
+        job_id,
+        {
+            "type": "status",
+            "status": "running",
+            "progress": progress,
+            "statusMessage": status_message,
+            "stage": stage,
+            "currentStepLabel": current_step_label,
+            "completedSteps": completed_steps or [],
+            "totalSteps": total_steps or 0,
+        },
+    )
+
+
+def _append_project_updated(job_id: str, *, progress: int, stage: str, current_step_label: str | None = None, completed_steps: list | None = None, total_steps: int | None = None):
+    append_job_event(
+        job_id,
+        {
+            "type": "project_updated",
+            "progress": progress,
+            "stage": stage,
+            "currentStepLabel": current_step_label,
+            "completedSteps": completed_steps or [],
+            "totalSteps": total_steps or 0,
+        },
+    )
+
+
+def _normalize_orchestrator_plan(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        raise RuntimeError("orchestrate_song payload must be an object")
+    plan = payload.get("plan")
+    if not isinstance(plan, dict):
+        raise RuntimeError("orchestrate_song requires a `plan` object")
+    global_plan = plan.get("global")
+    roles = plan.get("roles")
+    sections = plan.get("sections")
+    if not isinstance(global_plan, dict) or not isinstance(roles, list) or not isinstance(sections, list):
+        raise RuntimeError("orchestrate_song plan must include `global`, `roles`, and `sections`")
+
+    normalized_roles = []
+    role_ids = set()
+    for index, role in enumerate(roles):
+        if not isinstance(role, dict):
+            raise RuntimeError("Invalid role in orchestrator plan")
+        role_id = str(role.get("id") or f"role_{index + 1}").strip()
+        if not role_id:
+            raise RuntimeError("Each orchestrator role needs an id")
+        if role_id in role_ids:
+            raise RuntimeError(f"Duplicate orchestrator role id `{role_id}`")
+        role_ids.add(role_id)
+        instrument_family = str(role.get("instrumentFamily") or "").strip()
+        if not instrument_family:
+            raise RuntimeError(f"Role `{role_id}` is missing an instrumentFamily")
+        fx_preset = str(role.get("fxPreset") or "clean").strip() or "clean"
+        if fx_preset not in ORCHESTRATOR_FX_PRESETS:
+            raise RuntimeError(f"Unsupported FX preset `{fx_preset}` in orchestrator plan")
+        base_prompt = str(role.get("basePrompt") or "").strip()
+        if not base_prompt:
+            raise RuntimeError(f"Role `{role_id}` is missing a basePrompt")
+        normalized_roles.append(
+            {
+                "id": role_id,
+                "laneName": str(role.get("laneName") or instrument_family).strip() or instrument_family,
+                "instrumentFamily": instrument_family,
+                "basePrompt": base_prompt,
+                "styleTags": str(role.get("styleTags") or "").strip(),
+                "fxTags": str(role.get("fxTags") or "").strip(),
+                "fxPreset": fx_preset,
+            }
+        )
+
+    normalized_sections = []
+    enabled_total_bars = 0
+    for index, section in enumerate(sections):
+        if not isinstance(section, dict):
+            raise RuntimeError("Invalid section in orchestrator plan")
+        bars = int(section.get("bars") or 0)
+        if bars not in {4, 8}:
+            raise RuntimeError("Each orchestrator section must be 4 or 8 bars")
+        section_id = str(section.get("id") or f"section_{index + 1}").strip() or f"section_{index + 1}"
+        steps = section.get("steps")
+        if not isinstance(steps, list) or not steps:
+            raise RuntimeError(f"Section `{section_id}` must include at least one step")
+        normalized_steps = []
+        for step_index, step in enumerate(steps):
+            if not isinstance(step, dict):
+                raise RuntimeError(f"Invalid step in section `{section_id}`")
+            role_id = str(step.get("roleId") or "").strip()
+            if role_id not in role_ids:
+                raise RuntimeError(f"Section `{section_id}` references unknown role `{role_id}`")
+            normalized_steps.append(
+                {
+                    "id": str(step.get("id") or f"{section_id}_step_{step_index + 1}").strip() or f"{section_id}_step_{step_index + 1}",
+                    "roleId": role_id,
+                    "enabled": False if step.get("enabled") is False else True,
+                    "prompt": str(step.get("prompt") or "").strip(),
+                    "styleTags": str(step.get("styleTags") or "").strip(),
+                    "fxTags": str(step.get("fxTags") or "").strip(),
+                }
+            )
+        enabled = False if section.get("enabled") is False else True
+        if enabled:
+            enabled_total_bars += bars
+        normalized_sections.append(
+            {
+                "id": section_id,
+                "label": str(section.get("label") or f"Section {index + 1}").strip() or f"Section {index + 1}",
+                "bars": bars,
+                "enabled": enabled,
+                "steps": normalized_steps,
+            }
+        )
+        if enabled and not any(step["enabled"] for step in normalized_steps):
+            raise RuntimeError(f"Enabled section `{section_id}` must include at least one enabled step")
+
+    total_bars = max(4, int(global_plan.get("totalBars") or enabled_total_bars or 16))
+    if enabled_total_bars != total_bars:
+        raise RuntimeError("Enabled orchestrator sections must sum exactly to the requested total bars")
+
+    return {
+        "global": {
+            "bpm": max(40, min(240, int(global_plan.get("bpm") or 120))),
+            "keyNote": str(global_plan.get("keyNote") or "C").strip() or "C",
+            "scale": "minor" if str(global_plan.get("scale") or "major").strip().lower() == "minor" else "major",
+            "totalBars": total_bars,
+            "drumPrompt": str(global_plan.get("drumPrompt") or "").strip() or "Punchy modern pop drums, clean kick, crisp snare, energetic hats",
+        },
+        "roles": normalized_roles,
+        "sections": normalized_sections,
+    }
+
+
+def _bars_to_seconds(bars: int, bpm: float) -> float:
+    safe_bpm = max(40.0, float(bpm or 120.0))
+    return float(bars or 0) * 4.0 * 60.0 / safe_bpm
+
+
+def run_orchestrate_song_job(job_id: str, project_id: str, payload: dict):
+    _append_job_progress(job_id, progress=0, status_message="Planning orchestration...", stage="plan")
+
+    project_record = get_project(project_id)
+    if not project_record:
+        update_job(job_id, status="failed", error="Project not found", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": "Project not found"})
+        return
+
+    stage_conditioning_path = None
+    try:
+        plan = _normalize_orchestrator_plan(payload)
+        insert_sec = max(0.0, float(payload.get("insertSec") or 0.0))
+        global_plan = plan["global"]
+        _apply_orchestrator_project_settings(project_record, global_plan)
+
+        role_lane_map = {}
+        generated_audio_lane_ids = []
+        generated_midi_lane_ids = []
+        for role in plan["roles"]:
+            audio_lane = _create_lane(project_record, "generated", f"AI · {role['laneName']}")
+            midi_lane = _create_lane(project_record, "midi", f"AI · {role['laneName']} MIDI", muted=True)
+            _apply_lane_fx_preset(project_record, audio_lane["id"], role.get("fxPreset"))
+            role_lane_map[role["id"]] = {
+                "audioLaneId": audio_lane["id"],
+                "midiLaneId": midi_lane["id"],
+                "audioLaneName": audio_lane["name"],
+            }
+            generated_audio_lane_ids.append(audio_lane["id"])
+            generated_midi_lane_ids.append(midi_lane["id"])
+
+        section_cursor = insert_sec
+        completed_steps = []
+        enabled_sections = [section for section in plan["sections"] if section.get("enabled")]
+        execution_steps = [
+            f"{section['label']} · {next((role['laneName'] for role in plan['roles'] if role['id'] == step['roleId']), step['roleId'])}"
+            for section in enabled_sections
+            for step in section.get("steps", [])
+            if step.get("enabled", True)
+        ]
+        execution_steps.extend(f"{section['label']} · Drums" for section in enabled_sections)
+        total_steps = max(1, len(execution_steps))
+
+        _append_job_progress(
+            job_id,
+            progress=5,
+            status_message="Creating role lanes...",
+            stage="prepare",
+            completed_steps=completed_steps,
+            total_steps=total_steps,
+        )
+        _update_project_duration(project_record)
+        save_project(project_record)
+        _append_project_updated(
+            job_id,
+            progress=5,
+            stage="prepare",
+            completed_steps=completed_steps,
+            total_steps=total_steps,
+        )
+
+        for section in enabled_sections:
+            section_start_sec = section_cursor
+            section_duration_sec = _bars_to_seconds(section["bars"], global_plan["bpm"])
+            for step in section.get("steps", []):
+                if step.get("enabled") is False:
+                    continue
+                role = next((item for item in plan["roles"] if item["id"] == step["roleId"]), None)
+                if not role:
+                    continue
+                step_label = f"{section['label']} · {role['laneName']}"
+                current_progress = min(94, 5 + int((len(completed_steps) / total_steps) * 85))
+                _append_job_progress(
+                    job_id,
+                    progress=current_progress,
+                    status_message=f"Generating {step_label}...",
+                    stage="foundation",
+                    current_step_label=step_label,
+                    completed_steps=completed_steps,
+                    total_steps=total_steps,
+                )
+                foundation_payload = {
+                    "prompt": step.get("prompt") or role.get("basePrompt"),
+                    "bars": section["bars"],
+                    "bpm": global_plan["bpm"],
+                    "key": _format_key_signature(global_plan["keyNote"], global_plan["scale"]),
+                    "instrumentFamily": role.get("instrumentFamily"),
+                    "styleTags": step.get("styleTags") or role.get("styleTags"),
+                    "fxTags": step.get("fxTags") or role.get("fxTags"),
+                    "variantCount": 1,
+                    "commitMode": "both",
+                    "timelineStartSec": section_start_sec,
+                    "insertSec": section_start_sec,
+                    "targetAudioLaneId": role_lane_map[role["id"]]["audioLaneId"],
+                    "targetMidiLaneId": role_lane_map[role["id"]]["midiLaneId"],
+                    "skipIfTargetLaneMissing": True,
+                }
+                result = run_foundation_studio_job("generate", foundation_payload)
+                project_record = _reload_project_for_async_write(project_id, project_record)
+                _apply_orchestrator_project_settings(project_record, global_plan)
+                _record_foundation_result(project_record, foundation_payload, result)
+                completed_steps.append(step_label)
+                save_project(project_record)
+                _append_project_updated(
+                    job_id,
+                    progress=min(94, 5 + int((len(completed_steps) / total_steps) * 85)),
+                    stage="foundation",
+                    current_step_label=step_label,
+                    completed_steps=completed_steps,
+                    total_steps=total_steps,
+                )
+            section_cursor += section_duration_sec
+
+        drums_lane = _create_lane(project_record, "generated", "AI · Drums")
+        section_cursor = insert_sec
+        for section in enabled_sections:
+            section_start_sec = section_cursor
+            section_duration_sec = _bars_to_seconds(section["bars"], global_plan["bpm"])
+            section_end_sec = section_start_sec + section_duration_sec
+            drum_step_label = f"{section['label']} · Drums"
+            project_record = _reload_project_for_async_write(project_id, project_record)
+            _apply_orchestrator_project_settings(project_record, global_plan)
+            current_progress = min(97, 5 + int((len(completed_steps) / total_steps) * 85))
+            _append_job_progress(
+                job_id,
+                progress=current_progress,
+                status_message=f"Preparing drums for {section['label']}...",
+                stage="drums_prepare",
+                current_step_label=drum_step_label,
+                completed_steps=completed_steps,
+                total_steps=total_steps,
+            )
+            stage_conditioning_path, _mix_start, _mix_end = _render_stage_conditioning_mix(
+                project_record,
+                {
+                    "laneIds": generated_audio_lane_ids,
+                    "startSec": section_start_sec,
+                    "endSec": section_end_sec,
+                },
+            )
+            stage_payload = {
+                "conditioningAudioPath": str(stage_conditioning_path),
+                "timelineStartSec": section_start_sec,
+                "insertSec": section_start_sec,
+                "durationSec": max(0.5, section_end_sec - section_start_sec),
+                "prompt": global_plan["drumPrompt"],
+                "bpm": global_plan["bpm"],
+                "label": "AI Drums",
+                "targetLaneId": drums_lane["id"],
+                "skipIfTargetLaneMissing": True,
+            }
+            _append_job_progress(
+                job_id,
+                progress=min(98, current_progress + 1),
+                status_message=f"Generating drums for {section['label']}...",
+                stage="drums",
+                current_step_label=drum_step_label,
+                completed_steps=completed_steps,
+                total_steps=total_steps,
+            )
+            stage_result = run_stage_drums_job(stage_payload)
+            project_record = _reload_project_for_async_write(project_id, project_record)
+            _apply_orchestrator_project_settings(project_record, global_plan)
+            _record_stage_result(project_record, stage_payload, stage_result)
+            completed_steps.append(drum_step_label)
+            _update_project_duration(project_record)
+            save_project(project_record)
+            _append_project_updated(
+                job_id,
+                progress=min(99, 5 + int((len(completed_steps) / total_steps) * 90)),
+                stage="drums",
+                current_step_label=drum_step_label,
+                completed_steps=completed_steps,
+                total_steps=total_steps,
+            )
+            try:
+                Path(stage_conditioning_path).unlink(missing_ok=True)
+            except Exception:
+                pass
+            stage_conditioning_path = None
+            section_cursor += section_duration_sec
+
+        _update_project_duration(project_record)
+        save_project(project_record)
+        _append_project_updated(
+            job_id,
+            progress=99,
+            stage="drums",
+            current_step_label=completed_steps[-1] if completed_steps else None,
+            completed_steps=completed_steps,
+            total_steps=total_steps,
+        )
+        result = {
+            "insertSec": insert_sec,
+            "totalBars": global_plan["totalBars"],
+            "audioLaneIds": generated_audio_lane_ids + [drums_lane["id"]],
+            "midiLaneIds": generated_midi_lane_ids,
+            "completedSteps": completed_steps,
+        }
+        update_job(job_id, status="completed", progress=100, result=result, statusMessage="Song orchestration completed.")
+        append_job_event(
+            job_id,
+            {
+                "type": "status",
+                "status": "completed",
+                "progress": 100,
+                "statusMessage": "Song orchestration completed.",
+                "stage": "completed",
+                "completedSteps": completed_steps,
+                "totalSteps": total_steps,
+                "result": result,
+            },
+        )
+    except Exception as exc:
+        update_job(job_id, status="failed", progress=100, error=str(exc))
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
+    finally:
+        if stage_conditioning_path:
+            try:
+                Path(stage_conditioning_path).unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
 def _record_result(project_record: dict, job_type: str, payload: dict, result: dict):
@@ -686,6 +1150,7 @@ def run_render_job(job_id: str, project_id: str):
 
     try:
         output = render_mixdown(project_record)
+        project_record = _reload_project_for_async_write(project_id, project_record)
         asset_id = f"render:{job_id}"
         asset = {
             "id": asset_id,
@@ -801,6 +1266,7 @@ def run_soulx_resing_job(job_id: str, project_id: str, payload: dict):
             "sampleRate": info.get("sampleRate"),
         }
 
+        project_record = _reload_project_for_async_write(project_id, project_record)
         _record_result(project_record, "resynthesize", payload, result_payload)
         _update_project_duration(project_record)
         save_project(project_record)
@@ -903,6 +1369,7 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
             raise RuntimeError(f"Unknown job type: {job_type}")
 
         if isinstance(result, dict):
+            project_record = _reload_project_for_async_write(project_id, project_record)
             _record_result(project_record, job_type, payload, result)
             _update_project_duration(project_record)
             save_project(project_record)

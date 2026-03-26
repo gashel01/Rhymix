@@ -1,0 +1,10 @@
+{
+  "mode": "drums",
+  "prompt": "Summer Islands Drums",
+  "bpm": 118.0,
+  "seed": 42,
+  "durationSec": 24.406779661016948,
+  "conditioningAudioPath": "C:\\Users\\gaeli\\Downloads\\Rhymix\\data\\singing\\temp\\stage_context_dfd71e730faf4c5ea32d12ba7b518267.wav",
+  "addClick": false,
+  "label": "AI Drums"
+}
