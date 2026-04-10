@@ -21,6 +21,9 @@ def bootstrap_env():
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
     # Reduce verbose logging
     os.environ["PYTHONWARNINGS"] = "ignore"
+    # Reduce CUDA memory fragmentation on 8 GB VRAM cards (must be set before
+    # torch is imported — the allocator reads this once at initialisation).
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
     if enable_logs:
         logging.basicConfig(level=log_level, format="%(levelname)s: %(message)s")
@@ -46,3 +49,26 @@ def bootstrap_env():
     rvc_path = os.path.join(applio_path, "rvc")
     if rvc_path not in sys.path:
         sys.path.append(rvc_path)
+
+
+def configure_cuda_backend() -> None:
+    """Apply Ampere-specific CUDA performance flags.
+
+    Call this once, *after* torch has been imported for the first time (e.g.
+    at the top of any worker that loads a model).  Safe to call multiple times.
+
+    Flags set:
+    - allow_tf32 on matmul and cuDNN  → ~10–20 % free speedup on Ampere with
+      no perceptible quality loss for audio tasks.
+    - cudnn.benchmark = True          → auto-tunes conv kernels for fixed input
+      shapes; pays back after the first few batches.
+    """
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        torch.backends.cudnn.benchmark = True
+    except Exception:
+        pass

@@ -43,9 +43,10 @@ const LiveInferencePanel = ({ project, lanes, selection, transport, onRefreshPro
   const [volumeEnvelope, setVolumeEnvelope] = useState(1);
   const [f0Method, setF0Method] = useState("rmvpe");
   const [formantPreset, setFormantPreset] = useState("none");
-  const [monitorEnabled, setMonitorEnabled] = useState(true);
   const [inputGain, setInputGain] = useState(1);
   const [monitorGain, setMonitorGain] = useState(1);
+  const [rawMicMonitor, setRawMicMonitor] = useState(false);
+  const [monitorEnabled, setMonitorEnabled] = useState(true);
 
   const availableLanes = useMemo(
     () => (Array.isArray(lanes) ? lanes.filter((lane) => lane.type !== "midi") : []),
@@ -82,6 +83,7 @@ const LiveInferencePanel = ({ project, lanes, selection, transport, onRefreshPro
     cancel,
     setInputGain: applyInputGain,
     setMonitorGain: applyMonitorGain,
+    toggleMicMonitor: applyMicMonitor,
   } = useStudioLiveInferenceWs({
     onCommitted: (commit) => {
       const projectId = commit?.projectId || project?.id || null;
@@ -162,6 +164,10 @@ const LiveInferencePanel = ({ project, lanes, selection, transport, onRefreshPro
   useEffect(() => {
     applyMonitorGain(monitorEnabled ? monitorGain : 0);
   }, [applyMonitorGain, monitorEnabled, monitorGain]);
+
+  useEffect(() => {
+    applyMicMonitor(rawMicMonitor, inputGain);
+  }, [applyMicMonitor, rawMicMonitor, inputGain]);
 
   const formantConfig = FORMANT_PRESETS[formantPreset] || FORMANT_PRESETS.none;
 
@@ -370,6 +376,16 @@ const LiveInferencePanel = ({ project, lanes, selection, transport, onRefreshPro
           Gain x{inputGain.toFixed(2)} · {inputDb.toFixed(1)} dB
         </div>
       </div>
+
+      <label className="studio-toggle">
+        <input
+          type="checkbox"
+          checked={rawMicMonitor}
+          onChange={(e) => setRawMicMonitor(e.target.checked)}
+          disabled={isBusy}
+        />
+        Hear raw microphone (direct loopback)
+      </label>
 
       <label className="studio-toggle">
         <input

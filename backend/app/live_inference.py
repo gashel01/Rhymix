@@ -6,6 +6,7 @@ import wave
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
@@ -89,11 +90,20 @@ def _resample_audio(audio: np.ndarray, source_rate: int, target_rate: int) -> np
     samples = np.asarray(audio, dtype=np.float32)
     if samples.size == 0 or source_rate == target_rate:
         return samples
-    duration = samples.shape[0] / float(source_rate)
-    target_length = max(1, int(round(duration * target_rate)))
-    source_positions = np.linspace(0.0, 1.0, num=samples.shape[0], endpoint=False, dtype=np.float64)
-    target_positions = np.linspace(0.0, 1.0, num=target_length, endpoint=False, dtype=np.float64)
-    return np.interp(target_positions, source_positions, samples).astype(np.float32, copy=False)
+    # Polyphase resampler — avoids the aliasing and harmonic smearing that
+    # np.interp (linear interpolation) causes on voice signals.
+    try:
+        from math import gcd
+        from scipy.signal import resample_poly
+        g = gcd(int(source_rate), int(target_rate))
+        return resample_poly(samples, int(target_rate) // g, int(source_rate) // g).astype(np.float32)
+    except Exception:
+        # Graceful fallback to linear interpolation if scipy is unavailable
+        duration = samples.shape[0] / float(source_rate)
+        target_length = max(1, int(round(duration * target_rate)))
+        src_pos = np.linspace(0.0, 1.0, num=samples.shape[0], endpoint=False, dtype=np.float64)
+        tgt_pos = np.linspace(0.0, 1.0, num=target_length, endpoint=False, dtype=np.float64)
+        return np.interp(tgt_pos, src_pos, samples).astype(np.float32, copy=False)
 
 
 @dataclass
@@ -111,7 +121,9 @@ class StudioLiveInferenceSession:
         self.project_id = str(self.payload.get("projectId") or "").strip() or None
         self.lane_id = str(self.payload.get("laneId") or "").strip() or None
         self.insert_at_sec = _safe_float(self.payload.get("insertAtSec"), 0.0)
-        self.frame_size = max(512, _safe_int(self.payload.get("frameSize"), 2048))
+        # Force a minimum frame size of 4096 (85ms) to prevent massive per-chunk GPU overhead.
+        # Frontend default of 1024 (21ms) causes GPU to fall behind realtime on most cards.
+        self.frame_size = max(4096, _safe_int(self.payload.get("frameSize"), 4096))
         self.input_sample_rate = max(8000, _safe_int(self.payload.get("sampleRate"), AUDIO_SAMPLE_RATE))
         self.embedder_model = str(self.payload.get("embedderModel") or "contentvec")
         self.low_latency_monitor = bool(self.payload.get("lowLatencyMonitor", True))
@@ -128,11 +140,12 @@ class StudioLiveInferenceSession:
         self._dropped_chunks = 0
         self._uploaded_dry_audio: bytes | None = None
         self._uploaded_dry_sample_rate = self.input_sample_rate
-        default_max_queue = 6 if self.low_latency_monitor else 64
+        default_max_queue = 6 if self.low_latency_monitor else 32
         default_monitor_chunk = self.frame_size if self.low_latency_monitor else 4096
-        self.max_queue_chunks = max(2, _safe_int(self.payload.get("maxQueueChunks"), default_max_queue))
+        self.max_queue_chunks = max(4, _safe_int(self.payload.get("maxQueueChunks"), default_max_queue))
         self.monitor_chunk_samples = max(self.frame_size, _safe_int(self.payload.get("monitorChunkSamples"), default_monitor_chunk))
         self._monitor_buffer = bytearray()
+        self._audio_buffer_48k = np.zeros(0, dtype=np.float32)
 
         model_path, index_path, normalized_model = _resolve_model_paths(
             self.payload.get("model"),
@@ -145,14 +158,17 @@ class StudioLiveInferenceSession:
         self.realtime_index_path = index_path if self.index_enabled else None
         self.model = normalized_model
         self.model_name = normalized_model.get("name") or normalized_model.get("modelId") or "Live Model"
-        read_chunk_size = max(1, self.frame_size // 128)
+        read_chunk_size = max(32, self.frame_size // 128)
         cross_fade_overlap_size = _safe_float(
             self.payload.get("crossFadeOverlapSec"),
             0.035 if self.low_latency_monitor else 0.08,
         )
         extra_convert_size = _safe_float(
             self.payload.get("extraConvertSec"),
-            0.14 if self.low_latency_monitor else 0.5,
+            # 80 ms extra lookahead in low-latency mode (was 140 ms).
+            # Reduces end-to-end latency at the cost of slightly less overlap
+            # context — acceptable for a live filter use-case.
+            0.08 if self.low_latency_monitor else 0.5,
         )
         try:
             self.voice_changer = VoiceChanger(
@@ -161,7 +177,10 @@ class StudioLiveInferenceSession:
                 extra_convert_size=max(0.06, extra_convert_size),
                 model_path=model_path,
                 index_path=self.realtime_index_path,
-                f0_method=str(self.payload.get("f0Method") or "rmvpe"),
+                # FCPE is substantially faster than RMVPE for live inference
+                # while maintaining similar pitch accuracy on voice.
+                # Override via {"f0Method": "rmvpe"} in the WS start payload.
+                f0_method=str(self.payload.get("f0Method") or "fcpe"),
                 embedder_model=self.embedder_model,
                 silent_threshold=int(self.payload.get("silentThreshold") or -75),
                 vad_enabled=bool(self.payload.get("vadEnabled") or False),
@@ -173,9 +192,10 @@ class StudioLiveInferenceSession:
         self.pitch = _safe_int(self.payload.get("pitch"), 0)
         requested_index_rate = min(1.0, max(0.0, _safe_float(self.payload.get("indexRate"), 0.5)))
         self.index_rate = requested_index_rate if self.index_enabled else 0.0
-        self.protect = min(1.0, max(0.0, _safe_float(self.payload.get("protect"), 0.5)))
+        self.protect = min(1.0, max(0.0, _safe_float(self.payload.get("protect"), 0.33)))
         self.volume_envelope = min(1.0, max(0.0, _safe_float(self.payload.get("volumeEnvelope"), 1.0)))
         self.monitor = bool(self.payload.get("monitor", True))
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="live-infer")
 
     @property
     def output_queue(self) -> asyncio.Queue:
@@ -183,6 +203,28 @@ class StudioLiveInferenceSession:
 
     async def start(self):
         self._running = True
+        # Warmup pass — feed a silent block through VoiceChanger so that CUDA
+        # kernel JIT compilation happens now rather than on the first real audio
+        # chunk (which would cause an audible stutter at the start of every session).
+        try:
+            loop = asyncio.get_event_loop()
+            silence = np.zeros(self.voice_changer.block_frame, dtype=np.float32)
+            await loop.run_in_executor(
+                self._executor,
+                lambda: self.voice_changer.on_request(
+                    silence,
+                    self.pitch,
+                    self.index_rate,
+                    self.protect,
+                    self.volume_envelope,
+                    False,
+                    1.0,
+                    False,
+                    155.0,
+                ),
+            )
+        except Exception:
+            pass  # Warmup failure is non-fatal — real audio will still work
         self._worker_task = asyncio.create_task(self._worker())
 
     async def enqueue_bytes(self, data: bytes):
@@ -213,7 +255,12 @@ class StudioLiveInferenceSession:
             await self._worker_task
         await self._flush_monitor_buffer(force=True)
         await self._output_queue.put(None)
-        return self._commit_recording()
+        # Run the offline re-render (run_infer_script) in the thread pool so
+        # the async event loop stays responsive during the commit phase.
+        # Other WebSocket connections and FastAPI handlers are unblocked while
+        # the full-quality render runs for potentially long recordings.
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._commit_recording)
 
     async def cancel(self):
         self._running = False
@@ -222,6 +269,7 @@ class StudioLiveInferenceSession:
             await self._worker_task
         self._monitor_buffer.clear()
         await self._output_queue.put(None)
+        self._executor.shutdown(wait=False)
 
     def set_uploaded_dry_audio(self, data: bytes, sample_rate: int | None = None):
         if data:
@@ -233,22 +281,37 @@ class StudioLiveInferenceSession:
         while True:
             item = await self._input_queue.get()
             if item is None:
+                # Flush remaining buffer
+                try:
+                    loop = asyncio.get_event_loop()
+                    results = await loop.run_in_executor(self._executor, self._process_accumulate, b"")
+                    for result in results:
+                        if self.monitor and result.audio_bytes:
+                            await self._queue_monitor_audio(result.audio_bytes)
+                except Exception:
+                    pass
                 break
             try:
-                result = await asyncio.to_thread(self._process_chunk, item)
-                if self.monitor and result.audio_bytes:
-                    await self._queue_monitor_audio(result.audio_bytes)
-                self._processed_chunks += 1
-                if self._processed_chunks % self._metrics_every == 0:
-                    await self._output_queue.put(
-                        {
-                            "type": "metrics",
-                            "latencyMs": round(result.latency_ms, 2),
-                            "inputRms": round(result.input_rms, 4),
-                            "droppedChunks": self._dropped_chunks,
-                        }
-                    )
+                loop = asyncio.get_event_loop()
+                # Run the ingestion, resampling, and buffer chunking in the threadpool
+                results = await loop.run_in_executor(self._executor, self._process_accumulate, item)
+                
+                for result in results:
+                    if self.monitor and result.audio_bytes:
+                        await self._queue_monitor_audio(result.audio_bytes)
+                    self._processed_chunks += 1
+                    if self._processed_chunks % self._metrics_every == 0:
+                        await self._output_queue.put(
+                            {
+                                "type": "metrics",
+                                "latencyMs": round(result.latency_ms, 2),
+                                "inputRms": round(result.input_rms, 4),
+                                "droppedChunks": self._dropped_chunks,
+                            }
+                        )
             except Exception as exc:
+                import traceback
+                traceback.print_exc()
                 await self._output_queue.put({"type": "error", "message": str(exc)})
                 self._running = False
                 break
@@ -270,42 +333,73 @@ class StudioLiveInferenceSession:
             take = len(self._monitor_buffer) if force and len(self._monitor_buffer) < chunk_bytes else chunk_bytes
             payload = bytes(self._monitor_buffer[:take])
             del self._monitor_buffer[:take]
+            # Send binary frame to the client over WS
             await self._output_queue.put({"type": "audio", "data": payload})
 
-    def _process_chunk(self, data: bytes) -> LiveChunkResult:
-        pcm = np.frombuffer(data, dtype=np.int16)
-        if pcm.size == 0:
-            return LiveChunkResult(audio_bytes=b"", latency_ms=0.0, input_rms=0.0)
-        dry = pcm.astype(np.float32) / 32768.0
-        dry = np.ascontiguousarray(dry)
-        model_input = _resample_audio(dry, self.input_sample_rate, AUDIO_SAMPLE_RATE)
-        with self._lock:
-            wet, vol, perf = self.voice_changer.on_request(
-                model_input,
-                self.pitch,
-                self.index_rate,
-                self.protect,
-                self.volume_envelope,
-                False,
-                1.0,
-                False,
-                155.0,
-            )
-        wet = np.asarray(wet, dtype=np.float32)
-        if wet.size != model_input.size:
-            if wet.size < model_input.size:
-                wet = np.pad(wet, (0, model_input.size - wet.size))
+    def _process_accumulate(self, data: bytes) -> list[LiveChunkResult]:
+        is_flush = len(data) == 0
+        if not is_flush:
+            pcm = np.frombuffer(data, dtype=np.int16)
+            if pcm.size > 0:
+                dry = pcm.astype(np.float32) / 32768.0
+                dry = np.ascontiguousarray(dry)
+                # Store dry frames for the final offline composite
+                self._dry_frames.append(dry.copy())
+                
+                # Resample to 48kHz for VoiceChanger
+                model_input_48k = _resample_audio(dry, self.input_sample_rate, AUDIO_SAMPLE_RATE)
+                self._audio_buffer_48k = np.concatenate((self._audio_buffer_48k, model_input_48k))
+            
+        results = []
+        target_size = self.voice_changer.block_frame
+        
+        while self._audio_buffer_48k.size >= target_size or (is_flush and self._audio_buffer_48k.size > 0):
+            if is_flush and self._audio_buffer_48k.size < target_size:
+                # Pad out the last chunk with silence to process the trailing phrase
+                chunk = np.pad(self._audio_buffer_48k, (0, target_size - self._audio_buffer_48k.size))
+                actual_size = self._audio_buffer_48k.size
+                self._audio_buffer_48k = np.zeros(0, dtype=np.float32)
             else:
-                wet = wet[: model_input.size]
-        self._dry_frames.append(dry.copy())
-        self._wet_frames.append(wet.copy())
-        wet_pcm = (np.clip(wet, -1.0, 1.0) * 32767.0).astype(np.int16)
-        latency_ms = perf[1] if isinstance(perf, (list, tuple)) and len(perf) > 1 else 0.0
-        return LiveChunkResult(
-            audio_bytes=wet_pcm.tobytes(),
-            latency_ms=float(latency_ms),
-            input_rms=float(vol or 0.0),
-        )
+                chunk = self._audio_buffer_48k[:target_size]
+                actual_size = target_size
+                self._audio_buffer_48k = self._audio_buffer_48k[target_size:]
+            
+            with self._lock:
+                wet, vol, perf = self.voice_changer.on_request(
+                    chunk,
+                    self.pitch,
+                    self.index_rate,
+                    self.protect,
+                    self.volume_envelope,
+                    False,
+                    1.0,
+                    False,
+                    155.0,
+                )
+            
+            wet = np.asarray(wet, dtype=np.float32)
+            if wet.size != target_size:
+                if wet.size < target_size:
+                    wet = np.pad(wet, (0, target_size - wet.size))
+                else:
+                    wet = wet[:target_size]
+            
+            if is_flush and actual_size < target_size:
+                wet = wet[:actual_size]
+                    
+            self._wet_frames.append(wet.copy())
+            wet_pcm = (np.clip(wet, -1.0, 1.0) * 32767.0).astype(np.int16)
+            latency_ms = perf[1] if isinstance(perf, (list, tuple)) and len(perf) > 1 else 0.0
+            
+            results.append(
+                LiveChunkResult(
+                    audio_bytes=wet_pcm.tobytes(),
+                    latency_ms=float(latency_ms),
+                    input_rms=float(vol or 0.0),
+                )
+            )
+            
+        return results
 
     def _render_final_output(self) -> tuple[Path | None, float]:
         if not self._uploaded_dry_audio and not self._dry_frames:

@@ -72,7 +72,7 @@ class RealtimeVoiceConverter:
 
             self.net_g.load_state_dict(self.cpt["weight"], strict=False)
             strip_parametrizations(self.net_g)
-            self.net_g = self.net_g.to(self.config.device).float()
+            self.net_g = self.net_g.to(self.config.device).half()
             self.net_g.eval()
             # self.net_g.remove_weight_norm()
 
@@ -84,9 +84,14 @@ class RealtimeVoiceConverter:
         pitch: Tensor,
         pitchf: Tensor,
     ):
+        # Cast to net_g dtype (float16) so mixed-precision inputs don't raise dtype errors
+        model_dtype = next(self.net_g.parameters()).dtype
+        feats = feats.to(model_dtype)
+        if pitchf is not None:
+            pitchf = pitchf.to(model_dtype)
         output = self.net_g.infer(feats, p_len, pitch, pitchf, sid)[0][0, 0]
 
-        return torch.clip(output, -1.0, 1.0, out=output)
+        return torch.clip(output.float(), -1.0, 1.0)
 
 
 class Realtime_Pipeline:
@@ -301,14 +306,16 @@ class Realtime_Pipeline:
             p_len = torch.tensor([p_len], device=self.device, dtype=torch.int64)
             out_audio = self.vc.inference(feats, p_len, self.sid, pitch, pitchf).float()
             if volume_envelope != 1:
-                out_audio = AudioProcessor.change_rms(
-                    audio.cpu().numpy(),
-                    self.sample_rate,
-                    out_audio.cpu().numpy(),
-                    self.tgt_sr,
-                    volume_envelope,
+                # Pure-GPU RMS envelope — no CPU round-trips
+                src_rms = torch.sqrt(
+                    torch.mean(audio.to(self.device).float() ** 2) + 1e-7
                 )
-                out_audio = torch.as_tensor(out_audio, device=self.device)
+                tgt_rms = torch.sqrt(torch.mean(out_audio ** 2) + 1e-7)
+                if tgt_rms > 1e-7:
+                    out_audio = (
+                        out_audio * (src_rms / tgt_rms) * volume_envelope
+                        + out_audio * (1.0 - volume_envelope)
+                    )
 
             scaled_window = int(np.floor(1.0 * self.model_window))
 
@@ -354,6 +361,13 @@ def load_faiss_index(file_index):
         try:
             index = faiss.read_index(file_index)
             big_npy = index.reconstruct_n(0, index.ntotal)
+            # Move FAISS index to GPU when available — eliminates CPU round-trips during search
+            try:
+                if faiss.get_num_gpus() > 0:
+                    res = faiss.StandardGpuResources()
+                    index = faiss.index_cpu_to_gpu(res, 0, index)
+            except (AttributeError, Exception):
+                pass  # faiss-cpu installed; stay on CPU
         except Exception as error:
             print(f"An error occurred reading the FAISS index: {error}")
             index = big_npy = None
@@ -389,7 +403,7 @@ def create_pipeline(
     index, big_npy = load_faiss_index(normalized_index_path)
 
     hubert_model = load_embedding(embedder_model or "contentvec", embedder_model_custom)
-    hubert_model = hubert_model.to(vc.config.device).float()
+    hubert_model = hubert_model.to(vc.config.device).half()
     hubert_model.eval()
 
     pipeline = Realtime_Pipeline(

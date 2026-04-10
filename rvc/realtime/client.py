@@ -1,6 +1,8 @@
 import os
 import sys
 import json
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, WebSocketDisconnect, WebSocket
 import numpy as np
 import torch
@@ -11,6 +13,8 @@ from .core import VoiceChanger
 
 app = FastAPI()
 vc_instance = None
+# Thread-pool for running blocking GPU inference without starving the async event loop
+_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="vc-ws")
 
 
 @app.websocket("/ws-audio")
@@ -63,16 +67,22 @@ async def websocket_audio(ws: WebSocket):
                     else arr[:block_frame].astype(np.float32)
                 )
 
-            audio_output, _, perf = vc_instance.on_request(
-                arr * (params["input_audio_gain"] / 100.0),
-                f0_up_key=params["pitch"],
-                index_rate=params["index_rate"],
-                protect=params["protect"],
-                volume_envelope=params["volume_envelope"],
-                f0_autotune=params["autotune"],
-                f0_autotune_strength=params["autotune_strength"],
-                proposed_pitch=params["proposed_pitch"],
-                proposed_pitch_threshold=params["proposed_pitch_threshold"],
+            def _infer(audio_chunk):
+                return vc_instance.on_request(
+                    audio_chunk,
+                    f0_up_key=params["pitch"],
+                    index_rate=params["index_rate"],
+                    protect=params["protect"],
+                    volume_envelope=params["volume_envelope"],
+                    f0_autotune=params["autotune"],
+                    f0_autotune_strength=params["autotune_strength"],
+                    proposed_pitch=params["proposed_pitch"],
+                    proposed_pitch_threshold=params["proposed_pitch_threshold"],
+                )
+
+            loop = asyncio.get_event_loop()
+            audio_output, _, perf = await loop.run_in_executor(
+                _executor, _infer, arr * (params["input_audio_gain"] / 100.0)
             )
 
             await ws.send_text(json.dumps({"type": "latency", "value": perf[1]}))

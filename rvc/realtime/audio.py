@@ -2,9 +2,10 @@ import os
 import sys
 import librosa
 import traceback
+import threading
+import collections
 import numpy as np
 import sounddevice as sd
-from queue import Queue
 from dataclasses import dataclass
 
 now_dir = os.getcwd()
@@ -99,6 +100,111 @@ def list_audio_device():
     return audio_input_device, audio_output_device
 
 
+# ---------------------------------------------------------------------------
+# InferenceThread
+# ---------------------------------------------------------------------------
+# Decouples GPU inference from the real-time sounddevice callback so that
+# the audio I/O thread is never blocked by GPU work.
+#
+# Data flow:
+#   sounddevice input callback  -->  _input_deque  (ring, maxlen=2)
+#                                          |
+#                                  InferenceThread  (background)
+#                                          |
+#                                  _output_deque  (ring, maxlen=4)
+#                                          |
+#   sounddevice output callback  <--  pop oldest frame  (silence if empty)
+#   sounddevice monitor callback <--  same output deque
+#
+# Using collections.deque(maxlen=N) as a lock-free ring buffer:
+#   - Input full  → oldest input is auto-dropped  (GPU too slow → skip stale audio)
+#   - Output full → oldest output is auto-dropped  (playback stalls → keep fresh)
+#   - Output empty → silence returned              (pipeline warming up)
+# ---------------------------------------------------------------------------
+
+class InferenceThread(threading.Thread):
+    """Background thread that runs VC inference and feeds the output ring buffer."""
+
+    def __init__(self, callbacks, audio_params: dict, block_frame: int):
+        super().__init__(daemon=True, name="vc-inference")
+        self.callbacks = callbacks
+        self.params = audio_params
+        self.block_frame = block_frame
+
+        # input_deque: raw mic frames waiting to be processed.
+        # maxlen=2 → if inference falls >2 blocks behind, stale audio is discarded.
+        self._input_deque: collections.deque = collections.deque(maxlen=2)
+
+        # output_deque: processed frames ready for playback.
+        # maxlen=4 → ~4 blocks of headroom; oldest auto-dropped when output stalls.
+        self._output_deque: collections.deque = collections.deque(maxlen=4)
+
+        self._stop_event = threading.Event()
+        self._has_input = threading.Event()
+        self.latency: float = 0.0
+        self._silence = np.zeros(block_frame, dtype=np.float32)
+
+    # ------------------------------------------------------------------
+    # Called from sounddevice input callback (real-time thread)
+    # ------------------------------------------------------------------
+    def push_input(self, mono_float32: np.ndarray):
+        self._input_deque.append(mono_float32)
+        self._has_input.set()
+
+    # ------------------------------------------------------------------
+    # Called from sounddevice output + monitor callbacks (real-time threads)
+    # Returns a processed frame; returns silence if none is ready yet.
+    # ------------------------------------------------------------------
+    def pop_output(self) -> np.ndarray:
+        try:
+            return self._output_deque.popleft()
+        except IndexError:
+            return self._silence.copy()
+
+    # ------------------------------------------------------------------
+    # Background inference loop
+    # ------------------------------------------------------------------
+    def run(self):
+        p = self.params
+        while not self._stop_event.is_set():
+            # Wait for input to arrive (or stop signal)
+            self._has_input.wait(timeout=0.05)
+            self._has_input.clear()
+
+            # Process every pending frame — if multiple queued, process each one.
+            # The output deque auto-drops stale frames if we produce faster than playback.
+            while self._input_deque and not self._stop_event.is_set():
+                indata_mono = self._input_deque.popleft()
+                try:
+                    out_wav, _, perf, _ = self.callbacks.change_voice(
+                        indata_mono,
+                        p["f0_up_key"],
+                        p["index_rate"],
+                        p["protect"],
+                        p["volume_envelope"],
+                        p["f0_autotune"],
+                        p["f0_autotune_strength"],
+                        p["proposed_pitch"],
+                        p["proposed_pitch_threshold"],
+                    )
+                    self.latency = perf[1]
+                    self._output_deque.append(out_wav * p["output_audio_gain"])
+                except Exception as exc:
+                    print(f"[InferenceThread] error: {exc}")
+                    print(traceback.format_exc())
+                    # On error, push silence so playback stays continuous
+                    self._output_deque.append(self._silence.copy())
+
+    def stop(self):
+        self._stop_event.set()
+        self._has_input.set()  # unblock the .wait() so the thread exits
+        self.join(timeout=2.0)
+
+
+# ---------------------------------------------------------------------------
+# Audio class
+# ---------------------------------------------------------------------------
+
 class Audio:
     def __init__(
         self,
@@ -117,7 +223,6 @@ class Audio:
         monitor: bool = False,
     ):
         self.callbacks = callbacks
-        self.mon_queue = Queue()
         self.stream = None
         self.monitor = None
         self.running = False
@@ -133,76 +238,84 @@ class Audio:
         self.f0_autotune_strength = f0_autotune_strength
         self.proposed_pitch = proposed_pitch
         self.proposed_pitch_threshold = proposed_pitch_threshold
+        self.latency: float = 0.0
+
+        # InferenceThread is created fresh on each start() call
+        self._inference_thread: "InferenceThread | None" = None
 
     def get_input_audio_device(self, index: int):
         audioinput, _ = list_audio_device()
         serverAudioDevice = [x for x in audioinput if x.index == index]
-
         return serverAudioDevice[0] if len(serverAudioDevice) > 0 else None
 
     def get_output_audio_device(self, index: int):
         _, audiooutput = list_audio_device()
         serverAudioDevice = [x for x in audiooutput if x.index == index]
-
         return serverAudioDevice[0] if len(serverAudioDevice) > 0 else None
 
-    def process_data(self, indata: np.ndarray):
-        indata = indata * self.input_audio_gain
-        unpacked_data = librosa.to_mono(indata.T)
-
-        return self.callbacks.change_voice(
-            unpacked_data,
-            self.f0_up_key,
-            self.index_rate,
-            self.protect,
-            self.volume_envelope,
-            self.f0_autotune,
-            self.f0_autotune_strength,
-            self.proposed_pitch,
-            self.proposed_pitch_threshold,
-        )
-
-    def process_data_with_time(self, indata: np.ndarray):
-        out_wav, _, perf, _ = self.process_data(indata)
-        performance_ms = perf[1]
-        # print(f"real-time voice conversion performance: {performance_ms:.2f} ms")
-        self.latency = performance_ms  # latency to display on the application interface
-
-        return out_wav
+    # ------------------------------------------------------------------
+    # sounddevice callbacks — must finish in microseconds
+    # ------------------------------------------------------------------
 
     def audio_stream_callback(
         self, indata: np.ndarray, outdata: np.ndarray, frames, times, status
     ):
+        """
+        Real-time audio I/O callback — NO INFERENCE HAPPENS HERE.
+
+        Input:  apply gain → mono → push to InferenceThread input deque
+        Output: pop latest processed frame from InferenceThread output deque
+        """
         try:
-            out_wav = self.process_data_with_time(indata)
+            thread = self._inference_thread
+            if thread is None:
+                outdata[:] = 0
+                return
+
+            # Push mic audio to inference thread
+            mono = librosa.to_mono((indata * self.input_audio_gain).T)
+            thread.push_input(mono)
+
+            # Pull processed audio (silence if inference hasn't caught up yet)
+            out_wav = thread.pop_output()
+            self.latency = thread.latency
 
             output_channels = outdata.shape[1]
-            if self.use_monitor:
-                self.mon_queue.put(out_wav)
-
             outdata[:] = (
                 np.repeat(out_wav, output_channels).reshape(-1, output_channels)
-                * self.output_audio_gain
             )
         except Exception as error:
             print(f"An error occurred while running the audio stream: {error}")
             print(traceback.format_exc())
+            outdata[:] = 0
 
-    def audio_queue(self, outdata: np.ndarray, frames, times, status):
+    def audio_monitor_callback(
+        self, outdata: np.ndarray, frames, times, status
+    ):
+        """
+        Monitor output callback.
+
+        Reads from the InferenceThread output ring-buffer with monitor_audio_gain.
+        Outputs silence if the deque is empty — NEVER drops or skips frames.
+        """
         try:
-            mon_wav = self.mon_queue.get()
+            thread = self._inference_thread
+            if thread is None:
+                outdata[:] = 0
+                return
 
-            while self.mon_queue.qsize() > 0:
-                self.mon_queue.get()
-
+            out_wav = thread.pop_output()
             output_channels = outdata.shape[1]
             outdata[:] = (
-                np.repeat(mon_wav, output_channels).reshape(-1, output_channels)
+                np.repeat(out_wav, output_channels).reshape(-1, output_channels)
                 * self.monitor_audio_gain
             )
         except Exception as error:
-            print(f"An error occurred while running the audio queue: {error}")
+            print(f"An error occurred while running the audio monitor: {error}")
             print(traceback.format_exc())
+            outdata[:] = 0
+
+    # ------------------------------------------------------------------
 
     def run_audio_stream(
         self,
@@ -217,6 +330,26 @@ class Audio:
         output_extra_setting,
         output_monitor_extra_setting,
     ):
+        # Build audio parameter dict for InferenceThread
+        audio_params = {
+            "f0_up_key": self.f0_up_key,
+            "index_rate": self.index_rate,
+            "protect": self.protect,
+            "volume_envelope": self.volume_envelope,
+            "f0_autotune": self.f0_autotune,
+            "f0_autotune_strength": self.f0_autotune_strength,
+            "proposed_pitch": self.proposed_pitch,
+            "proposed_pitch_threshold": self.proposed_pitch_threshold,
+            "output_audio_gain": self.output_audio_gain,
+        }
+
+        # Launch the inference background thread
+        self._inference_thread = InferenceThread(
+            self.callbacks, audio_params, block_frame
+        )
+        self._inference_thread.start()
+
+        # Open the I/O stream
         self.stream = sd.Stream(
             callback=self.audio_stream_callback,
             latency="low",
@@ -229,9 +362,10 @@ class Audio:
         )
         self.stream.start()
 
+        # Open the monitor output stream (reads same output ring-buffer)
         if self.use_monitor:
             self.monitor = sd.OutputStream(
-                callback=self.audio_queue,
+                callback=self.audio_monitor_callback,
                 dtype=np.float32,
                 device=output_monitor_id,
                 blocksize=block_frame,
@@ -243,6 +377,11 @@ class Audio:
 
     def stop(self):
         self.running = False
+
+        # Stop inference thread first so callbacks don't race on teardown
+        if self._inference_thread is not None:
+            self._inference_thread.stop()
+            self._inference_thread = None
 
         if self.stream is not None:
             self.stream.close()
@@ -265,13 +404,10 @@ class Audio:
     ):
         self.stop()
 
-        input_audio_device, output_audio_device = self.get_input_audio_device(
-            input_device_id
-        ), self.get_output_audio_device(output_device_id)
-        input_channels, output_channels = (
-            input_audio_device.max_input_channels,
-            output_audio_device.max_output_channels,
-        )
+        input_audio_device = self.get_input_audio_device(input_device_id)
+        output_audio_device = self.get_output_audio_device(output_device_id)
+        input_channels = input_audio_device.max_input_channels
+        output_channels = output_audio_device.max_output_channels
 
         (
             input_extra_setting,

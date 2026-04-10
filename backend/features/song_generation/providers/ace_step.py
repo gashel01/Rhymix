@@ -38,12 +38,19 @@ ACESTEP15_DEFAULTS = {
     "checkpoints_root": str(ACESTEP15_CHECKPOINTS_ROOT),
     "main_model_path": "acestep-v15-turbo",
     "lm_model_path": "acestep-5Hz-lm-0.6B",
-    "device": "auto",
+    # Explicit CUDA target — avoids auto-detection overhead on single-GPU machines.
+    # Override via env: ACESTEP15_DEVICE=cpu (or "auto") in .env if needed.
+    "device": "cuda",
     "lm_backend": "vllm",
     "initialize_lm": True,
     "use_flash_attention": True,
-    "offload_to_cpu": True,
-    "offload_dit_to_cpu": True,
+    # The turbo DiT + vLLM LM together push close to 8 GB on a 3070 Ti, so
+    # keep the LM offloaded to CPU (it only runs once at the start, not every
+    # diffusion step).  The DiT stays on GPU — that's where step-by-step speed
+    # matters.  Set ACESTEP15_OFFLOAD=0 in .env to disable offloading entirely
+    # if you have a larger VRAM card and want maximum throughput.
+    "offload_to_cpu": True,      # LM offloaded — runs once, not per-step
+    "offload_dit_to_cpu": False, # DiT stays on GPU — called every diffusion step
     "compile_model": True,
     "int8_quantization": True,
 }
@@ -309,6 +316,25 @@ class AceStepPersistentWorker:
                     _patch_from_pretrained(transformers.AutoModelForCausalLM)
             except Exception as e:
                 _print("WARNING: Failed to patch transformers from_pretrained: " + str(e))
+
+            def _configure_cuda():
+                # Set Ampere/CUDA performance flags before first model init.
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        # TF32 gives ~10-20% free speedup on matmul/conv for Ampere GPUs
+                        # with no perceptible quality difference for audio generation.
+                        torch.backends.cuda.matmul.allow_tf32 = True
+                        torch.backends.cudnn.allow_tf32 = True
+                        # NOTE: cudnn.benchmark is intentionally left OFF here.
+                        # torch.compile already selects optimal kernels itself, and
+                        # enabling benchmark on top of it can deadlock during the
+                        # first generation while both systems race to tune kernels.
+                        torch.backends.cudnn.benchmark = False
+                except Exception as e:
+                    _print("WARNING: Could not configure CUDA backend flags: " + str(e))
+
+            _configure_cuda()
 
             _dit_handler = None
             _dit_key = None

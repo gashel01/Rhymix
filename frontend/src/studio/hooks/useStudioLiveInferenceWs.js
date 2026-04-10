@@ -38,8 +38,10 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
   const [inputLevel, setInputLevel] = useState(0);
   const [inputDb, setInputDb] = useState(-60);
   const [inputClip, setInputClip] = useState(false);
+  const [micMonitor, setMicMonitor] = useState(false);
   const inputGainRef = useRef(1);
   const monitorGainRef = useRef(1);
+  const micMonitorGainRef = useRef(1);
   const levelRafRef = useRef(null);
   const levelUpdateRef = useRef(0);
 
@@ -300,7 +302,7 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
       appendDryCapture(event.inputBuffer.getChannelData(0));
     };
     captureMute = ctx.createGain();
-    captureMute.gain.value = 0;
+    captureMute.gain.value = micMonitor ? (micMonitorGainRef.current || 1) : 0;
     gain.connect(captureNode);
     captureNode.connect(captureMute).connect(ctx.destination);
 
@@ -365,6 +367,14 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
     monitorGainRef.current = next;
     if (mediaRef.current.monitorGain) {
       mediaRef.current.monitorGain.gain.value = next;
+    }
+  }, []);
+
+  const toggleMicMonitor = useCallback((enabled, gainValue = 1) => {
+    setMicMonitor(enabled);
+    micMonitorGainRef.current = gainValue;
+    if (mediaRef.current.captureMute) {
+      mediaRef.current.captureMute.gain.value = enabled ? gainValue : 0;
     }
   }, []);
 
@@ -491,5 +501,7 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
     cancel,
     setInputGain,
     setMonitorGain,
+    micMonitor,
+    toggleMicMonitor,
   };
 };

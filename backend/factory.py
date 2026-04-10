@@ -8,6 +8,7 @@ from app.utils.file_handling import FileHandler  # noqa: F401
 from app.utils.audio_processor import AudioProcessor  # noqa: F401
 from app.config import Config  # noqa: F401
 
+from backend.env_bootstrap import configure_cuda_backend
 from backend.logging_setup import configure_logging
 from backend.paths.manager import paths
 
@@ -17,6 +18,7 @@ def create_app():
     CORS(app)
 
     configure_logging()
+    configure_cuda_backend()   # TF32 + cudnn.benchmark for RTX/Ampere
     paths.ensure_directories_exist()
 
     # Register routes
