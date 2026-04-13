@@ -15,6 +15,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!/rvc/lib/
 lib64/
 parts/
 sdist/
@@ -258,7 +259,8 @@ None
 /logs/
 /models/
 /assets/weights/
-/rvc/
+/rvc/models/
+/rvc/**/__pycache__/
 /frontend/build/
 
 # Keep data/ schema examples but ignore everything else under it
