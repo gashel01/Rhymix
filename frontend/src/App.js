@@ -24,6 +24,7 @@ import { GlobalStyles } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
 import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
+import SpaceDashboardIcon from "@mui/icons-material/SpaceDashboard";
 import FileUpload from "./components/FileUpload";
 // import DownloadResults from "./components/DownloadResults";
 import HomeView from "./components/HomeView";
@@ -38,6 +39,8 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import NavigationBar from "./components/NavigationBar";
 import { uploadFiles, startProcessing, getTrackStatuses, cleanDirectories } from "./utils/apiService";
 import { mergeProcessingUpdate, processingEquals, isTerminalProcessingState } from "./utils/processingStatus";
+import StudioPage from "./studio/StudioPage";
+import BeatboxCalibrationWizard from "./beatboxWizard/BeatboxCalibrationWizard";
 
 // Tesla/Apple-inspired theme system
 const createAppTheme = (mode) => createTheme({
@@ -45,69 +48,69 @@ const createAppTheme = (mode) => createTheme({
     mode,
     ...(mode === 'dark'
       ? {
-          // Dark theme - Tesla inspired
-          primary: {
-            main: '#007AFF', // iOS blue
-            light: '#4DA3FF',
-            dark: '#0056CC',
-          },
-          secondary: {
-            main: '#FF3B30', // iOS red
-            light: '#FF6B66',
-            dark: '#CC2F26',
-          },
-          background: {
-            default: '#000000',
-            paper: 'transparent', // iOS dark gray
-            surface: '#2C2C2E', // iOS surface color
-          },
-          text: {
-            primary: '#FFFFFF',
-            secondary: '#EBEBF599',
-          },
-          divider: '#38383A',
-          success: {
-            main: '#34C759', // iOS green
-          },
-          warning: {
-            main: '#FF9500', // iOS orange
-          },
-          error: {
-            main: '#FF3B30',
-          },
-        }
+        // Dark theme - Tesla inspired
+        primary: {
+          main: '#007AFF', // iOS blue
+          light: '#4DA3FF',
+          dark: '#0056CC',
+        },
+        secondary: {
+          main: '#FF3B30', // iOS red
+          light: '#FF6B66',
+          dark: '#CC2F26',
+        },
+        background: {
+          default: '#000000',
+          paper: 'transparent', // iOS dark gray
+          surface: '#2C2C2E', // iOS surface color
+        },
+        text: {
+          primary: '#FFFFFF',
+          secondary: '#EBEBF599',
+        },
+        divider: '#38383A',
+        success: {
+          main: '#34C759', // iOS green
+        },
+        warning: {
+          main: '#FF9500', // iOS orange
+        },
+        error: {
+          main: '#FF3B30',
+        },
+      }
       : {
-          // Light theme - Clean Apple inspired
-          primary: {
-            main: '#007AFF',
-            light: '#4DA3FF',
-            dark: '#0056CC',
-          },
-          secondary: {
-            main: '#FF3B30',
-            light: '#FF6B66',
-            dark: '#CC2F26',
-          },
-          background: {
-            default: '#F2F2F7', // iOS light gray
-            paper: '#FFFFFF',
-            surface: '#F2F2F7',
-          },
-          text: {
-            primary: '#1C1C1E',
-            secondary: '#3C3C4399',
-          },
-          divider: '#C6C6C8',
-          success: {
-            main: '#34C759',
-          },
-          warning: {
-            main: '#FF9500',
-          },
-          error: {
-            main: '#FF3B30',
-          },
-        }),
+        // Light theme - Clean Apple inspired
+        primary: {
+          main: '#007AFF',
+          light: '#4DA3FF',
+          dark: '#0056CC',
+        },
+        secondary: {
+          main: '#FF3B30',
+          light: '#FF6B66',
+          dark: '#CC2F26',
+        },
+        background: {
+          default: '#F2F2F7', // iOS light gray
+          paper: '#FFFFFF',
+          surface: '#F2F2F7',
+        },
+        text: {
+          primary: '#1C1C1E',
+          secondary: '#3C3C4399',
+        },
+        divider: '#C6C6C8',
+        success: {
+          main: '#34C759',
+        },
+        warning: {
+          main: '#FF9500',
+        },
+        error: {
+          main: '#FF3B30',
+        },
+      }),
   },
   typography: {
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif',
@@ -244,6 +247,8 @@ const globalStylesInputProps = {
 };
 
 function App() {
+  const isBeatboxCalibrationRoute = window.location.pathname.startsWith("/beatbox-calibration");
+
   const [activeStep, setActiveStep] = useState(0);
   const [files, setFiles] = useState([]);
   const config = {
@@ -272,7 +277,7 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const [volume,setVolume]= useState(1);
+  const [volume, setVolume] = useState(1);
   // Inference flow state
   const [selectedTracksForInference, setSelectedTracksForInference] = useState(null);
   const [selectedModelForInference, setSelectedModelForInference] = useState(null);
@@ -281,11 +286,45 @@ function App() {
   const [liveInferenceData, setLiveInferenceData] = useState(null);
   const [navContext, setNavContext] = useState(null);
   const [inferenceParamsOrigin, setInferenceParamsOrigin] = useState(null);
+  const [createSongNav, setCreateSongNav] = useState({
+    mode: "create",
+    sourceSongId: null,
+    sourceSong: null,
+  });
+
+  const getStudioRouteInfo = useCallback(() => {
+    const path = window.location.pathname || "";
+    if (path === "/studio" || path === "/studio/") {
+      const params = new URLSearchParams(window.location.search || "");
+      return {
+        assetId: null,
+        projectId: params.get("projectId") || null,
+        sourceFileId: params.get("sourceFileId") || null,
+      };
+    }
+    const match = path.match(/^\/studio\/(.+)$/);
+    if (!match) return null;
+    const assetId = decodeURIComponent(match[1]);
+    const search = window.location.search || "";
+    const params = new URLSearchParams(search);
+    const sourceFileId = params.get("sourceFileId") || null;
+    return { assetId, projectId: params.get("projectId") || null, sourceFileId };
+  }, []);
+
+  const [studioRouteInfo, setStudioRouteInfo] = useState(() => getStudioRouteInfo());
+  // Keep legacy studioAssetId alias for remaining references
+  const studioAssetId = studioRouteInfo?.assetId || null;
 
   const theme = createAppTheme(darkMode ? 'dark' : 'light');
 
   const [open, setOpen] = React.useState(!sidebarCollapsed);
   React.useEffect(() => { if (!sidebarCollapsed) setOpen(true); }, [sidebarCollapsed]);;
+
+  useEffect(() => {
+    const handlePopState = () => setStudioRouteInfo(getStudioRouteInfo());
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [getStudioRouteInfo]);
 
 
   const onVolumeChange = (v01) => setVolume(Math.max(0, Math.min(1, v01)));
@@ -381,6 +420,11 @@ function App() {
   };
 
   const handleNavigation = useCallback((view) => {
+    if (view === "studio") {
+      window.history.pushState({}, "", "/studio");
+      setStudioRouteInfo(getStudioRouteInfo());
+      return;
+    }
     setCurrentView(view);
     setShowHomeView(view === "home");
     setSelectedVocalsForTraining(null);
@@ -390,6 +434,12 @@ function App() {
     setInferenceData(null);
     setNavContext(null);
     setInferenceParamsOrigin(null);
+    if (view === "create-song") {
+      setCreateSongNav({ mode: "create", sourceSongId: null, sourceSong: null });
+    }
+    if (view !== "create-song") {
+      setCreateSongNav({ mode: "create", sourceSongId: null, sourceSong: null });
+    }
     if (view !== "inference") setLiveInferenceData(null);
     setDrawerOpen(false);
     // Update URL hash for navigation persistence
@@ -398,7 +448,78 @@ function App() {
     } else {
       window.history.replaceState(null, '', window.location.pathname);
     }
+  }, [getStudioRouteInfo]);
+
+  const toCoverSourceId = useCallback((track, source) => {
+    if (!track || typeof track !== "object") return null;
+    if (source === "inference" && track.runId) return `run:${track.runId}`;
+    if (track.fileId) return `upload:${track.fileId}`;
+    if (track.id && source === "inference") return `run:${track.id}`;
+    if (track.id) return `upload:${track.id}`;
+    return null;
   }, []);
+
+  const openCreateCover = useCallback(
+    ({ source, track }) => {
+      const sourceSongId = toCoverSourceId(track, source);
+      if (!sourceSongId) return;
+      const sourceSong = {
+        sourceSongId,
+        title: track?.displayName || track?.name || track?.originalName || "Untitled source",
+        artist: track?.artist || null,
+        duration: track?.duration || null,
+        audioUrl: track?.audioUrl || track?.vocalUrl || track?.instrumentalUrl || null,
+        instrumentalUrl: track?.instrumentalUrl || null,
+        vocalsUrl: track?.vocalUrl || track?.originalVocalUrl || null,
+        source,
+      };
+
+      setCreateSongNav({
+        mode: "cover",
+        sourceSongId,
+        sourceSong,
+      });
+      setCurrentView("create-song");
+      setShowHomeView(false);
+      setDrawerOpen(false);
+      window.history.replaceState(
+        null,
+        "",
+        `#create-song?mode=cover&sourceSongId=${encodeURIComponent(sourceSongId)}`
+      );
+    },
+    [toCoverSourceId]
+  );
+
+  const handleHomeCoverTrack = useCallback(
+    (track) => {
+      openCreateCover({ source: "home", track });
+    },
+    [openCreateCover]
+  );
+
+  const handleInferenceCoverTrack = useCallback(
+    (track) => {
+      openCreateCover({ source: "inference", track });
+    },
+    [openCreateCover]
+  );
+
+  const handleHomeCoverTracks = useCallback(
+    (tracks) => {
+      if (!Array.isArray(tracks) || tracks.length === 0) return;
+      handleHomeCoverTrack(tracks[0]);
+    },
+    [handleHomeCoverTrack]
+  );
+
+  const handleInferenceCoverTracks = useCallback(
+    (tracks) => {
+      if (!Array.isArray(tracks) || tracks.length === 0) return;
+      handleInferenceCoverTrack(tracks[0]);
+    },
+    [handleInferenceCoverTrack]
+  );
 
   const getTrackId = useCallback((track) => {
     return track?.fileId || track?.trackId || track?.id || track?.runId || track?.tempId || null;
@@ -453,11 +574,18 @@ function App() {
   useEffect(() => {
     const hash = window.location.hash.substring(1); // Remove the '#'
     if (hash && hash !== 'home') {
+      const [hashView, hashQuery] = hash.split("?");
       // Only set the view if it's a valid navigation hash
-      const validViews = ['datasets', 'training', 'talking-workflow', 'inference-model-selection', 'inference-params', 'inference'];
-      if (validViews.includes(hash)) {
-        setCurrentView(hash);
+      const validViews = ['datasets', 'training', 'talking-workflow', 'inference-model-selection', 'inference-params', 'inference', 'create-song'];
+      if (validViews.includes(hashView)) {
+        setCurrentView(hashView);
         setShowHomeView(false);
+        if (hashView === "create-song" && hashQuery) {
+          const sp = new URLSearchParams(hashQuery);
+          const mode = sp.get("mode") === "cover" ? "cover" : "create";
+          const sourceSongId = sp.get("sourceSongId") || null;
+          setCreateSongNav({ mode, sourceSongId, sourceSong: null });
+        }
       }
     }
   }, []);
@@ -634,13 +762,6 @@ function App() {
   };
 
   const handleTrainWithDataset = useCallback((selectedVocals) => {
-    console.log("Training with selected vocals:", selectedVocals);
-
-    // If metadata is available, this is coming from diarization
-    if (selectedVocals.metadata) {
-      console.log("Training with diarization data:", selectedVocals.metadata);
-    }
-
     setSelectedVocalsForTraining(selectedVocals);
     setCurrentView("training");
     setShowHomeView(false);
@@ -672,7 +793,7 @@ function App() {
 
   const onOpenCreateDataset = useCallback(() => setCreateDatasetModalOpen(true), []);
 
-  
+
   const navigationItems = [
     {
       id: 'home',
@@ -698,6 +819,12 @@ function App() {
       icon: <AudioFileIcon />,
       description: 'View past inference results'
     },
+    {
+      id: 'studio',
+      label: 'Studio',
+      icon: <SpaceDashboardIcon />,
+      description: 'Open and manage Studio projects'
+    },
   ];
 
 
@@ -706,10 +833,12 @@ function App() {
       case "home":
         return (
           <HomeView
+            darkMode={darkMode}
             onOpenCreateDataset={onOpenCreateDataset}
             handleTrainWithDataset={handleTrainWithDataset}
             onCreateTalkingDataset={handleCreateTalkingDataset}
             onInferenceWithTracks={handleInferenceWithTracks}
+            onCoverWithTracks={handleHomeCoverTracks}
             optimisticTracks={optimisticTracks}
             onOptimisticTracksChange={setOptimisticTracks}
           />
@@ -790,16 +919,24 @@ function App() {
 
       case "create-song":
         return (
-          <CreateSongView onBack={() => handleNavigation("home")} />
+          <CreateSongView
+            darkMode={darkMode}
+            onBack={() => handleNavigation("home")}
+            initialMode={createSongNav.mode}
+            sourceSongId={createSongNav.sourceSongId}
+            initialSourceSong={createSongNav.sourceSong}
+          />
         );
 
       case "models":
-        return <ModelsView />;
+        return <ModelsView darkMode={darkMode} />;
 
       case "inference":
         return (
           <InferenceView
+            darkMode={darkMode}
             onNavigate={handleNavigation}
+            onCoverWithTracks={handleInferenceCoverTracks}
             liveInferenceData={liveInferenceData}
             onSelectionToParams={({ source, selectedTracks, selectedModel }) => {
               openInferenceParams({
@@ -821,6 +958,7 @@ function App() {
       case "talking-workflow":
         return (
           <TalkWorkflowPage
+            darkMode={darkMode}
             onBack={() => handleNavigation("home")}
             handleTrainWithDataset={handleTrainWithDataset}
           />
@@ -828,8 +966,9 @@ function App() {
 
       case "inference-model-selection":
         return (
-          <ModelsView 
-            isInferenceSelection={true} 
+          <ModelsView
+            darkMode={darkMode}
+            isInferenceSelection={true}
             selectedTracks={selectedTracksForInference}
             navContext={navContext}
             onNavigate={handleNavigation}
@@ -848,13 +987,14 @@ function App() {
                 selectedModel: model,
                 from: "model",
               });
-            }} 
+            }}
           />
         );
 
       case "inference-params":
         return (
           <InferenceParams
+            darkMode={darkMode}
             selectedModel={selectedModelForInference}
             selectedTracks={selectedTracksForInference}
             navContext={navContext}
@@ -907,173 +1047,178 @@ function App() {
       <CssBaseline />
       <GlobalStyles {...globalStylesInputProps} />
       <VolumeProvider volume={volume}>
+        {isBeatboxCalibrationRoute ? (
+          <BeatboxCalibrationWizard />
+        ) : studioRouteInfo ? (
+          <StudioPage assetId={studioRouteInfo?.assetId || null} projectId={studioRouteInfo?.projectId || null} />
+        ) : (
 
-      <div style={{
-        display: "flex",
-        
-        minHeight: "100vh",
-        backgroundColor: '#1c1c1f99'// main back color 
-      }}>
-        <div style={{ position: 'relative', display: 'flex' }}>
-          <NavigationBar
-            theme={theme}
-            darkMode={darkMode}
-            open={open}
-            setOpen={setOpen}
-            handleThemeToggle={handleThemeToggle}
-            handleDrawerToggle={handleDrawerToggle}
-            drawerOpen={drawerOpen}
-            navigationItems={navigationItems}
-            currentView={currentView}
-            handleNavigation={handleNavigation}
-            sidebarCollapsed={sidebarCollapsed}
-            handleSidebarToggle={handleSidebarToggle}
-            handleCleanDirectories={handleCleanDirectories}
-            loading={loading}
-            onVolumeChange={onVolumeChange}
-            muted={muted}
-            volume={volume}
-          />
-        </div>
-        {/* Main Content */}
-        <div
-          component="main"
-          style={{
-            flexGrow: 1,
-            backgroundColor: 'transparent',
-            minHeight: '100vh',
-          }}
-        >
-          <div >
-            {error && (
-              <Alert
-                severity="error"
-                sx={{
-                  mb: 3,
-                  borderRadius: 3,
-                  boxShadow: theme.shadows[2]
+          <div style={{
+            display: "flex",
+            minHeight: "100vh",
+            backgroundColor: darkMode ? '#1c1c1f99' : '#EEF2F6' // main back color 
+          }}>
+            <div style={{ position: 'relative', display: 'flex' }}>
+              <NavigationBar
+                theme={theme}
+                darkMode={darkMode}
+                open={open}
+                setOpen={setOpen}
+                handleThemeToggle={handleThemeToggle}
+                handleDrawerToggle={handleDrawerToggle}
+                drawerOpen={drawerOpen}
+                navigationItems={navigationItems}
+                currentView={currentView}
+                handleNavigation={handleNavigation}
+                sidebarCollapsed={sidebarCollapsed}
+                handleSidebarToggle={handleSidebarToggle}
+                handleCleanDirectories={handleCleanDirectories}
+                loading={loading}
+                onVolumeChange={onVolumeChange}
+                muted={muted}
+                volume={volume}
+              />
+            </div>
+            {/* Main Content */}
+            <div
+              component="main"
+              style={{
+                flexGrow: 1,
+                backgroundColor: 'transparent',
+                minHeight: '100vh',
+              }}
+            >
+              <div >
+                {error && (
+                  <Alert
+                    severity="error"
+                    sx={{
+                      mb: 3,
+                      borderRadius: 3,
+                      boxShadow: theme.shadows[2]
+                    }}
+                    onClose={() => setError(null)}
+                  >
+                    {error}
+                  </Alert>
+                )}
+
+                {renderView()}
+              </div>
+
+              {/* Confirmation Dialog */}
+              <Dialog
+                open={confirmDialogOpen}
+                onClose={() => setConfirmDialogOpen(false)}
+                PaperProps={{
+                  sx: {
+                    borderRadius: 3,
+                    maxWidth: 400,
+                  }
                 }}
-                onClose={() => setError(null)}
               >
-                {error}
-              </Alert>
-            )}
+                <DialogTitle sx={{ pb: 1 }}>
+                  Confirm Upload and Processing
+                </DialogTitle>
+                <DialogContent sx={{ pb: 1 }}>
+                  <DialogContentText>
+                    This will upload your files and remove all previously processed results.
+                    Any previous vocal extractions will be permanently deleted.
+                    <br />
+                    <br />
+                    Are you sure you want to continue?
+                  </DialogContentText>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                  <Button
+                    onClick={() => setConfirmDialogOpen(false)}
+                    sx={{ borderRadius: 2, px: 3 }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setConfirmDialogOpen(false);
+                      handleProcessFiles();
+                    }}
+                    variant="contained"
+                    sx={{ borderRadius: 2, px: 3 }}
+                    autoFocus
+                  >
+                    Yes, Upload and Process
+                  </Button>
+                </DialogActions>
+              </Dialog>
 
-            {renderView()}
-          </div>
-
-          {/* Confirmation Dialog */}
-          <Dialog
-            open={confirmDialogOpen}
-            onClose={() => setConfirmDialogOpen(false)}
-            PaperProps={{
-              sx: {
-                borderRadius: 3,
-                maxWidth: 400,
-              }
-            }}
-          >
-            <DialogTitle sx={{ pb: 1 }}>
-              Confirm Upload and Processing
-            </DialogTitle>
-            <DialogContent sx={{ pb: 1 }}>
-              <DialogContentText>
-                This will upload your files and remove all previously processed results.
-                Any previous vocal extractions will be permanently deleted.
-                <br />
-                <br />
-                Are you sure you want to continue?
-              </DialogContentText>
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2 }}>
-              <Button
-                onClick={() => setConfirmDialogOpen(false)}
-                sx={{ borderRadius: 2, px: 3 }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  setConfirmDialogOpen(false);
-                  handleProcessFiles();
+              {/* Create Dataset Modal - rendered in App so HomeView doesn't re-render on jobStatus/polling */}
+              <Dialog
+                open={createDatasetModalOpen}
+                onClose={() => {
+                  setCreateDatasetModalOpen(false);
+                  setFiles([]);
                 }}
-                variant="contained"
-                sx={{ borderRadius: 2, px: 3 }}
-                autoFocus
+                maxWidth="md"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: 3 } }}
               >
-                Yes, Upload and Process
-              </Button>
-            </DialogActions>
-          </Dialog>
-
-          {/* Create Dataset Modal - rendered in App so HomeView doesn't re-render on jobStatus/polling */}
-          <Dialog
-            open={createDatasetModalOpen}
-            onClose={() => {
-              setCreateDatasetModalOpen(false);
-              setFiles([]);
-            }}
-            maxWidth="md"
-            fullWidth
-            PaperProps={{ sx: { borderRadius: 3 } }}
-          >
-            <DialogTitle sx={{ textAlign: "center", fontWeight: 700 }}>
-              Create Singing Dataset
-            </DialogTitle>
-            <DialogContent>
-              <Paper sx={{ p: 4, borderRadius: 3 }}>
-                <Stepper activeStep={activeStep} sx={{ mb: 6 }}>
-                  {steps.map((label) => (
-                    <Step key={label}>
-                      <StepLabel sx={{ '& .MuiStepLabel-label': { fontSize: '0.9rem', fontWeight: 600 } }}>
-                        {label}
-                      </StepLabel>
-                    </Step>
-                  ))}
-                </Stepper>
-                <Box sx={{ mt: 4, mb: 4 }}>
-                  {activeStep === 0 && (
-                    <FileUpload
-                      key={createDatasetModalOpen ? "open" : "closed"}
-                      files={files}
-                      setFiles={setFiles}
-                      setError={setError}
-                      loading={loading}
-                      setLoading={setLoading}
-                    />
-                  )}
-                  {/* {activeStep === 2 && (
+                <DialogTitle sx={{ textAlign: "center", fontWeight: 700 }}>
+                  Create Singing Dataset
+                </DialogTitle>
+                <DialogContent>
+                  <Paper sx={{ p: 4, borderRadius: 3 }}>
+                    <Stepper activeStep={activeStep} sx={{ mb: 6 }}>
+                      {steps.map((label) => (
+                        <Step key={label}>
+                          <StepLabel sx={{ '& .MuiStepLabel-label': { fontSize: '0.9rem', fontWeight: 600 } }}>
+                            {label}
+                          </StepLabel>
+                        </Step>
+                      ))}
+                    </Stepper>
+                    <Box sx={{ mt: 4, mb: 4 }}>
+                      {activeStep === 0 && (
+                        <FileUpload
+                          key={createDatasetModalOpen ? "open" : "closed"}
+                          files={files}
+                          setFiles={setFiles}
+                          setError={setError}
+                          loading={loading}
+                          setLoading={setLoading}
+                        />
+                      )}
+                      {/* {activeStep === 2 && (
                     <DownloadResults jobStatus={jobStatus} handleReset={handleReset} />
                   )} */}
-                </Box>
-                <Box sx={{ display: "flex", flexDirection: "row", pt: 4, gap: 2, justifyContent: "center" }}>
-                  <Button
-                    onClick={handleNext}
-                    disabled={loading || files.length === 0}
-                    variant="contained"
-                    sx={{ minWidth: 160, borderRadius: 2 }}
-                  >
-                    {loading ? <CircularProgress size={20} /> : "Upload & Start"}
-                  </Button>
-                </Box>
-              </Paper>
-            </DialogContent>
-          </Dialog>
+                    </Box>
+                    <Box sx={{ display: "flex", flexDirection: "row", pt: 4, gap: 2, justifyContent: "center" }}>
+                      <Button
+                        onClick={handleNext}
+                        disabled={loading || files.length === 0}
+                        variant="contained"
+                        sx={{ minWidth: 160, borderRadius: 2 }}
+                      >
+                        {loading ? <CircularProgress size={20} /> : "Upload & Start"}
+                      </Button>
+                    </Box>
+                  </Paper>
+                </DialogContent>
+              </Dialog>
 
-          {/* Legacy Voice Conversion (if needed) */}
-          {showVoiceConversion && (
-            <InferenceView
-              onNavigate={handleNavigation}
-              onBack={() => {
-                setShowVoiceConversion(false);
-                setShowHomeView(true);
-              }}
-            />
-          )}
-        </div>
+              {/* Legacy Voice Conversion (if needed) */}
+              {showVoiceConversion && (
+                <InferenceView
+                  onNavigate={handleNavigation}
+                  onBack={() => {
+                    setShowVoiceConversion(false);
+                    setShowHomeView(true);
+                  }}
+                />
+              )}
+            </div>
 
 
-      </div>
+          </div>
+        )}
       </VolumeProvider>
     </ThemeProvider>
   );

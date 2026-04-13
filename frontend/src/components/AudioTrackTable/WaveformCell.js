@@ -3,6 +3,7 @@ import { Box, Typography, Grid } from '@mui/material';
 import AudioWaveform from '../AudioWaveform';
 import { useVolume } from '../../contexts/VolumeContext';
 import styles from './WaveformCell.module.css';
+import { Theme } from '../Homeview/Theme';
 
 /**
  * Cell component for displaying a single waveform
@@ -24,8 +25,10 @@ function WaveformCell({
   badgeText = null,
   isPrimary = false,
   emptyMessage = "No audio",
+  darkMode,
 }) {
   const { volumeRef } = useVolume();
+  const { t } = Theme({ darkMode });
   // Use context volume ref if available, fallback to prop
   const volume = volumeRef?.current ?? volumeProp ?? 1;
 
@@ -51,7 +54,13 @@ function WaveformCell({
           otherWaveform={otherWaveform}
         />
       ) : (
-        <Box className={styles.emptyState}>
+        <Box
+          className={styles.emptyState}
+          style={{
+            backgroundColor: t.cardA,
+            border: `1px dashed ${t.hairline}`
+          }}
+        >
           <Typography variant="caption" color="text.secondary">
             {emptyMessage}
           </Typography>
@@ -77,6 +86,7 @@ const areEqual = (prev, next) =>
   prev.onReady === next.onReady &&
   prev.onSeek === next.onSeek &&
   prev.onFinish === next.onFinish &&
-  prev.otherWaveform === next.otherWaveform;
+  prev.otherWaveform === next.otherWaveform &&
+  prev.darkMode === next.darkMode;
 
 export default React.memo(WaveformCell, areEqual);

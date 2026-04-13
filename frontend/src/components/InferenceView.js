@@ -2,7 +2,11 @@ import React, { useState, useCallback, memo, useEffect, useRef, useMemo } from "
 import { useVolume } from "../contexts/VolumeContext";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
 import PsychologyIcon from "@mui/icons-material/Psychology";
+import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/Delete";
 import AudioTrackTable from "./AudioTrackTable/AudioTrackTable";
+import DeleteDialog from "./AudioTrackTable/InferenceResult/DeleteDialog";
 import ErrorBoundary from "./ErrorBoundary";
 import { useAudioPlayback } from "./InferenceView/useAudioPlayback";
 import { useTableActions } from "./InferenceView/useTableActions";
@@ -11,8 +15,10 @@ import { Alert } from './Homeview/Alert.js';
 import { Theme } from './Homeview/Theme.js';
 import Panel from './Homeview/Panel.js';
 import Btn from './Homeview/Btn.js';
+import IconBtn from './Homeview/IconBtn.js';
+import { deleteInferenceRuns } from "../utils/apiService";
 
-function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToParams, onSelectionToModelSelection }) {
+function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToParams, onSelectionToModelSelection, onCoverWithTracks }) {
   const { volumeRef } = useVolume();
   const t = Theme({ darkMode }).t;
 
@@ -22,16 +28,19 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
   const [optimisticRuns, setOptimisticRuns] = useState([]);
   const [liveLoading, setLiveLoading] = useState(false);
   const [reactionPendingByRunId, setReactionPendingByRunId] = useState({});
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteState, setDeleteState] = useState({ loading: false, result: null });
   const pollingJobsRef = useRef(null);
   const liveStartedRef = useRef(false);
   const [pollingCount, setPollingCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [groupVocalModeByKey, setGroupVocalModeByKey] = useState({});
 
   const {
     trackPairs,
     fetchInferenceResults,
-    handleVocalModeChange,
     handleDownload,
-    vocalMode,
   } = useAudioPlayback({
     inferenceResults: serverRuns,
     setLoading,
@@ -39,13 +48,6 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
     setInferenceResults: setServerRuns,
     liveResults: optimisticRuns,
   });
-
-  const {
-    handleRowSelect,
-    handleSelectAllRows,
-    handleDeselectAllRows,
-    selectedRows,
-  } = useTableActions({ inferenceResults: serverRuns, trackPairs });
 
   const updateReactionLocal = useCallback((runId, reaction) => {
     if (!runId) return;
@@ -205,10 +207,62 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
     };
   }, [pollingCount]);
 
+  const filteredTrackPairs = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return trackPairs;
+    return trackPairs.filter((pair) => {
+      const fields = [
+        pair?.displayName,
+        pair?.name,
+        pair?.originalName,
+        pair?.modelName,
+        pair?.paramsSummary,
+      ];
+      return fields.some((field) => String(field || "").toLowerCase().includes(query));
+    });
+  }, [searchQuery, trackPairs]);
+
+  const {
+    handleRowSelect,
+    handleSelectAllRows,
+    handleDeselectAllRows,
+    selectedRows,
+  } = useTableActions({ inferenceResults: serverRuns, trackPairs: filteredTrackPairs });
+
   const selectedPairs = useMemo(() => {
     if (!selectedRows.length) return [];
     return trackPairs.filter((pair) => selectedRows.includes(pair.id));
   }, [selectedRows, trackPairs]);
+
+  const selectedRunIds = useMemo(() => {
+    if (!selectedRows.length) return [];
+    const byId = new Map(trackPairs.map((pair) => [pair.id, pair]));
+    const runIds = [];
+    selectedRows.forEach((id) => {
+      const pair = byId.get(id);
+      const runId = pair?.runId || pair?.result?.runId || pair?.result?.id || null;
+      if (runId) runIds.push(runId);
+    });
+    return [...new Set(runIds)];
+  }, [selectedRows, trackPairs]);
+
+  const handleGroupVocalModeChange = useCallback((groupKey, nextSource) => {
+    if (!groupKey || !nextSource) return;
+    setGroupVocalModeByKey((prev) => ({ ...prev, [groupKey]: nextSource }));
+  }, []);
+
+  useEffect(() => {
+    const validKeys = new Set(trackPairs.map((pair) => pair?.groupKey || pair?.runId || pair?.id).filter(Boolean));
+    setGroupVocalModeByKey((prev) => {
+      const next = {};
+      let changed = false;
+      Object.entries(prev).forEach(([key, value]) => {
+        if (validKeys.has(key)) next[key] = value;
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [trackPairs]);
 
   const uniqueModels = useMemo(() => {
     const models = new Map();
@@ -230,23 +284,23 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
     return Array.from(uniqueModels.values())[0];
   }, [uniqueModels]);
 
+  const pairToTrack = useCallback((pair) => {
+    if (pair?.result?.track) return pair.result.track;
+    if (pair?.track) return pair.track;
+    const fileId = pair?.fileId || null;
+    if (!fileId) return null;
+    return {
+      fileId,
+      id: fileId,
+      displayName: pair?.displayName || pair?.name || null,
+      originalName: pair?.originalName || null,
+      vocalFileType: pair?.vocalFileType || pair?.result?.vocalFileType || pair?.result?.params?.vocalsFileType,
+    };
+  }, []);
+
   const selectedTracks = useMemo(() => {
-    return selectedPairs
-      .map((pair) => {
-        if (pair?.result?.track) return pair.result.track;
-        if (pair?.track) return pair.track;
-        const fileId = pair?.fileId || null;
-        if (!fileId) return null;
-        return {
-          fileId,
-          id: fileId,
-          displayName: pair?.displayName || pair?.name || null,
-          originalName: pair?.originalName || null,
-          vocalFileType: pair?.vocalFileType || pair?.result?.vocalFileType || pair?.result?.params?.vocalsFileType,
-        };
-      })
-      .filter(Boolean);
-  }, [selectedPairs]);
+    return selectedPairs.map(pairToTrack).filter(Boolean);
+  }, [pairToTrack, selectedPairs]);
 
   const getPairTimestamp = useCallback((pair) => {
     const stamp = pair?.createdAt || pair?.result?.createdAt;
@@ -294,18 +348,32 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
     });
   }, [onNavigate, onSelectionToModelSelection, selectedTracks]);
 
-  const handleReturnToInferenceParams = useCallback(() => {
-    if (!selectionModel || !onSelectionToParams) return;
-    const latestPair = selectedPairs.reduce((latest, pair) => {
+  const handleReturnToInferenceParams = useCallback((sourcePair = null) => {
+    if (!onSelectionToParams) return;
+    const navigationPairs = sourcePair ? [sourcePair] : selectedPairs;
+    if (!navigationPairs.length) return;
+    const navigationTracks = navigationPairs.map(pairToTrack).filter(Boolean);
+    if (!navigationTracks.length) return;
+
+    const modelCandidate = sourcePair
+      ? {
+        modelId: sourcePair?.modelId || null,
+        modelName: sourcePair?.modelName || null,
+      }
+      : selectionModel;
+
+    if (!modelCandidate && !sourcePair) return;
+
+    const latestPair = navigationPairs.reduce((latest, pair) => {
       if (!latest) return pair;
       return getPairTimestamp(pair) >= getPairTimestamp(latest) ? pair : latest;
     }, null);
     const checkpointCandidate = getPairCheckpoint(latestPair);
     const modelPayload = {
-      id: selectionModel.modelId || null,
-      name: selectionModel.modelName || null,
-      modelId: selectionModel.modelId || null,
-      modelName: selectionModel.modelName || null,
+      id: modelCandidate?.modelId || null,
+      name: modelCandidate?.modelName || null,
+      modelId: modelCandidate?.modelId || null,
+      modelName: modelCandidate?.modelName || null,
     };
     if (checkpointCandidate) {
       if (checkpointCandidate.path) {
@@ -316,7 +384,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
     }
     onSelectionToParams({
       source: "inference",
-      selectedTracks,
+      selectedTracks: navigationTracks,
       selectedModel: modelPayload,
     });
   }, [
@@ -324,15 +392,52 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
     getPairTimestamp,
     normalizeModelCheckpoint,
     onSelectionToParams,
+    pairToTrack,
     selectedPairs,
     selectionModel,
-    selectedTracks,
   ]);
 
   const showSelectionButton = Boolean(selectionModel);
 
-  const hasRows = trackPairs.length > 0;
-  const showSpinner = loading && !hasRows;
+  const hasAnyRows = trackPairs.length > 0;
+  const hasRows = filteredTrackPairs.length > 0;
+  const showSpinner = loading && !hasAnyRows;
+
+  const handleOpenDelete = useCallback(() => {
+    if (!selectedRows.length) return;
+    if (!selectedRunIds.length) {
+      setError("No deletable inference results selected.");
+      return;
+    }
+    setDeleteDialogOpen(true);
+  }, [selectedRows.length, selectedRunIds.length, setError]);
+
+  const handleClearDeleteResult = useCallback(() => {
+    setDeleteState((prev) => ({ ...prev, result: null }));
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!selectedRunIds.length) {
+      setDeleteDialogOpen(false);
+      return;
+    }
+    setDeleteState({ loading: true, result: null });
+    try {
+      const res = await deleteInferenceRuns(selectedRunIds);
+      const runIdSet = new Set(selectedRunIds);
+      setServerRuns((prev) => prev.filter((run) => !runIdSet.has(run.runId || run.id)));
+      setOptimisticRuns((prev) => prev.filter((run) => !runIdSet.has(run.runId || run.id)));
+      setDeleteState({ loading: false, result: res });
+      setDeleteDialogOpen(false);
+      handleDeselectAllRows();
+      fetchInferenceResults();
+    } catch (err) {
+      setDeleteState({
+        loading: false,
+        result: { error: err?.message || "Failed to delete inference results" },
+      });
+    }
+  }, [fetchInferenceResults, handleDeselectAllRows, selectedRunIds, setOptimisticRuns, setServerRuns]);
 
   if (showSpinner) {
     return (
@@ -354,7 +459,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
   }
 
   return (
-  <>
+    <>
       <div style={{ marginTop: 16 }}>
         {error && (
           <div style={{ marginBottom: 12 }}>
@@ -364,7 +469,7 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
           </div>
         )}
 
-        {!hasRows ? (
+        {!hasAnyRows ? (
           <Panel style={{ padding: 28 }} t={t}>
             <div style={{ textAlign: "center", padding: "26px 0" }}>
               <div
@@ -402,68 +507,178 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
               </div>
             </div>
           </Panel>
+        ) : !hasRows ? (
+          <Panel style={{ padding: 28 }} t={t}>
+            <div style={{ textAlign: "center", padding: "18px 0" }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: t.text }}>No Matching Inference Results</div>
+              <div style={{ marginTop: 8, fontSize: 13, fontWeight: 650, color: t.subtext }}>
+                No result matches “{searchQuery.trim()}”.
+              </div>
+            </div>
+          </Panel>
         ) : (
           <ErrorBoundary>
             <AudioTrackTable
               darkMode={darkMode}
-              trackPairs={trackPairs}
+              trackPairs={filteredTrackPairs}
               vocalModeType="inference"
-              vocalMode={vocalMode}
-              handleVocalModeChange={handleVocalModeChange}
+              vocalMode="converted"
               handleDownload={handleDownload}
-              showVocalToggle={true}
+              showVocalToggle={false}
+              enablePerFileVocalToggle
               vocalsFileType="inference"
               showDatasetButton={false}
               showInferenceButton={false}
               showInferenceResultsActions={true}
+              showHeaderWorkflowActions={false}
+              hideActionBar
+              handleCoverWithTracks={onCoverWithTracks}
               onReturnToModelSelection={handleReturnToModelSelection}
               onReturnToInferenceParams={showSelectionButton ? handleReturnToInferenceParams : null}
+              onRowInferenceParams={handleReturnToInferenceParams}
               externalSelectedRows={selectedRows} // important
               onRowSelect={handleRowSelect} // important
               onSelectAll={handleSelectAllRows} // important
               onDeselectAll={handleDeselectAllRows} // important
+              onDeleteSelected={handleOpenDelete}
+              externalDeleteResult={deleteState.result}
+              onClearDeleteResult={handleClearDeleteResult}
               enableGrouping
               onSetReaction={handleSetReaction}
               reactionPendingByRunId={reactionPendingByRunId}
               defaultLabel=" "
+              vocalModeByGroupKey={groupVocalModeByKey}
+              onGroupVocalModeChange={handleGroupVocalModeChange}
               volume={volumeRef.current}
               header={<div style={{ padding: 14 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                  <div
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: 16,
-                      display: "grid",
-                      placeItems: "center",
-                      border: `1px solid ${t.hairline}`,
-                      background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <AudioFileIcon style={{ color: t.text }} />
-                  </div>
+
 
                   <div style={{ flex: "1 1 340px", minWidth: 240 }}>
-                    <div style={{ fontSize: 26, fontWeight: 950, letterSpacing: -0.6, color: t.text, lineHeight: 1.1 }}>
+                    <div style={{
+                      fontSize: "28px",
+                      fontWeight: 900,
+                      letterSpacing: "-0.02em",
+                      margin: "0px",
+                      textTransform: "uppercase", color: t.text, lineHeight: 1.1
+                    }}>
                       Past Inference Results
                     </div>
-                    <div style={{ marginTop: 4, fontSize: 13, fontWeight: 650, color: t.subtext }}>
-                      View, play, and download your previous voice inference results.
-                    </div>
+
                   </div>
 
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <Btn
-                      variant="outline"
-                      onClick={fetchInferenceResults}
-                      style={{ height: 40, padding: "0 14px" }}
-                      title="Refresh"
-                      t={t}
+                  <div style={{ width: "100%", marginTop: 12 }}>
+                    <div
+                      style={{
+                        padding: 8,
+                        borderRadius: 16,
+                        border: `1px solid ${t.hairline}`,
+                        background: t.isDark ? "rgba(28,28,33,0.8)" : "rgba(255,255,255,0.9)",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                      }}
                     >
-                      Refresh
-                    </Btn>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+                          <div style={{ position: "relative", flex: "1 1 280px", minWidth: 0 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "10px 12px",
+                                borderRadius: 12,
+                                border: `1px solid ${isSearchFocused ? (t.isDark ? "rgba(255,255,255,0.2)" : t.primaryWash) : t.hairline}`,
+                                background: isSearchFocused ? (t.isDark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.04)") : (t.isDark ? "rgba(0,0,0,0.25)" : "rgba(0,0,0,0.03)"),
+                                transition: "border-color 180ms, background 180ms",
+                              }}
+                            >
+                              <SearchIcon style={{ fontSize: 18, color: t.subtext }} />
+                              <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onFocus={() => setIsSearchFocused(true)}
+                                onBlur={() => setTimeout(() => setIsSearchFocused(false), 180)}
+                                placeholder="Search your library or the community..."
+                                style={{
+                                  flex: 1,
+                                  background: "transparent",
+                                  border: "none",
+                                  outline: "none",
+                                  color: t.text,
+                                  fontSize: 14,
+                                  fontWeight: 600,
+                                  minWidth: 0,
+                                }}
+                              />
+                              {searchQuery && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSearchQuery("")}
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  style={{ padding: 4, border: "none", background: "transparent", cursor: "pointer", color: t.subtext, display: "flex" }}
+                                >
+                                  <CloseIcon style={{ fontSize: 16 }} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
 
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <Btn t={t} variant="outline" onClick={handleSelectAllRows} style={{ height: 40, padding: "0 16px", fontSize: 12, fontWeight: 700 }}>
+                              Select All
+                            </Btn>
+                            <div style={{ maxWidth: selectedRows.length > 0 ? 120 : 0, opacity: selectedRows.length > 0 ? 1 : 0, overflow: "hidden", transition: "all 180ms ease" }}>
+                              <Btn t={t} variant="outline" onClick={handleDeselectAllRows} style={{ height: 40, padding: "0 14px" }}>
+                                Clear
+                              </Btn>
+                            </div>
+                            <div style={{ width: 1, height: 20, background: t.hairline }} />
+                            <div style={{ position: "relative" }}>
+                              <IconBtn
+                                t={t}
+                                title="Delete selected"
+                                onClick={handleOpenDelete}
+                                disabled={selectedRows.length === 0}
+                                style={{
+                                  borderColor: selectedRows.length > 0 ? "rgba(255,59,48,0.45)" : t.hairline,
+                                  background:
+                                    selectedRows.length > 0
+                                      ? "linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))"
+                                      : `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
+                                  color: selectedRows.length > 0 ? "white" : t.subtext,
+                                }}
+                              >
+                                <DeleteIcon style={{ fontSize: 20 }} />
+                              </IconBtn>
+
+                              {selectedRows.length > 0 && (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: -6,
+                                    right: -6,
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: 999,
+                                    background: "red",
+                                    color: "white",
+                                    display: "grid",
+                                    placeItems: "center",
+                                    fontSize: 12,
+                                    fontWeight: 950,
+                                    border: `2px solid ${t.isDark ? "rgba(18,18,20,0.8)" : "rgba(255,255,255,0.85)"}`,
+                                    boxShadow: t.shadowSoft,
+                                  }}
+                                >
+                                  {selectedRows.length}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>}
@@ -477,7 +692,15 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
           @keyframes spin{to{transform:rotate(360deg)}}
         `}</style>
 
-</>
+      <DeleteDialog
+        deleteDialogOpen={deleteDialogOpen}
+        setDeleteDialogOpen={setDeleteDialogOpen}
+        selectedRows={selectedRows}
+        isDeleting={deleteState.loading}
+        confirmDelete={confirmDelete}
+      />
+
+    </>
   );
 }
 
@@ -489,6 +712,7 @@ export default memo(InferenceView, (prevProps, nextProps) => {
     prevProps.darkMode === nextProps.darkMode &&
     prevProps.liveInferenceData === nextProps.liveInferenceData &&
     prevProps.onSelectionToParams === nextProps.onSelectionToParams &&
-    prevProps.onSelectionToModelSelection === nextProps.onSelectionToModelSelection
+    prevProps.onSelectionToModelSelection === nextProps.onSelectionToModelSelection &&
+    prevProps.onCoverWithTracks === nextProps.onCoverWithTracks
   );
 });

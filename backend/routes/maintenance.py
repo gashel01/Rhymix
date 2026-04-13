@@ -1,0 +1,197 @@
+import os
+import shutil
+import time
+from pathlib import Path
+
+from flask import Blueprint, jsonify, request
+
+from clean_vocals import clean_directories
+from backend.jobs.registry import active_jobs
+from backend.paths.manager import paths
+
+bp = Blueprint("maintenance", __name__)
+
+
+def _coerce_bool(value, default: bool = True) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
+
+
+def _resolve_rvc_model_path(payload: dict):
+    model_path = payload.get("modelPath") or payload.get("model_path")
+    model_name = payload.get("modelName") or payload.get("model_name")
+
+    def _find_pth(root: Path) -> Path | None:
+        if not root.exists():
+            return None
+        candidates = [p for p in root.rglob("*.pth") if p.is_file()]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda p: p.stat().st_mtime)
+
+    if model_path:
+        p = Path(model_path)
+        if not p.is_absolute():
+            p = paths.APPLIO_MODELS_DIR / model_path
+        if p.is_dir():
+            return _find_pth(p)
+        if p.is_file():
+            return p
+
+    if model_name:
+        p = paths.APPLIO_MODELS_DIR / model_name
+        if p.exists():
+            return _find_pth(p)
+
+    return _find_pth(paths.APPLIO_MODELS_DIR)
+
+
+def warmup_models(payload: dict | None = None) -> dict:
+    data = payload or {}
+    results = {"started_at": time.time(), "details": {}}
+
+    if _coerce_bool(data.get("acestep", True), True):
+        params = data.get("acestep") if isinstance(data.get("acestep"), dict) else {}
+        if "initialize_lm" not in params and os.getenv("ACESTEP15_WARMUP_LM") is not None:
+            params["initialize_lm"] = _coerce_bool(os.getenv("ACESTEP15_WARMUP_LM"), True)
+        try:
+            from backend.features.song_generation.providers.ace_step import warmup_acestep
+
+            results["details"]["acestep"] = warmup_acestep(params)
+        except Exception as exc:
+            results["details"]["acestep"] = {"status": "error", "error": str(exc)}
+    else:
+        results["details"]["acestep"] = {"status": "skipped"}
+
+    if _coerce_bool(data.get("rvc", True), True):
+        params = data.get("rvc") if isinstance(data.get("rvc"), dict) else {}
+        try:
+            from applio.core import import_voice_converter
+
+            model_path = _resolve_rvc_model_path(params)
+            if not model_path:
+                results["details"]["rvc"] = {"status": "skipped", "reason": "no_model_found"}
+            else:
+                vc = import_voice_converter()
+                vc.get_vc(str(model_path), sid=0)
+                embedder = params.get("embedderModel") or params.get("embedder_model") or "contentvec"
+                embedder_custom = params.get("embedderModelCustom") or params.get("embedder_model_custom")
+                vc.load_hubert(embedder, embedder_custom)
+                results["details"]["rvc"] = {"status": "ok", "model_path": str(model_path)}
+        except Exception as exc:
+            results["details"]["rvc"] = {"status": "error", "error": str(exc)}
+    else:
+        results["details"]["rvc"] = {"status": "skipped"}
+
+    results["completed_at"] = time.time()
+    results["duration_sec"] = round(results["completed_at"] - results["started_at"], 2)
+    return results
+
+
+def clean_directory(d, force=False, show_empty=True):
+    if not d.exists():
+        d.mkdir(parents=True, exist_ok=True)
+        return show_empty and print(f"  ✅ {d.name} already empty")
+    try:
+        items = list(d.glob("*"))
+        if not items:
+            return show_empty and print(f"  ✅ {d.name} already empty")
+        n = 0
+        for p in items:
+            try:
+                (time.sleep(0.1), p.unlink(missing_ok=True)) if p.is_file() else shutil.rmtree(p, ignore_errors=True)
+                n += 1
+            except Exception:
+                if force and os.name == "nt":
+                    try:
+                        os.system(f'del /F /Q "{p}"') if p.is_file() else shutil.rmtree(p, ignore_errors=True)
+                        n += 1
+                    except Exception:
+                        pass
+        print(f"  ✅ {d.name} cleaned ({n} items removed)")
+    except Exception as e:
+        print(f"  ❌ Error cleaning {d}: {e}")
+
+
+def clean_diarization_directories(include_input=False, force=False):
+    for d in [paths.TALKING_RESULTS_DIR, paths.TALKING_TEMP_DIR] + (
+        [paths.TALKING_UPLOADS_DIR] if include_input else []
+    ):
+        print(f"Cleaning diarization directory: {d}")
+        clean_directory(d, force=force)
+
+
+@bp.route("/api/clean", methods=["POST"])
+def clean_all():
+    d = request.json or {}
+    include_input, force = d.get("include_input", True), d.get("force", True)
+
+    print("\n" + "=" * 48 + "\n           CLEANING ALL DIRECTORIES\n" + "=" * 48)
+    print("\n--- Cleaning Singing/Vocal Directories ---")
+    clean_directories(include_input=include_input, force=force)
+
+    print("\n--- Cleaning Job Directories ---")
+    if paths.SINGING_JOBS_DIR.exists():
+        print(f"Cleaning job directory: {paths.SINGING_JOBS_DIR}")
+        clean_directory(paths.SINGING_JOBS_DIR, force=force)
+
+    print("\n--- Cleaning Diarization/Talking Directories ---")
+    clean_diarization_directories(include_input=include_input, force=force)
+
+    if include_input:
+        print("\n--- Cleaning Original Audio Directory ---")
+        clean_directory(paths.ORIGINAL_AUDIO_DIR, force=force)
+
+    print("\n--- Cleaning Additional Temp Directories ---")
+    for p, label in [
+        (Path("diarization/pyannote-diarization/temp_segments"), "diarization temp segments"),
+        (Path("temp"), "general temp directory"),
+    ]:
+        if p.exists():
+            print(f"Cleaning {label}: {p}")
+            clean_directory(p, force=force)
+
+    print("\n" + "=" * 48 + "\n     ALL DIRECTORIES CLEANED SUCCESSFULLY\n" + "=" * 48 + "\n")
+    return jsonify(
+        {
+            "message": "All directories cleaned successfully",
+            "included_input": include_input,
+            "cleaned": {
+                "singing_vocals": True,
+                "job_directories": True,
+                "diarization": True,
+                "original_audio": include_input,
+                "temp_files": True,
+            },
+        }
+    )
+
+
+@bp.route("/api/prepare-processing", methods=["POST"])
+def prepare_processing():
+    try:
+        time.sleep(2.0)
+        clean_directories(include_input=False, force=True)
+        return jsonify({"status": "ready"})
+    except Exception as e:
+        print(f"Error preparing for processing: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/job/<job_id>")
+def get_job_status(job_id):
+    return (jsonify(active_jobs[job_id]), 200) if job_id in active_jobs else (
+        jsonify({"error": "Job not found"}),
+        404,
+    )
+
+
+@bp.route("/api/warmup", methods=["POST", "GET"])
+def warmup():
+    data = request.get_json(silent=True) or {}
+    return jsonify(warmup_models(data))

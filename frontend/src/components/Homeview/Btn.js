@@ -14,6 +14,36 @@ export const Btn = ({ children, onClick, variant = "secondary", disabled, style,
         fg: "white",
         bd: "rgba(52,199,89,0.45)",
       },
+      danger: {
+        bg: `linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))`,
+        fg: "white",
+        bd: "rgba(255,59,48,0.45)",
+      },
+      warning: {
+        bg: `linear-gradient(180deg, rgba(255,149,0,0.95), rgba(255,149,0,0.78))`,
+        fg: "white",
+        bd: "rgba(255,149,0,0.45)",
+      },
+      info: {
+        bg: `linear-gradient(180deg, rgba(10,132,255,0.95), rgba(10,132,255,0.78))`,
+        fg: "white",
+        bd: "rgba(10,132,255,0.45)",
+      },
+      neutral: {
+        bg: `linear-gradient(180deg, rgba(128,128,128,0.95), rgba(128,128,128,0.78))`,
+        fg: "white",
+        bd: "rgba(128,128,128,0.45)",
+      },
+      light: {
+        bg: `linear-gradient(180deg, rgba(248,248,250,0.95), rgba(248,248,250,0.78))`,
+        fg: "black",
+        bd: "rgba(248,248,250,0.45)",
+      },
+      dark: {
+        bg: `linear-gradient(180deg, rgba(18,18,20,0.95), rgba(18,18,20,0.78))`,
+        fg: "white",
+        bd: "rgba(18,18,20,0.45)",
+      },
     }[variant];
 
     return (

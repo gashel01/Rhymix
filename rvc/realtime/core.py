@@ -50,6 +50,7 @@ class Realtime:
         **kwargs,
         # device: str = "cuda",
     ):
+        self.pipeline = None
         self.sample_rate = SAMPLE_RATE
         self.convert_buffer = None
         self.pitch_buffer = None
@@ -60,7 +61,7 @@ class Realtime:
         # Convert dB to RMS
         self.input_sensitivity = 10 ** (silent_threshold / 20)
         self.window_size = self.sample_rate // 100
-        self.dtype = torch.float32  # torch.float16 if config.is_half else torch.float32
+        self.dtype = torch.float16  # FP16: 2x throughput on RTX Tensor Cores vs float32
 
         self.vad = (
             VADProcessor(
@@ -239,7 +240,7 @@ class Realtime:
         vol = max(vol_t.item(), 0)
 
         if self.vad is not None:
-            is_speech = self.vad.is_speech(audio_input_16k.cpu().numpy().copy())
+            is_speech = self.vad.is_speech(audio_input_16k.cpu().numpy())
             if not is_speech:
                 # Busy wait to keep power manager happy and clocks stable. Running pipeline on-demand seems to lag when the delay between
                 # voice changer activation is too high.
@@ -323,7 +324,12 @@ class Realtime:
         return audio_out, vol
 
     def __del__(self):
-        del self.pipeline
+        pipeline = getattr(self, "pipeline", None)
+        if pipeline is not None:
+            try:
+                del self.pipeline
+            except Exception:
+                pass
 
 
 class VoiceChanger:

@@ -1,0 +1,400 @@
+.bw-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 16px;
+  background: linear-gradient(130deg, #f2f6ff, #edf9f1);
+  color: #102114;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.bw-page.embedded {
+  min-height: auto;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+  background: transparent;
+}
+
+.bw-page.pro {
+  background: #f7f7f7;
+}
+
+.bw-card {
+  width: min(920px, 100%);
+  background: #ffffff;
+  border: 1px solid #dce8df;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 12px 30px rgba(16, 33, 20, 0.08);
+}
+
+.bw-page.embedded .bw-card {
+  width: 100%;
+  box-shadow: none;
+  border-radius: 10px;
+  border-color: #cfdbd4;
+}
+
+.bw-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bw-header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bw-header-main h1 {
+  margin: 0;
+}
+
+.bw-header-row {
+  display: flex;
+  gap: 20px;
+}
+
+.bw-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bw-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.bw-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.bw-settings label {
+  display: grid;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+
+.bw-settings input {
+  min-height: 40px;
+  border: 1px solid #b8cbc4;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.bw-copy {
+  margin: 0;
+  color: #335246;
+}
+
+.bw-progress {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bw-pill {
+  border: 1px solid #cddfd7;
+  background: #f7fbf8;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bw-pill.active {
+  border-color: #226647;
+  background: #e6f5ec;
+  font-weight: 700;
+}
+
+.bw-pill.done {
+  border-color: #2f7d57;
+}
+
+.bw-pill-count {
+  font-size: 0.75rem;
+  color: #376153;
+  background: #edf6f1;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.bw-meter {
+  margin: 8px 0 12px;
+  position: relative;
+  height: 28px;
+  border: 1px solid #b8cbc4;
+  border-radius: 99px;
+  overflow: hidden;
+  background: #f8fbf9;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 10px;
+}
+
+.bw-meter-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #3ecf8e, #37a96e);
+  opacity: 0.45;
+}
+
+.bw-warn {
+  margin-left: auto;
+  color: #9f2f2f;
+  font-weight: 700;
+}
+
+.bw-level {
+  margin-left: auto;
+  border-radius: 999px;
+  border: 1px solid #c8d8d0;
+  background: #f5fbf7;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.bw-level.good-level {
+  border-color: #2f8f5f;
+  color: #1e6440;
+  background: #ebf8f1;
+}
+
+.bw-level.too-quiet {
+  border-color: #c8924c;
+  color: #915f1f;
+  background: #fff8ee;
+}
+
+.bw-level.clipping {
+  border-color: #c86565;
+  color: #8d2f2f;
+  background: #fff0f0;
+}
+
+.bw-countdown {
+  font-size: 2.2rem;
+  font-weight: 900;
+}
+
+.bw-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bw-primary,
+.bw-secondary,
+.bw-chip {
+  cursor: pointer;
+  border: 1px solid #b9c9c3;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #fff;
+}
+
+.bw-primary {
+  border-color: #2f8f5f;
+  background: #2f8f5f;
+  color: #fff;
+  font-weight: 700;
+}
+
+.bw-secondary {
+  background: #f3f8f5;
+}
+
+.bw-secondary.active {
+  border-color: #2f8f5f;
+  background: #e9f7ef;
+  color: #1f6240;
+}
+
+.bw-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.bw-results,
+.bw-review {
+  margin-top: 12px;
+  border: 1px solid #dce8df;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.bw-result-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.bw-chip-row {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bw-chip {
+  font-size: 0.82rem;
+  background: #f7fbf8;
+}
+
+.bw-chip.ok {
+  border-color: #23935f;
+  background: #eaf8f0;
+}
+
+.bw-chip.bad {
+  border-color: #bf5a5a;
+  background: #fff2f2;
+}
+
+.bw-quality-banner {
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #cddfd7;
+  font-weight: 600;
+}
+
+.bw-quality-banner.good {
+  border-color: #2f8f5f;
+  background: #ebf9f1;
+  color: #1f6140;
+}
+
+.bw-quality-banner.bad {
+  border-color: #d07b7b;
+  background: #fff2f2;
+  color: #8d2f2f;
+}
+
+.bw-tips {
+  margin-top: 10px;
+  background: #f6faf8;
+  border: 1px solid #dce8df;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.bw-tips p {
+  margin: 0 0 6px;
+  color: #294f40;
+}
+
+.bw-tips p:last-child {
+  margin-bottom: 0;
+}
+
+.bw-review-item {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.bw-review-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bw-error {
+  margin-top: 10px;
+  color: #8b1f1f;
+  background: #ffeaea;
+  border: 1px solid #f2c6c6;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.bw-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 13, 10, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 2000;
+}
+
+.bw-modal {
+  width: min(760px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #dce8df;
+  border-radius: 14px;
+  box-shadow: 0 20px 56px rgba(8, 13, 10, 0.24);
+}
+
+.bw-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e7efea;
+}
+
+.bw-modal-header h3 {
+  margin: 0;
+}
+
+.bw-modal-body {
+  padding: 14px;
+}
+
+.bw-modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 14px;
+  border-top: 1px solid #e7efea;
+}
+
+.bw-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #cfded6;
+  background: #f8fbf9;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .bw-review-item {
+    grid-template-columns: 1fr;
+  }
+
+  .bw-modal-footer {
+    justify-content: stretch;
+  }
+
+  .bw-modal-footer .bw-primary,
+  .bw-modal-footer .bw-secondary {
+    flex: 1;
+  }
+}

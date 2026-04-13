@@ -4,6 +4,7 @@ import ErrorIcon from "@mui/icons-material/Error";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 
 // keep existing local components (NOT changing icons)
 import TextOverflow from "../TextOverflow.tsx";
@@ -11,11 +12,10 @@ import WaveformCell from "./WaveformCell";
 import TrackControls from "./TrackControls";
 import { getFileNameFromPath } from "./utils";
 import { getBaseNameAndExt, makeDownloadName } from "../../utils/audioUtils";
-import {Theme} from "../Homeview/Theme";
-import {Pill} from "../ModelView/Pill";
-import {ThumbsUpIcon, ThumbsDownIcon, StarIcon, CornerDownRightIcon} from "lucide-react";
-
-const STYLE_ID = "vf-audiotrackrow-css-v2";
+import { Theme } from "../Homeview/Theme";
+import { Pill } from "../ModelView/Pill";
+import { ThumbsUpIcon, ThumbsDownIcon, StarIcon, CornerDownRightIcon, ExternalLink, Fingerprint, SlidersHorizontal, Image, Trash2 } from "lucide-react";
+import styles from "./AudioTrackRow.module.css";
 const AudioTrackRow = (props) => {
   const {
     pair,
@@ -52,61 +52,78 @@ const AudioTrackRow = (props) => {
     versionCount = 0,
     favoriteCount = 0,
     reaction = "none",
+    reactionRunId = null,
     reactionPending = false,
     onToggleGroup,
     onSetReaction,
+    onOpenStudio,
     darkMode,
+    showPerFileVocalToggle = false,
+    vocalPathOverride,
+    vocalUrlOverride,
+    vocalSourceOptions = [],
+    selectedVocalSource,
+    activeConvertedLabel,
+    onVocalSourceChange,
+    onMenuModelSelection,
+    onMenuInferenceParams,
+    onMenuCover,
+    onMenuDelete,
   } = props;
-// ---------- Theme tokens ----------
-const {t} = Theme({darkMode});
-  // inject CSS once (don’t render <style> inside <tbody>)
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    if (document.getElementById(STYLE_ID)) return;
+  const { t } = Theme({ darkMode });
 
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = `
-      @keyframes atr-shimmer {
-        0% { transform: translateX(-60%); }
-        100% { transform: translateX(60%); }
-      }
 
-      /* 3-column grid: instrumental | controls | vocal  */
-      .atr-grid{
-        display:grid;
-        grid-template-columns: 50px minmax(280px, 1fr) 60px minmax(280px, 1fr) 50px;
-        gap: 10px;
-        align-items: center;
-        width: 100%;
-      }
-
-      /* keep side-by-side on most screens; stack only on small */
-      @media (max-width: 900px){
-        .atr-grid{
-          grid-template-columns: 1fr;
-        }
-        .atr-controls{ order: 2; display:flex; justify-content:center; }
-        .atr-inst{ order: 1; }
-        .atr-vocal{ order: 3; }
-      }
-    `;
-    document.head.appendChild(style);
-  }, []);
-
-  
 
   // ---------- Refs ----------
   const iwRef = useRef(null);
   const vwRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Compatibility: Handle different schemas
   const instPath = pair?.instrumental || pair?.original || "";
-  const vocalPath = pair?.vocal || pair?.converted || "";
+  const vocalPath = vocalPathOverride || pair?.vocal || pair?.converted || "";
+  const vocalUrl = vocalUrlOverride || pair?.vocalUrl || "";
   const trackPairId = pair?.id || `${getFileNameFromPath(instPath)}-${getFileNameFromPath(vocalPath)}`;
   const instrumentalKey = pair?.instrumentalKey || `${trackPairId}-instrumental`;
   const vocalKey = pair?.vocalKey || `${trackPairId}-vocal`;
   const isCurrentlyPlayingBoth = Boolean(playingBoth && playingBoth.id === trackPairId);
+  const hasConvertedChoices = Array.isArray(vocalSourceOptions) && vocalSourceOptions.length > 0;
+  const inferredOptions = hasConvertedChoices
+    ? vocalSourceOptions
+    : [{ value: "inferred", label: "Inferred" }];
+  const selectedVocalValue =
+    selectedVocalSource || (vocalMode === "original" ? "original" : inferredOptions?.[0]?.value || "inferred");
+  const isOriginalVocal = selectedVocalValue === "original";
+  const convertedSelection = String(
+    isOriginalVocal
+      ? inferredOptions[0]?.value || "inferred"
+      : selectedVocalValue || inferredOptions[0]?.value || "inferred"
+  );
+  const convertedLabel =
+    activeConvertedLabel ||
+    inferredOptions.find((option) => String(option.value) === String(convertedSelection))?.label ||
+    modelUsed ||
+    "Inferred";
+  const leftLaneLabel = "Instrumental";
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+    const onEsc = (event) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [menuOpen]);
 
   // Sync vocal position with instrumental when vocal ready
   const handleVocalReady = useCallback((wf) => {
@@ -128,36 +145,23 @@ const {t} = Theme({darkMode});
   // ---------- UI bits ----------
   const SpinnerBar = ({ color = "#1976d2" }) => (
     <div
+      className={styles.spinnerBar}
       style={{
-        width: "100%",
-        height: 70,
-        borderRadius: 10,
         border: `1px solid ${t.hairline}`,
-        background: t.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
-        overflow: "hidden",
-        position: "relative",
+        background: t.cardA,
       }}
       aria-label="Processing"
     >
       <div
+        className={styles.spinnerShimmer}
         style={{
-          position: "absolute",
-          inset: 0,
-          background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)",
-          transform: "translateX(-40%)",
-          animation: "atr-shimmer 1.2s ease-in-out infinite",
           mixBlendMode: t.isDark ? "screen" : "multiply",
         }}
       />
       <div
+        className={styles.spinnerProgress}
         style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: "36%",
           background: color,
-          opacity: 0.22,
         }}
       />
     </div>
@@ -165,13 +169,10 @@ const {t} = Theme({darkMode});
 
   const FailedCell = () => (
     <div
+      className={styles.failedCell}
       style={{
-        height: 60,
-        borderRadius: 10,
         border: `1px solid ${t.hairline}`,
-        background: t.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
-        display: "grid",
-        placeItems: "center",
+        background: t.cardA,
       }}
       aria-label="Failed"
     >
@@ -179,7 +180,7 @@ const {t} = Theme({darkMode});
     </div>
   );
 
-  
+
 
   const processingState = processing?.state;
   const isProcessingRow = processingState && processingState !== "ready";
@@ -223,15 +224,15 @@ const {t} = Theme({darkMode});
       displayName: pair?.displayName || name,
     });
     const isConverted = vocalMode === "converted";
-    const namingType = vocalModeType === "inference" ? "raw_vocal" : pair?.vocalFileType || vocalsFileType || "processed_vocals";
+    const namingType = vocalModeType === "inference" ? "raw_vocal" : vocalsFileType || pair?.vocalFileType || "processed_vocals";
     const vocalType = isConverted ? "converted" : namingType;
     const downloadName = makeDownloadName({
       baseName,
       type: vocalType,
-      modelName: pair?.modelName || modelUsed,
+      modelName: modelUsed || pair?.modelName,
       ext,
     });
-    const fileType = isConverted ? "inference" : pair?.vocalFileType || vocalsFileType;
+    const fileType = isConverted ? "inference" : vocalsFileType || pair?.vocalFileType;
     handleDownload(fileType, vocalPath, downloadName);
   }, [handleDownload, modelUsed, name, pair?.displayName, pair?.modelName, pair?.originalName, pair?.vocalFileType, vocalMode, vocalModeType, vocalPath, vocalsFileType]);
 
@@ -240,8 +241,8 @@ const {t} = Theme({darkMode});
   const downloadDisabledReason = !instPath
     ? "Instrumental missing"
     : !vocalPath
-    ? "Vocal missing"
-    : null;
+      ? "Vocal missing"
+      : null;
 
   const handleDownloadMerged = useCallback(async () => {
     if (!handleDownloadFullSong || isMerging || !canMerge) return;
@@ -250,14 +251,14 @@ const {t} = Theme({darkMode});
       displayName: pair?.displayName || name,
     });
     const isConverted = vocalMode === "converted";
-    const mergedModelName = isConverted ? (pair?.modelName || modelUsed || "model") : "original";
+    const mergedModelName = isConverted ? (modelUsed || pair?.modelName || "model") : "original";
     const downloadName = makeDownloadName({
       baseName,
       type: "merged",
       modelName: mergedModelName,
       ext,
     });
-    const vocalType = isConverted ? "inference" : pair?.vocalFileType || vocalsFileType || "raw_vocals";
+    const vocalType = isConverted ? "inference" : vocalsFileType || pair?.vocalFileType || "raw_vocals";
     const instrumentalPayload = { type: "instrumental", id: instPath };
     const vocalPayload = { type: vocalType, id: vocalPath };
 
@@ -321,7 +322,7 @@ const {t} = Theme({darkMode});
     const url =
       type === "inst"
         ? pair?.instrumentalUrl || `/api/download/instrumental/${path}`
-        : pair?.vocalUrl || `/api/download/${vocalsFileType}/${path}`;
+        : vocalUrl || pair?.vocalUrl || `/api/download/${vocalsFileType}/${path}`;
 
     // Instrumental key: file identity only (never changes with vocal mode). Vocal key: file + variant (remounts only vocal).
     const stableKey =
@@ -350,53 +351,41 @@ const {t} = Theme({darkMode});
 
   const displayName = name || `Track ${index + 1}`;
   const actionsDisabled = status === "processing" || status === "failed";
-  const canSetReaction = Boolean(onSetReaction && pair?.runId);
+  const effectiveReactionRunId = reactionRunId || pair?.runId || null;
+  const canSetReaction = Boolean(onSetReaction && effectiveReactionRunId);
   const currentReaction = reaction || "none";
   const reactionDisabled = actionsDisabled || reactionPending || !canSetReaction;
   const handleReactionClick = useCallback(
     (value) => {
-      if (!pair?.runId) return;
+      if (!effectiveReactionRunId) return;
       const next = currentReaction === value ? "none" : value;
-      onSetReaction?.(pair.runId, next, currentReaction);
+      onSetReaction?.(effectiveReactionRunId, next, currentReaction);
     },
-    [currentReaction, onSetReaction, pair?.runId]
+    [currentReaction, effectiveReactionRunId, onSetReaction]
   );
 
   const ReactionButton = ({ value, label, icon }) => {
     const active = currentReaction === value;
     const iconColor = active ? t.flatIconActive : t.flatIconInactive;
     if (icon) {
-      icon = React.cloneElement(icon, {stroke:iconColor,  fill: iconColor , color: iconColor});
+      icon = React.cloneElement(icon, { stroke: iconColor, fill: iconColor, color: iconColor });
     }
     return (
       <Tooltip title={active ? `Clear ${label}` : `Set ${label}`} placement="top">
         <span>
           <button
             type="button"
+            className={styles.reactionBtn}
             onClick={() => handleReactionClick(value)}
             disabled={reactionDisabled}
             aria-pressed={active}
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "6px",
-              borderRadius: "6px",
-              border: active ? `1px solid ${t.hairline}` : "none",
               background: active
-                ? t.isDark
-                  ? "rgba(255,255,255,0.12)"
-                  : "rgba(0,0,0,0.08)"
-                : t.isDark
-                  ? "rgba(255,255,255,0.04)"
-                  : "rgba(0,0,0,0.03)",
-              // background: "transparent",
-              // border: "none",
+                ? (t.isDark ? "rgba(0,194,255,0.14)" : "rgba(0,122,255,0.12)")
+                : "transparent",
               color: active ? t.text : t.subtext,
               cursor: reactionDisabled ? "not-allowed" : "pointer",
-             
               opacity: reactionDisabled ? 0.4 : 1,
-              fontSize: 14,
             }}
           >
             {icon}
@@ -415,172 +404,395 @@ const {t} = Theme({darkMode});
     isGroupedVersion && createdAt && !Number.isNaN(Date.parse(createdAt))
       ? new Date(createdAt).toLocaleString()
       : null;
+  const baseTimestamp =
+    createdAt && !Number.isNaN(Date.parse(createdAt))
+      ? new Date(createdAt).toLocaleString()
+      : null;
+  const metaLine = [paramsSummary, runTimestamp || baseTimestamp].filter(Boolean).join(" • ");
 
   return (
-    <tr style={{  ...style }}>
+    <tr style={{ ...style }}>
 
       {/* Waveforms + controls + bare checkbox */}
-      <td style={{   borderBottom: `1px solid ${t.hairline}`, padding: "5px 10px 10px 10px", position: "relative" }}>
-        {/* Name */}
-        <div style={{ display: "flex",marginTop: 5, width: "100%", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6, paddingLeft: isGroupedVersion ? 14 : 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-            {isGroupHeader && (
-              <button
-                type="button"
-                onClick={handleGroupToggle}
-                aria-label={isGroupExpanded ? "Collapse group" : "Expand group"}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 20,
-                  height: 20,
-                  borderRadius: 6,
-                  border: `1px solid ${t.hairline}`,
-                  background: t.isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
-                  color: t.text,
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              >
-                {isGroupExpanded ? <KeyboardArrowDownIcon style={{ fontSize: 18 }} /> : <KeyboardArrowRightIcon style={{ fontSize: 18 }} />}
-              </button>
-            )}
-            {isGroupedVersion && (
-              <span style={{ fontSize: 12, fontWeight: 800, color: t.subtext }}><CornerDownRightIcon size={16}  /></span>
-            )}
-           
-            <TextOverflow
-              text={normaliseTitle(displayName)}
-              style={{ fontFamily: "Poppins", fontWeight: 500, letterSpacing: -0.2, color: t.text, display: "flex", alignItems: "center" }}
-            />
-            
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          
-            
-            {isGroupHeader && versionCount > 1 && <Pill tone="version" t={t} style={{ fontFamily: "Rubik", fontWeight: 500, borderRadius: "6px" }}>{versionCount} versions</Pill>}
-            {isGroupHeader && favoriteCount > 0 && <Pill tone="favorite" t={t} style={{fontFamily: "Rubik", fontWeight: 500, borderRadius: "6px" }}>{favoriteCount} fav</Pill>}
-            {isProcessingRow && (
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <Pill t={t} tone="processing" style={{ fontFamily: "Rubik", fontWeight: 500, borderRadius: "6px" }}>{processingLabel}</Pill>
-                <Tooltip title={processingTooltip} placement="top">
-                  <span
+      <td className={styles.tableCell}>
+        <div
+          className={styles.rowWrapper}
+          style={{
+            border: `1px solid ${isSelected ? t.primary : t.hairline}`,
+            background: isSelected
+              ? (t.isDark ? "rgba(24,24,31,0.92)" : "rgba(236,242,255,0.95)")
+              : (t.isDark ? "rgba(20,20,26,0.72)" : t.cardA),
+            boxShadow: isSelected
+              ? (t.isDark ? "0 0 22px rgba(99,102,241,0.24)" : "0 10px 24px rgba(99,102,241,0.16)")
+              : t.shadowSoft,
+          }}
+        >
+          {/* Header */}
+          <div className={styles.headerFlex} style={{ paddingLeft: isGroupedVersion ? 14 : 6 }}>
+            <div className={styles.headerLeftFlex}>
+              {vocalModeType !== "inference" && isGroupHeader && (
+                <button
+                  type="button"
+                  onClick={handleGroupToggle}
+                  aria-label={isGroupExpanded ? "Collapse group" : "Expand group"}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 20,
+                    height: 20,
+                    borderRadius: 6,
+                    border: `1px solid ${t.hairline}`,
+                    background: t.cardB,
+                    color: t.text,
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                >
+                  {isGroupExpanded ? <KeyboardArrowDownIcon style={{ fontSize: 18 }} /> : <KeyboardArrowRightIcon style={{ fontSize: 18 }} />}
+                </button>
+              )}
+              {vocalModeType !== "inference" && isGroupedVersion && (
+                <span className={styles.cornerIcon} style={{ color: t.subtext }}><CornerDownRightIcon size={16} /></span>
+              )}
+
+              <TextOverflow
+                text={normaliseTitle(displayName)}
+                className={styles.textOverflow}
+                style={{ color: t.text }}
+              />
+            </div>
+            <div className={styles.statusBadges}>
+
+
+              {isGroupHeader && versionCount > 1 && <Pill tone="version" t={t} style={{ fontFamily: "Rubik", fontWeight: 500, borderRadius: "6px" }}>{versionCount} versions</Pill>}
+              {isGroupHeader && favoriteCount > 0 && <Pill tone="favorite" t={t} style={{ fontFamily: "Rubik", fontWeight: 500, borderRadius: "6px" }}>{favoriteCount} fav</Pill>}
+              {isProcessingRow && (
+                <div className={styles.processingWrapper}>
+                  <Pill t={t} tone="processing" style={{ fontFamily: "Rubik", fontWeight: 500, borderRadius: "6px" }}>{processingLabel}</Pill>
+                  <Tooltip title={processingTooltip} placement="top">
+                    <span className={styles.infoIconWrapper} style={{ color: t.subtext }}>
+                      <InfoOutlinedIcon style={{ fontSize: 16 }} />
+                    </span>
+                  </Tooltip>
+                </div>
+              )}
+
+              {isNew && (
+
+                <Pill t={t} tone="new" style={{ borderRadius: "6px" }}>NEW</Pill>
+              )}
+              {vocalModeType === "inference" && versionCount > 1 && (
+                <span style={{ fontSize: 10, fontWeight: 800, color: t.subtext, textTransform: "uppercase", letterSpacing: 0.7 }}>
+                  {versionCount} versions
+                </span>
+              )}
+              <div ref={menuRef} style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  aria-label="Row actions"
+                  className={styles.menuToggleBtn}
+                  onClick={() => setMenuOpen((prev) => !prev)}
+                  style={{ color: t.subtext }}
+                >
+                  <MoreHorizIcon style={{ fontSize: 18 }} />
+                </button>
+                {menuOpen && (
+                  <div
+                    className={styles.menuDropdown}
                     style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      color: t.subtext,
-                      cursor: "help",
+                      border: `1px solid ${t.hairline}`,
+                      background: t.isDark ? "rgba(24,24,28,0.98)" : t.cardA,
+                      boxShadow: t.shadowSoft,
                     }}
                   >
-                    <InfoOutlinedIcon style={{ fontSize: 16 }} />
+                    <button
+                      type="button"
+                      disabled={!onOpenStudio || actionsDisabled}
+                      className={styles.menuItemBtn}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onOpenStudio?.(pair);
+                      }}
+                      style={{
+                        color: t.text,
+                        cursor: !onOpenStudio || actionsDisabled ? "not-allowed" : "pointer",
+                        opacity: !onOpenStudio || actionsDisabled ? 0.5 : 1,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                      }}
+                    >
+                      <ExternalLink size={16} /> Open in Studio
+                    </button>
+                    {onMenuModelSelection && (
+                      <button
+                        type="button"
+                        className={styles.menuItemBtn}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onMenuModelSelection();
+                        }}
+                        style={{
+                          color: t.text,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                        }}
+                      >
+                        <Fingerprint size={16} /> Model Selection
+                      </button>
+                    )}
+                    {onMenuInferenceParams && (
+                      <button
+                        type="button"
+                        className={styles.menuItemBtn}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onMenuInferenceParams();
+                        }}
+                        style={{
+                          color: t.text,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                        }}
+                      >
+                        <SlidersHorizontal size={16} /> Inference Params
+                      </button>
+                    )}
+                    {onMenuCover && (
+                      <button
+                        type="button"
+                        className={styles.menuItemBtn}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onMenuCover();
+                        }}
+                        style={{
+                          color: t.text,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                        }}
+                      >
+                        <Image size={16} /> Cover
+                      </button>
+                    )}
+                    {onMenuDelete && (
+                      <button
+                        type="button"
+                        className={styles.menuItemBtn}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onMenuDelete();
+                        }}
+                        style={{
+                          color: t.isDark ? "rgba(255,95,87,0.98)" : "rgba(211,47,47,0.98)",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                        }}
+                      >
+                        <Trash2 size={16} /> Delete
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+          {(metaLine || canSetReaction) && (
+            <div className={styles.metaWrapper}>
+              {metaLine && (
+                <span className={styles.metaText} style={{ color: t.subtext }}>
+                  {metaLine}
+                </span>
+              )}
+              {canSetReaction && (
+                <div className={styles.reactionsGroup}>
+                  <ReactionButton value="like" label="Like" icon={<ThumbsUpIcon size={10} fill={t.flatIconActive} />} />
+                  <ReactionButton value="dislike" label="Dislike" icon={<ThumbsDownIcon size={10} fill={t.flatIconActive} />} />
+                  <ReactionButton value="favorite" label="Favorite" icon={<StarIcon size={10} fill={t.flatIconActive} />} />
+                </div>
+              )}
+            </div>
+          )}
+          <div className={styles.divider} style={{ background: t.hairline }} />
+
+          <div >
+            <div className={`${styles.atrGrid} atr-grid`} style={{ marginTop: "10px" }}>
+
+              <div className={`${styles.atrInst} atr-inst`} style={{ padding: "5px 0px" }}>
+
+              </div>
+
+              {/* Instrumental */}
+              <div className={`${styles.atrInst} atr-inst`}>
+                <div className={styles.laneHeader}>
+                  <span className={styles.laneLabel} style={{ color: t.subtext }}>
+                    {leftLaneLabel}
                   </span>
-                </Tooltip>
+                </div>
+                <div
+                  className={styles.waveformWrapper}
+                  style={{
+                    background: t.isDark ? "rgba(10,12,20,0.72)" : t.cardB, // using cardB instead of darker
+                    border: `1px solid ${t.hairline}`,
+                  }}
+                >
+                  {renderWaveform(
+                    "inst",
+                    instPath,
+                    isInstrumentalPlaying,
+                    internalMutedInstrumentals?.[instPath],
+                    "#ff9800",
+                    handleInstrumentalSeek
+                  )}
+                </div>
               </div>
-            )}
-            
-            {isNew && (
-             
-              <Pill t={t} tone="new" style={{ borderRadius: "6px" }}>NEW</Pill>
-            )}
-            {modelUsed && <Pill t={t} tone="meta" style={{ fontFamily: "Rubik", fontWeight: 500, borderRadius: "6px" }}>{modelUsed}</Pill>}
-           
+
+              {/* Controls */}
+              <div className="atr-controls" style={{ display: "flex", justifyContent: "center", alignItems: "center", boxSizing: "border-box", paddingTop: 32 }}>
+                <TrackControls
+                  instrumental={instPath}
+                  vocal={vocalPath}
+                  isPlaying={isCurrentlyPlayingBoth}
+                  onPlayBoth={() => handlePlayBothModified(trackPairId)}
+                  onDownloadFullSong={handleDownloadMerged}
+                  disabled={actionsDisabled}
+                  downloadDisabledReason={downloadDisabledReason}
+                  downloading={isMerging}
+                  darkMode={darkMode}
+                />
+              </div>
+
+              {/* Vocal */}
+              <div className="atr-vocal" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {showPerFileVocalToggle && onVocalSourceChange ? (
+                  <div className={styles.vocalDropdownFlex}>
+                    <span className={styles.laneLabel} style={{ color: t.subtext }}>
+                      Vocals
+                    </span>
+                    <div
+                      className={styles.vocalPillWrapper}
+                      style={{
+                        border: `1px solid ${t.hairline}`,
+                        background: t.isDark ? "rgba(0,0,0,0.35)" : t.cardA,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={styles.vocalBtnBase}
+                        onClick={() => onVocalSourceChange("original")}
+                        style={{
+                          background: isOriginalVocal ? (t.isDark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.08)") : "transparent",
+                          color: isOriginalVocal ? t.text : t.subtext,
+                        }}
+                      >
+                        original
+                      </button>
+                      {inferredOptions.length > 1 ? (
+                        <select
+                          className={styles.vocalSelect}
+                          value={convertedSelection}
+                          onChange={(e) => onVocalSourceChange(e.target.value)}
+                          style={{
+                            background: !isOriginalVocal
+                              ? (t.isDark ? "rgba(10,132,255,0.75)" : "rgba(10,132,255,0.95)")
+                              : "transparent",
+                            color: !isOriginalVocal ? "white" : t.subtext,
+                          }}
+                          title="Select inferred version"
+                        >
+                          {inferredOptions.map((option) => (
+                            <option key={String(option.value)} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.vocalSingleBtn}
+                          onClick={() => onVocalSourceChange(convertedSelection)}
+                          style={{
+                            background: !isOriginalVocal ? (t.isDark ? "rgba(10,132,255,0.75)" : "rgba(10,132,255,0.95)") : "transparent",
+                            color: !isOriginalVocal ? "white" : t.subtext,
+                          }}
+                          title={convertedLabel}
+                        >
+                          {convertedLabel}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.laneHeader}>
+                    <span className={styles.laneLabel} style={{ color: t.subtext }}>
+                      Vocals
+                    </span>
+                  </div>
+                )}
+                <div
+                  className={styles.waveformWrapper}
+                  style={{
+                    background: t.isDark
+                      ? (isOriginalVocal ? "rgba(10,12,20,0.72)" : "rgba(16,24,58,0.55)")
+                      : (isOriginalVocal ? t.cardB : "rgba(240,245,255,0.96)"), // Light mode vocal backgrounds
+                    border: `1px solid ${isOriginalVocal
+                      ? t.hairline
+                      : (t.isDark ? "rgba(56,139,253,0.42)" : "rgba(56,139,253,0.35)")
+                      }`,
+                  }}
+                >
+                  {renderWaveform(
+                    "vocal",
+                    vocalPath,
+                    isVocalPlaying,
+                    internalMutedVocals?.[vocalPath],
+                    "#1976d2",
+                    handleVocalSeek
+                  )}
+                </div>
+              </div>
+              <div className={styles.controlsWrapper}>
+                <button
+                  type="button"
+                  disabled={actionsDisabled}
+                  className={styles.checkboxBtn}
+                  onClick={() => onRowSelect?.(pair.id, !isSelected)}
+                  title={
+                    actionsDisabled
+                      ? "Available when processing completes"
+                      : isSelected
+                        ? "Deselect row"
+                        : "Select row"
+                  }
+                  style={{
+                    border: `2px solid ${isSelected ? t.primary : (t.isDark ? "rgba(255,255,255,0.34)" : "rgba(0,0,0,0.22)")}`,
+                    background: isSelected
+                      ? (t.isDark ? "rgba(56,139,253,0.28)" : "rgba(56,139,253,0.18)")
+                      : "transparent",
+                    color: isSelected ? (t.isDark ? "white" : t.primary) : "transparent",
+                    cursor: actionsDisabled ? "not-allowed" : "pointer",
+                    opacity: actionsDisabled ? 0.5 : 1,
+                  }}
+                >
+                  {isSelected ? "✓" : ""}
+                </button>
+              </div>
+
+            </div>
+            {/* Bare checkbox (no container styling) */}
+
           </div>
         </div>
-        {(paramsSummary || runTimestamp) && (
-          <div style={{ fontFamily:"Rubik", fontWeight: 500, fontSize: 11, color: t.subtext }}>
-            {paramsSummary}
-            {runTimestamp ? (paramsSummary ? ` • ${runTimestamp}` : runTimestamp) : ""} 
-            {canSetReaction && (
-              <div style={{ display: "inline-flex", justifyContent: "flex-end", alignItems: "center", gap: 4 , marginLeft:  "15px"}}>
-                <ReactionButton value="like" label="Like" icon={<ThumbsUpIcon  size={10} fill={t.flatIconActive}/>} />
-                <ReactionButton value="dislike" label="Dislike" icon={<ThumbsDownIcon  size={10} fill={t.flatIconActive}/>} />
-                <ReactionButton value="favorite" label="Favorite" icon={<StarIcon  size={10} fill={t.flatIconActive}/>} />
-              </div>
-            )}
-          </div>
-        )}
-
-        <div >
-          <div className="atr-grid" style={{ marginTop: "10px" }}>
-
-            <div className="atr-inst" style={{ padding: "5px 0px" }}>
-
-            </div>
-
-            {/* Instrumental */}
-            <div className="atr-inst" style={{ backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 10, padding: "5px 0px" }}>
-
-
-
-              {renderWaveform(
-                "inst",
-                instPath,
-                isInstrumentalPlaying,
-                internalMutedInstrumentals?.[instPath],
-                "#ff9800",
-                handleInstrumentalSeek
-              )}
-            </div>
-
-            {/* Controls */}
-            <div className="atr-controls" style={{ display: "flex", justifyContent: "center" }}>
-              <TrackControls
-                instrumental={instPath}
-                vocal={vocalPath}
-                isPlaying={isCurrentlyPlayingBoth}
-                onPlayBoth={() => handlePlayBothModified(trackPairId)}
-                onDownloadFullSong={handleDownloadMerged}
-                disabled={actionsDisabled}
-                downloadDisabledReason={downloadDisabledReason}
-                downloading={isMerging}
-              />
-            </div>
-
-            {/* Vocal */}
-            <div className="atr-vocal" style={{ backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 10, padding: "5px 0px" }}>
-              {renderWaveform(
-                "vocal",
-                vocalPath,
-                isVocalPlaying,
-                internalMutedVocals?.[vocalPath],
-                "#1976d2",
-                handleVocalSeek
-              )}
-
-            </div>
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-              <input
-                type="checkbox"
-                checked={!!isSelected}
-                onChange={(e) => onRowSelect?.(pair.id, e.target.checked)}
-                disabled={actionsDisabled}
-                title={
-                  actionsDisabled
-                    ? "Available when processing completes"
-                    : isSelected
-                      ? "Deselect row"
-                      : "Select row"
-                }
-                style={{
-
-                  width: 16,
-                  height: 16,
-                  accentColor: t.primary,
-                  cursor: actionsDisabled ? "not-allowed" : "pointer",
-                  background: "transparent",
-                  border: "none",
-                  outline: "none",
-                  opacity: actionsDisabled ? 0.5 : 1,
-                }}
-              />
-            </div>
-
-          </div>
-          {/* Bare checkbox (no container styling) */}
-         
-        </div>
-        
       </td>
     </tr>
   );
@@ -620,9 +832,22 @@ const areEqual = (prev, next) =>
   prev.versionCount === next.versionCount &&
   prev.favoriteCount === next.favoriteCount &&
   prev.reaction === next.reaction &&
+  prev.reactionRunId === next.reactionRunId &&
   prev.reactionPending === next.reactionPending &&
   prev.processing === next.processing &&
   prev.onToggleGroup === next.onToggleGroup &&
-  prev.onSetReaction === next.onSetReaction;
+  prev.onSetReaction === next.onSetReaction &&
+  prev.onOpenStudio === next.onOpenStudio &&
+  prev.showPerFileVocalToggle === next.showPerFileVocalToggle &&
+  prev.vocalPathOverride === next.vocalPathOverride &&
+  prev.vocalUrlOverride === next.vocalUrlOverride &&
+  prev.vocalSourceOptions === next.vocalSourceOptions &&
+  prev.selectedVocalSource === next.selectedVocalSource &&
+  prev.activeConvertedLabel === next.activeConvertedLabel &&
+  prev.onVocalSourceChange === next.onVocalSourceChange &&
+  prev.onMenuModelSelection === next.onMenuModelSelection &&
+  prev.onMenuInferenceParams === next.onMenuInferenceParams &&
+  prev.onMenuCover === next.onMenuCover &&
+  prev.onMenuDelete === next.onMenuDelete;
 
 export default React.memo(AudioTrackRow, areEqual);

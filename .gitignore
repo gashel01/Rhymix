@@ -232,3 +232,44 @@ rvc/models/embedders/contentvec/pytorch_model.bin
 rvc/models/predictors/fcpe.pt
 rvc/models/predictors/rmvpe.pt
 rvc/models/formant/stftpitchshift.exe
+
+# Local runtime / workstation artifacts
+flask_app.log
+processing.log
+None
+*.bak
+*.log
+
+# ---------------------------------------------------------------------------
+# Vendored third-party repos (kept locally for the app to run, NOT pushed).
+# These contain their own git history, checkpoints, and huge model files.
+# ---------------------------------------------------------------------------
+/ACE-Step-1.5/
+/RC-stable-audio-tools/
+/SoulX-Singer/
+/applio/
+/whisperX/
+/stage/
+
+# ---------------------------------------------------------------------------
+# Runtime data, user uploads, generated artifacts, model weights
+# ---------------------------------------------------------------------------
+/data/
+/logs/
+/models/
+/assets/weights/
+/rvc/
+/frontend/build/
+
+# Keep data/ schema examples but ignore everything else under it
+!/data/.gitkeep
+
+# Studio project state (contains user projects)
+data/studio/
+
+# IDE / OS cruft
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+

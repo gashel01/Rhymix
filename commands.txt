@@ -1,0 +1,10 @@
+WORKER : 
+(venv) C:\Users\gaeli\Downloads\Rhymix>python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8002
+OR DEBUG : 
+(venv) C:\Users\gaeli\Downloads\Rhymix>python -X faulthandler -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8002
+
+BACKEND: 
+(venv) C:\Users\gaeli\Downloads\Rhymix>python app.py
+
+FRONTEND: 
+C:\Users\gaeli\Downloads\Rhymix\frontend>npm start

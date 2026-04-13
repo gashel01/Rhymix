@@ -25,10 +25,11 @@ export const Modal = ({
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 2000,
+        zIndex: 10000,
         display: "grid",
         placeItems: "center",
         padding: 16,
+        backDropFilter: "blur(20px)",
         background: t.isDark ? "rgba(0,0,0,.55)" : "rgba(0,0,0,.3)",
       }}
     >

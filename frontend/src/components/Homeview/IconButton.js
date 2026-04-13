@@ -8,7 +8,7 @@ style={style}
 title={title}
 t={t}
 >
-<span style={{ display: "inline-flex", alignItems: "center", gap: 10 , fontFamily: "DM Sans"}}>
+<span style={{ display: "flex", alignItems: "center", gap: 10 , fontFamily: "DM Sans"}}>
   {icon}
   {title}
 </span>
