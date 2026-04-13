@@ -133,25 +133,50 @@ REM Use explicit venv paths for all pip/python calls - more reliable than activa
 set "VPIP=%VENV%\Scripts\pip.exe"
 set "VPYTHON=%VENV%\Scripts\python.exe"
 
-call :info "Upgrading pip..."
-"%VPYTHON%" -m pip install --upgrade pip >> "%LOG%" 2>&1
-if errorlevel 1 ( call :warn "pip upgrade failed (non-fatal)" )
-
-call :info "Installing requirements.txt (this may take a few minutes)..."
-"%VPIP%" install -r "%ROOT%\requirements.txt" > "%ROOT%\setup_tmp.txt" 2>&1
-set "PIP_RC=!ERRORLEVEL!"
-type "%ROOT%\setup_tmp.txt"
-type "%ROOT%\setup_tmp.txt" >> "%LOG%"
+REM ---------------------------------------------------------------------------
+REM  Hash requirements.txt to skip pip when nothing has changed.
+REM  After a successful install the MD5 is written to venv\.pip-hash.
+REM  On the next run: if the hash matches, pip is skipped entirely (fast path).
+REM  If requirements.txt changed or the hash file is absent, pip re-runs.
+REM ---------------------------------------------------------------------------
+set "PIP_HASH_FILE=%VENV%\.pip-hash"
+set "CURR_HASH="
+"%VPYTHON%" -c "import hashlib,pathlib; print(hashlib.md5(pathlib.Path(r'%ROOT%\requirements.txt').read_bytes()).hexdigest())" > "%ROOT%\setup_tmp.txt" 2>&1
+set /p CURR_HASH=<"%ROOT%\setup_tmp.txt"
 del "%ROOT%\setup_tmp.txt" >nul 2>&1
-if "!PIP_RC!" neq "0" (
-    call :fail "pip install -r requirements.txt failed. See setup.log for details."
-    set "R_VENV=1"
-    call :summary
-    pause
-    exit /b 1
+
+REM Read stored hash outside any block - set /p with < redirect is unreliable inside ( ).
+set "STORED_HASH="
+if exist "%PIP_HASH_FILE%" set /p STORED_HASH=<"%PIP_HASH_FILE%"
+
+set "NEED_PIP=1"
+if not "!CURR_HASH!"=="" if "!CURR_HASH!"=="!STORED_HASH!" set "NEED_PIP=0"
+
+if "!NEED_PIP!"=="1" (
+    call :info "Upgrading pip..."
+    "%VPYTHON%" -m pip install --upgrade pip >> "%LOG%" 2>&1
+    if errorlevel 1 ( call :warn "pip upgrade failed (non-fatal)" )
+
+    call :info "Installing requirements.txt (this may take a few minutes)..."
+    "%VPIP%" install -r "%ROOT%\requirements.txt" > "%ROOT%\setup_tmp.txt" 2>&1
+    set "PIP_RC=!ERRORLEVEL!"
+    type "%ROOT%\setup_tmp.txt"
+    type "%ROOT%\setup_tmp.txt" >> "%LOG%"
+    del "%ROOT%\setup_tmp.txt" >nul 2>&1
+    if "!PIP_RC!" neq "0" (
+        call :fail "pip install -r requirements.txt failed. See setup.log for details."
+        set "R_VENV=1"
+        call :summary
+        pause
+        exit /b 1
+    )
+    echo !CURR_HASH!>"%PIP_HASH_FILE%"
+    call :ok "requirements.txt installed."
+    set "R_VENV=0"
+) else (
+    call :skip "requirements.txt unchanged - pip install skipped."
+    set "R_VENV=2"
 )
-call :ok "requirements.txt installed."
-call :step_done 2 "R_VENV"
 
 REM ---------------------------------------------------------------------------
 REM STEP 3/7 - PyTorch (CUDA 12.1 required - GPU build)
@@ -159,15 +184,22 @@ REM ---------------------------------------------------------------------------
 call :bar 2
 call :header 3 "Installing PyTorch 2.4.1 + CUDA 12.1"
 
-REM Skip if torch is already importable in the venv
-"%VPYTHON%" -c "import torch; print(torch.__version__)" > "%ROOT%\setup_tmp.txt" 2>&1
+REM Skip only if torch is already installed AND is a CUDA build (not +cpu).
+REM A CPU-only torch (e.g. 2.11.0+cpu) must be replaced with the CUDA wheel.
+"%VPYTHON%" -c "import torch, sys; v=torch.__version__; is_cuda='cu' in v; print(v); sys.exit(0 if is_cuda else 1)" > "%ROOT%\setup_tmp.txt" 2>&1
 if not errorlevel 1 (
-    for /f "tokens=*" %%V in ('type "%ROOT%\setup_tmp.txt"') do call :skip "torch %%V already installed in venv - skipping."
+    for /f "tokens=*" %%V in ('type "%ROOT%\setup_tmp.txt"') do call :skip "torch %%V (CUDA^) already installed - skipping."
     del "%ROOT%\setup_tmp.txt" >nul 2>&1
     call :step_done 3 "R_TORCH"
     goto :after_torch
 )
 del "%ROOT%\setup_tmp.txt" >nul 2>&1
+REM If a CPU-only torch is present, uninstall it first so the CUDA wheel can be installed.
+"%VPYTHON%" -c "import torch" >nul 2>&1
+if not errorlevel 1 (
+    call :warn "CPU-only torch detected - uninstalling before CUDA install..."
+    "%VPIP%" uninstall -y torch torchvision torchaudio >> "%LOG%" 2>&1
+)
 
 call :info "Downloading wheels (1-3 GB - may take a few minutes)..."
 call :info "Index: https://download.pytorch.org/whl/cu121"
