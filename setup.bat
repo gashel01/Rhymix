@@ -205,6 +205,16 @@ call :clone_repo "RC-stable-audio-tools" "https://github.com/RoyalCities/RC-stab
 call :clone_repo "SoulX-Singer"          "https://github.com/Soul-AILab/SoulX-Singer.git"
 call :clone_repo "stage"                 "https://github.com/giorgioskij/stage.git"
 
+REM Patch applio/core.py: fix tts_voices.json path and make load non-fatal.
+REM The upstream file uses a CWD-relative path that breaks when run from ROOT.
+call :info "Applying applio compatibility patch..."
+"%VPYTHON%" "%ROOT%\scripts\patch_applio.py" >> "%LOG%" 2>&1
+if errorlevel 1 (
+    call :warn "applio patch failed - FastAPI may not start. Check setup.log."
+) else (
+    call :ok "applio patch applied."
+)
+
 if "%CLONE_FAILS%"=="0" (
     call :step_done 4 "R_REPOS"
 ) else (

@@ -40,6 +40,7 @@ pyworld==0.3.4
 # --- Audio processing / cleanup ---------------------------------------------
 noisereduce==3.0.2
 pedalboard==0.9.12
+vocal==0.0.5
 
 # --- Machine learning & audio models ----------------------------------------
 # transformers is constrained by pyannote.audio 3.1.1 (needs <5, >=4.27).
