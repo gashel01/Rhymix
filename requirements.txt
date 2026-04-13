@@ -52,10 +52,11 @@ tensorboardX==2.6.2.2
 
 # --- UI / visualization -----------------------------------------------------
 matplotlib==3.7.1
-gradio==4.44.1
+# gradio is used by vendored repos (applio, SoulX-Singer) which manage their
+# own environments — it does not belong in the main app requirements.
 
 # --- Utilities --------------------------------------------------------------
-requests==2.28.2
+requests>=2.31.0
 tqdm==4.65.0
 wget==3.2
 beautifulsoup4==4.12.3
