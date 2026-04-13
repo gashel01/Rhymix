@@ -247,6 +247,25 @@ if errorlevel 1 (
     call :ok "applio patch applied."
 )
 
+REM Download RVC predictor weights (rmvpe.pt, fcpe.pt) if not already present.
+REM These are needed for vocal pitch extraction at inference time.
+set "PREDICTORS_DIR=%ROOT%\rvc\models\predictors"
+set "PREDICTORS_OK=1"
+for %%F in (rmvpe.pt fcpe.pt) do (
+    if not exist "%PREDICTORS_DIR%\%%F" (
+        call :info "Downloading %%F from HuggingFace..."
+        "%VPYTHON%" -c "import wget, os; os.makedirs(r'%PREDICTORS_DIR%', exist_ok=True); wget.download('https://huggingface.co/IAHispano/Applio/resolve/main/Resources/predictors/%%F', out=r'%PREDICTORS_DIR%\%%F')" >> "%LOG%" 2>&1
+        if errorlevel 1 (
+            call :warn "Failed to download %%F - inference will auto-retry on first use."
+            set "PREDICTORS_OK=0"
+        ) else (
+            call :ok "Downloaded %%F"
+        )
+    ) else (
+        call :skip "%%F already present."
+    )
+)
+
 if "%CLONE_FAILS%"=="0" (
     call :step_done 4 "R_REPOS"
 ) else (
