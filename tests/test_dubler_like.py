@@ -1,8 +1,10 @@
 import wave
 
 import numpy as np
+import pytest
 
 from backend.app.dubler_melody import transcribe_dubler_melody_v2
+from tests.conftest import requires_crepe
 
 
 SR = 48000
@@ -47,6 +49,7 @@ def _glide(freq_start, freq_end, dur, sr=SR, amp=0.6):
     return (amp * np.sin(phase)).astype(np.float32)
 
 
+@requires_crepe
 def test_silence_yields_no_notes(tmp_path):
     noise = np.random.normal(0.0, 1e-5, int(SR * 1.0)).astype(np.float32)
     audio = np.zeros(int(SR * 1.0), dtype=np.float32) + noise
@@ -56,6 +59,7 @@ def test_silence_yields_no_notes(tmp_path):
     assert len(notes) == 0
 
 
+@requires_crepe
 def test_single_tone_is_stable(tmp_path):
     audio = _sine(220.0, 1.0)
     notes, _cc, _pb, _dbg = transcribe_dubler_melody_v2(
@@ -66,6 +70,7 @@ def test_single_tone_is_stable(tmp_path):
     assert notes[0]["endSec"] - notes[0]["startSec"] > 0.8
 
 
+@requires_crepe
 def test_two_notes_non_overlapping(tmp_path):
     audio = np.concatenate(
         [_sine(220.0, 0.8), np.zeros(int(SR * 0.1), dtype=np.float32), _sine(246.94, 0.8)]
@@ -79,6 +84,7 @@ def test_two_notes_non_overlapping(tmp_path):
         assert prev["endSec"] <= nxt["startSec"] + 1e-3
 
 
+@requires_crepe
 def test_vibrato_produces_pitchbend(tmp_path):
     audio = _vibrato(220.0, 2.0)
     notes, _cc, pb, _dbg = transcribe_dubler_melody_v2(
@@ -92,6 +98,7 @@ def test_vibrato_produces_pitchbend(tmp_path):
     assert len(pb) > 20
 
 
+@requires_crepe
 def test_legato_has_fewer_retriggers(tmp_path):
     audio = _glide(220.0, 246.94, 1.2)
     notes_legato, _cc, _pb, _dbg = transcribe_dubler_melody_v2(
