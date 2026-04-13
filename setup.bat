@@ -487,7 +487,7 @@ if "%ANY_FAIL%"=="0" (
     echo.
     echo   All steps completed successfully!
     echo   Next steps:
-    echo     1. Download model weights (see Step 6 output above and docs/SETUP_MODELS.md)
+    echo     1. Download model weights - see Step 4 output above and docs/SETUP_MODELS.md
     echo     2. Edit .env if you want to customize settings
     echo     3. Start the app:  run_all.bat
 ) else (
