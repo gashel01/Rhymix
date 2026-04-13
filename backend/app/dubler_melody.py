@@ -5,7 +5,10 @@ from typing import Dict, List, Literal, Optional, Tuple
 import librosa
 import numpy as np
 
-from .crepe_adapter import transcribe_crepe_frames
+try:
+    from .crepe_adapter import transcribe_crepe_frames
+except Exception:  # pragma: no cover — torch/torchaudio not available (e.g. CI)
+    transcribe_crepe_frames = None  # type: ignore[assignment]
 
 try:
     import parselmouth
