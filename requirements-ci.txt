@@ -1,0 +1,21 @@
+# Minimal dependency set for GitHub Actions CI.
+#
+# CI only runs the pure-Python unit tests in tests/ — it does NOT load
+# ACE-Step, Applio, WhisperX, pyannote, or any GPU model. Keep this file
+# as small as possible so CI stays fast (< 3 minutes).
+#
+# If a new test starts failing in CI with an ImportError, add the missing
+# package here rather than bloating the full requirements.txt.
+
+numpy==1.23.5
+scipy==1.10.1
+librosa==0.10.1
+soundfile==0.12.1
+
+# torchcrepe pulls a small CPU-only torch — needed by backend.app.crepe_adapter
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.4.1+cpu
+torchcrepe
+
+# Test runner
+pytest>=7.4
