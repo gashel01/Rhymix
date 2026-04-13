@@ -48,7 +48,7 @@ export function useMicrophoneRecorder() {
     const analyser = analyserRef.current;
     const arr = levelDataRef.current;
     if (!analyser || !arr) return;
-    analyser.getFloatTimeDomainData(arr);
+    analyser.getFloatTimeDomainData(arr as Float32Array<ArrayBuffer>);
     let sum = 0;
     let peak = 0;
     for (let i = 0; i < arr.length; i += 1) {
