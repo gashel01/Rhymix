@@ -8,8 +8,9 @@ try:
 
     bootstrap_env()
     configure_cuda_backend()   # TF32 + cudnn.benchmark for RTX/Ampere
-except Exception:
-    pass
+except Exception as _bootstrap_err:
+    import sys as _sys
+    print(f"[rhymix] WARNING: env_bootstrap failed: {_bootstrap_err}", file=_sys.stderr)
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
