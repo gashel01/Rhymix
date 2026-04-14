@@ -133,6 +133,14 @@ REM Use explicit venv paths for all pip/python calls - more reliable than activa
 set "VPIP=%VENV%\Scripts\pip.exe"
 set "VPYTHON=%VENV%\Scripts\python.exe"
 
+REM Write a .pth file so applio/ and project root are on sys.path automatically.
+REM This is the only reliable way to make 'from core import ...' and
+REM 'from rvc.lib import ...' work regardless of CWD or how Python is launched.
+set "PTH_FILE=%VENV%\Lib\site-packages\rhymix.pth"
+(echo %ROOT%
+ echo %ROOT%\applio) > "%PTH_FILE%"
+call :ok "Written sys.path config to venv\Lib\site-packages\rhymix.pth"
+
 REM ---------------------------------------------------------------------------
 REM  Hash requirements.txt to skip pip when nothing has changed.
 REM  After a successful install the MD5 is written to venv\.pip-hash.

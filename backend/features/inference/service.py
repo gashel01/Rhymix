@@ -21,8 +21,12 @@ try:
         run_index_script,
     )
 except ImportError as e:
-    print(f"Error importing core functions: {e}")
-    # Use direct path calls as fallback
+    import sys as _sys
+    print(f"[rhymix] WARNING: applio not installed - inference unavailable ({e})", file=_sys.stderr)
+    # Stubs so dependent modules can import without crashing.
+    # All will raise a clear error if actually called before setup.bat runs.
+    run_infer_script = None
+    run_preprocess_script = None
     run_extract_script = None
     run_train_script = None
     run_index_script = None
@@ -216,6 +220,8 @@ def run_inference_job(job_id, run_id, model, track, params):
                     "logs": active_jobs[job_id].get("logs", []) + ["Running inference..."],
                 }
             )
+            if run_infer_script is None:
+                raise RuntimeError("applio is not installed. Run setup.bat first.")
             result = run_infer_script(**inference_params)
         except RuntimeError as e:
             if "FFmpeg" in str(e) or "torio" in str(e):
