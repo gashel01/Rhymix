@@ -261,20 +261,11 @@ cd /d "%ROOT%"
 set "CLONE_FAILS=0"
 
 call :clone_repo "ACE-Step-1.5"          "https://github.com/gael-gaussens/ACE-Step-1.5.git"
-call :clone_repo "applio"                "https://github.com/IAHispano/Applio.git"
+REM NOTE: applio/core.py is committed directly in this repo (upstream IAHispano/Applio
+REM restructured their repo and removed core.py). No clone needed.
 call :clone_repo "RC-stable-audio-tools" "https://github.com/RoyalCities/RC-stable-audio-tools.git"
 call :clone_repo "SoulX-Singer"          "https://github.com/Soul-AILab/SoulX-Singer.git"
 call :clone_repo "stage"                 "https://github.com/giorgioskij/stage.git"
-
-REM Patch applio/core.py: fix tts_voices.json path and make load non-fatal.
-REM The upstream file uses a CWD-relative path that breaks when run from ROOT.
-call :info "Applying applio compatibility patch..."
-"%VPYTHON%" "%ROOT%\scripts\patch_applio.py" >> "%LOG%" 2>&1
-if errorlevel 1 (
-    call :warn "applio patch failed - FastAPI may not start. Check setup.log."
-) else (
-    call :ok "applio patch applied."
-)
 
 REM Download RVC predictor weights (rmvpe.pt, fcpe.pt) if not already present.
 REM These are needed for vocal pitch extraction at inference time.
