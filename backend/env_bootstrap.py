@@ -42,13 +42,16 @@ def bootstrap_env():
             for handler in logger.handlers:
                 handler.setLevel(logging.CRITICAL)
 
-    # Ensure applio and rvc are on the path
-    applio_path = os.path.abspath("applio")
+    # Ensure applio and rvc are on the path.
+    # Use __file__-relative paths so this works regardless of CWD.
+    # backend/env_bootstrap.py  →  ../  →  project root
+    _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    applio_path = os.path.join(_project_root, "applio")
     if applio_path not in sys.path:
-        sys.path.append(applio_path)
-    rvc_path = os.path.join(applio_path, "rvc")
+        sys.path.insert(0, applio_path)
+    rvc_path = _project_root  # rvc/ lives at project root, not inside applio/
     if rvc_path not in sys.path:
-        sys.path.append(rvc_path)
+        sys.path.insert(0, rvc_path)
 
 
 def configure_cuda_backend() -> None:
