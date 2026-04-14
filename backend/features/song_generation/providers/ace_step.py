@@ -33,6 +33,29 @@ ACESTEP15_CHECKPOINTS_ROOT = ACESTEP15_DIR / "checkpoints"
 ACESTEP15_VENV_PATH = ACESTEP15_DIR / "venv"  # ACE-Step 1.5 dedicated virtual environment
 ACESTEP15_FALLBACK_VENV_PATH = ACESTEP15_DIR / ".venv"
 
+
+def _flash_attn_available() -> bool:
+    """Return True only if flash_attn is installed AND its CUDA kernels work on this GPU.
+
+    Importing flash_attn succeeds even on unsupported GPUs - the CUDA error only
+    surfaces when a kernel is actually called.  We run a tiny real forward pass to
+    verify the kernel works before committing to use_flash_attention=True.
+    """
+    try:
+        import torch
+        import flash_attn  # noqa: F401
+        if not torch.cuda.is_available():
+            return False
+        # Run a minimal forward pass to verify the GPU kernel actually executes.
+        # If the wheel was compiled without this GPU's SM arch, this will raise.
+        from flash_attn.flash_attn_interface import flash_attn_qkvpacked_func
+        qkv = torch.zeros(1, 4, 3, 1, 32, dtype=torch.float16, device="cuda")
+        flash_attn_qkvpacked_func(qkv)
+        return True
+    except Exception:
+        return False
+
+
 # ACE-Step 1.5 default parameters (can be overridden)
 ACESTEP15_DEFAULTS = {
     "checkpoints_root": str(ACESTEP15_CHECKPOINTS_ROOT),
@@ -43,7 +66,7 @@ ACESTEP15_DEFAULTS = {
     "device": "cuda",
     "lm_backend": "vllm",
     "initialize_lm": True,
-    "use_flash_attention": True,
+    "use_flash_attention": _flash_attn_available(),
     # The turbo DiT + vLLM LM together push close to 8 GB on a 3070 Ti, so
     # keep the LM offloaded to CPU (it only runs once at the start, not every
     # diffusion step).  The DiT stays on GPU — that's where step-by-step speed

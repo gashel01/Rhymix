@@ -10,8 +10,9 @@ REM   2. Create the main Python virtualenv and install dependencies
 REM   3. Install PyTorch 2.4.1 with CUDA 12.1 support
 REM   4. Clone the required AI model repos (skips any already present)
 REM   5. Create a separate whisperX venv (required by the transcription pipeline)
-REM   6. Install frontend (npm) dependencies
-REM   7. Create .env from .env.example if one doesn't exist
+REM   6. Create ACE-Step 1.5 venv (Python 3.11 + torch 2.7.1+cu128 + flash-attn)
+REM   7. Install frontend (npm) dependencies
+REM   8. Create .env from .env.example if one doesn't exist
 REM
 REM After this finishes, use run_all.bat to start the app.
 REM Model weights (ACE-Step checkpoints, RVC pretrained models, etc.) must be
@@ -31,11 +32,12 @@ set "R_VENV=0"
 set "R_TORCH=0"
 set "R_REPOS=0"
 set "R_WHISPERX=0"
+set "R_ACESTEP=0"
 set "R_FRONTEND=0"
 set "R_ENV=0"
 
 REM Total steps for progress bar
-set "TOTAL=7"
+set "TOTAL=8"
 
 REM Initialize log file (type nul truncates to 0 bytes reliably even on shared drives)
 type nul > "%LOG%"
@@ -294,7 +296,7 @@ if "%CLONE_FAILS%"=="0" (
 )
 
 REM ---------------------------------------------------------------------------
-REM STEP 5/7 - WhisperX venv
+REM STEP 5/8 - WhisperX venv
 REM ---------------------------------------------------------------------------
 call :bar 4
 call :header 5 "Setting up WhisperX venv"
@@ -331,10 +333,149 @@ if exist "%WHISPERX_VENV%\Scripts\python.exe" (
 )
 
 REM ---------------------------------------------------------------------------
-REM STEP 6/7 - Frontend
+REM STEP 6/8 - ACE-Step 1.5 venv
+REM ACE-Step requires Python 3.11 to get the pre-built flash-attn wheel.
+REM It uses torch 2.7.1+cu128 in its own isolated venv.
 REM ---------------------------------------------------------------------------
 call :bar 5
-call :header 6 "Installing frontend dependencies"
+call :header 6 "Setting up ACE-Step 1.5 venv"
+
+set "ACESTEP_DIR=%ROOT%\ACE-Step-1.5"
+set "ACESTEP_VENV=%ACESTEP_DIR%\venv"
+
+REM Detect best Python for ACE-Step: prefer 3.11, accept 3.12 or 3.13.
+REM sdbds provides flash-attn wheels for cp311, cp312, cp313.
+set "ACESTEP_PY="
+set "ACESTEP_PYVER="
+for %%V in (3.11 3.12 3.13) do (
+    if "!ACESTEP_PY!"=="" (
+        py -%%V --version >nul 2>&1
+        if not errorlevel 1 (
+            set "ACESTEP_PY=py -%%V"
+            set "ACESTEP_PYVER=%%V"
+        )
+    )
+)
+REM Also scan common install paths for 311/312/313
+if "!ACESTEP_PY!"=="" (
+    for %%V in (311 312 313) do (
+        if "!ACESTEP_PY!"=="" (
+            for %%P in (
+                "%LOCALAPPDATA%\Programs\Python\Python%%V\python.exe"
+                "%PROGRAMFILES%\Python%%V\python.exe"
+                "C:\Python%%V\python.exe"
+            ) do (
+                if "!ACESTEP_PY!"=="" if exist "%%~P" (
+                    set "ACESTEP_PY=%%~P"
+                    set "ACESTEP_PYVER=3.%%V"
+                    set "ACESTEP_PYVER=!ACESTEP_PYVER:3.311=3.11!"
+                    set "ACESTEP_PYVER=!ACESTEP_PYVER:3.312=3.12!"
+                    set "ACESTEP_PYVER=!ACESTEP_PYVER:3.313=3.13!"
+                )
+            )
+        )
+    )
+)
+if not "!ACESTEP_PY!"=="" (
+    call :ok "ACE-Step will use Python !ACESTEP_PYVER! (!ACESTEP_PY!)"
+) else (
+    call :warn "Python 3.11/3.12/3.13 not found - ACE-Step venv will use 3.10, flash-attn unavailable"
+)
+
+REM If venv exists but Python version is too old (3.10), rebuild with newer Python.
+if exist "%ACESTEP_VENV%\Scripts\python.exe" (
+    if not "!ACESTEP_PY!"=="" (
+        "%ACESTEP_VENV%\Scripts\python.exe" -c "import sys; exit(0 if sys.version_info >= (3,11) else 1)" >nul 2>&1
+        if errorlevel 1 (
+            call :info "ACE-Step venv is Python 3.10 - rebuilding with !ACESTEP_PYVER! for flash-attn..."
+            rmdir /s /q "%ACESTEP_VENV%" >nul 2>&1
+        ) else (
+            call :skip "ACE-Step 1.5 venv already exists."
+            set "R_ACESTEP=2"
+        )
+    ) else (
+        call :skip "ACE-Step 1.5 venv already exists."
+        set "R_ACESTEP=2"
+    )
+)
+
+if "!R_ACESTEP!"=="2" goto :acestep_done
+if not exist "%ACESTEP_DIR%\requirements.txt" (
+    call :warn "ACE-Step-1.5 not cloned yet - skipping venv setup."
+    set "R_ACESTEP=2"
+    goto :acestep_done
+)
+
+if not "!ACESTEP_PY!"=="" (
+    call :info "Creating ACE-Step venv with Python !ACESTEP_PYVER!..."
+    !ACESTEP_PY! -m venv "%ACESTEP_VENV%" >> "%LOG%" 2>&1
+) else (
+    call :warn "Using Python 3.10 for ACE-Step venv (flash-attn unavailable)"
+    py -3.10 -m venv "%ACESTEP_VENV%" >> "%LOG%" 2>&1
+)
+if errorlevel 1 (
+    call :fail "Failed to create ACE-Step venv."
+    set "R_ACESTEP=1"
+    goto :acestep_done
+) else (
+        call :info "Installing ACE-Step requirements (torch 2.7.1+cu128 ~3 GB - may take several minutes)..."
+        "%ACESTEP_VENV%\Scripts\pip" install --upgrade pip >> "%LOG%" 2>&1
+        "%ACESTEP_VENV%\Scripts\pip" install -r "%ACESTEP_DIR%\requirements.txt" --extra-index-url https://download.pytorch.org/whl/cu128 > "%ROOT%\setup_tmp.txt" 2>&1
+        set "PIP_RC=!ERRORLEVEL!"
+        type "%ROOT%\setup_tmp.txt" >> "%LOG%"
+        del "%ROOT%\setup_tmp.txt" >nul 2>&1
+        if "!PIP_RC!" neq "0" (
+            call :warn "ACE-Step install had errors (see setup.log) - song generation may not work."
+            set "R_ACESTEP=1"
+        ) else (
+            REM requirements.txt flash-attn wheel only targets cp311 (sdbds).
+            REM For cp312/cp313, use lldacing HuggingFace wheels (different source).
+            "%ACESTEP_VENV%\Scripts\python.exe" -c "import flash_attn" >nul 2>&1
+            if not errorlevel 1 (
+                call :skip "flash-attn already installed."
+            ) else if "!ACESTEP_PYVER!"=="3.11" (
+                set "FATTN_URL=https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.2/flash_attn-2.8.2+cu128torch2.7.1cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl"
+                call :info "Installing flash-attn for Python 3.11..."
+                "%ACESTEP_VENV%\Scripts\pip" install "!FATTN_URL!" --no-build-isolation >> "%LOG%" 2>&1
+                if errorlevel 1 ( call :warn "flash-attn install failed." ) else ( call :ok "flash-attn installed." )
+            ) else if "!ACESTEP_PYVER!"=="3.12" (
+                set "FATTN_URL=https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1+cu128torch2.7.0cxx11abiFALSE-cp312-cp312-win_amd64.whl"
+                call :info "Installing flash-attn for Python 3.12..."
+                "%ACESTEP_VENV%\Scripts\pip" install "!FATTN_URL!" --no-build-isolation >> "%LOG%" 2>&1
+                if errorlevel 1 (
+                    call :warn "flash-attn install failed."
+                ) else (
+                    REM Test that the CUDA kernel actually runs - pre-built wheels may not
+                    REM cover all GPU architectures (e.g. SM 8.6 / RTX 30xx).
+                    call :info "Testing flash-attn GPU kernel..."
+                    "%ACESTEP_VENV%\Scripts\python.exe" -c "from flash_attn.flash_attn_interface import flash_attn_qkvpacked_func; import torch; qkv=torch.zeros(1,4,3,1,32,dtype=torch.float16,device='cuda'); flash_attn_qkvpacked_func(qkv)" >nul 2>&1
+                    if errorlevel 1 (
+                        call :warn "flash-attn kernel test failed (GPU arch not supported) - uninstalling."
+                        "%ACESTEP_VENV%\Scripts\pip" uninstall -y flash-attn >> "%LOG%" 2>&1
+                        call :info "  ACE-Step will use standard attention (slightly slower, fully functional)."
+                    ) else (
+                        call :ok "flash-attn installed and kernel verified."
+                    )
+                )
+            ) else if "!ACESTEP_PYVER!"=="3.13" (
+                call :warn "No pre-built flash-attn wheel for Python 3.13+cu128 yet - ACE-Step may not work."
+                call :info "  Consider installing Python 3.11 or 3.12 for full ACE-Step support."
+            ) else (
+                call :warn "flash-attn not available for Python !ACESTEP_PYVER! on Windows."
+            )
+            call :ok "ACE-Step 1.5 venv ready."
+            call :step_done 6 "R_ACESTEP"
+        )
+    )
+)
+
+:acestep_done
+
+REM ---------------------------------------------------------------------------
+REM STEP 7/8 - Frontend
+REM ---------------------------------------------------------------------------
+call :bar 6
+call :header 7 "Installing frontend dependencies"
 
 if exist "%FRONTEND%\node_modules" (
     call :skip "node_modules already exists."
@@ -352,16 +493,16 @@ if exist "%FRONTEND%\node_modules" (
         set "R_FRONTEND=1"
     ) else (
         call :ok "Frontend dependencies installed."
-        call :step_done 6 "R_FRONTEND"
+        call :step_done 7 "R_FRONTEND"
     )
     cd /d "%ROOT%"
 )
 
 REM ---------------------------------------------------------------------------
-REM STEP 7/7 - .env file
+REM STEP 8/8 - .env file
 REM ---------------------------------------------------------------------------
-call :bar 6
-call :header 7 "Setting up .env"
+call :bar 7
+call :header 8 "Setting up .env"
 
 if exist "%ROOT%\.env" (
     call :skip ".env already exists - leaving it untouched."
@@ -373,7 +514,7 @@ if exist "%ROOT%\.env" (
         set "R_ENV=1"
     ) else (
         call :ok "Created .env from .env.example."
-        call :step_done 7 "R_ENV"
+        call :step_done 8 "R_ENV"
     )
 )
 
@@ -389,7 +530,7 @@ if errorlevel 1 (
 REM ---------------------------------------------------------------------------
 REM Final bar + model weights reminder
 REM ---------------------------------------------------------------------------
-call :bar 7
+call :bar 8
 
 echo.
 echo   ---------------------------------------------------------------------------
@@ -545,12 +686,13 @@ call :summary_row "2. Python venv     " "%R_VENV%"
 call :summary_row "3. PyTorch CUDA    " "%R_TORCH%"
 call :summary_row "4. AI repos        " "%R_REPOS%"
 call :summary_row "5. WhisperX venv   " "%R_WHISPERX%"
-call :summary_row "6. Frontend (npm)  " "%R_FRONTEND%"
-call :summary_row "7. .env file       " "%R_ENV%"
+call :summary_row "6. ACE-Step venv   " "%R_ACESTEP%"
+call :summary_row "7. Frontend (npm)  " "%R_FRONTEND%"
+call :summary_row "8. .env file       " "%R_ENV%"
 echo ===========================================================================
 
 set "ANY_FAIL=0"
-for %%S in (%R_PREREQ% %R_VENV% %R_TORCH% %R_REPOS% %R_WHISPERX% %R_FRONTEND% %R_ENV%) do (
+for %%S in (%R_PREREQ% %R_VENV% %R_TORCH% %R_REPOS% %R_WHISPERX% %R_ACESTEP% %R_FRONTEND% %R_ENV%) do (
     if "%%S"=="1" set "ANY_FAIL=1"
 )
 
@@ -573,7 +715,7 @@ echo.
 call :log ""
 call :log "=== SUMMARY ==="
 call :log "R_PREREQ=%R_PREREQ%  R_VENV=%R_VENV%  R_TORCH=%R_TORCH%  R_REPOS=%R_REPOS%"
-call :log "R_WHISPERX=%R_WHISPERX%  R_FRONTEND=%R_FRONTEND%  R_ENV=%R_ENV%"
+call :log "R_WHISPERX=%R_WHISPERX%  R_ACESTEP=%R_ACESTEP%  R_FRONTEND=%R_FRONTEND%  R_ENV=%R_ENV%"
 exit /b 0
 
 
