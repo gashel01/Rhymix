@@ -220,6 +220,27 @@ if "!PIP_RC!"=="0" (
     set "R_TORCH=1"
 )
 
+REM ---------------------------------------------------------------------------
+REM flash-attn (optional, Windows-only pre-built wheel for torch 2.4.1+cu121)
+REM ACE-Step uses flash attention if available; falls back gracefully if not.
+REM The sdbds pre-built wheels avoid the 30-min source compile.
+REM ---------------------------------------------------------------------------
+"%VPYTHON%" -c "import flash_attn" >nul 2>&1
+if not errorlevel 1 (
+    call :skip "flash-attn already installed."
+) else (
+    call :info "Installing flash-attn pre-built wheel for torch 2.4.1+cu121..."
+    set "FATTN_WHL=flash_attn-2.6.3+cu121torch2.4.1cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl"
+    set "FATTN_URL=https://github.com/sdbds/flash-attention-for-windows/releases/download/2.6.3/!FATTN_WHL!"
+    "%VPIP%" install "!FATTN_URL!" --no-build-isolation >> "%LOG%" 2>&1
+    if errorlevel 1 (
+        call :warn "flash-attn install failed - ACE-Step will run without it (slower attention)."
+        call :info "  To install manually: pip install !FATTN_URL!"
+    ) else (
+        call :ok "flash-attn installed."
+    )
+)
+
 :after_torch
 
 REM ---------------------------------------------------------------------------
