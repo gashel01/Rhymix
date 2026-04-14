@@ -13,7 +13,12 @@ import numpy as np
 from backend.features.inference.models import resolve_checkpoint
 from backend.features.studio.storage import get_project, save_project
 from backend.paths.manager import paths
-from core import run_infer_script
+try:
+    from core import run_infer_script
+except ImportError as _e:
+    import sys as _sys
+    print(f"[rhymix] WARNING: applio not installed - live inference unavailable ({_e})", file=_sys.stderr)
+    run_infer_script = None
 
 try:
     from rvc.realtime.core import AUDIO_SAMPLE_RATE, VoiceChanger
