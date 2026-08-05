@@ -165,6 +165,12 @@ def _resolve_download_source(source):
                 return candidate
             legacy = paths.get_inference_file_path(src_id)
             return legacy if legacy.exists() else None
+        if src_type == "exports":
+            # Generated audio (Foundation, Studio AI, renders) lives here and is
+            # addressed by filename. The download route already serves it; without
+            # this branch anything reusing such an asset as a source can't find it.
+            candidate = paths.EXPORT_DIR / os.path.basename(src_id)
+            return candidate if candidate.exists() else None
         return None
 
     if isinstance(source, str):

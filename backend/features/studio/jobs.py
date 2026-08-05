@@ -5,7 +5,7 @@ import uuid
 from pathlib import Path
 
 from backend.features.studio.ai_adapters import get_ai_adapter
-from backend.features.studio.assets import probe_audio
+from backend.features.studio.assets import probe_audio, resolve_asset_path
 from backend.features.studio.foundation_one import run_foundation_studio_job
 from backend.features.studio.render import render_mixdown
 from backend.features.studio.stage_drums import run_stage_drums_job
@@ -1096,6 +1096,12 @@ def run_orchestrate_song_job(job_id: str, project_id: str, payload: dict):
                 pass
 
 
+def _asset_source_path(assets: dict, asset_id):
+    """String form of resolve_asset_path, for payloads sent to the AI bridge."""
+    resolved = resolve_asset_path(assets, asset_id)
+    return str(resolved) if resolved else None
+
+
 def _record_result(project_record: dict, job_type: str, payload: dict, result: dict):
     if job_type in {"understand", "lrc", "quality_score"}:
         metadata = project_record.get("metadata") or {}
@@ -1299,14 +1305,15 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
         assets = project_record.get("assets") if isinstance(project_record.get("assets"), dict) else {}
         if isinstance(payload, dict):
             source_id = payload.get("sourceAssetId")
-            if source_id and assets.get(source_id) and assets[source_id].get("path"):
-                payload["sourceAssetPath"] = assets[source_id]["path"]
+            source_path = _asset_source_path(assets, source_id)
+            if source_path:
+                payload["sourceAssetPath"] = source_path
             ref_id = payload.get("referenceAssetId")
-            if ref_id and assets.get(ref_id) and assets[ref_id].get("path"):
-                payload["referenceAssetPath"] = assets[ref_id]["path"]
-            if job_type == "cover" and not payload.get("referenceAssetPath"):
-                if source_id and assets.get(source_id) and assets[source_id].get("path"):
-                    payload["referenceAssetPath"] = assets[source_id]["path"]
+            ref_path = _asset_source_path(assets, ref_id)
+            if ref_path:
+                payload["referenceAssetPath"] = ref_path
+            if job_type == "cover" and not payload.get("referenceAssetPath") and source_path:
+                payload["referenceAssetPath"] = source_path
 
         adapter = None
         if job_type in {
