@@ -21,6 +21,11 @@ from backend.paths.manager import paths
 
 bp = Blueprint("models", __name__)
 
+# voice-models.com's nginx rejects the literal "python-requests/x.y" User-Agent
+# with a 403 — its robots.txt allows crawlers, it just wants a client that names
+# itself. Identify properly rather than pretending to be a browser.
+USER_AGENT = "Rhymix/1.0 (+https://github.com/gashel01/Rhymix)"
+
 
 def _extract_hf_model_id(url: str) -> str:
     if not url:
@@ -158,13 +163,27 @@ def search_online_models():
     if not q:
         return jsonify({"models": [], "total_pages": 1})
 
+    # Upstream failures are the directory's problem, not ours — report them as
+    # 502 with a readable message instead of collapsing into an opaque 500.
     try:
-        raw = requests.post(
+        response = requests.post(
             "https://voice-models.com/fetch_data.php",
             data={"page": page, "search": q},
+            headers={"User-Agent": USER_AGENT},
             timeout=10,
-        ).json()
+        )
+        response.raise_for_status()
+        raw = response.json()
+    except requests.RequestException as e:
+        logging.warning("voice-models.com search failed: %s", e)
+        return jsonify({"error": f"Model directory unreachable: {e}", "models": []}), 502
+    except ValueError:
+        logging.warning("voice-models.com returned a non-JSON body for query %r", q)
+        return jsonify(
+            {"error": "Model directory returned an unexpected response", "models": []}
+        ), 502
 
+    try:
         models = []
         html = (raw.get("table") or "").strip()
         if html:
@@ -210,7 +229,10 @@ def search_online_models():
         return jsonify({"models": models, "total_pages": total_pages, "current_page": int(page)})
 
     except Exception as e:
-        return jsonify({"error": str(e), "models": []}), 500
+        # Reaching here means the response parsed as JSON but its HTML payload no
+        # longer matches what we scrape — i.e. the directory changed its markup.
+        logging.exception("Could not parse voice-models.com results")
+        return jsonify({"error": f"Could not parse model directory results: {e}", "models": []}), 500
 
 
 def _safe_model_dir_name(user_query: str, model_name: str, model_id: str) -> str:
