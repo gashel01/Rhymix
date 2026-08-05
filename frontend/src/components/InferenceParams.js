@@ -289,6 +289,25 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
     effectiveModel?.name || effectiveModel?.modelName || effectiveModel?.id || effectiveModel?.modelId
   );
 
+  // Tracks coming from the Inference view carry the run they were produced by,
+  // which makes two different jobs possible: convert the original vocals again,
+  // or stack this model on top of the previous conversion.
+  const [sourceMode, setSourceMode] = useState("original");
+  const layerableTracks = useMemo(
+    () => (selectedTracks || []).filter((track) => track?.sourceRunId),
+    [selectedTracks]
+  );
+  const canLayer = layerableTracks.length > 0;
+  const previousModelName = useMemo(() => {
+    const named = layerableTracks.find((track) => track?.sourceModelName);
+    return named?.sourceModelName || null;
+  }, [layerableTracks]);
+
+  // A selection without any run behind it can only be re-inferred from source.
+  useEffect(() => {
+    if (!canLayer) setSourceMode("original");
+  }, [canLayer]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -395,9 +414,17 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
       // keep Applio name if needed: rms_mix_rate = volumeEnvelope maybe, etc.
     };
 
+    // Only a layered run keeps sourceRunId — stripping it is what tells the
+    // backend to go back to the original upload's vocals.
+    const tracks = (Array.isArray(selectedTracks) ? selectedTracks : []).map((track) => {
+      if (sourceMode === "layered" && track?.sourceRunId) return track;
+      const { sourceRunId, ...rest } = track || {};
+      return rest;
+    });
+
     onStartInference({
       model: effectiveModel,
-      tracks: Array.isArray(selectedTracks) ? selectedTracks : [],
+      tracks,
       params: payloadParams,
     });
   };
@@ -551,6 +578,63 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
           </Grid>
         </Grid>
       </Paper>
+
+      {/* Input source — only meaningful when the selection came from a past run */}
+      {canLayer && (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            mb: 3,
+            borderRadius: 3,
+            border: `1px solid ${theme.palette.divider}`,
+            backgroundColor:
+              theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "rgba(255, 255, 255, 0.8)",
+          }}
+        >
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+            Input source
+          </Typography>
+          <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 2 }}>
+            {layerableTracks.length} of {trackCount} selected track{trackCount !== 1 ? "s" : ""} came from
+            a previous conversion.
+          </Typography>
+
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+            <Button
+              variant={sourceMode === "original" ? "contained" : "outlined"}
+              onClick={() => setSourceMode("original")}
+              sx={{ textTransform: "none", flex: "1 1 260px", justifyContent: "flex-start", py: 1.5 }}
+            >
+              <Box sx={{ textAlign: "left" }}>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  Original vocals
+                </Typography>
+                <Typography variant="caption" sx={{ opacity: 0.8, display: "block" }}>
+                  Convert the source track again, ignoring the earlier result
+                </Typography>
+              </Box>
+            </Button>
+
+            <Button
+              variant={sourceMode === "layered" ? "contained" : "outlined"}
+              onClick={() => setSourceMode("layered")}
+              sx={{ textTransform: "none", flex: "1 1 260px", justifyContent: "flex-start", py: 1.5 }}
+            >
+              <Box sx={{ textAlign: "left" }}>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  Layered
+                </Typography>
+                <Typography variant="caption" sx={{ opacity: 0.8, display: "block" }}>
+                  {previousModelName
+                    ? `Stack ${modelName} on top of the ${previousModelName} result`
+                    : `Stack ${modelName} on top of the previous result`}
+                </Typography>
+              </Box>
+            </Button>
+          </Box>
+        </Paper>
+      )}
 
       {/* Core Voice Conversion */}
       <SectionAccordion

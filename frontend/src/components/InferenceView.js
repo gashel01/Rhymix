@@ -285,8 +285,15 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
   }, [uniqueModels]);
 
   const pairToTrack = useCallback((pair) => {
-    if (pair?.result?.track) return pair.result.track;
-    if (pair?.track) return pair.track;
+    // Every row here is an inference result, so carry its run id along. Without
+    // it the params screen has nothing but the original upload's fileId to work
+    // with, and "run a model on this result" silently reprocesses the raw vocals.
+    const sourceRunId = pair?.runId || pair?.result?.runId || null;
+    const sourceModelName = pair?.modelName || pair?.result?.modelName || null;
+
+    const base = pair?.result?.track || pair?.track || null;
+    if (base) return { ...base, sourceRunId, sourceModelName };
+
     const fileId = pair?.fileId || null;
     if (!fileId) return null;
     return {
@@ -295,6 +302,8 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
       displayName: pair?.displayName || pair?.name || null,
       originalName: pair?.originalName || null,
       vocalFileType: pair?.vocalFileType || pair?.result?.vocalFileType || pair?.result?.params?.vocalsFileType,
+      sourceRunId,
+      sourceModelName,
     };
   }, []);
 
