@@ -7,7 +7,8 @@ from pathlib import Path
 from backend.features.studio.ai_adapters import get_ai_adapter
 from backend.features.studio.assets import probe_audio, resolve_asset_path
 from backend.features.studio.foundation_one import run_foundation_studio_job
-from backend.features.studio.render import render_mixdown
+from backend.features.studio.midi_export import export_midi
+from backend.features.studio.render import render_mixdown, render_stems
 from backend.features.studio.stage_drums import run_stage_drums_job
 from backend.features.studio.uvr_stems import extract_uvr_multi_stems
 from backend.features.studio.storage import (
@@ -1174,6 +1175,81 @@ def run_render_job(job_id: str, project_id: str):
         save_project(project_record)
 
         update_job(job_id, status="completed", progress=100, result={"assetId": asset_id})
+        append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
+    except Exception as exc:
+        update_job(job_id, status="failed", progress=100, error=str(exc))
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
+
+
+def run_stems_render_job(job_id: str, project_id: str):
+    """Export one file per lane.
+
+    Unlike the mixdown these aren't added to the timeline as a clip — they are
+    an output of the project, not new material for it. They're registered as
+    assets so the UI can list and download them.
+    """
+    update_job(job_id, status="running", progress=0, statusMessage="Rendering stems...")
+    append_job_event(job_id, {"type": "status", "status": "running", "progress": 0})
+
+    project_record = get_project(project_id)
+    if not project_record:
+        update_job(job_id, status="failed", error="Project not found", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+
+    try:
+        output = render_stems(project_record)
+        project_record = _reload_project_for_async_write(project_id, project_record)
+
+        for index, stem in enumerate(output.get("stems", [])):
+            _register_asset(
+                project_record,
+                {
+                    "id": f"stem:{job_id}:{index}",
+                    "kind": "derived",
+                    "label": f"Stem · {stem.get('laneName') or index + 1}",
+                    "path": stem.get("path"),
+                    "url": stem.get("url"),
+                    "durationSec": stem.get("durationSec", 0.0),
+                    "sampleRate": stem.get("sampleRate"),
+                },
+            )
+
+        save_project(project_record)
+
+        update_job(job_id, status="completed", progress=100, result=output)
+        append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
+    except Exception as exc:
+        update_job(job_id, status="failed", progress=100, error=str(exc))
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
+
+
+def run_midi_export_job(job_id: str, project_id: str):
+    update_job(job_id, status="running", progress=0, statusMessage="Exporting MIDI...")
+    append_job_event(job_id, {"type": "status", "status": "running", "progress": 0})
+
+    project_record = get_project(project_id)
+    if not project_record:
+        update_job(job_id, status="failed", error="Project not found", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+
+    try:
+        output = export_midi(project_record)
+        project_record = _reload_project_for_async_write(project_id, project_record)
+        _register_asset(
+            project_record,
+            {
+                "id": f"midi:{job_id}",
+                "kind": "derived",
+                "label": "MIDI Export",
+                "path": output.get("path"),
+                "url": output.get("url"),
+            },
+        )
+        save_project(project_record)
+
+        update_job(job_id, status="completed", progress=100, result=output)
         append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
     except Exception as exc:
         update_job(job_id, status="failed", progress=100, error=str(exc))

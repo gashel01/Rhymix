@@ -16,6 +16,8 @@ const Transport = ({
   onUndo,
   onRedo,
   onRender,
+  onRenderStems,
+  onExportMidi,
   onReset,
   jobStatus,
   contextActions = [],
@@ -74,6 +76,14 @@ const Transport = ({
             Reset
           </button>
         ) : null}
+        {/* A mixdown is a finished file; stems are what you carry into a DAW.
+            Both belong here — exporting is a project-level action. */}
+        <button className="studio-btn ghost" onClick={onRenderStems} title="Export one file per lane">
+          Stems
+        </button>
+        <button className="studio-btn ghost" onClick={onExportMidi} title="Export MIDI clips as a .mid file">
+          MIDI
+        </button>
         <button className="studio-btn accent" onClick={onRender}>
           Export
         </button>

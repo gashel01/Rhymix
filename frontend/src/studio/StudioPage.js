@@ -7,6 +7,8 @@ import {
   resetProject,
   startAiJob,
   startRender,
+  startStemsRender,
+  startMidiExport,
   subscribeJobEvents,
   updateProject,
 } from "./api";
@@ -501,6 +503,30 @@ const StudioPageInner = ({ assetId, projectId }) => {
     subscribeJob(response.jobId);
   };
 
+  const handleRenderStems = async () => {
+    if (!state.project?.id) return;
+    try {
+      const response = await startStemsRender(state.project.id);
+      setJobs((prev) => [...prev, { id: response.jobId, type: "render_stems", status: "queued", progress: 0 }]);
+      subscribeJob(response.jobId);
+    } catch (err) {
+      console.error("Failed to start stems render", err);
+      window.alert(err?.response?.data?.error || "Could not start the stems export.");
+    }
+  };
+
+  const handleExportMidi = async () => {
+    if (!state.project?.id) return;
+    try {
+      const response = await startMidiExport(state.project.id);
+      setJobs((prev) => [...prev, { id: response.jobId, type: "export_midi", status: "queued", progress: 0 }]);
+      subscribeJob(response.jobId);
+    } catch (err) {
+      console.error("Failed to start MIDI export", err);
+      window.alert(err?.response?.data?.error || "Could not start the MIDI export.");
+    }
+  };
+
   const handleResetProject = async () => {
     if (!state.project?.id) return;
     const confirmed = window.confirm("Reset this project to the original assets and lanes?");
@@ -875,6 +901,8 @@ const StudioPageInner = ({ assetId, projectId }) => {
         onUndo={actions.undo}
         onRedo={actions.redo}
         onRender={handleRender}
+        onRenderStems={handleRenderStems}
+        onExportMidi={handleExportMidi}
         onReset={handleResetProject}
         jobStatus={jobStatus}
         contextActions={transportActions}

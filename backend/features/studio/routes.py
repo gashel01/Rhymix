@@ -18,8 +18,10 @@ from backend.features.studio.jobs import (
     create_job,
     run_ai_job,
     run_orchestrate_song_job,
+    run_midi_export_job,
     run_render_job,
     run_soulx_resing_job,
+    run_stems_render_job,
     start_job_thread,
 )
 from backend.features.studio.storage import (
@@ -323,6 +325,20 @@ def patch_project(project_id):
 def render_project(project_id):
     job = create_job("render", project_id, {})
     start_job_thread(run_render_job, (job["id"], project_id))
+    return jsonify({"jobId": job["id"]})
+
+
+@bp.route("/api/studio/projects/<project_id>/render/stems", methods=["POST"])
+def render_project_stems(project_id):
+    job = create_job("render_stems", project_id, {})
+    start_job_thread(run_stems_render_job, (job["id"], project_id))
+    return jsonify({"jobId": job["id"]})
+
+
+@bp.route("/api/studio/projects/<project_id>/export/midi", methods=["POST"])
+def export_project_midi(project_id):
+    job = create_job("export_midi", project_id, {})
+    start_job_thread(run_midi_export_job, (job["id"], project_id))
     return jsonify({"jobId": job["id"]})
 
 

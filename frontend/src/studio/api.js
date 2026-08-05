@@ -46,6 +46,16 @@ export const startRender = async (projectId) => {
   return response.data;
 };
 
+export const startStemsRender = async (projectId) => {
+  const response = await axios.post(`${API_BASE}/api/studio/projects/${projectId}/render/stems`);
+  return response.data;
+};
+
+export const startMidiExport = async (projectId) => {
+  const response = await axios.post(`${API_BASE}/api/studio/projects/${projectId}/export/midi`);
+  return response.data;
+};
+
 export const resetProject = async (projectId) => {
   const response = await axios.post(`${API_BASE}/api/studio/projects/${projectId}/reset`);
   return response.data;
