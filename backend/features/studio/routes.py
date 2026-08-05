@@ -18,10 +18,11 @@ from backend.features.studio.jobs import (
     create_job,
     run_ai_job,
     run_orchestrate_song_job,
+    cancel_job,
     run_midi_export_job,
     run_render_job,
-    run_soulx_resing_job,
     run_stems_render_job,
+    run_soulx_resing_job,
     start_job_thread,
 )
 from backend.features.studio.storage import (
@@ -515,6 +516,16 @@ def get_job_status(job_id):
     job = get_job(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
+    return jsonify(job)
+
+
+@bp.route("/api/jobs/<job_id>/cancel", methods=["POST"])
+def cancel_job_route(job_id):
+    job, problem = cancel_job(job_id)
+    if problem == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+    if problem == "already_finished":
+        return jsonify({"error": f"Job already {job.get('status')}"}), 409
     return jsonify(job)
 
 

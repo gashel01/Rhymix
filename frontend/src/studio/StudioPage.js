@@ -9,6 +9,7 @@ import {
   startRender,
   startStemsRender,
   startMidiExport,
+  cancelJob,
   subscribeJobEvents,
   updateProject,
 } from "./api";
@@ -16,6 +17,7 @@ import Transport from "./components/Transport";
 import TrackList from "./components/TrackList";
 import Timeline from "./components/Timeline";
 import Inspector from "./components/Inspector";
+import SelectionActions from "./components/SelectionActions";
 import JobToasts from "./components/JobToasts";
 import LibraryPanel from "./components/LibraryPanel";
 import OrchestratorModal from "./components/OrchestratorModal";
@@ -394,6 +396,19 @@ const StudioPageInner = ({ assetId, projectId }) => {
     }
   };
 
+  // Everything offered on a timeline selection. All of them read a stretch of
+  // an existing asset, so they need a source clip and a range.
+  const SELECTION_ACTION_JOBS = new Set(["repaint", "extend", "vocal2bgm", "cover"]);
+
+  // Jobs that regenerate part of an existing asset rather than creating one
+  // from nothing: the timeline selection has to be mapped onto source offsets.
+  const RANGE_SOURCE_JOBS = new Set([
+    "foundation_restyle",
+    "foundation_extend",
+    "replace_section",
+    ...SELECTION_ACTION_JOBS,
+  ]);
+
   const handleStartJob = async (jobType, payload) => {
     if (!state.project?.id) return;
     const sourceRequiredJobs = new Set([
@@ -402,6 +417,8 @@ const StudioPageInner = ({ assetId, projectId }) => {
       "stem_extract_uvr",
       "foundation_restyle",
       "foundation_extend",
+      "replace_section",
+      ...SELECTION_ACTION_JOBS,
     ]);
     const explicitClip = payload?.clipId
       ? state.clips.find((clip) => clip.id === payload.clipId)
@@ -439,7 +456,9 @@ const StudioPageInner = ({ assetId, projectId }) => {
         };
       }
     }
-    if (jobType === "foundation_restyle" || jobType === "foundation_extend") {
+    // These all regenerate a slice of an existing asset, so they need the
+    // selected timeline range translated into offsets inside the source file.
+    if (RANGE_SOURCE_JOBS.has(jobType)) {
       const hasExplicitSourceRange =
         Boolean(nextPayload?.useExplicitSourceRange)
         && Boolean(nextPayload?.sourceAssetId || sourceAssetId)
@@ -450,7 +469,7 @@ const StudioPageInner = ({ assetId, projectId }) => {
         sourceAssetId = nextPayload.sourceAssetId || sourceAssetId;
       } else {
         if (!sourceClip?.sourceAssetId) {
-          throw new Error("Select an audio clip or range before running Foundation restyle.");
+          throw new Error("Select an audio clip or range first.");
         }
         const clipStart = sourceClip.timelineStartSec ?? 0;
         const clipSrcStart = sourceClip.srcStartSec ?? 0;
@@ -496,11 +515,44 @@ const StudioPageInner = ({ assetId, projectId }) => {
     handleResynthesizeSelection,
   } = useLyricsActions({ handleStartJob });
 
+  // Which selection action is currently running, so the bar can show it.
+  const busySelectionAction = useMemo(() => {
+    const job = activeJobs.find((entry) => SELECTION_ACTION_JOBS.has(entry.type));
+    return job?.type || null;
+  }, [activeJobs]);
+
+  const handleSelectionAction = async (jobType, { prompt, startSec, endSec }) => {
+    try {
+      await handleStartJob(jobType, {
+        prompt,
+        startSec,
+        endSec,
+        // Land the result where the selection is rather than at time zero.
+        timelineStartSec: startSec,
+        insertSec: startSec,
+        durationSec: Math.max(0.5, endSec - startSec),
+      });
+    } catch (err) {
+      console.error(`Failed to start ${jobType}`, err);
+      window.alert(err?.message || "Could not start the job.");
+    }
+  };
+
   const handleRender = async () => {
     if (!state.project?.id) return;
     const response = await startRender(state.project.id);
     setJobs((prev) => [...prev, { id: response.jobId, type: "render", status: "queued", progress: 0 }]);
     subscribeJob(response.jobId);
+  };
+
+  const handleCancelJob = async (jobId) => {
+    try {
+      const data = await cancelJob(jobId);
+      setJobs((prev) => prev.map((job) => (job.id === jobId ? { ...job, ...data } : job)));
+    } catch (err) {
+      console.error("Failed to cancel job", err);
+      window.alert(err?.response?.data?.error || "Could not cancel the job.");
+    }
   };
 
   const handleRenderStems = async () => {
@@ -840,6 +892,13 @@ const StudioPageInner = ({ assetId, projectId }) => {
                   />
                 </div>
               </div>
+
+              <SelectionActions
+                range={state.selection?.range}
+                sourceClip={selectionSourceClip || selectedClip}
+                busyAction={busySelectionAction}
+                onRun={handleSelectionAction}
+              />
             </div>
           </div>
 
@@ -957,6 +1016,7 @@ const StudioPageInner = ({ assetId, projectId }) => {
           jobSubscriptionsRef.current.delete(jobId);
           setJobs((prev) => prev.filter((job) => job.id !== jobId));
         }}
+        onCancel={handleCancelJob}
       />
     </div>
   );

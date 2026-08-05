@@ -2082,3 +2082,67 @@
   border-color: rgba(91, 214, 118, 0.42);
   background: rgba(91, 214, 118, 0.08);
 }
+
+/* Selection actions — appear under the timeline once a range is selected.
+   Kept next to the selection itself: regenerating a region is a gesture on
+   what you just highlighted, not a command hidden in a side panel. */
+.studio-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-top: 8px;
+  border: 1px solid var(--studio-panel-border);
+  border-radius: 12px;
+  background: rgba(0, 194, 255, 0.06);
+}
+
+.studio-selection-actions__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.studio-selection-actions__range {
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--studio-text);
+  opacity: 0.75;
+}
+
+.studio-selection-actions__prompt {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--studio-text);
+  font-size: 12px;
+}
+
+.studio-selection-actions__prompt::placeholder {
+  color: var(--studio-text);
+  opacity: 0.4;
+}
+
+.studio-selection-actions__prompt:disabled {
+  opacity: 0.5;
+}
+
+.studio-selection-actions__action {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--studio-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.studio-mini.danger {
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #ef4444;
+}

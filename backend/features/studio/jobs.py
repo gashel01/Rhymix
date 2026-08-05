@@ -4,7 +4,7 @@ import threading
 import uuid
 from pathlib import Path
 
-from backend.features.studio.ai_adapters import get_ai_adapter
+from backend.features.studio.ai_adapters import get_ai_adapter, terminate_ai_adapter
 from backend.features.studio.assets import probe_audio, resolve_asset_path
 from backend.features.studio.foundation_one import run_foundation_studio_job
 from backend.features.studio.midi_export import export_midi
@@ -1181,6 +1181,43 @@ def run_render_job(job_id: str, project_id: str):
         append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
 
 
+TERMINAL_JOB_STATUSES = {"completed", "failed", "cancelled"}
+
+
+def cancel_job(job_id: str):
+    """Stop a running job.
+
+    The AI work happens in a bridge subprocess that holds the models and the
+    GPU, so cancelling means killing it — there is no cooperative stop to ask
+    for. The flag is written first: the worker thread checks it before writing
+    a terminal status, so the kill isn't reported as a failure.
+    """
+    job = get_job(job_id)
+    if not job:
+        return None, "not_found"
+    if job.get("status") in TERMINAL_JOB_STATUSES:
+        return job, "already_finished"
+
+    update_job(
+        job_id,
+        status="cancelled",
+        progress=100,
+        error="Cancelled",
+        statusMessage="Cancelled",
+    )
+    stopped = terminate_ai_adapter()
+    append_job_event(
+        job_id,
+        {"type": "status", "status": "cancelled", "progress": 100, "stoppedBridge": stopped},
+    )
+    return get_job(job_id), None
+
+
+def _job_cancelled(job_id: str) -> bool:
+    job = get_job(job_id)
+    return bool(job and job.get("status") == "cancelled")
+
+
 def run_stems_render_job(job_id: str, project_id: str):
     """Export one file per lane.
 
@@ -1202,18 +1239,16 @@ def run_stems_render_job(job_id: str, project_id: str):
         project_record = _reload_project_for_async_write(project_id, project_record)
 
         for index, stem in enumerate(output.get("stems", [])):
-            _register_asset(
-                project_record,
-                {
-                    "id": f"stem:{job_id}:{index}",
-                    "kind": "derived",
-                    "label": f"Stem · {stem.get('laneName') or index + 1}",
-                    "path": stem.get("path"),
-                    "url": stem.get("url"),
-                    "durationSec": stem.get("durationSec", 0.0),
-                    "sampleRate": stem.get("sampleRate"),
-                },
-            )
+            asset = {
+                "id": f"stem:{job_id}:{index}",
+                "kind": "derived",
+                "label": f"Stem · {stem.get('laneName') or index + 1}",
+                "path": stem.get("path"),
+                "url": stem.get("url"),
+                "durationSec": stem.get("durationSec", 0.0),
+                "sampleRate": stem.get("sampleRate"),
+            }
+            _register_asset(project_record, asset)
 
         save_project(project_record)
 
@@ -1451,6 +1486,11 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
         else:
             raise RuntimeError(f"Unknown job type: {job_type}")
 
+        # Killing the bridge mid-run surfaces here as a normal return or an
+        # exception; either way the user asked for it, so don't overwrite it.
+        if _job_cancelled(job_id):
+            return
+
         if isinstance(result, dict):
             project_record = _reload_project_for_async_write(project_id, project_record)
             _record_result(project_record, job_type, payload, result)
@@ -1460,6 +1500,8 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
         update_job(job_id, status="completed", progress=100, result=result)
         append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
     except Exception as exc:
+        if _job_cancelled(job_id):
+            return
         update_job(job_id, status="failed", progress=100, error=str(exc))
         append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
     finally:
