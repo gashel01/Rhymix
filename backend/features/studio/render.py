@@ -79,8 +79,10 @@ def render_mixdown(project_payload: dict) -> dict:
             filter_parts.append(f"volume={gain}")
         if delay_ms > 0:
             filter_parts.append(f"adelay={delay_ms}|{delay_ms}")
-        filter_parts.append(f"[{label}]")
-        filters.append(";".join(filter_parts))
+        # Filters inside one chain are comma-separated; ";" separates chains.
+        # Joining with ";" turned the output pad into a chain of its own and
+        # ffmpeg rejected the graph with "No such filter: ''".
+        filters.append(f"{','.join(filter_parts)}[{label}]")
 
     if not inputs:
         raise RuntimeError("No audio sources found for render")
