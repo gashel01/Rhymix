@@ -289,6 +289,8 @@ function App() {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [createDatasetModalOpen, setCreateDatasetModalOpen] = useState(false);
   const [currentView, setCurrentView] = useState("home");
+  // Set when opening an already-running training run from the Models list.
+  const [resumeTrainingJobId, setResumeTrainingJobId] = useState(null);
   const [selectedVocalsForTraining, setSelectedVocalsForTraining] =
     useState(null);
   const [showVoiceConversion, setShowVoiceConversion] = useState(false);
@@ -476,6 +478,7 @@ function App() {
     setCurrentView(view);
     setShowHomeView(view === "home");
     setSelectedVocalsForTraining(null);
+    setResumeTrainingJobId(null);
     setSelectedTracksForInference(null);
     setSelectedModelForInference(null);
     setInferenceParams(null);
@@ -797,11 +800,31 @@ function App() {
     setOptimisticTracks([]);
   };
 
+  // Open a training run that is already going, from its card in the Models list.
+  const handleResumeTraining = useCallback((jobId) => {
+    if (!jobId) return;
+    setResumeTrainingJobId(jobId);
+    setSelectedVocalsForTraining(null);
+    setCurrentView("training");
+    setShowHomeView(false);
+    const base = `${window.location.pathname}${window.location.search}`;
+    if (`${base}#training` !== `${base}${window.location.hash}`) {
+      window.history.pushState(null, '', `${base}#training`);
+    }
+  }, []);
+
   const handleTrainWithDataset = useCallback((selectedVocals) => {
+    setResumeTrainingJobId(null);
     setSelectedVocalsForTraining(selectedVocals);
     setCurrentView("training");
     setShowHomeView(false);
     setShowVoiceConversion(false);
+    // Push the entry by hand: handleNavigation can't be used here because it
+    // clears selectedVocalsForTraining, which is exactly what we just set.
+    const base = `${window.location.pathname}${window.location.search}`;
+    if (`${base}#training` !== `${base}${window.location.hash}`) {
+      window.history.pushState(null, '', `${base}#training`);
+    }
   }, []);
 
 
@@ -949,6 +972,7 @@ function App() {
         return (
           <TrainingView
             selectedVocals={selectedVocalsForTraining}
+            resumeJobId={resumeTrainingJobId}
             onBack={() => handleNavigation("home")}
           />
         );
@@ -965,7 +989,7 @@ function App() {
         );
 
       case "models":
-        return <ModelsView darkMode={darkMode} />;
+        return <ModelsView darkMode={darkMode} onResumeTraining={handleResumeTraining} />;
 
       case "inference":
         return (

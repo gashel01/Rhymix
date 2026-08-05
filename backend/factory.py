@@ -27,7 +27,7 @@ def create_app():
     from backend.routes.waveform import bp as waveform_bp
     from backend.routes.models import bp as models_bp
     from backend.routes.maintenance import bp as maintenance_bp
-    from backend.routes.training import bp as training_bp
+    from backend.routes.training import bp as training_bp, restore_training_jobs
 
     from backend.features.processing.routes import bp as processing_bp
     from backend.features.inference.routes import bp as inference_bp
@@ -55,6 +55,11 @@ def create_app():
     from backend.routes.base import bp as base_bp
 
     app.register_blueprint(base_bp)
+
+    # Training workers survive a backend restart but become unreachable — they'd
+    # hold the GPU with no UI able to stop them. Clear them out and reload what
+    # the previous process knew.
+    restore_training_jobs()
 
     if os.getenv("RHYMIX_WARMUP_ON_STARTUP", "").lower() in {"1", "true", "yes", "y", "on"}:
         from backend.routes.maintenance import warmup_models

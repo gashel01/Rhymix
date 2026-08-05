@@ -38,6 +38,7 @@ const AudioTrackTable = (props) => {
     handleInferenceWithTracks,
     showInferenceResultsActions,
     showHeaderWorkflowActions,
+    showSelectionControls,
     hideActionBar,
     onReturnToModelSelection,
     onRowModelSelection,
@@ -495,6 +496,7 @@ const AudioTrackTable = (props) => {
         handleCoverWithTracks={handleCoverWithTracks}
         showInferenceResultsActions={showInferenceResultsActions}
         showHeaderWorkflowActions={showHeaderWorkflowActions}
+        showSelectionControls={showSelectionControls}
         hideActionBar={hideActionBar}
         onReturnToModelSelection={onReturnToModelSelection}
         onReturnToInferenceParams={onReturnToInferenceParams}

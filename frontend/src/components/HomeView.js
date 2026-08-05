@@ -211,6 +211,10 @@ function HomeView({
                 >
 
 
+                  {/* The action bar is shown here because it carries Train Model,
+                      which has no other entry point: training needs a multi-track
+                      selection, so a per-row menu can't host it. Select All /
+                      Clear / Delete stay in this view's own header. */}
                   <AudioTrackTable
                     darkMode={darkMode}
                     trackPairs={filteredTrackPairs}
@@ -229,7 +233,7 @@ function HomeView({
                     handleInferenceWithTracks={onInferenceWithTracks}
                     onRowModelSelection={handleRowModelSelection}
                     handleCoverWithTracks={onCoverWithTracks}
-                    hideActionBar
+                    showSelectionControls={false}
                     volume={volumeRef.current}
                     header={({ selectedCount, onSelectAll, onClear, onDelete }) => (
                       <div className={styles.headerWrapper}>

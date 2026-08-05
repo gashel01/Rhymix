@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
   Typography,
@@ -41,7 +41,7 @@ import { useTheme } from "@mui/material/styles";
 import PageHeader from "./common/PageHeader";
 import Section from "./common/Section";
 
-function TrainingView({ selectedVocals, onBack }) {
+function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
   const theme = useTheme();
 
   // Transform the selected tracks array into the expected structure
@@ -88,6 +88,43 @@ function TrainingView({ selectedVocals, onBack }) {
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
   const [fileDetailsModalOpen, setFileDetailsModalOpen] = useState(false);
   const [currentJobId, setCurrentJobId] = useState(null);
+  // How many backend log lines we've already shown. The status endpoint returns
+  // the whole log every poll, so without this the box fills with duplicates.
+  const consumedLogsRef = useRef(0);
+
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancelTraining = async () => {
+    if (!currentJobId || cancelling) return;
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/training-jobs/${encodeURIComponent(currentJobId)}/cancel`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        setIsTraining(false);
+        setCurrentJobId(null);
+        setTrainingLogs((prev) => [...prev, "Cancelled by user"]);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setTrainingLogs((prev) => [...prev, `Could not cancel: ${data.error || res.status}`]);
+      }
+    } catch (err) {
+      setTrainingLogs((prev) => [...prev, `Could not reach the backend to cancel: ${err}`]);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  // Reattach to a run started elsewhere: the job outlives this view, so opening
+  // it from the Models list should pick the run up where it is, not start over.
+  useEffect(() => {
+    if (!resumeJobId) return;
+    consumedLogsRef.current = 0;
+    setCurrentJobId(resumeJobId);
+    setIsTraining(true);
+    setTrainingLogs([`Reattached to training job ${resumeJobId}`]);
+  }, [resumeJobId]);
 
   // Poll training status when job starts
   useEffect(() => {
@@ -109,9 +146,12 @@ function TrainingView({ selectedVocals, onBack }) {
             setTrainingProgress(data.progress);
           }
 
-          // Add new logs if any
-          if (data.logs && data.logs.length > 0) {
-            setTrainingLogs((prev) => [...prev, ...data.logs]);
+          // Append only the lines we haven't shown yet — the endpoint returns
+          // the full log each time.
+          if (data.logs && data.logs.length > consumedLogsRef.current) {
+            const fresh = data.logs.slice(consumedLogsRef.current);
+            consumedLogsRef.current = data.logs.length;
+            setTrainingLogs((prev) => [...prev, ...fresh]);
           }
 
           // Check if training is complete
@@ -207,6 +247,7 @@ function TrainingView({ selectedVocals, onBack }) {
 
         if (data.jobId) {
           // Start polling for updates
+          consumedLogsRef.current = 0;
           setCurrentJobId(data.jobId);
         } else {
           setTrainingLogs((prev) => [
@@ -438,18 +479,31 @@ function TrainingView({ selectedVocals, onBack }) {
                 mb: 0.5,
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Typography variant="h4" sx={{
-                    fontWeight: 700,
-                    color: theme.palette.primary.main,
-                  }}>
-                    {selectedVocals?.length || 0}
-                  </Typography>
-                  <Typography variant="body2" sx={{
-                    color: theme.palette.text.secondary,
-                    fontWeight: 500,
-                  }}>
-                    vocal tracks selected
-                  </Typography>
+                  {/* A reattached run has no selection to count — the dataset was
+                      fixed when it started. Report the run instead of "0 tracks". */}
+                  {resumeJobId ? (
+                    <Typography variant="body2" sx={{
+                      color: theme.palette.text.secondary,
+                      fontWeight: 500,
+                    }}>
+                      Watching a run already in progress
+                    </Typography>
+                  ) : (
+                    <>
+                      <Typography variant="h4" sx={{
+                        fontWeight: 700,
+                        color: theme.palette.primary.main,
+                      }}>
+                        {selectedVocals?.length || 0}
+                      </Typography>
+                      <Typography variant="body2" sx={{
+                        color: theme.palette.text.secondary,
+                        fontWeight: 500,
+                      }}>
+                        vocal tracks selected
+                      </Typography>
+                    </>
+                  )}
                 </Box>
 
                 {/* See Details Button */}
@@ -486,7 +540,9 @@ function TrainingView({ selectedVocals, onBack }) {
                 <Typography variant="body2" sx={{
                   color: theme.palette.text.secondary,
                 }}>
-                  Estimated training time: ~{Math.round((selectedVocals?.length || 0) * 3.5)} minutes
+                  {resumeJobId
+                    ? "Started from another view — progress below is live"
+                    : `Estimated training time: ~${Math.round((selectedVocals?.length || 0) * 3.5)} minutes`}
                 </Typography>
               </Box>
             </Box>
@@ -511,6 +567,18 @@ function TrainingView({ selectedVocals, onBack }) {
           <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
             <CircularProgress size={24} sx={{ mr: 2 }} />
             <Typography variant="body2">{trainingProgress}% Complete</Typography>
+            {/* This is the screen you sit on while it runs, so the way out
+                belongs here too — not only on the card in the Models list. */}
+            <Button
+              variant="outlined"
+              color="error"
+              size="small"
+              onClick={handleCancelTraining}
+              disabled={!currentJobId || cancelling}
+              sx={{ ml: "auto", textTransform: "none" }}
+            >
+              {cancelling ? "Cancelling…" : "Cancel training"}
+            </Button>
           </Box>
 
           <Box

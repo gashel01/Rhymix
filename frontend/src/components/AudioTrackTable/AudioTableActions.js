@@ -15,6 +15,9 @@ const AudioTableActions = ({
   handleCoverWithTracks,
   showInferenceResultsActions,
   showHeaderWorkflowActions = true,
+  // Views that render their own Select All / Clear / Delete (Home does, in its
+  // custom header) turn this off so the bar doesn't duplicate them.
+  showSelectionControls = true,
   hideActionBar = false,
   onReturnToModelSelection,
   onReturnToInferenceParams,
@@ -169,7 +172,9 @@ const AudioTableActions = ({
           <div
             className={`${styles.ataGrid} ata-grid`}
             style={{
-              gridTemplateColumns: showHeaderWorkflowActions ? "1fr auto auto" : "1fr auto",
+              gridTemplateColumns: ["1fr", showHeaderWorkflowActions && "auto", showSelectionControls && "auto"]
+                .filter(Boolean)
+                .join(" "),
               transition: "padding 180ms ease",
             }}
           >
@@ -299,33 +304,35 @@ const AudioTableActions = ({
             ) : null}
 
             {/* Right */}
-            <div className={styles.rightFlex}>
-              <Btn variant="outline" title="Select all" onClick={onSelectAll}>
-                Select All
-              </Btn>
+            {showSelectionControls ? (
+              <div className={styles.rightFlex}>
+                <Btn variant="outline" title="Select all" onClick={onSelectAll}>
+                  Select All
+                </Btn>
 
-              {hasSelection ? (
-                <>
-                  <Btn variant="outline" title="Clear selection" onClick={onClear}>
-                    Clear
-                  </Btn>
+                {hasSelection ? (
+                  <>
+                    <Btn variant="outline" title="Clear selection" onClick={onClear}>
+                      Clear
+                    </Btn>
 
-                  <Btn
-                    variant="danger"
-                    title="Delete selected"
-                    onClick={onDelete}
-                    icon={
-                      <SmallIcon>
-                        <DeleteIcon />
-                      </SmallIcon>
-                    }
-                    style={{ padding: "0 10px" }}
-                  >
-                    Delete
-                  </Btn>
-                </>
-              ) : null}
-            </div>
+                    <Btn
+                      variant="danger"
+                      title="Delete selected"
+                      onClick={onDelete}
+                      icon={
+                        <SmallIcon>
+                          <DeleteIcon />
+                        </SmallIcon>
+                      }
+                      style={{ padding: "0 10px" }}
+                    >
+                      Delete
+                    </Btn>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
