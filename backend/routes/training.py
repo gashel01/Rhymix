@@ -8,11 +8,22 @@ import uuid
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
+from werkzeug.utils import secure_filename
 
 from backend.jobs.registry import active_jobs
 from backend.paths.manager import paths
 
 bp = Blueprint("training", __name__)
+
+
+def _safe_model_name(raw):
+    """Reduce a client-supplied model name to a single safe path segment.
+
+    The name becomes a directory under the dataset and logs roots, so anything
+    like "../.." would write outside them. Returns "" when nothing usable is
+    left, which callers reject.
+    """
+    return secure_filename((raw or "").strip())
 
 
 @bp.route("/api/prepare-training-dataset", methods=["POST"])
@@ -24,13 +35,13 @@ def prepare_training_dataset():
         if not files[0].filename:
             return jsonify({"error": "No audio files selected"}), 400
 
-        name = request.form.get("modelName", "unnamed_model")
+        name = _safe_model_name(request.form.get("modelName"))
+        if not name:
+            return jsonify({"error": "Invalid model name"}), 400
         _sr = int(request.form.get("sampleRate", 48000))  # kept for parity, even if unused here
 
         d = paths.APPLIO_DATASET_DIR / name
         d.mkdir(parents=True, exist_ok=True)
-
-        from werkzeug.utils import secure_filename
 
         for f in files:
             f.save(str(d / secure_filename(f.filename)))
@@ -50,7 +61,7 @@ def prepare_training_dataset():
 def start_training():
     try:
         d = request.json or {}
-        model = d.get("modelName")
+        model = _safe_model_name(d.get("modelName"))
         if not model:
             return jsonify({"error": "Model name is required"}), 400
 
