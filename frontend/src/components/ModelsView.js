@@ -249,6 +249,7 @@ function ModelsView({
             ...existing,
             status: job.status,
             downloadProgress: job.progress ?? null,
+            downloadPhase: job.phase || null,
             downloadError: job.error || existing.downloadError,
           });
         }
@@ -259,6 +260,7 @@ function ModelsView({
         modelId: job.modelId,
         status: job.status || "downloading",
         downloadProgress: job.progress ?? null,
+        downloadPhase: job.phase || null,
         downloadError: job.error || null,
         checkpoints: [],
         size_mb: job.size_mb || null,
@@ -279,8 +281,12 @@ function ModelsView({
     const q = searchQuery.trim().toLowerCase();
     const qUnderscore = q.replace(/\s+/g, "_");
     return localModelsMerged.filter((model) => {
-      const name = model.name?.toLowerCase() || "";
-      return name.includes(q) || name.includes(qUnderscore);
+      // Match the alias the user chose AND the name it was published under, so
+      // a model saved as "progress_test" is still findable by "ariana".
+      const haystacks = [model.name, model.sourceName]
+        .filter(Boolean)
+        .map((value) => value.toLowerCase());
+      return haystacks.some((value) => value.includes(q) || value.includes(qUnderscore));
     });
   }, [localModelsMerged, searchQuery]);
 
@@ -316,7 +322,9 @@ function ModelsView({
           }
         })
       );
-    }, 2000);
+      // 1s rather than 2s: a progress bar that only moves every other second
+      // reads as stalled. The endpoint is a local dict lookup, so it's cheap.
+    }, 1000);
     return () => clearInterval(interval);
   }, [downloadJobs, fetchModels]);
 
@@ -423,6 +431,20 @@ function ModelsView({
     const n = Number(hz);
     if (n >= 1000) return `${n / 1000}k`;
     return `${n} Hz`;
+  };
+
+  // Installing a community model is fetch → unzip → install, never training.
+  // Name the phase the job actually reports, and show how far along it is.
+  const DOWNLOAD_PHASE_LABELS = {
+    starting: "Starting",
+    downloading: "Downloading",
+    extracting: "Extracting",
+    installing: "Installing",
+  };
+
+  const describeDownload = (phase, percent) => {
+    const label = DOWNLOAD_PHASE_LABELS[phase] || "Downloading";
+    return typeof percent === "number" ? `${label} ${percent}%` : label;
   };
 
 
@@ -937,10 +959,11 @@ function ModelsView({
                           textTransform: "uppercase",
                           letterSpacing: "0.02em",
                           borderRadius: 8,
+                          whiteSpace: "nowrap",
                           animation: "pulse 1.5s ease-in-out infinite",
                         }}
                       >
-                        Training
+                        {describeDownload(model.downloadPhase, downloadPct)}
                       </span>
                     )}
                     {(model.status === "failed" || model.status === "error") && (
@@ -982,6 +1005,24 @@ function ModelsView({
                       <p style={{ color: t.subtext, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.15em", margin: 0 }}>
                         Voice Model
                       </p>
+                      {/* Published name, shown raw — normaliseModelName strips
+                          accents and brackets, which mangles community titles. */}
+                      {model.sourceName && (
+                        <p
+                          title={model.sourceName}
+                          style={{
+                            color: t.subtext,
+                            fontSize: 12,
+                            margin: 0,
+                            marginTop: 6,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {model.sourceName}
+                        </p>
+                      )}
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -1009,9 +1050,15 @@ function ModelsView({
                       </div>
                     </div>
 
-                    {downloadPct !== null && model.status === "downloading" && (
-                      <div style={{ marginTop: -4 }}>
-                        <ProgressBar value={downloadPct} />
+                    {model.status === "downloading" && (
+                      <div style={{ marginTop: -4, display: "flex", flexDirection: "column", gap: 6 }}>
+                        <ProgressBar value={downloadPct ?? 0} />
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: t.subtext }}>
+                          <span>{DOWNLOAD_PHASE_LABELS[model.downloadPhase] || "Downloading"}</span>
+                          <span style={{ fontFamily: "monospace" }}>
+                            {downloadPct !== null ? `${downloadPct}%` : "—"}
+                          </span>
+                        </div>
                       </div>
                     )}
 
