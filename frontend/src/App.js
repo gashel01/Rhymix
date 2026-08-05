@@ -246,6 +246,30 @@ const globalStylesInputProps = {
   },
 };
 
+// Views that can be restored from the URL hash. Every view that handleNavigation
+// writes a hash for must be listed here, or reloading/going back lands on Home
+// while the URL still claims otherwise.
+const HASH_VIEWS = [
+  "datasets",
+  "training",
+  "talking-workflow",
+  "models",
+  "inference-model-selection",
+  "inference-params",
+  "inference",
+  "create-song",
+];
+
+// Parse the current hash into { view, query }, or null for Home / anything
+// we don't recognise. Studio is deliberately absent: it routes on /studio.
+const readHashRoute = () => {
+  const hash = window.location.hash.substring(1);
+  if (!hash || hash === "home") return null;
+  const [view, query] = hash.split("?");
+  if (!HASH_VIEWS.includes(view)) return null;
+  return { view, query: query || null };
+};
+
 function App() {
   const isBeatboxCalibrationRoute = window.location.pathname.startsWith("/beatbox-calibration");
 
@@ -320,11 +344,35 @@ function App() {
   const [open, setOpen] = React.useState(!sidebarCollapsed);
   React.useEffect(() => { if (!sidebarCollapsed) setOpen(true); }, [sidebarCollapsed]);;
 
+  // Drive the view from the URL. Used both on first paint and on every
+  // back/forward, so the address bar and what's on screen can't drift apart.
+  const applyHashRoute = useCallback(() => {
+    const route = readHashRoute();
+    if (!route) {
+      setCurrentView("home");
+      setShowHomeView(true);
+      return;
+    }
+    setCurrentView(route.view);
+    setShowHomeView(false);
+    if (route.view === "create-song" && route.query) {
+      const sp = new URLSearchParams(route.query);
+      setCreateSongNav({
+        mode: sp.get("mode") === "cover" ? "cover" : "create",
+        sourceSongId: sp.get("sourceSongId") || null,
+        sourceSong: null,
+      });
+    }
+  }, []);
+
   useEffect(() => {
-    const handlePopState = () => setStudioRouteInfo(getStudioRouteInfo());
+    const handlePopState = () => {
+      setStudioRouteInfo(getStudioRouteInfo());
+      applyHashRoute();
+    };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [getStudioRouteInfo]);
+  }, [getStudioRouteInfo, applyHashRoute]);
 
 
   const onVolumeChange = (v01) => setVolume(Math.max(0, Math.min(1, v01)));
@@ -442,11 +490,14 @@ function App() {
     }
     if (view !== "inference") setLiveInferenceData(null);
     setDrawerOpen(false);
-    // Update URL hash for navigation persistence
-    if (view !== "home") {
-      window.history.replaceState(null, '', `#${view}`);
-    } else {
-      window.history.replaceState(null, '', window.location.pathname);
+    // Push, don't replace: each view change gets its own history entry so the
+    // browser Back button walks back through views instead of leaving the app.
+    // Guarded so re-clicking the current item doesn't stack duplicates.
+    const base = `${window.location.pathname}${window.location.search}`;
+    const nextUrl = view === "home" ? window.location.pathname : `${base}#${view}`;
+    const currentUrl = `${base}${window.location.hash}`;
+    if (nextUrl !== currentUrl) {
+      window.history.pushState(null, '', nextUrl);
     }
   }, [getStudioRouteInfo]);
 
@@ -570,25 +621,10 @@ function App() {
     [updateInferenceContext]
   );
 
-  // Handle URL hash routing for navigation persistence
+  // Restore the view from the URL hash on first paint.
   useEffect(() => {
-    const hash = window.location.hash.substring(1); // Remove the '#'
-    if (hash && hash !== 'home') {
-      const [hashView, hashQuery] = hash.split("?");
-      // Only set the view if it's a valid navigation hash
-      const validViews = ['datasets', 'training', 'talking-workflow', 'inference-model-selection', 'inference-params', 'inference', 'create-song'];
-      if (validViews.includes(hashView)) {
-        setCurrentView(hashView);
-        setShowHomeView(false);
-        if (hashView === "create-song" && hashQuery) {
-          const sp = new URLSearchParams(hashQuery);
-          const mode = sp.get("mode") === "cover" ? "cover" : "create";
-          const sourceSongId = sp.get("sourceSongId") || null;
-          setCreateSongNav({ mode, sourceSongId, sourceSong: null });
-        }
-      }
-    }
-  }, []);
+    applyHashRoute();
+  }, [applyHashRoute]);
 
   useEffect(() => {
     const candidates = (optimisticTracks || []).filter((track) => {
