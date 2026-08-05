@@ -24,6 +24,7 @@ def create_app():
     # Register routes
     from backend.routes.upload import bp as upload_bp
     from backend.routes.download import bp as download_bp
+    from backend.routes.waveform import bp as waveform_bp
     from backend.routes.models import bp as models_bp
     from backend.routes.maintenance import bp as maintenance_bp
     from backend.routes.training import bp as training_bp
@@ -39,6 +40,7 @@ def create_app():
     # Order: specific APIs first, catch-all frontend last
     app.register_blueprint(upload_bp)
     app.register_blueprint(download_bp)
+    app.register_blueprint(waveform_bp)
     app.register_blueprint(models_bp)
     app.register_blueprint(maintenance_bp)
     app.register_blueprint(training_bp)

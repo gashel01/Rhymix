@@ -43,6 +43,9 @@ class PathManager:
         self.INFERENCE_DIR = self.BASE_DIR / "data" / "singing" / "inference"
         self.INFERENCE_RUNS_DIR = self.INFERENCE_DIR / "runs"
 
+        # Precomputed waveform peaks, keyed by source file mtime+size
+        self.WAVEFORM_CACHE_DIR = self.BASE_DIR / "data" / "waveform_cache"
+
     def ensure_directories_exist(self):
         """Ensure all required directories exist"""
         directories = [
@@ -66,6 +69,7 @@ class PathManager:
             self.INFERENCE_DIR,
             self.INFERENCE_RUNS_DIR,
             self.METADATA_DIR,
+            self.WAVEFORM_CACHE_DIR,
         ]
 
         for directory in directories:
