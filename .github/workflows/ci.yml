@@ -14,7 +14,15 @@ concurrency:
 jobs:
   # ---------------------------------------------------------------------------
   # Backend unit tests — pure-Python, no GPU, no model checkpoints.
-  # Only runs the dubler / magic-wand tests in tests/.
+  #
+  # Runs the dubler / magic-wand tests in tests/ AND the Flask route tests in
+  # backend/tests/. The latter existed but were never executed by CI, which is
+  # how a NameError in the studio job-cancellation path survived in main: the
+  # test that catches it was already written.
+  #
+  # backend/tests/test_dubler_melody.py is excluded by name — it is the only
+  # one that transitively imports torch, torchaudio and torchcrepe, and
+  # installing a GPU stack to run one file would cost more than it returns.
   # ---------------------------------------------------------------------------
   backend-tests:
     name: Backend tests (pytest)
@@ -45,7 +53,8 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          pytest tests/ -v --tb=short
+          pytest tests/ backend/tests/ -v --tb=short \
+            --ignore=backend/tests/test_dubler_melody.py
 
   # ---------------------------------------------------------------------------
   # Frontend build — proves the React app compiles cleanly.

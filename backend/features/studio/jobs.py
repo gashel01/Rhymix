@@ -13,6 +13,7 @@ from backend.features.studio.stage_drums import run_stage_drums_job
 from backend.features.studio.uvr_stems import extract_uvr_multi_stems
 from backend.features.studio.storage import (
     append_job_event,
+    get_job,
     get_project,
     save_job,
     save_project,
