@@ -16,6 +16,7 @@ import { Theme } from "../Homeview/Theme";
 import { Pill } from "../ModelView/Pill";
 import { ThumbsUpIcon, ThumbsDownIcon, StarIcon, CornerDownRightIcon, ExternalLink, Fingerprint, SlidersHorizontal, Image, Trash2 } from "lucide-react";
 import styles from "./AudioTrackRow.module.css";
+import { trackColor, trackGradient, trackWaveColor } from "../../utils/trackIdentity";
 const AudioTrackRow = (props) => {
   const {
     pair,
@@ -143,7 +144,7 @@ const AudioTrackRow = (props) => {
   }, [instrumentalKey, handleInstrumentalWaveformReady]);
 
   // ---------- UI bits ----------
-  const SpinnerBar = ({ color = "#1976d2" }) => (
+  const SpinnerBar = ({ color = "#0A84FF" }) => (
     <div
       className={styles.spinnerBar}
       style={{
@@ -337,7 +338,9 @@ const AudioTrackRow = (props) => {
         isPlaying={isPlaying}
         isMuted={isMuted}
         volume={volume}
-        waveColor={t.waveColor}
+        // The unplayed part now carries the track's own colour instead of a
+        // flat grey, so two rows are told apart by their waveform alone.
+        waveColor={trackWaveColor(displayName)}
         progressColor={color}
         onPlayPause={type === "inst" ? handleInstrumentalPlayPause : handleVocalPlayPause}
         onDownload={type === "inst" ? handleInstrumentalDownload : handleVocalDownload}
@@ -456,6 +459,22 @@ const AudioTrackRow = (props) => {
                 <span className={styles.cornerIcon} style={{ color: t.subtext }}><CornerDownRightIcon size={16} /></span>
               )}
 
+              {/* The row's only piece of identity. A model card gets a whole
+                  gradient header; a track row gets the same gradient in the
+                  space it has. */}
+              {!isGroupedVersion && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    flex: "none",
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    background: trackGradient(displayName),
+                    boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
+                  }}
+                />
+              )}
               <TextOverflow
                 text={normaliseTitle(displayName)}
                 className={styles.textOverflow}
@@ -651,7 +670,7 @@ const AudioTrackRow = (props) => {
                     instPath,
                     isInstrumentalPlaying,
                     internalMutedInstrumentals?.[instPath],
-                    "#ff9800",
+                    trackColor(displayName),
                     handleInstrumentalSeek
                   )}
                 </div>
@@ -756,7 +775,7 @@ const AudioTrackRow = (props) => {
                     vocalPath,
                     isVocalPlaying,
                     internalMutedVocals?.[vocalPath],
-                    "#1976d2",
+                    trackColor(displayName),
                     handleVocalSeek
                   )}
                 </div>
