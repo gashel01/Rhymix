@@ -4096,3 +4096,14 @@
     transition: none;
   }
 }
+
+/* The shared Select sizes itself to its container; in the timeline toolbar it
+   sits beside pills, so it needs to be as compact as they are. */
+.studio-inline-select {
+  width: auto;
+  min-width: 92px;
+  min-height: 30px;
+  padding: 4px 10px;
+  border-radius: 9px;
+  font-size: 12px;
+}

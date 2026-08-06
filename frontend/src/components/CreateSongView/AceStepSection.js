@@ -1,19 +1,6 @@
 import React from "react";
+import Select from "../common/Select";
 import { ACESTEP_MAIN_MODELS, ACESTEP_LM_MODELS } from "./constants";
-
-const selectStyle = (t) => ({
-  width: "100%",
-  height: 44,
-  borderRadius: 16,
-  border: `1px solid ${t.hairline}`,
-  background: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-  color: t.text,
-  padding: "0 12px",
-  fontWeight: 700,
-  boxShadow: t.shadowSoft,
-  outline: "none",
-  appearance: "none",
-});
 
 export function AceStepSection({
   ui,
@@ -132,38 +119,52 @@ export function AceStepSection({
           )}
           <div className="cs-selectWrap">
             <Label text="Main model" tip="Select the ACE-Step checkpoint used for generation." />
-            <select value={mainModelPath} onChange={(e) => setMainModelPath(e.target.value)} style={selectStyle(t)}>
-              {ACESTEP_MAIN_MODELS.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-            <div className="cs-selectChevron">▾</div>
+            <Select
+              value={mainModelPath}
+              onChange={setMainModelPath}
+              options={ACESTEP_MAIN_MODELS.map((m) => ({ value: m, label: m }))}
+              ariaLabel="Main model"
+            />
           </div>
           {showQualityLLM && (
             <div className="cs-selectWrap">
               <Label text="LLM model" tip="Text-to-semantic model used when LLM is enabled." />
-              <select value={lmModelPath} onChange={(e) => setLmModelPath(e.target.value)} disabled={!initializeLm} style={selectStyle(t)}>
-                {ACESTEP_LM_MODELS.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-              <div className="cs-selectChevron">▾</div>
+              <Select
+                value={lmModelPath}
+                onChange={setLmModelPath}
+                disabled={!initializeLm}
+                options={ACESTEP_LM_MODELS.map((m) => ({ value: m, label: m }))}
+                ariaLabel="LLM model"
+              />
             </div>
           )}
           {advancedMode && (
             <>
               <div className="cs-selectWrap">
                 <Label text="LLM backend" tip="Backend used to run the LLM (vllm is recommended)." />
-                <select value={lmBackend} onChange={(e) => setLmBackend(e.target.value)} disabled={!initializeLm} style={selectStyle(t)}>
-                  <option value="vllm">vllm</option>
-                  <option value="pt">pt</option>
-                </select>
-                <div className="cs-selectChevron">▾</div>
+                <Select
+                  value={lmBackend}
+                  onChange={setLmBackend}
+                  disabled={!initializeLm}
+                  options={[
+                    { value: "vllm", label: "vllm", description: "Recommended" },
+                    { value: "pt", label: "pt", description: "PyTorch fallback" },
+                  ]}
+                  ariaLabel="LLM backend"
+                />
               </div>
               <div className="cs-selectWrap">
                 <Label text="Device" tip="Auto picks GPU if available; CPU is slower." />
-                <select value={device} onChange={(e) => setDevice(e.target.value)} style={selectStyle(t)}>
-                  <option value="auto">auto</option>
-                  <option value="cuda">cuda</option>
-                  <option value="cpu">cpu</option>
-                </select>
-                <div className="cs-selectChevron">▾</div>
+                <Select
+                  value={device}
+                  onChange={setDevice}
+                  options={[
+                    { value: "auto", label: "auto", description: "Pick the best available" },
+                    { value: "cuda", label: "cuda", description: "GPU" },
+                    { value: "cpu", label: "cpu", description: "Slower, always works" },
+                  ]}
+                  ariaLabel="Device"
+                />
               </div>
               <Hairline style={{ margin: "6px 0" }} />
               <div style={{ display: "grid", gap: 8 }}>

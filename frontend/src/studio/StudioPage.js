@@ -27,6 +27,7 @@ import { useStudioPlayback } from './hooks/useStudioPlayback';
 import { useLyricsActions } from './hooks/useLyricsActions';
 import { useStudioKeyboardShortcuts } from './hooks/useStudioKeyboardShortcuts';
 import { LANE_HEIGHT, fitZoom, sliderToZoom, zoomToSlider } from "./timelineMetrics";
+import Select from "../components/common/Select";
 import {
   ChevronLeftIcon,
   FitIcon,
@@ -797,19 +798,22 @@ const StudioPageInner = ({ assetId, projectId }) => {
                 <div className="studio-toolbar-right">
                   <div className="studio-field-inline">
                     <label>Grid</label>
-                    <select
-                      value={state.ui.gridDiv || 1}
-                      onChange={(e) => {
-                        const gridDiv = Math.max(1, Number(e.target.value) || 1);
+                    <Select
+                      value={String(state.ui.gridDiv || 1)}
+                      onChange={(next) => {
+                        const gridDiv = Math.max(1, Number(next) || 1);
                         const bpm = state.project?.bpm || 120;
                         actions.setUi({ gridDiv, gridSec: 60 / bpm / gridDiv });
                       }}
-                    >
-                      <option value={1}>1/4</option>
-                      <option value={2}>1/8</option>
-                      <option value={4}>1/16</option>
-                      <option value={8}>1/32</option>
-                    </select>
+                      options={[
+                        { value: "1", label: "1/4", description: "Beat" },
+                        { value: "2", label: "1/8", description: "Half beat" },
+                        { value: "4", label: "1/16", description: "Quarter beat" },
+                        { value: "8", label: "1/32", description: "Eighth beat" },
+                      ]}
+                      ariaLabel="Snap grid"
+                      className="studio-inline-select"
+                    />
                   </div>
                   {/* Three toggles that used to be three identical word-boxes:
                       nothing but a faint fill said which were on. An icon plus
