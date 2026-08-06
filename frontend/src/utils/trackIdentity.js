@@ -9,6 +9,11 @@
  *
  * The colour is derived from the track's own name rather than its position, so
  * a track keeps its identity when the list is filtered, sorted or paginated.
+ *
+ * This is for chrome that identifies a track — the chip beside its title. It is
+ * deliberately kept off the waveform: there, colour already means something
+ * else (orange instrumental, blue vocal, and grey for whatever has not played
+ * yet), and a second colour system on the same pixels would erase the first.
  */
 
 /* The palette ModelsView cycles through, kept in step deliberately: a track
@@ -40,18 +45,4 @@ export const identityIndex = (name) => hashString(name) % IDENTITY_GRADIENTS.len
 export const trackGradient = (name) => {
   const { from, to } = IDENTITY_GRADIENTS[identityIndex(name)];
   return `linear-gradient(135deg, ${from} 0%, ${to} 100%)`;
-};
-
-/** The single hue to tint a waveform or a progress bar with. */
-export const trackColor = (name) => IDENTITY_GRADIENTS[identityIndex(name)].from;
-
-/** Same hue, dimmed — for the unplayed part of a waveform, which should read as
- *  the track's colour without competing with the played part. */
-export const trackWaveColor = (name) => {
-  const hex = trackColor(name).replace("#", "");
-  const value = Number.parseInt(hex, 16);
-  const r = (value >> 16) & 255;
-  const g = (value >> 8) & 255;
-  const b = value & 255;
-  return `rgba(${r}, ${g}, ${b}, 0.42)`;
 };

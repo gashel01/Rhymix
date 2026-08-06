@@ -16,7 +16,18 @@ import { Theme } from "../Homeview/Theme";
 import { Pill } from "../ModelView/Pill";
 import { ThumbsUpIcon, ThumbsDownIcon, StarIcon, CornerDownRightIcon, ExternalLink, Fingerprint, SlidersHorizontal, Image, Trash2 } from "lucide-react";
 import styles from "./AudioTrackRow.module.css";
-import { trackColor, trackGradient, trackWaveColor } from "../../utils/trackIdentity";
+import { trackGradient } from "../../utils/trackIdentity";
+
+/* The played part of a waveform says which stem it is: orange for the
+   instrumental, blue for the vocal. That is a legend the user already reads,
+   and it is the same on Home and on Inference. It was previously written as
+   Material's #ff9800 and #1976d2; these are the system equivalents.
+
+   The unplayed part stays neutral, because the boundary between the two is
+   the playhead — colour it as well and the waveform stops reporting
+   progress at all. */
+const STEM_COLORS = { instrumental: "#FF9F0A", vocal: "#0A84FF" };
+const UNPLAYED_COLOR = "#9e9e9e";
 const AudioTrackRow = (props) => {
   const {
     pair,
@@ -338,9 +349,9 @@ const AudioTrackRow = (props) => {
         isPlaying={isPlaying}
         isMuted={isMuted}
         volume={volume}
-        // The unplayed part now carries the track's own colour instead of a
-        // flat grey, so two rows are told apart by their waveform alone.
-        waveColor={trackWaveColor(displayName)}
+        // Grey is the unplayed part. Tinting it as well destroyed the one
+        // thing the waveform was saying: how far through the track you are.
+        waveColor={UNPLAYED_COLOR}
         progressColor={color}
         onPlayPause={type === "inst" ? handleInstrumentalPlayPause : handleVocalPlayPause}
         onDownload={type === "inst" ? handleInstrumentalDownload : handleVocalDownload}
@@ -670,7 +681,7 @@ const AudioTrackRow = (props) => {
                     instPath,
                     isInstrumentalPlaying,
                     internalMutedInstrumentals?.[instPath],
-                    trackColor(displayName),
+                    STEM_COLORS.instrumental,
                     handleInstrumentalSeek
                   )}
                 </div>
@@ -775,7 +786,7 @@ const AudioTrackRow = (props) => {
                     vocalPath,
                     isVocalPlaying,
                     internalMutedVocals?.[vocalPath],
-                    trackColor(displayName),
+                    STEM_COLORS.vocal,
                     handleVocalSeek
                   )}
                 </div>
