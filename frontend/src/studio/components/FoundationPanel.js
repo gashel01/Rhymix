@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Select from "../../components/common/Select";
 import { importFoundationVoiceInput } from "../api";
 import { requestGroqAutofill } from "../../utils/groqAutofill";
 import { StudioAssistButton, StudioAssistSuggestion } from "./GroqAssist";
@@ -386,11 +387,11 @@ const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartA
 
       <div className="studio-field">
         <label>Mode</label>
-        <select value={mode} onChange={(event) => setMode(event.target.value)}>
-          <option value="generate">Generate Loop</option>
-          <option value="restyle">Restyle Selection</option>
-          <option value="voice_to_midi">Voice to MIDI</option>
-        </select>
+        <Select
+          value={mode}
+          onChange={setMode}
+          options={[{ value: "generate", label: "Generate Loop" }, { value: "restyle", label: "Restyle Selection" }, { value: "voice_to_midi", label: "Voice to MIDI" }]}
+        />
       </div>
 
       {mode === "restyle" && (
@@ -492,13 +493,11 @@ const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartA
       <div className="studio-inline">
         <div className="studio-field">
           <label>Bars</label>
-          <select value={bars} onChange={(event) => setBars(Number(event.target.value) || 4)}>
-            {BARS_OPTIONS.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+          <Select
+            value={String(bars)}
+            onChange={(next) => setBars(Number(next) || 4)}
+            options={BARS_OPTIONS.map((value) => ({ value: String(value), label: String(value) }))}
+          />
         </div>
 
         <div className="studio-field">
@@ -526,13 +525,11 @@ const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartA
 
       <div className="studio-field">
         <label>Instrument Family</label>
-        <select value={instrumentFamily} onChange={(event) => setInstrumentFamily(event.target.value)}>
-          {INSTRUMENT_OPTIONS.map((value) => (
-            <option key={value} value={value}>
-              {value}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={instrumentFamily}
+          onChange={setInstrumentFamily}
+          options={INSTRUMENT_OPTIONS.map((value) => ({ value: String(value), label: String(value) }))}
+        />
       </div>
 
       <div className="studio-field">
@@ -590,13 +587,11 @@ const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartA
       <div className="studio-inline">
         <div className="studio-field">
           <label>Variants</label>
-          <select value={variantCount} onChange={(event) => setVariantCount(Number(event.target.value) || 1)}>
-            {VARIANT_OPTIONS.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+          <Select
+            value={String(variantCount)}
+            onChange={(next) => setVariantCount(Number(next) || 1)}
+            options={VARIANT_OPTIONS.map((value) => ({ value: String(value), label: String(value) }))}
+          />
         </div>
       </div>
 
@@ -657,13 +652,11 @@ const FoundationPanel = ({ lanes, clips, selection, project, transport, onStartA
 
         <div className="studio-field">
           <label>Sampler</label>
-          <select value={samplerType} onChange={(event) => setSamplerType(event.target.value)}>
-            {SAMPLER_OPTIONS.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+          <Select
+            value={samplerType}
+            onChange={setSamplerType}
+            options={SAMPLER_OPTIONS.map((value) => ({ value: String(value), label: String(value) }))}
+          />
         </div>
 
         {mode !== "generate" && (

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import Select from "../../components/common/Select";
 
 const formatRange = (start, end) => {
   const length = Math.max(0, end - start);
@@ -60,19 +61,13 @@ const SelectionActions = ({ range, sourceClip, busyAction = null, onRun }) => {
         <span className="studio-selection-actions__range">{formatRange(start, end)}</span>
       </div>
 
-      <select
-        className="studio-selection-actions__action"
+      <Select
         value={actionId}
-        onChange={(event) => setActionId(event.target.value)}
+        onChange={setActionId}
+        options={ACTIONS.map((entry) => ({ value: entry.id, label: entry.label }))}
         disabled={busy}
-        title={action.hint}
-      >
-        {ACTIONS.map((entry) => (
-          <option key={entry.id} value={entry.id}>
-            {entry.label}
-          </option>
-        ))}
-      </select>
+        className="studio-selection-actions__action"
+      />
 
       <input
         className="studio-selection-actions__prompt"

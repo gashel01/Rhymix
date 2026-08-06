@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import Select from "../../components/common/Select";
 import { useStudioLiveInferenceWs } from "../hooks/useStudioLiveInferenceWs";
 
 const F0_METHODS = [
@@ -214,21 +215,17 @@ const LiveInferencePanel = ({ project, lanes, selection, transport, onRefreshPro
 
       <div className="studio-field">
         <label>Owned Model</label>
-        <select
+        <Select
           value={selectedModelId}
-          onChange={(e) => setSelectedModelId(e.target.value)}
+          onChange={setSelectedModelId}
           disabled={loadingModels || isBusy || !models.length}
-        >
-          {!models.length && <option value="">{loadingModels ? "Loading..." : "No models found"}</option>}
-          {models.map((model) => {
-            const value = model.modelId || model.name;
-            return (
-              <option key={value} value={value}>
-                {model.name || model.modelId}
-              </option>
-            );
-          })}
-        </select>
+          options={models.map((model) => ({
+            value: model.modelId || model.name,
+            label: model.name || model.modelId,
+          }))}
+          placeholder={loadingModels ? "Loading…" : "No models found"}
+          ariaLabel="Voice model"
+        />
         {selectedModel && (
           <div className="studio-subtext">
             {selectedModel.checkpoints?.length || 0} checkpoints · {selectedModel.sampleRate || 48000} Hz
@@ -239,40 +236,41 @@ const LiveInferencePanel = ({ project, lanes, selection, transport, onRefreshPro
 
       <div className="studio-field">
         <label>Checkpoint</label>
-        <select
+        <Select
           value={selectedCheckpointPath}
-          onChange={(e) => setSelectedCheckpointPath(e.target.value)}
+          onChange={setSelectedCheckpointPath}
           disabled={!selectedModel || isBusy}
-        >
-          {!selectedModel?.checkpoints?.length && <option value="">No checkpoints</option>}
-          {(selectedModel?.checkpoints || []).map((checkpoint) => (
-            <option key={checkpoint.path || checkpoint.filename} value={checkpoint.path}>
-              {formatCheckpointLabel(checkpoint)}
-            </option>
-          ))}
-        </select>
+          options={(selectedModel?.checkpoints || []).map((checkpoint) => ({
+            value: checkpoint.path,
+            label: formatCheckpointLabel(checkpoint),
+          }))}
+          placeholder="No checkpoints"
+          ariaLabel="Checkpoint"
+        />
       </div>
 
       <div className="studio-inline">
         <div className="studio-field">
           <label>Target Lane</label>
-          <select value={targetLaneId} onChange={(e) => setTargetLaneId(e.target.value)} disabled={isBusy}>
-            <option value="new">Create new lane</option>
-            {availableLanes.map((lane) => (
-              <option key={lane.id} value={lane.id}>
-                {lane.name}
-              </option>
-            ))}
-          </select>
+          <Select
+            value={targetLaneId}
+            onChange={setTargetLaneId}
+            disabled={isBusy}
+            options={[
+              { value: "new", label: "Create new lane" },
+              ...availableLanes.map((lane) => ({ value: lane.id, label: lane.name })),
+            ]}
+            ariaLabel="Target lane"
+          />
         </div>
         <div className="studio-field">
           <label>Insert At</label>
-          <select value={startMode} onChange={(e) => setStartMode(e.target.value)} disabled={isBusy}>
-            <option value="playhead">Playhead</option>
-            <option value="selection" disabled={!selection?.range}>
-              Selection start
-            </option>
-          </select>
+          <Select
+            value={startMode}
+            onChange={setStartMode}
+            options={[{ value: "playhead", label: "Playhead" }]}
+            disabled={isBusy}
+          />
         </div>
       </div>
 
@@ -291,13 +289,12 @@ const LiveInferencePanel = ({ project, lanes, selection, transport, onRefreshPro
         </div>
         <div className="studio-field">
           <label>F0 Method</label>
-          <select value={f0Method} onChange={(e) => setF0Method(e.target.value)} disabled={isBusy}>
-            {F0_METHODS.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+          <Select
+            value={f0Method}
+            onChange={setF0Method}
+            options={F0_METHODS.map((item) => ({ value: item.value, label: item.label }))}
+            disabled={isBusy}
+          />
         </div>
       </div>
 
@@ -345,13 +342,16 @@ const LiveInferencePanel = ({ project, lanes, selection, transport, onRefreshPro
 
       <div className="studio-field">
         <label>Formant Shift</label>
-        <select value={formantPreset} onChange={(e) => setFormantPreset(e.target.value)} disabled={isBusy}>
-          {Object.entries(FORMANT_PRESETS).map(([value, preset]) => (
-            <option key={value} value={value}>
-              {preset.label}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={formantPreset}
+          onChange={setFormantPreset}
+          disabled={isBusy}
+          options={Object.entries(FORMANT_PRESETS).map(([value, preset]) => ({
+            value,
+            label: preset.label,
+          }))}
+          ariaLabel="Formant preset"
+        />
         <div className="studio-subtext">
           Applied to the final offline render. Live monitor keeps the faster realtime path.
         </div>

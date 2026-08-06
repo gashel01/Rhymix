@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Select from "../../components/common/Select";
 import CreationDashboard from "./CreationDashboard";
 import FoundationPanel from "./FoundationPanel";
 import LiveInferencePanel from "./LiveInferencePanel";
@@ -349,19 +350,11 @@ const ClipAdvancedPanel = ({
           <div className="studio-panel-title">MIDI Sound</div>
           <div className="studio-field">
             <label>SoundFont</label>
-            <select
+            <Select
               value={selectedClip.midi?.soundfont || ""}
-              onChange={(e) => {
-                const soundfont = e.target.value || null;
-                onUpdateClip?.(selectedClip.id, { midi: { ...(selectedClip.midi || {}), soundfont } });
-              }}
-            >
-              {SOUND_FONT_OPTIONS.map((opt) => (
-                <option key={opt.value || "default"} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              onChange={(next) => { const soundfont = next || null; onUpdateClip?.(selectedClip.id, { midi: { ...(selectedClip.midi || {}), soundfont } }); }}
+              options={SOUND_FONT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+            />
           </div>
         </div>
       ) : null}
@@ -1184,19 +1177,11 @@ const Inspector = ({
                 ) : null}
                 <div className="studio-field">
                   <label>Sound</label>
-                  <select
+                  <Select
                     value={selectedClip.midi?.soundfont || ""}
-                    onChange={(e) => {
-                      const soundfont = e.target.value || null;
-                      onUpdateClip?.(selectedClip.id, { midi: { ...(selectedClip.midi || {}), soundfont } });
-                    }}
-                  >
-                    {SOUND_FONT_OPTIONS.map((opt) => (
-                      <option key={opt.value || "default"} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(next) => { const soundfont = next || null; onUpdateClip?.(selectedClip.id, { midi: { ...(selectedClip.midi || {}), soundfont } }); }}
+                    options={SOUND_FONT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+                  />
                 </div>
                 <div className="studio-actions-row">
                   <button className="studio-btn ghost" onClick={() => openDrawer("clip")}>
@@ -1344,10 +1329,11 @@ const Inspector = ({
                 <div className="studio-inline">
                   <div className="studio-field">
                     <label>Bars</label>
-                    <select value={foundationBars} onChange={(e) => setFoundationBars(Number(e.target.value) || 4)}>
-                      <option value={4}>4</option>
-                      <option value={8}>8</option>
-                    </select>
+                    <Select
+                      value={String(foundationBars)}
+                      onChange={(next) => setFoundationBars(Number(next) || 4)}
+                      options={[{ value: String(4), label: "4" }, { value: String(8), label: "8" }]}
+                    />
                   </div>
                   <div className="studio-field">
                     <label>BPM</label>
@@ -1356,34 +1342,28 @@ const Inspector = ({
                 </div>
                 <div className="studio-field">
                   <label>Instrument Family</label>
-                  <select value={foundationInstrumentFamily} onChange={(e) => setFoundationInstrumentFamily(e.target.value)}>
-                    {FOUNDATION_INSTRUMENT_OPTIONS.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    value={foundationInstrumentFamily}
+                    onChange={setFoundationInstrumentFamily}
+                    options={FOUNDATION_INSTRUMENT_OPTIONS.map((value) => ({ value: String(value), label: String(value) }))}
+                  />
                 </div>
                 <div className="studio-inline">
                   <div className="studio-field">
                     <label>Key</label>
-                    <select value={foundationKeyNote} onChange={(e) => setFoundationKeyNote(e.target.value)}>
-                      {FOUNDATION_KEY_NOTES.map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      value={foundationKeyNote}
+                      onChange={setFoundationKeyNote}
+                      options={FOUNDATION_KEY_NOTES.map((value) => ({ value: String(value), label: String(value) }))}
+                    />
                   </div>
                   <div className="studio-field">
                     <label>Scale</label>
-                    <select value={foundationKeyScale} onChange={(e) => setFoundationKeyScale(e.target.value)}>
-                      {FOUNDATION_KEY_SCALES.map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      value={foundationKeyScale}
+                      onChange={setFoundationKeyScale}
+                      options={FOUNDATION_KEY_SCALES.map((value) => ({ value: String(value), label: String(value) }))}
+                    />
                   </div>
                 </div>
                 {(resolvedRightPanelContext === PANEL_CONTEXT.RANGE || resolvedRightPanelContext === PANEL_CONTEXT.AUDIO) ? (

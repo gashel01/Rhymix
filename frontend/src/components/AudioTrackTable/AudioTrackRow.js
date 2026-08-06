@@ -1,4 +1,5 @@
 import React, { useRef, useCallback, useEffect, useState } from "react";
+import Select from "../common/Select";
 import { Tooltip } from "@mui/material";
 import ErrorIcon from "@mui/icons-material/ErrorOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
@@ -728,24 +729,12 @@ const AudioTrackRow = (props) => {
                         original
                       </button>
                       {inferredOptions.length > 1 ? (
-                        <select
-                          className={styles.vocalSelect}
+                        <Select
                           value={convertedSelection}
-                          onChange={(e) => onVocalSourceChange(e.target.value)}
-                          style={{
-                            background: !isOriginalVocal
-                              ? (t.isDark ? "rgba(10,132,255,0.75)" : "rgba(10,132,255,0.95)")
-                              : "transparent",
-                            color: !isOriginalVocal ? "white" : t.subtext,
-                          }}
-                          title="Select inferred version"
-                        >
-                          {inferredOptions.map((option) => (
-                            <option key={String(option.value)} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(next) => onVocalSourceChange(next)}
+                          options={inferredOptions.map((option) => ({ value: option.value, label: option.label }))}
+                          className={styles.vocalSelect}
+                        />
                       ) : (
                         <button
                           type="button"
