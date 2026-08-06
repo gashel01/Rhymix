@@ -64,6 +64,11 @@ const StudioWaveform = ({
   url,
   height = 64,
   color = "#00c2ff",
+  /* The clip used to be a dark box with a light waveform floating in it. It is
+     now a solid block of the lane's colour with the signal cut out of it in
+     darker ink, which is what makes a Suno arrangement readable at a glance —
+     so the ink needs to be able to sit heavier than a 0.55 wash. */
+  inkAlpha = 0.55,
   clipStartSec = 0,
   pixelsPerSecond,
 }) => {
@@ -104,7 +109,7 @@ const StudioWaveform = ({
     const pxPerSec = Number(pixelsPerSecond) > 0 ? Number(pixelsPerSecond) : width / data.duration;
     const mid = height / 2;
 
-    ctx.fillStyle = hexToRgba(color, 0.55) || "rgba(255,255,255,0.5)";
+    ctx.fillStyle = hexToRgba(color, inkAlpha) || "rgba(255,255,255,0.5)";
 
     for (let x = 0; x < width; x += 1) {
       const time = (Number(clipStartSec) || 0) + x / pxPerSec;
@@ -117,7 +122,7 @@ const StudioWaveform = ({
       const bottom = mid - Math.min(0, low) * mid;
       ctx.fillRect(x, top, 1, Math.max(1, bottom - top));
     }
-  }, [data, height, color, clipStartSec, pixelsPerSecond]);
+  }, [data, height, color, inkAlpha, clipStartSec, pixelsPerSecond]);
 
   return (
     <div className="studio-waveform" style={{ height }}>

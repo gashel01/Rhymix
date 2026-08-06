@@ -1,6 +1,6 @@
 import React from "react";
 
-const LANE_HEIGHT = 110;
+import { LANE_HEIGHT } from "../timelineMetrics";
 
 const SelectionOverlay = ({ range, pxPerSec, lanes = [], laneIds = null }) => {
   if (!range) return null;

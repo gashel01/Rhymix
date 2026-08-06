@@ -1,28 +1,9 @@
 import React, { useMemo, useRef, useState } from "react";
 import ClipView from "./ClipView";
 import SelectionOverlay from "./SelectionOverlay";
+import { LANE_HEIGHT, LANE_GUTTER, BASE_PX_PER_SEC } from "../timelineMetrics";
 
-const LANE_HEIGHT = 110;
 const laneHasFx = (lane) => Object.values(lane?.fx || {}).some((fx) => fx?.enabled);
-const hexToRgba = (hex, alpha) => {
-  if (!hex || typeof hex !== "string") return null;
-  const trimmed = hex.replace("#", "").trim();
-  if (trimmed.length !== 3 && trimmed.length !== 6) return null;
-  const full =
-    trimmed.length === 3
-      ? trimmed
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : trimmed;
-  const intVal = Number.parseInt(full, 16);
-  if (Number.isNaN(intVal)) return null;
-  const r = (intVal >> 16) & 255;
-  const g = (intVal >> 8) & 255;
-  const b = intVal & 255;
-  const a = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
-};
 
 const Timeline = ({
   project,
@@ -82,7 +63,7 @@ const Timeline = ({
   const selectionDragRef = useRef(false);
   const suppressBodyScrollRef = useRef(false);
 
-  const pxPerSec = 80 * zoom;
+  const pxPerSec = BASE_PX_PER_SEC * zoom;
   const snapEnabled = Boolean(snap);
   const snapGrid = gridSec || 0.5;
 
@@ -121,19 +102,42 @@ const Timeline = ({
   }, [selection, lanes, pxPerSec]);
   const selectionIsTranscribing = selectionLyricsEntry?.status === "transcribing";
 
+  /* The step used to be chosen from `zoom` alone (4 beats below 0.8, 2 below
+     1.2, else 1). Zoomed out to fit a song that put a numbered mark every ~9px
+     and the ruler became a smear of overlapping digits. What matters is not the
+     zoom value but how many pixels a bar is worth, so pick the step from that
+     and label only as often as there is room to read. */
   const timeMarks = useMemo(() => {
     const marks = [];
     const beatsPerBar = 4;
     const beatSec = bpm ? 60 / bpm : 1;
-    const beatStep = zoom < 0.8 ? 4 : zoom < 1.2 ? 2 : 1;
-    const stepSec = beatSec * beatStep;
+    const barSec = beatSec * beatsPerBar;
+    const MIN_LABEL_PX = 64;
+    const MIN_TICK_PX = 10;
+    const steps = [1, 2, 4, 8, 16, 32, 64, 128, 256];
+    const barStep =
+      steps.find((step) => step * barSec * pxPerSec >= MIN_LABEL_PX) ?? steps[steps.length - 1];
+    const showBeats = beatSec * pxPerSec >= MIN_TICK_PX;
+    const stepSec = showBeats ? beatSec : barSec * barStep;
+    if (!(stepSec > 0)) return marks;
     for (let t = 0; t <= durationSec; t += stepSec) {
       const beatIndex = Math.round(t / beatSec);
       const isBar = beatIndex % beatsPerBar === 0;
-      marks.push({ t, isBar, beat: beatIndex + 1, bar: Math.floor(beatIndex / beatsPerBar) + 1 });
+      const bar = Math.floor(beatIndex / beatsPerBar) + 1;
+      marks.push({ t, isBar, bar, labelled: isBar && (bar - 1) % barStep === 0 });
     }
     return marks;
-  }, [durationSec, zoom, bpm]);
+  }, [durationSec, pxPerSec, bpm]);
+
+  /* Width of one labelled bar, published to CSS so the background grid
+     behind the lanes lines up with the ruler above them. */
+  const barPx = useMemo(() => {
+    const beatSec = bpm ? 60 / bpm : 1;
+    const barSec = beatSec * 4;
+    const steps = [1, 2, 4, 8, 16, 32, 64, 128, 256];
+    const barStep = steps.find((step) => step * barSec * pxPerSec >= 64) ?? steps[steps.length - 1];
+    return barSec * barStep * pxPerSec;
+  }, [bpm, pxPerSec]);
 
   const getTimeFromEvent = (event) => {
     const rect = bodyRef.current?.getBoundingClientRect();
@@ -214,7 +218,13 @@ const Timeline = ({
     onSelectClip?.(clip.id);
   };
 
-  const handleMouseDown = (event) => {
+  /* Press on empty lane background (or Alt-press on a clip). Nothing is
+     decided here: the old version cleared the selection on mousedown, before
+     the 4px threshold below could tell a click from a drag, so simply pressing
+     anywhere threw the selection away. Pointer capture keeps the gesture alive
+     when the cursor leaves the timeline — which is what the removed
+     onMouseLeave={handleMouseUp} used to cut short. */
+  const handlePointerDown = (event) => {
     if (event.button !== 0) return;
     if (clipDrag) return;
     if (
@@ -232,11 +242,14 @@ const Timeline = ({
     setDragStart(time);
     setDragStartX(event.clientX);
     setDragLaneId(laneId);
-    onSelectRange?.(null);
-    onSelectClip?.(null);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      /* capture is an optimisation; the gesture still works without it */
+    }
   };
 
-  const handleMouseMove = (event) => {
+  const handlePointerMove = (event) => {
     if (clipDrag) return;
     if (!dragging || dragStart == null) return;
     const time = getTimeFromEvent(event);
@@ -247,15 +260,29 @@ const Timeline = ({
     onSelectRange?.(selection);
   };
 
-  const handleMouseUp = () => {
-    const shouldOpenMenu = dragging && selectionDragRef.current && selection?.range && canTranscribeSelection;
+  /* The gesture is classified here, once, on release. The seek used to live in
+     an onClick that raced this handler: mouseup set `dragging` to false and the
+     click that followed read it as false, so finishing a range selection could
+     also jump the playhead. A ref settles it in the same tick. */
+  const handlePointerUp = (event) => {
+    if (!dragging) return;
+    const wasDrag = selectionDragRef.current;
+    if (wasDrag) {
+      if (selection?.range && canTranscribeSelection) setSelectionMenuOpen(true);
+    } else {
+      onSelectRange?.(null);
+      onSelectClip?.(null);
+      onSeek?.(Math.max(0, getTimeFromEvent(event)));
+    }
     setDragging(false);
     setDragStart(null);
     setDragStartX(0);
     setDragLaneId(null);
     selectionDragRef.current = false;
-    if (shouldOpenMenu) {
-      setSelectionMenuOpen(true);
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      /* already released */
     }
   };
 
@@ -274,11 +301,13 @@ const Timeline = ({
     const handleUp = () => {
       setDragPlayhead(false);
     };
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("pointercancel", handleUp);
     return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
     };
   }, [dragPlayhead, onSeek]);
 
@@ -303,11 +332,13 @@ const Timeline = ({
       setClipDrag(null);
       setDragPreview(null);
     };
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("pointercancel", handleUp);
     return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
     };
   }, [clipDrag, dragPreview, onMoveClip, snapEnabled, snapGrid]);
 
@@ -370,11 +401,13 @@ const Timeline = ({
       setTrimDrag(null);
       setTrimPreview(null);
     };
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("pointercancel", handleUp);
     return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
     };
   }, [trimDrag, trimPreview, onTrimClip, onTrimClipRight, snapEnabled, snapGrid]);
 
@@ -384,10 +417,15 @@ const Timeline = ({
         <div
           className="studio-ruler-inner"
           style={{ width: timelineWidth }}
-          onMouseDown={(event) => {
+          // Pressing the ruler seeks, and keeps seeking while the button is
+          // held — scrubbing. Before, only the small handle could be dragged
+          // and a press anywhere else on the ruler was a one-shot jump, so the
+          // same strip behaved two different ways depending on a few pixels.
+          onPointerDown={(event) => {
             if (event.button !== 0) return;
             const time = getTimeFromRulerEvent(event);
             onSeek?.(Math.max(0, time));
+            setDragPlayhead(true);
           }}
         >
           <div
@@ -397,7 +435,8 @@ const Timeline = ({
           <div
             className="studio-playhead-handle"
             style={{ left: currentTime * pxPerSec }}
-            onMouseDown={(event) => {
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
               event.preventDefault();
               event.stopPropagation();
               setDragPlayhead(true);
@@ -409,7 +448,7 @@ const Timeline = ({
               className={`studio-ruler-mark ${mark.isBar ? "bar" : "beat"}`}
               style={{ left: mark.t * pxPerSec }}
             >
-              {mark.isBar && <span>{mark.bar}</span>}
+              {mark.labelled && <span>{mark.bar}</span>}
             </div>
           ))}
         </div>
@@ -417,23 +456,16 @@ const Timeline = ({
 
       <div
         className="studio-timeline-body"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onDragOver={(event) => {
           event.preventDefault();
           setDropLaneId(getLaneFromEvent(event));
         }}
         onDragLeave={() => setDropLaneId(null)}
         onDrop={handleExternalDrop}
-        onClick={(event) => {
-          if (dragging) return;
-          if (clipDrag) return;
-          if (event.button !== 0) return;
-          const time = getTimeFromEvent(event);
-          onSeek?.(time);
-        }}
         onScroll={() => {
           if (rulerRef.current && bodyRef.current) {
             rulerRef.current.scrollLeft = bodyRef.current.scrollLeft;
@@ -443,7 +475,14 @@ const Timeline = ({
         }}
         ref={bodyRef}
       >
-        <div className="studio-timeline-inner" style={{ width: timelineWidth, height: lanes.length * LANE_HEIGHT }}>
+        <div
+          className="studio-timeline-inner"
+          style={{
+            width: timelineWidth,
+            height: lanes.length * LANE_HEIGHT,
+            "--studio-bar-px": `${barPx}px`,
+          }}
+        >
           <SelectionOverlay
             range={selection?.range}
             pxPerSec={pxPerSec}
@@ -457,7 +496,7 @@ const Timeline = ({
                 left: selectionBox.left + selectionBox.width - 6,
                 top: selectionBox.top + 6,
               }}
-              onMouseDown={(event) => {
+              onPointerDown={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
               }}
@@ -513,16 +552,15 @@ const Timeline = ({
             const isDropTarget = dragPreview?.laneId === lane.id || dropLaneId === lane.id;
             const fxActive = laneHasFx(lane);
             const laneColor = lane.color || "#2b3a45";
-            const laneBg = hexToRgba(laneColor, 0.08);
             return (
               <div
                 key={lane.id}
-                className={`studio-lane ${isDropTarget ? "drop-target" : ""}`}
+                className={`studio-lane ${isDropTarget ? "drop-target" : ""} ${lane.mute ? "muted" : ""}`}
                 style={{
                   top: laneIndex * LANE_HEIGHT,
-                  height: LANE_HEIGHT - 10,
-                  borderLeft: laneColor ? `4px solid ${laneColor}` : undefined,
-                  "--lane-bg": laneBg || undefined,
+                  height: LANE_HEIGHT - LANE_GUTTER,
+                  // The lane row stays neutral; the colour is carried by a 3px
+                  // spine (.studio-lane::before) and by the clips themselves.
                   "--lane-color": laneColor || undefined,
                 }}
               >
