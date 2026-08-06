@@ -27,7 +27,11 @@
 .tableWrapper {
   position: relative;
   width: 100%;
-  padding-bottom: 64px; /* space so overlay doesn't cover last row */
+  /* 64px keeps the pagination overlay off the last row; the inset adds the
+     floating selection bar's footprint while it is up, so the last track stays
+     reachable instead of ending underneath it. */
+  padding-bottom: calc(64px + var(--rhymix-bottom-inset, 0px));
+  transition: padding-bottom 180ms ease;
 }
 
 .paginationOverlay {

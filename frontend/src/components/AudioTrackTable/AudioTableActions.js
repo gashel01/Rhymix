@@ -132,6 +132,23 @@ const AudioTableActions = ({
      by its full height for nothing. They are the same buttons; they now
      ride a bar that appears over the content only while a selection
      exists, which is where iOS and Suno put a selection context. */
+  /* The bar is fixed over the content, so anything anchored to the bottom —
+     the pagination overlay, the last row of the list — ends up underneath it.
+     Publishing its footprint lets those move out of the way in CSS rather than
+     each of them guessing a magic number. Measured rather than hard-coded: the
+     bar grows a second line when the buttons wrap on a narrow window. */
+  const barRef = useRef(null);
+  const barActive = hasSelection && showHeaderWorkflowActions;
+  useEffect(() => {
+    if (!barActive) {
+      document.body.style.removeProperty("--rhymix-bottom-inset");
+      return undefined;
+    }
+    const height = barRef.current?.offsetHeight || 57;
+    document.body.style.setProperty("--rhymix-bottom-inset", `${height + 34}px`);
+    return () => document.body.style.removeProperty("--rhymix-bottom-inset");
+  }, [barActive, selectedRows.length]);
+
   const workflowActions = (
     <>
         {showInferenceResultsActions ? (
@@ -328,9 +345,10 @@ const AudioTableActions = ({
         {/* {children ? children : null} */}
       </div>
 
-      {hasSelection && showHeaderWorkflowActions
+      {barActive
         ? createPortal(
             <div
+              ref={barRef}
               className={styles.floatingBar}
               role="region"
               aria-label="Selection actions"

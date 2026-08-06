@@ -83,7 +83,11 @@
 .floatingBar {
   position: fixed;
   left: 50%;
-  bottom: 24px;
+  /* --rhymix-pagination-h is set on <body> by AudioTrackTable when the
+     pagination overlay is on screen. The overlay is sticky and cannot be
+     pushed above its own static position, so this bar is the one that steps
+     over it. */
+  bottom: calc(24px + var(--rhymix-pagination-h, 0px));
   transform: translateX(-50%);
   z-index: 1200;
   display: flex;

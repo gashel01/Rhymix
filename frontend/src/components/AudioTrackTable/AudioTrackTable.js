@@ -107,6 +107,7 @@ const AudioTrackTable = (props) => {
 
   const displayTrackPairs = useMemo(() => {
     if (!enableGrouping) return trackPairs;
+
     const isInferenceMode = vocalModeType === "inference";
     const groups = new Map();
     const order = [];
@@ -152,6 +153,22 @@ const AudioTrackTable = (props) => {
 
     return output;
   }, [enableGrouping, expandedGroups, trackPairs, vocalModeType]);
+
+  /* The pagination sits at the bottom of the list and the selection bar is
+     fixed to the bottom of the viewport, so without this they land on each
+     other. A sticky element cannot be pushed above its own static position, so the bar
+     is the one that moves: publish how much room the pagination needs and let
+     it offset itself by that. */
+  const paginationVisible = displayTrackPairs.length > pageSize;
+  useEffect(() => {
+    if (!paginationVisible) {
+      document.body.style.removeProperty("--rhymix-pagination-h");
+      return undefined;
+    }
+    document.body.style.setProperty("--rhymix-pagination-h", "60px");
+    return () => document.body.style.removeProperty("--rhymix-pagination-h");
+  }, [paginationVisible]);
+
 
   const versionsByGroupKey = useMemo(() => {
     const groups = new Map();
