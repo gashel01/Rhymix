@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Delete as DeleteIcon,
   School as SchoolIcon,
@@ -126,6 +127,111 @@ const AudioTableActions = ({
     </span>
   );
 
+  /* The workflow actions used to sit in a third header row that was always
+     present and empty until something was selected, pushing the list down
+     by its full height for nothing. They are the same buttons; they now
+     ride a bar that appears over the content only while a selection
+     exists, which is where iOS and Suno put a selection context. */
+  const workflowActions = (
+    <>
+        {showInferenceResultsActions ? (
+          <>
+            {onReturnToModelSelection && (
+              <Btn
+                variant="primary"
+                title="Model Selection"
+                onClick={onReturnToModelSelection}
+                icon={
+                  <SmallIcon>
+                    <PsychologyIcon />
+                  </SmallIcon>
+                }
+              >
+                Model Selection
+              </Btn>
+            )}
+
+            {onReturnToInferenceParams && (
+              <Btn
+                variant="primary"
+                title="Inference Params"
+                onClick={onReturnToInferenceParams}
+                icon={
+                  <SmallIcon>
+                    <ArrowBackIcon />
+                  </SmallIcon>
+                }
+              >
+                Inference Params
+              </Btn>
+            )}
+
+            {handleCoverWithTracks && (
+              <Btn
+                variant="primary"
+                title="Create Cover"
+                onClick={() => handleCoverWithTracks(getSelectedTracks())}
+                icon={
+                  <SmallIcon>
+                    <PsychologyIcon />
+                  </SmallIcon>
+                }
+              >
+                Cover
+              </Btn>
+            )}
+          </>
+        ) : (
+          <>
+            {handleTrainWithDataset && (
+              <Btn
+                variant="primary"
+                title="Train Model"
+                onClick={() => handleTrainWithDataset(getSelectedTracks())}
+                icon={
+                  <SmallIcon>
+                    <SchoolIcon />
+                  </SmallIcon>
+                }
+              >
+                Train Model
+              </Btn>
+            )}
+
+            {handleInferenceWithTracks && (
+              <Btn
+                variant="primary"
+                title="Run Inference"
+                onClick={() => handleInferenceWithTracks(getSelectedTracks())}
+                icon={
+                  <SmallIcon>
+                    <PsychologyIcon />
+                  </SmallIcon>
+                }
+              >
+                Run Inference
+              </Btn>
+            )}
+
+            {handleCoverWithTracks && (
+              <Btn
+                variant="primary"
+                title="Create Cover"
+                onClick={() => handleCoverWithTracks(getSelectedTracks())}
+                icon={
+                  <SmallIcon>
+                    <PsychologyIcon />
+                  </SmallIcon>
+                }
+              >
+                Cover
+              </Btn>
+            )}
+          </>
+        )}
+    </>
+  );
+
   return (
     <>
       {/* ✅ NEW: sentinel placed just before sticky header */}
@@ -167,10 +273,16 @@ const AudioTableActions = ({
               {/* The count used to be printed twice: a blue pill reading
                   "1" beside the words "1 track selected". */}
               <div className={styles.minWidthZero}>
+                {/* Once the floating bar is up it carries the count, so printing
+                    it here as well put the same words on screen twice. The
+                    header keeps only the prompt shown before anything is
+                    selected. */}
                 {hasSelection ? (
-                  <div className={styles.selectedText} style={{ color: t.text }}>
-                    {selectedRows.length} track{selectedRows.length !== 1 ? "s" : ""} selected
-                  </div>
+                  showHeaderWorkflowActions ? null : (
+                    <div className={styles.selectedText} style={{ color: t.text }}>
+                      {selectedRows.length} track{selectedRows.length !== 1 ? "s" : ""} selected
+                    </div>
+                  )
                 ) : (
                   <div className={styles.defaultText} style={{ color: t.subtext }}>
                     {defaultLabel || "Select tracks to get started"}
@@ -179,114 +291,7 @@ const AudioTableActions = ({
               </div>
             </div>
 
-            {/* Middle */}
-            {showHeaderWorkflowActions ? (
-              <div
-                className={`${styles.middleActions} ata-actions`}
-                style={{
-                  opacity: hasSelection ? 1 : 0,
-                  pointerEvents: hasSelection ? "auto" : "none",
-                  transition: "opacity 160ms ease",
-                }}
-              >
-                {showInferenceResultsActions ? (
-                  <>
-                    {onReturnToModelSelection && (
-                      <Btn
-                        variant="primary"
-                        title="Model Selection"
-                        onClick={onReturnToModelSelection}
-                        icon={
-                          <SmallIcon>
-                            <PsychologyIcon />
-                          </SmallIcon>
-                        }
-                      >
-                        Model Selection
-                      </Btn>
-                    )}
-
-                    {onReturnToInferenceParams && (
-                      <Btn
-                        variant="primary"
-                        title="Inference Params"
-                        onClick={onReturnToInferenceParams}
-                        icon={
-                          <SmallIcon>
-                            <ArrowBackIcon />
-                          </SmallIcon>
-                        }
-                      >
-                        Inference Params
-                      </Btn>
-                    )}
-
-                    {handleCoverWithTracks && (
-                      <Btn
-                        variant="primary"
-                        title="Create Cover"
-                        onClick={() => handleCoverWithTracks(getSelectedTracks())}
-                        icon={
-                          <SmallIcon>
-                            <PsychologyIcon />
-                          </SmallIcon>
-                        }
-                      >
-                        Cover
-                      </Btn>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {handleTrainWithDataset && (
-                      <Btn
-                        variant="primary"
-                        title="Train Model"
-                        onClick={() => handleTrainWithDataset(getSelectedTracks())}
-                        icon={
-                          <SmallIcon>
-                            <SchoolIcon />
-                          </SmallIcon>
-                        }
-                      >
-                        Train Model
-                      </Btn>
-                    )}
-
-                    {handleInferenceWithTracks && (
-                      <Btn
-                        variant="primary"
-                        title="Run Inference"
-                        onClick={() => handleInferenceWithTracks(getSelectedTracks())}
-                        icon={
-                          <SmallIcon>
-                            <PsychologyIcon />
-                          </SmallIcon>
-                        }
-                      >
-                        Run Inference
-                      </Btn>
-                    )}
-
-                    {handleCoverWithTracks && (
-                      <Btn
-                        variant="primary"
-                        title="Create Cover"
-                        onClick={() => handleCoverWithTracks(getSelectedTracks())}
-                        icon={
-                          <SmallIcon>
-                            <PsychologyIcon />
-                          </SmallIcon>
-                        }
-                      >
-                        Cover
-                      </Btn>
-                    )}
-                  </>
-                )}
-              </div>
-            ) : null}
-
+            {/* Moved out of the flow — see workflowActions above. */}
             {/* Right */}
             {showSelectionControls ? (
               <div className={styles.rightFlex}>
@@ -322,6 +327,39 @@ const AudioTableActions = ({
 
         {/* {children ? children : null} */}
       </div>
+
+      {hasSelection && showHeaderWorkflowActions
+        ? createPortal(
+            <div
+              className={styles.floatingBar}
+              role="region"
+              aria-label="Selection actions"
+              style={{
+                background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
+                border: `1px solid ${t.hairline}`,
+                boxShadow: t.shadow,
+              }}
+            >
+              <span className={styles.floatingCount} style={{ color: t.text }}>
+                {selectedRows.length} track{selectedRows.length !== 1 ? "s" : ""} selected
+              </span>
+              <span className={styles.floatingDivider} style={{ background: t.hairline }} />
+              <div className={styles.floatingActions}>{workflowActions}</div>
+              {onClear ? (
+                <button
+                  type="button"
+                  className={styles.floatingDone}
+                  style={{ color: t.subtext }}
+                  onClick={onClear}
+                  title="Clear selection"
+                >
+                  Done
+                </button>
+              ) : null}
+            </div>,
+            document.body
+          )
+        : null}
     </>
   );
 };

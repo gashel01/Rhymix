@@ -75,3 +75,100 @@
     justify-content: flex-end;
     flex-wrap: wrap;
 }
+/* --- Floating selection bar ---------------------------------------------- */
+/* The workflow actions used to be a third header row, present at all times and
+   empty until something was selected — so every list started ~120px lower than
+   it needed to, permanently, to make room for a bar that is only relevant part
+   of the time. This appears over the content when a selection exists. */
+.floatingBar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 48px);
+  padding: 10px 12px 10px 18px;
+  border-radius: 999px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  animation: floating-bar-in 180ms ease both;
+}
+
+@keyframes floating-bar-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.floatingCount {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.floatingDivider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 0;
+}
+
+.floatingActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.floatingActions::-webkit-scrollbar {
+  display: none;
+}
+
+.floatingDone {
+  flex: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.floatingDone:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* On a narrow window the bar spans the width instead of centring. */
+@media (max-width: 720px) {
+  .floatingBar {
+    left: 12px;
+    right: 12px;
+    transform: none;
+    max-width: none;
+    border-radius: 18px;
+  }
+  @keyframes floating-bar-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floatingBar {
+    animation: none;
+  }
+}
