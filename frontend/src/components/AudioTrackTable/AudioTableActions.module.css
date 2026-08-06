@@ -82,18 +82,24 @@
    of the time. This appears over the content when a selection exists. */
 .floatingBar {
   position: fixed;
-  left: 50%;
-  /* --rhymix-pagination-h is set on <body> by AudioTrackTable when the
-     pagination overlay is on screen. The overlay is sticky and cannot be
-     pushed above its own static position, so this bar is the one that steps
-     over it. */
+  /* Centred on the content, not on the window. The bar is portalled to <body>,
+     so left: 50% centres it against the viewport — which puts it half the
+     sidebar's width to the left of the pagination it sits above. Spanning from
+     the rail to the right edge and centring inside that lines the two up.
+     --rhymix-rail-w is published by NavigationBar and follows the collapse. */
+  left: var(--rhymix-rail-w, 0px);
+  right: 0;
+  margin: 0 auto;
+  width: fit-content;
+  /* --rhymix-pagination-h is set by AudioTrackTable while the pagination
+     overlay is on screen. That overlay is sticky and cannot be pushed above its
+     own static position, so this bar is the one that steps over it. */
   bottom: calc(24px + var(--rhymix-pagination-h, 0px));
-  transform: translateX(-50%);
   z-index: 1200;
   display: flex;
   align-items: center;
   gap: 12px;
-  max-width: calc(100vw - 48px);
+  max-width: calc(100vw - var(--rhymix-rail-w, 0px) - 48px);
   padding: 10px 12px 10px 18px;
   border-radius: 999px;
   backdrop-filter: blur(24px);
@@ -104,11 +110,11 @@
 @keyframes floating-bar-in {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(8px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
   }
 }
 
@@ -161,7 +167,7 @@
   .floatingBar {
     left: 12px;
     right: 12px;
-    transform: none;
+    width: auto;
     max-width: none;
     border-radius: 18px;
   }

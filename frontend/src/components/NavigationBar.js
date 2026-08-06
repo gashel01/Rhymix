@@ -86,7 +86,7 @@ function NavigationBar({
     };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("touchstart", onDown);
-    return () => {
+  return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("touchstart", onDown);
     };
@@ -119,6 +119,17 @@ function NavigationBar({
       primaryWash2: isDark ? "rgba(10,132,255,0.10)" : "rgba(0,122,255,0.08)",
     };
   }, [darkMode, sidebarCollapsed]);
+
+  /* Anything rendered through a portal to <body> — the floating selection bar —
+     is positioned against the viewport, not against the content area, so
+     centring it puts it half the sidebar's width to the left of everything it
+     belongs with. Publish the rail's width so those can centre on the content
+     instead. */
+  useEffect(() => {
+    document.body.style.setProperty("--rhymix-rail-w", `${tokens.sidebarW}px`);
+    return () => document.body.style.removeProperty("--rhymix-rail-w");
+  }, [tokens.sidebarW]);
+
 
   const pct = Math.max(0, Math.min(100, Math.round((volume ?? 0) * 100)));
   const [groqApiKey, setGroqApiKey] = useState("");
