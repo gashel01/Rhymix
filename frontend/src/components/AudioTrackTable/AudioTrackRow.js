@@ -733,7 +733,19 @@ const AudioTrackRow = (props) => {
                           value={convertedSelection}
                           onChange={(next) => onVocalSourceChange(next)}
                           options={inferredOptions.map((option) => ({ value: option.value, label: option.label }))}
+                          variant="segment"
                           className={styles.vocalSelect}
+                          ariaLabel="Converted vocal source"
+                          /* Carries the same selected state as the "original"
+                             button beside it: this is the other half of one
+                             toggle, not a separate control that happens to sit
+                             next to it. */
+                          style={{
+                            background: !isOriginalVocal
+                              ? (t.isDark ? "rgba(10,132,255,0.75)" : "rgba(10,132,255,0.95)")
+                              : "transparent",
+                            color: !isOriginalVocal ? "white" : t.subtext,
+                          }}
                         />
                       ) : (
                         <button

@@ -28,6 +28,11 @@ const Select = ({
   ariaLabel,
   id,
   className = "",
+  /* "segment" strips the trigger's own box so it can sit inside an existing
+     segmented control — the original/processed toggle in a track row — instead
+     of arriving as a second, differently-shaped control beside it. */
+  variant = "default",
+  style,
   menuMaxHeight = 280,
 }) => {
   const reactId = useId();
@@ -191,7 +196,13 @@ const Select = ({
         type="button"
         id={id}
         ref={triggerRef}
-        className={`${styles.trigger} ${open ? styles.triggerOpen : ""} ${className}`}
+        className={[
+          styles.trigger,
+          variant === "segment" ? styles.triggerSegment : "",
+          open ? styles.triggerOpen : "",
+          className,
+        ].filter(Boolean).join(" ")}
+        style={style}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -205,8 +216,8 @@ const Select = ({
         </span>
         <svg
           className={`${styles.chevron} ${open ? styles.chevronOpen : ""}`}
-          width="16"
-          height="16"
+          width={variant === "segment" ? 12 : 16}
+          height={variant === "segment" ? 12 : 16}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"

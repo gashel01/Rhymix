@@ -277,14 +277,14 @@
   font-weight: 800;
 }
 
+/* Matches .vocalBtnBase beside it, so the two halves of the toggle are the
+   same size and weight. The box itself is removed by Select's `segment`
+   variant; this only sets type and width. */
 .vocalSelect {
-  border-radius: 6px;
-  border: none;
   font-size: 10px;
   font-weight: 800;
-  padding: 3px 8px;
-  cursor: pointer;
   max-width: 160px;
+  text-transform: none;
 }
 
 .vocalSingleBtn {

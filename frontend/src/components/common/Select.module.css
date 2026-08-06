@@ -153,3 +153,30 @@
     transition: none;
   }
 }
+
+/* Inside an existing segmented control the trigger must not bring its own box:
+   the wrapper already draws the border and the rounding, and a second border
+   nested a few pixels inside the first is what makes a control look bolted on
+   rather than part of the group. Size and weight come from the caller so it
+   matches the buttons it sits beside. */
+.triggerSegment {
+  width: auto;
+  min-height: 0;
+  padding: 3px 6px 3px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  gap: 4px;
+}
+
+.triggerSegment:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.triggerSegment:focus-visible {
+  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.5);
+}
+
+.triggerSegment.triggerOpen {
+  border: none;
+}
