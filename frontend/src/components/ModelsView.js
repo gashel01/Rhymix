@@ -608,8 +608,8 @@ function ModelsView({
               {isInferenceSelection ? (
                 <PageHeader title="Select Model for Inference" onBack={handleBack} />
               ) : (
-                <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.02em", color: t.text, margin: 0, textTransform: "uppercase" }}>
-                  Trained Voice Models
+                <h1 style={{ fontSize: 22, fontWeight: 650, letterSpacing: "-0.02em", color: t.text, margin: 0, lineHeight: 1.2 }}>
+                  Trained voice models
                 </h1>
               )}
             </div>
@@ -925,12 +925,12 @@ function ModelsView({
                     onClick={onDelete}
                     disabled={selectedCount === 0}
                     style={{
-                      borderColor: selectedCount > 0 ? "rgba(255,59,48,0.45)" : t.hairline,
+                      borderColor: selectedCount > 0 ? "rgba(255,69,58,0.28)" : t.hairline,
                       background:
                         selectedCount > 0
-                          ? `linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))`
+                          ? `transparent`
                           : `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                      color: selectedCount > 0 ? "white" : t.subtext,
+                      color: selectedCount > 0 ? "rgba(255,105,97,0.92)" : t.subtext,
                     }}
                   >
                    <DeleteIcon style={{ fontSize: 20 }} />

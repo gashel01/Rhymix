@@ -564,14 +564,16 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
 
 
                   <div style={{ flex: "1 1 340px", minWidth: 240 }}>
+                    {/* Sentence case at 22/650, matching MainHeader. Uppercase
+                        at display size read as a banner, not a heading. */}
                     <div style={{
-                      fontSize: "28px",
-                      fontWeight: 900,
+                      fontSize: 22,
+                      fontWeight: 650,
                       letterSpacing: "-0.02em",
                       margin: "0px",
-                      textTransform: "uppercase", color: t.text, lineHeight: 1.1
+                      color: t.text, lineHeight: 1.2
                     }}>
-                      Past Inference Results
+                      Past inference results
                     </div>
 
                   </div>
@@ -650,12 +652,12 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
                                 onClick={handleOpenDelete}
                                 disabled={selectedRows.length === 0}
                                 style={{
-                                  borderColor: selectedRows.length > 0 ? "rgba(255,59,48,0.45)" : t.hairline,
+                                  borderColor: selectedRows.length > 0 ? "rgba(255,69,58,0.28)" : t.hairline,
                                   background:
                                     selectedRows.length > 0
-                                      ? "linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))"
+                                      ? "transparent"
                                       : `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                                  color: selectedRows.length > 0 ? "white" : t.subtext,
+                                  color: selectedRows.length > 0 ? "rgba(255,105,97,0.92)" : t.subtext,
                                 }}
                               >
                                 <DeleteIcon style={{ fontSize: 20 }} />

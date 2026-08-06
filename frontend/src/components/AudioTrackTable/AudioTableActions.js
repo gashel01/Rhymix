@@ -53,7 +53,6 @@ const AudioTableActions = ({
       radiusLg: 18,
       radiusMd: 14,
       primary: isDark ? "rgba(10,132,255,1)" : "#2563EB",
-      purple: "rgba(156,39,176,1)",
       danger: "rgba(255,59,48,1)",
     };
   }, [darkMode]);
@@ -81,29 +80,14 @@ const AudioTableActions = ({
     return () => obs.disconnect();
   }, []);
 
-  const PillCount = () => (
-    <div
-      className={styles.pillCount}
-      style={{
-        color: "white",
-        background: `linear-gradient(180deg, ${t.primary}, rgba(10,132,255,0.78))`,
-        boxShadow: t.shadowSoft,
-        border: `1px solid rgba(10,132,255,0.35)`,
-      }}
-      aria-label={`${selectedRows.length} selected`}
-      title={`${selectedRows.length} selected`}
-    >
-      {selectedRows.length}
-    </div>
-  );
-
   const Btn = ({ children, onClick, variant = "secondary", disabled, title, style, icon }) => {
     const v = {
       primary: { bg: `linear-gradient(135deg, ${t.primary} 0%, rgba(13,71,161,1) 100%)`, fg: "white", bd: "rgba(10,132,255,0.45)" },
-      purple: { bg: `linear-gradient(135deg, ${t.purple} 0%, rgba(123,31,162,1) 100%)`, fg: "white", bd: "rgba(156,39,176,0.45)" },
       secondary: { bg: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`, fg: t.text, bd: t.hairline },
       outline: { bg: "transparent", fg: t.text, bd: t.hairline },
-      danger: { bg: `linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))`, fg: "white", bd: "rgba(255,59,48,0.45)" },
+      danger: { bg: `linear-gradient(180deg, rgba(255,69,58,0.95), rgba(255,69,58,0.78))`, fg: "white", bd: "rgba(255,69,58,0.45)" },
+      // Permanent deletion should not be the brightest thing on the bar.
+      quietDanger: { bg: "transparent", fg: "rgba(255,105,97,0.9)", bd: "rgba(255,69,58,0.28)" },
     }[variant];
 
     return (
@@ -180,8 +164,8 @@ const AudioTableActions = ({
           >
             {/* Left */}
             <div className={styles.leftFlex}>
-              {hasSelection ? <PillCount /> : null}
-
+              {/* The count used to be printed twice: a blue pill reading
+                  "1" beside the words "1 track selected". */}
               <div className={styles.minWidthZero}>
                 {hasSelection ? (
                   <div className={styles.selectedText} style={{ color: t.text }}>
@@ -224,7 +208,7 @@ const AudioTableActions = ({
 
                     {onReturnToInferenceParams && (
                       <Btn
-                        variant="purple"
+                        variant="primary"
                         title="Inference Params"
                         onClick={onReturnToInferenceParams}
                         icon={
@@ -271,7 +255,7 @@ const AudioTableActions = ({
 
                     {handleInferenceWithTracks && (
                       <Btn
-                        variant="purple"
+                        variant="primary"
                         title="Run Inference"
                         onClick={() => handleInferenceWithTracks(getSelectedTracks())}
                         icon={
@@ -317,8 +301,8 @@ const AudioTableActions = ({
                     </Btn>
 
                     <Btn
-                      variant="danger"
-                      title="Delete selected"
+                      variant="quietDanger"
+                      title={`Delete ${selectedRows.length} selected`}
                       onClick={onDelete}
                       icon={
                         <SmallIcon>
