@@ -2451,3 +2451,234 @@
   border-color: rgba(255, 69, 58, 0.35);
 }
 
+/* ==========================================================================
+   Frost pass, part two — right panel, left panel, modals.
+   ========================================================================== */
+
+/* --- Form fields: give them a shape -------------------------------------- */
+/* BPM and Key rendered as bare labels with an invisible input next to them,
+   so the panel looked like it was showing dead metadata. */
+.studio-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.studio-field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--studio-subtext);
+}
+
+.studio-field input,
+.studio-field select,
+.studio-field textarea,
+.studio-inspector textarea,
+.studio-inspector input[type="text"],
+.studio-inspector input[type="number"],
+.studio-inspector select {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--studio-text);
+  font-size: 13px;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.studio-field input:focus,
+.studio-field select:focus,
+.studio-inspector textarea:focus,
+.studio-inspector input:focus,
+.studio-inspector select:focus {
+  outline: none;
+  border-color: rgba(10, 132, 255, 0.55);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.studio-field input::placeholder,
+.studio-inspector textarea::placeholder,
+.studio-inspector input::placeholder {
+  color: rgba(255, 255, 255, 0.32);
+}
+
+/* --- Right panel: stop nesting cards ------------------------------------- */
+/* A block inside a block inside the panel, each with its own outline. Group by
+   spacing and a single hairline instead. */
+.studio-meta-block {
+  border: none;
+  background: none;
+  padding: 0;
+  margin-bottom: 22px;
+}
+
+.studio-meta-block + .studio-meta-block {
+  padding-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.studio-embedded-card {
+  border: none;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--studio-radius-md);
+  padding: 14px;
+  margin-bottom: 0;
+}
+
+.studio-embedded-card + .studio-embedded-card {
+  margin-top: 10px;
+  padding-top: 14px;
+  border-top: none;
+}
+
+.studio-empty {
+  color: var(--studio-subtext);
+  font-size: 12px;
+  line-height: 1.5;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--studio-radius-md);
+  padding: 14px;
+}
+
+/* Stacked full-width buttons all shouting equally. Let the row breathe and
+   let the primary keep the accent on its own. */
+.studio-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.studio-inspector-sticky {
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 18px;
+}
+
+/* --- Left panel: hide the machine ---------------------------------------- */
+/* Every asset row printed its internal id — 40-odd characters of hex the user
+   can do nothing with, at the same weight as the name. */
+.studio-library-id {
+  display: none;
+}
+
+.studio-library-item-actions {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.studio-library-item:hover .studio-library-item-actions,
+.studio-library-item:focus-within .studio-library-item-actions {
+  opacity: 1;
+}
+
+.studio-library-item {
+  border: none;
+  border-radius: 12px;
+  padding: 8px 10px;
+  transition: background 160ms ease;
+}
+
+.studio-library-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* The VOX / BAS / MUS / GEN badges were the loudest thing in the column. */
+.studio-library-group-badge,
+.studio-library-kind-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  color: var(--studio-subtext);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.studio-library-meta {
+  color: var(--studio-subtext);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Modals: centred, frosted, primary on the right ---------------------- */
+.studio-modal-backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(20px);
+  align-items: center;
+  animation: studio-fade-in 180ms ease both;
+}
+
+.studio-orchestrator-modal {
+  width: min(720px, calc(100vw - 56px));
+  border-radius: var(--studio-radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(22, 22, 26, 0.92);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.7);
+  animation: studio-fade-in 200ms ease both;
+}
+
+.studio-orchestrator-head {
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.studio-orchestrator-body {
+  padding: 20px 24px 24px;
+  gap: 18px;
+}
+
+.studio-orchestrator-card,
+.studio-orchestrator-step {
+  border: none;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--studio-radius-md);
+  padding: 14px;
+}
+
+/* The primary action sat small and bottom-left, where nothing looks for it. */
+.studio-orchestrator-body > .studio-btn,
+.studio-orchestrator-actions {
+  justify-self: end;
+  align-self: end;
+}
+
+.studio-orchestrator-body > .studio-btn {
+  padding: 11px 22px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-modal-backdrop,
+  .studio-orchestrator-modal {
+    animation: none;
+  }
+}
+
+/* The modal's primary action sat small and bottom-left. In a dialog the eye
+   finishes bottom-right, which is where the commitment belongs. */
+.studio-orchestrator-body .studio-actions-row {
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.studio-orchestrator-body .studio-actions-row .studio-btn {
+  padding: 11px 22px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+/* "Close" was a text button competing with the title. */
+.studio-orchestrator-head .studio-mini,
+.studio-orchestrator-head .studio-btn.ghost {
+  border-color: transparent;
+  color: var(--studio-subtext);
+}
+
+.studio-orchestrator-head .studio-mini:hover,
+.studio-orchestrator-head .studio-btn.ghost:hover {
+  color: var(--studio-text);
+  background: rgba(255, 255, 255, 0.08);
+}

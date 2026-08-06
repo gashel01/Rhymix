@@ -1022,7 +1022,10 @@ const Inspector = ({
               <div className="studio-panel-title">{selectionSummary.title}</div>
               <div className="studio-subtext">{selectionSummary.subtitle}</div>
             </div>
-            <div className="studio-context-chip">{resolvedRightPanelContext}</div>
+            {/* This is an internal enum. "nothing" is not a label for a user. */}
+            {resolvedRightPanelContext && resolvedRightPanelContext !== PANEL_CONTEXT.NOTHING ? (
+              <div className="studio-context-chip">{resolvedRightPanelContext}</div>
+            ) : null}
           </div>
           <div className="studio-actions-row">
             {quickActions.map((action) => (
@@ -1037,9 +1040,9 @@ const Inspector = ({
           </div>
         </div>
         <div className="studio-panel-content studio-right-panel-scroll">
+          {/* The sticky header above already shows this exact subtitle; a second
+              copy under a "Selection Summary" heading said nothing new. */}
           <div className="studio-meta-block">
-            <div className="studio-panel-title">Selection Summary</div>
-            <div className="studio-subtext">{selectionSummary.subtitle}</div>
             {resolvedRightPanelContext === PANEL_CONTEXT.NOTHING ? (
               <div className="studio-empty" style={{ marginTop: 10 }}>
                 No active source. Record with Live VC, capture Voice to MIDI, generate with Foundation, or select a clip to unlock source-based tools.
