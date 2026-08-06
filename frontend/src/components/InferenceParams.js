@@ -503,15 +503,15 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
                   borderRadius: "50%",
                   background:
                     theme.palette.mode === "dark"
-                      ? "linear-gradient(135deg, #1976D2 0%, #0D47A1 100%)"
-                      : "linear-gradient(135deg, #2196F3 0%, #1976D2 100%)",
+                      ? "linear-gradient(135deg, #0A84FF 0%, #0D47A1 100%)"
+                      : "linear-gradient(135deg, #0A84FF 0%, #0A84FF 100%)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   boxShadow:
                     theme.palette.mode === "dark"
-                      ? "0 4px 16px rgba(25, 118, 210, 0.3)"
-                      : "0 4px 16px rgba(25, 118, 210, 0.2)",
+                      ? "0 4px 16px rgba(10, 132, 255, 0.3)"
+                      : "0 4px 16px rgba(10, 132, 255, 0.2)",
                 }}
               >
                 <TuneIcon sx={{ fontSize: 28, color: "white" }} />
@@ -533,7 +533,7 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
                 <Box
                   sx={{
                     p: 3,
-                    backgroundColor: theme.palette.mode === "dark" ? "rgba(144, 202, 249, 0.08)" : "rgba(25, 118, 210, 0.06)",
+                    backgroundColor: theme.palette.mode === "dark" ? "rgba(144, 202, 249, 0.08)" : "rgba(10, 132, 255, 0.06)",
                     borderRadius: 2,
                     textAlign: "center",
                   }}
@@ -556,7 +556,7 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
                 <Box
                   sx={{
                     p: 3,
-                    backgroundColor: theme.palette.mode === "dark" ? "rgba(76, 175, 80, 0.08)" : "rgba(76, 175, 80, 0.06)",
+                    backgroundColor: theme.palette.mode === "dark" ? "rgba(52, 199, 89, 0.08)" : "rgba(52, 199, 89, 0.06)",
                     borderRadius: 2,
                     textAlign: "center",
                   }}
@@ -644,8 +644,8 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
         icon={<GraphicEqIcon sx={{ fontSize: 24, color: "white" }} />}
         gradient={
           theme.palette.mode === "dark"
-            ? "linear-gradient(135deg, #1976D2 0%, #0D47A1 100%)"
-            : "linear-gradient(135deg, #2196F3 0%, #1976D2 100%)"
+            ? "linear-gradient(135deg, #0A84FF 0%, #0D47A1 100%)"
+            : "linear-gradient(135deg, #0A84FF 0%, #0A84FF 100%)"
         }
       >
         <Grid container spacing={4}>
@@ -717,8 +717,8 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
         icon={<AudioFileIcon sx={{ fontSize: 24, color: "white" }} />}
         gradient={
           theme.palette.mode === "dark"
-            ? "linear-gradient(135deg, #FF9800 0%, #F57C00 100%)"
-            : "linear-gradient(135deg, #FFB74D 0%, #FF9800 100%)"
+            ? "linear-gradient(135deg, #FF9F0A 0%, #D98200 100%)"
+            : "linear-gradient(135deg, #FFB340 0%, #FF9F0A 100%)"
         }
       >
         <Grid container spacing={3}>
@@ -975,9 +975,9 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
           alignItems: "center",
           mt: 4,
           p: 4,
-          backgroundColor: theme.palette.mode === "dark" ? "rgba(25, 118, 210, 0.08)" : "rgba(25, 118, 210, 0.06)",
+          backgroundColor: theme.palette.mode === "dark" ? "rgba(10, 132, 255, 0.08)" : "rgba(10, 132, 255, 0.06)",
           border: `1px solid ${
-            theme.palette.mode === "dark" ? "rgba(25, 118, 210, 0.2)" : "rgba(25, 118, 210, 0.15)"
+            theme.palette.mode === "dark" ? "rgba(10, 132, 255, 0.2)" : "rgba(10, 132, 255, 0.15)"
           }`,
           borderRadius: 3,
         }}
@@ -1014,9 +1014,9 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
             borderRadius: 2,
             fontWeight: 600,
             fontSize: "1.1rem",
-            boxShadow: theme.palette.mode === "dark" ? "0 6px 20px rgba(25, 118, 210, 0.4)" : "0 6px 20px rgba(25, 118, 210, 0.3)",
+            boxShadow: theme.palette.mode === "dark" ? "0 6px 20px rgba(10, 132, 255, 0.4)" : "0 6px 20px rgba(10, 132, 255, 0.3)",
             "&:hover": {
-              boxShadow: theme.palette.mode === "dark" ? "0 8px 25px rgba(25, 118, 210, 0.5)" : "0 8px 25px rgba(25, 118, 210, 0.4)",
+              boxShadow: theme.palette.mode === "dark" ? "0 8px 25px rgba(10, 132, 255, 0.5)" : "0 8px 25px rgba(10, 132, 255, 0.4)",
               transform: "translateY(-1px)",
             },
             transition: "all 0.2s ease",

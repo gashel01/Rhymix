@@ -424,14 +424,14 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
                 height: 56,
                 borderRadius: '50%',
                 background: theme => theme.palette.mode === 'dark'
-                  ? 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)'
-                  : 'linear-gradient(135deg, #FFB74D 0%, #FF9800 100%)',
+                  ? 'linear-gradient(135deg, #0A84FF 0%, #0060DF 100%)'
+                  : 'linear-gradient(135deg, #4DA6FF 0%, #0A84FF 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: theme => theme.palette.mode === 'dark'
-                  ? '0 4px 16px rgba(255, 152, 0, 0.3)'
-                  : '0 4px 16px rgba(255, 152, 0, 0.2)',
+                  ? '0 4px 16px rgba(10, 132, 255, 0.3)'
+                  : '0 4px 16px rgba(10, 132, 255, 0.2)',
               }}>
                 <SchoolIcon sx={{ fontSize: 28, color: 'white' }} />
               </Box>
@@ -456,8 +456,8 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
             <Box sx={{
               p: 2.5,
               backgroundColor: theme.palette.mode === 'dark'
-                ? 'rgba(33, 150, 243, 0.08)'
-                : 'rgba(33, 150, 243, 0.06)',
+                ? 'rgba(10, 132, 255, 0.08)'
+                : 'rgba(10, 132, 255, 0.06)',
               borderRadius: 2,
               height: '100%',
               display: 'flex',
@@ -518,8 +518,8 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
                       '&:hover': {
                         borderColor: theme.palette.primary.dark,
                         backgroundColor: theme.palette.mode === 'dark'
-                          ? 'rgba(33, 150, 243, 0.08)'
-                          : 'rgba(33, 150, 243, 0.04)',
+                          ? 'rgba(10, 132, 255, 0.08)'
+                          : 'rgba(10, 132, 255, 0.04)',
                       },
                     }}
                   >
@@ -630,8 +630,8 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
             height: 48,
             borderRadius: 2,
             background: theme => theme.palette.mode === 'dark'
-              ? 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)'
-              : 'linear-gradient(135deg, #FFB74D 0%, #FF9800 100%)',
+              ? 'linear-gradient(135deg, #0A84FF 0%, #0060DF 100%)'
+              : 'linear-gradient(135deg, #4DA6FF 0%, #0A84FF 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -982,9 +982,9 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
         mt: 4,
         p: 4,
         backgroundColor: theme.palette.mode === 'dark'
-        ? 'rgba(25, 118, 210, 0.08)'
-        : 'rgba(25, 118, 210, 0.06)',
-      border: theme => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(25, 118, 210, 0.2)' : 'rgba(25, 118, 210, 0.15)'}`,
+        ? 'rgba(10, 132, 255, 0.08)'
+        : 'rgba(10, 132, 255, 0.06)',
+      border: theme => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(10, 132, 255, 0.2)' : 'rgba(10, 132, 255, 0.15)'}`,
         borderRadius: 3,
       }}>
         <Button
@@ -1029,12 +1029,12 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
             fontSize: '1.1rem',
            
             boxShadow: theme.palette.mode === 'dark'
-            ? '0 6px 20px rgba(25, 118, 210, 0.4)'
-            : '0 6px 20px rgba(25, 118, 210, 0.3)',
+            ? '0 6px 20px rgba(10, 132, 255, 0.4)'
+            : '0 6px 20px rgba(10, 132, 255, 0.3)',
           '&:hover': {
             boxShadow: theme.palette.mode === 'dark'
-              ? '0 8px 25px rgba(25, 118, 210, 0.5)'
-              : '0 8px 25px rgba(25, 118, 210, 0.4)',
+              ? '0 8px 25px rgba(10, 132, 255, 0.5)'
+              : '0 8px 25px rgba(10, 132, 255, 0.4)',
             transform: 'translateY(-1px)',
           },
             '&:disabled': {
