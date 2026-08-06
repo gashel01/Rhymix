@@ -1,6 +1,6 @@
 import React from "react";
 import IconBtn from "./IconBtn";
-import CloseIcon from "@mui/icons-material/Close";
+import CloseIcon from "@mui/icons-material/CloseOutlined";
 export const Alert = ({ kind = "error", children, onClose, t }) => {
     const isErr = kind === "error";
    

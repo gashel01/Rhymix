@@ -14,6 +14,38 @@ import { useVolume } from "../contexts/VolumeContext";
  * - Also calls wavesurfer.setMuted / setVolume / gainNode fallback
  */
 
+const DOWNLOAD_PREFIX = "/api/download/";
+const WAVEFORM_PREFIX = "/api/waveform/";
+
+/**
+ * Fetch precomputed peaks for a download URL.
+ *
+ * Drawing a waveform from the audio itself means pulling the whole WAV down —
+ * ~30 MB per lane, and a page full of them buries the backend. The peaks
+ * endpoint returns the same shape in a few KB. Returns null whenever peaks
+ * aren't available, so the caller can fall back to a plain full load.
+ */
+const fetchPeaks = async (audioUrl, signal) => {
+  const index = audioUrl.indexOf(DOWNLOAD_PREFIX);
+  if (index === -1) return null;
+
+  const peaksUrl =
+    audioUrl.slice(0, index) + WAVEFORM_PREFIX + audioUrl.slice(index + DOWNLOAD_PREFIX.length);
+
+  try {
+    const response = await fetch(peaksUrl, { signal, headers: { Accept: "application/json" } });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (!Array.isArray(data?.peaks) || data.peaks.length === 0) return null;
+    if (!Number.isFinite(data.duration) || data.duration <= 0) return null;
+
+    return data;
+  } catch {
+    return null;
+  }
+};
+
 const AudioWaveform = (
   {
     url: initialUrl,
@@ -314,7 +346,22 @@ const AudioWaveform = (
       restorePlaybackRef.current = null;
     });
 
-    ws.load(audioUrl).catch((err) => {
+    // Keep the media element from eagerly pulling the audio down: with peaks
+    // supplied the waveform renders without it, and the bytes are only needed
+    // once the user actually hits play.
+    try {
+      const media = ws.getMediaElement?.();
+      if (media) media.preload = "metadata";
+    } catch {}
+
+    // Render from precomputed peaks when the backend can supply them, and fall
+    // back to WaveSurfer's own full download when it can't.
+    const load = async () => {
+      const data = await fetchPeaks(audioUrl, abortControllerRef.current?.signal);
+      return data ? ws.load(audioUrl, data.peaks, data.duration) : ws.load(audioUrl);
+    };
+
+    load().catch((err) => {
       if (
         err?.name === "AbortError" ||
         err?.message?.includes("aborted") ||

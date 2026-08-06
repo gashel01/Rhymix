@@ -1,8 +1,33 @@
 import json
 import os
+import signal
 import subprocess
+import sys
 import threading
 import time
+
+
+def _kill_process_tree(pid: int) -> None:
+    """Kill a process and its children.
+
+    terminate() alone leaves the bridge's model worker running — that worker
+    holds several GB and the GPU, so it has to go with its parent.
+    """
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                check=False,
+                capture_output=True,
+                timeout=30,
+            )
+            return
+        except (OSError, subprocess.SubprocessError):
+            pass
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except (OSError, ProcessLookupError):
+        pass
 
 
 class AiAudioAdapter:
@@ -65,7 +90,14 @@ class NotConfiguredAdapter(AiAudioAdapter):
 class LocalPythonAdapter(AiAudioAdapter):
     def __init__(self, entrypoint: str | None = None, python_exe: str | None = None):
         self.entrypoint = entrypoint or os.environ.get("STUDIO_AI_BRIDGE") or "backend.features.studio.ai_bridge_acestep"
-        self.python_exe = python_exe or os.environ.get("STUDIO_AI_PYTHON") or "python"
+        # Default to the interpreter already running the app. A bare "python"
+        # resolves against PATH, which lands outside the virtualenv — the bridge
+        # then can't import applio or torch and every AI job fails on startup.
+        # Only set STUDIO_AI_PYTHON to run the bridge in a *different* env.
+        configured = python_exe or os.environ.get("STUDIO_AI_PYTHON")
+        if not configured or configured.strip().lower() in {"python", "python3", "py"}:
+            configured = sys.executable
+        self.python_exe = configured
         self.persistent = str(os.environ.get("STUDIO_AI_PERSISTENT", "1")).strip().lower() not in {
             "0",
             "false",
@@ -101,11 +133,15 @@ class LocalPythonAdapter(AiAudioAdapter):
 
     def _terminate_process(self):
         if self._process and self._process.poll() is None:
-            try:
-                self._process.terminate()
-            except Exception:
-                pass
+            _kill_process_tree(self._process.pid)
         self._process = None
+
+    def terminate(self) -> bool:
+        """Kill the bridge and whatever it spawned. True if one was running."""
+        with self._lock:
+            running = bool(self._process and self._process.poll() is None)
+            self._terminate_process()
+            return running
 
     def _read_response(self):
         noise = []
@@ -222,8 +258,32 @@ class LocalPythonAdapter(AiAudioAdapter):
         return self._invoke("quality_score", payload)
 
 
+_ADAPTER_LOCK = threading.Lock()
+_ADAPTER = None
+
+
 def get_ai_adapter() -> AiAudioAdapter:
-    adapter = os.environ.get("STUDIO_AI_ADAPTER", "").strip().lower()
-    if adapter == "local":
-        return LocalPythonAdapter()
-    return NotConfiguredAdapter()
+    """Return the shared adapter.
+
+    Building a new one per job defeated STUDIO_AI_PERSISTENT: every job spawned
+    its own bridge, each holding a multi-GB model worker, and nothing kept a
+    reference to stop them — they simply accumulated. One instance keeps the
+    bridge warm and gives cancellation something to terminate.
+    """
+    global _ADAPTER
+
+    wanted = os.environ.get("STUDIO_AI_ADAPTER", "").strip().lower()
+    if wanted != "local":
+        return NotConfiguredAdapter()
+
+    with _ADAPTER_LOCK:
+        if _ADAPTER is None:
+            _ADAPTER = LocalPythonAdapter()
+        return _ADAPTER
+
+
+def terminate_ai_adapter() -> bool:
+    """Stop the running bridge, if any. True when one was actually killed."""
+    with _ADAPTER_LOCK:
+        adapter = _ADAPTER
+    return bool(adapter and adapter.terminate())

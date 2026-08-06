@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import {
   API_BASE,
   clamp,
@@ -899,20 +899,16 @@ function CreateSongView({
   };
 
   const actionLabel = flowMode === "cover" ? "Create cover" : "Create song";
-  const actionTone = promptEngine === "fast"
-    ? {
-        bg: "linear-gradient(180deg, rgba(10,132,255,0.95), rgba(10,132,255,0.78))",
-        bd: "rgba(10,132,255,0.45)",
-      }
-    : promptEngine === "caption"
-      ? {
-          bg: "linear-gradient(180deg, rgba(255,149,0,0.95), rgba(255,149,0,0.78))",
-          bd: "rgba(255,149,0,0.45)",
-        }
-      : {
-          bg: "linear-gradient(180deg, rgba(212,175,55,0.95), rgba(212,175,55,0.78))",
-          bd: "rgba(212,175,55,0.45)",
-        };
+  /* The button used to change colour with the prompt engine — system blue for
+     `fast`, orange for `caption`, gold for `quality` — which put three accents
+     on one screen to carry information the button already spells out next to
+     the label. Colour alone is also the one channel a colour-blind user cannot
+     read. The primary action keeps the primary accent; the engine stays a
+     word. */
+  const actionTone = {
+    bg: "linear-gradient(180deg, rgba(10,132,255,0.95), rgba(10,132,255,0.78))",
+    bd: "rgba(10,132,255,0.45)",
+  };
   const createActionNode = (
     <div style={{ position: "relative", width: "100%", maxWidth: 340, minWidth: 240 }} ref={engineMenuRef}>
       <ui.Btn

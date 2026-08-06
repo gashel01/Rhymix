@@ -14,6 +14,35 @@ def _safe_float(value, default=0.0):
         return default
 
 
+def resolve_asset_path(assets: dict, asset_id) -> Path | None:
+    """Resolve a project asset to a file on disk, or None.
+
+    Generated assets carry an absolute "path", but assets that come from an
+    upload, an inference run or Foundation only carry a "url". Code that looked
+    at "path" alone silently skipped those — which is why jobs needing a real
+    file failed, and why a render could quietly drop clips. The download layer
+    already knows how to turn one of those URLs back into a path.
+    """
+    if not asset_id:
+        return None
+    asset = assets.get(asset_id) if isinstance(assets, dict) else None
+    if not isinstance(asset, dict):
+        return None
+
+    direct = asset.get("path")
+    if direct:
+        candidate = Path(direct)
+        if candidate.exists():
+            return candidate
+
+    # Imported lazily: backend.routes.download pulls in Flask blueprints, and
+    # importing it at module load would tangle the studio package with them.
+    from backend.routes.download import _resolve_download_source
+
+    resolved = _resolve_download_source(asset.get("url"))
+    return Path(resolved) if resolved else None
+
+
 def probe_audio(path: Path) -> dict:
     if not path or not path.exists():
         return {"durationSec": 0.0, "sampleRate": None}

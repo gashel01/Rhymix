@@ -1,10 +1,10 @@
 import React, { useState, useCallback, memo, useEffect, useRef, useMemo } from "react";
 import { useVolume } from "../contexts/VolumeContext";
-import AudioFileIcon from "@mui/icons-material/AudioFile";
-import PsychologyIcon from "@mui/icons-material/Psychology";
-import SearchIcon from "@mui/icons-material/Search";
-import CloseIcon from "@mui/icons-material/Close";
-import DeleteIcon from "@mui/icons-material/Delete";
+import AudioFileIcon from "@mui/icons-material/AudioFileOutlined";
+import PsychologyIcon from "@mui/icons-material/PsychologyOutlined";
+import SearchIcon from "@mui/icons-material/SearchOutlined";
+import CloseIcon from "@mui/icons-material/CloseOutlined";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import AudioTrackTable from "./AudioTrackTable/AudioTrackTable";
 import DeleteDialog from "./AudioTrackTable/InferenceResult/DeleteDialog";
 import ErrorBoundary from "./ErrorBoundary";
@@ -285,8 +285,15 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
   }, [uniqueModels]);
 
   const pairToTrack = useCallback((pair) => {
-    if (pair?.result?.track) return pair.result.track;
-    if (pair?.track) return pair.track;
+    // Every row here is an inference result, so carry its run id along. Without
+    // it the params screen has nothing but the original upload's fileId to work
+    // with, and "run a model on this result" silently reprocesses the raw vocals.
+    const sourceRunId = pair?.runId || pair?.result?.runId || null;
+    const sourceModelName = pair?.modelName || pair?.result?.modelName || null;
+
+    const base = pair?.result?.track || pair?.track || null;
+    if (base) return { ...base, sourceRunId, sourceModelName };
+
     const fileId = pair?.fileId || null;
     if (!fileId) return null;
     return {
@@ -295,6 +302,8 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
       displayName: pair?.displayName || pair?.name || null,
       originalName: pair?.originalName || null,
       vocalFileType: pair?.vocalFileType || pair?.result?.vocalFileType || pair?.result?.params?.vocalsFileType,
+      sourceRunId,
+      sourceModelName,
     };
   }, []);
 
@@ -555,14 +564,16 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
 
 
                   <div style={{ flex: "1 1 340px", minWidth: 240 }}>
+                    {/* Sentence case at 22/650, matching MainHeader. Uppercase
+                        at display size read as a banner, not a heading. */}
                     <div style={{
-                      fontSize: "28px",
-                      fontWeight: 900,
+                      fontSize: 22,
+                      fontWeight: 650,
                       letterSpacing: "-0.02em",
                       margin: "0px",
-                      textTransform: "uppercase", color: t.text, lineHeight: 1.1
+                      color: t.text, lineHeight: 1.2
                     }}>
-                      Past Inference Results
+                      Past inference results
                     </div>
 
                   </div>
@@ -641,12 +652,12 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
                                 onClick={handleOpenDelete}
                                 disabled={selectedRows.length === 0}
                                 style={{
-                                  borderColor: selectedRows.length > 0 ? "rgba(255,59,48,0.45)" : t.hairline,
+                                  borderColor: selectedRows.length > 0 ? "rgba(255,69,58,0.28)" : t.hairline,
                                   background:
                                     selectedRows.length > 0
-                                      ? "linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))"
+                                      ? "transparent"
                                       : `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                                  color: selectedRows.length > 0 ? "white" : t.subtext,
+                                  color: selectedRows.length > 0 ? "rgba(255,105,97,0.92)" : t.subtext,
                                 }}
                               >
                                 <DeleteIcon style={{ fontSize: 20 }} />

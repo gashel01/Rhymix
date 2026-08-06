@@ -1,10 +1,11 @@
 import React, { useRef, useCallback, useEffect, useState } from "react";
+import Select from "../common/Select";
 import { Tooltip } from "@mui/material";
-import ErrorIcon from "@mui/icons-material/Error";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
+import ErrorIcon from "@mui/icons-material/ErrorOutlined";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRightOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import MoreHorizIcon from "@mui/icons-material/MoreHorizOutlined";
 
 // keep existing local components (NOT changing icons)
 import TextOverflow from "../TextOverflow.tsx";
@@ -16,6 +17,18 @@ import { Theme } from "../Homeview/Theme";
 import { Pill } from "../ModelView/Pill";
 import { ThumbsUpIcon, ThumbsDownIcon, StarIcon, CornerDownRightIcon, ExternalLink, Fingerprint, SlidersHorizontal, Image, Trash2 } from "lucide-react";
 import styles from "./AudioTrackRow.module.css";
+import { trackGradient } from "../../utils/trackIdentity";
+
+/* The played part of a waveform says which stem it is: orange for the
+   instrumental, blue for the vocal. That is a legend the user already reads,
+   and it is the same on Home and on Inference. It was previously written as
+   Material's #ff9800 and #1976d2; these are the system equivalents.
+
+   The unplayed part stays neutral, because the boundary between the two is
+   the playhead — colour it as well and the waveform stops reporting
+   progress at all. */
+const STEM_COLORS = { instrumental: "#FF9F0A", vocal: "#0A84FF" };
+const UNPLAYED_COLOR = "#9e9e9e";
 const AudioTrackRow = (props) => {
   const {
     pair,
@@ -143,7 +156,7 @@ const AudioTrackRow = (props) => {
   }, [instrumentalKey, handleInstrumentalWaveformReady]);
 
   // ---------- UI bits ----------
-  const SpinnerBar = ({ color = "#1976d2" }) => (
+  const SpinnerBar = ({ color = "#0A84FF" }) => (
     <div
       className={styles.spinnerBar}
       style={{
@@ -337,7 +350,9 @@ const AudioTrackRow = (props) => {
         isPlaying={isPlaying}
         isMuted={isMuted}
         volume={volume}
-        waveColor={t.waveColor}
+        // Grey is the unplayed part. Tinting it as well destroyed the one
+        // thing the waveform was saying: how far through the track you are.
+        waveColor={UNPLAYED_COLOR}
         progressColor={color}
         onPlayPause={type === "inst" ? handleInstrumentalPlayPause : handleVocalPlayPause}
         onDownload={type === "inst" ? handleInstrumentalDownload : handleVocalDownload}
@@ -456,6 +471,22 @@ const AudioTrackRow = (props) => {
                 <span className={styles.cornerIcon} style={{ color: t.subtext }}><CornerDownRightIcon size={16} /></span>
               )}
 
+              {/* The row's only piece of identity. A model card gets a whole
+                  gradient header; a track row gets the same gradient in the
+                  space it has. */}
+              {!isGroupedVersion && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    flex: "none",
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    background: trackGradient(displayName),
+                    boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
+                  }}
+                />
+              )}
               <TextOverflow
                 text={normaliseTitle(displayName)}
                 className={styles.textOverflow}
@@ -651,7 +682,7 @@ const AudioTrackRow = (props) => {
                     instPath,
                     isInstrumentalPlaying,
                     internalMutedInstrumentals?.[instPath],
-                    "#ff9800",
+                    STEM_COLORS.instrumental,
                     handleInstrumentalSeek
                   )}
                 </div>
@@ -698,24 +729,24 @@ const AudioTrackRow = (props) => {
                         original
                       </button>
                       {inferredOptions.length > 1 ? (
-                        <select
-                          className={styles.vocalSelect}
+                        <Select
                           value={convertedSelection}
-                          onChange={(e) => onVocalSourceChange(e.target.value)}
+                          onChange={(next) => onVocalSourceChange(next)}
+                          options={inferredOptions.map((option) => ({ value: option.value, label: option.label }))}
+                          variant="segment"
+                          className={styles.vocalSelect}
+                          ariaLabel="Converted vocal source"
+                          /* Carries the same selected state as the "original"
+                             button beside it: this is the other half of one
+                             toggle, not a separate control that happens to sit
+                             next to it. */
                           style={{
                             background: !isOriginalVocal
                               ? (t.isDark ? "rgba(10,132,255,0.75)" : "rgba(10,132,255,0.95)")
                               : "transparent",
                             color: !isOriginalVocal ? "white" : t.subtext,
                           }}
-                          title="Select inferred version"
-                        >
-                          {inferredOptions.map((option) => (
-                            <option key={String(option.value)} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       ) : (
                         <button
                           type="button"
@@ -756,7 +787,7 @@ const AudioTrackRow = (props) => {
                     vocalPath,
                     isVocalPlaying,
                     internalMutedVocals?.[vocalPath],
-                    "#1976d2",
+                    STEM_COLORS.vocal,
                     handleVocalSeek
                   )}
                 </div>

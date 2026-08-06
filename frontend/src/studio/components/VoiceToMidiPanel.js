@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import Select from "../../components/common/Select";
 import { createPortal } from "react-dom";
 import { useVoiceToMidiWs } from "../hooks/useVoiceToMidiWs";
 import { insertMidiClip } from "../insertMidiClip";
@@ -474,13 +475,12 @@ const VoiceToMidiPanel = ({ lanes, project, transport, selection, actions, onRef
 
       <div className="studio-field">
         <label>Instrument</label>
-        <select value={instrument} onChange={(e) => setInstrument(e.target.value)} disabled={isBusy}>
-          {INSTRUMENTS.map((inst) => (
-            <option key={inst} value={inst}>
-              {inst}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={instrument}
+          onChange={setInstrument}
+          options={INSTRUMENTS.map((inst) => ({ value: String(inst), label: String(inst) }))}
+          disabled={isBusy}
+        />
       </div>
 
       <div className="studio-field">
@@ -561,35 +561,36 @@ const VoiceToMidiPanel = ({ lanes, project, transport, selection, actions, onRef
 
       <div className="studio-field">
         <label>Target Lane</label>
-        <select value={targetLaneId} onChange={(e) => setTargetLaneId(e.target.value)} disabled={isBusy}>
-          <option value="new">Create new lane</option>
-          {lanes.map((lane) => (
-            <option key={lane.id} value={lane.id}>
-              {lane.name}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={targetLaneId}
+          onChange={setTargetLaneId}
+          disabled={isBusy}
+          options={[
+            { value: "new", label: "Create new lane" },
+            ...lanes.map((lane) => ({ value: lane.id, label: lane.name })),
+          ]}
+          ariaLabel="Target lane"
+        />
       </div>
 
       <div className="studio-field">
         <label>Insert At</label>
-        <select value={startMode} onChange={(e) => setStartMode(e.target.value)} disabled={isBusy}>
-          <option value="playhead">Playhead</option>
-          <option value="selection" disabled={!selection?.range}>
-            Selection start
-          </option>
-        </select>
+        <Select
+          value={startMode}
+          onChange={setStartMode}
+          options={[{ value: "playhead", label: "Playhead" }]}
+          disabled={isBusy}
+        />
       </div>
 
       <div className="studio-field">
         <label>Quantize</label>
-        <select value={quantize} onChange={(e) => setQuantize(e.target.value)} disabled={isBusy}>
-          {quantizeOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={quantize}
+          onChange={setQuantize}
+          options={quantizeOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
+          disabled={isBusy}
+        />
       </div>
 
       <label className="studio-toggle">
@@ -615,17 +616,12 @@ const VoiceToMidiPanel = ({ lanes, project, transport, selection, actions, onRef
       {mode === "dubler_melody" && (
         <div className="studio-field">
           <label>Scale (optional)</label>
-          <select
+          <Select
             value={scaleOverride}
-            onChange={(e) => setScaleOverride(e.target.value)}
+            onChange={(next) => setScaleOverride(next)}
+            options={SCALE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
             disabled={isBusy}
-          >
-            {SCALE_OPTIONS.map((opt) => (
-              <option key={opt.value || "none"} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          />
           <div className="studio-subtext">If set, notes snap to this scale.</div>
         </div>
       )}
@@ -633,17 +629,12 @@ const VoiceToMidiPanel = ({ lanes, project, transport, selection, actions, onRef
       {mode === "dubler_melody" && (
         <div className="studio-field">
           <label>Decoder / Preset</label>
-          <select
+          <Select
             value={dublerDecodeMode}
-            onChange={(e) => setDublerDecodeMode(e.target.value)}
+            onChange={setDublerDecodeMode}
+            options={[{ value: "wand_sing", label: "Magic Wand (sing)" }, { value: "wand_whistle", label: "Magic Wand (whistle)" }, { value: "wand_noisy_room", label: "Magic Wand (noisy room)" }, { value: "rules", label: "Rules (classic)" }, { value: "viterbi", label: "Viterbi (global)" }]}
             disabled={isBusy}
-          >
-            <option value="wand_sing">Magic Wand (sing)</option>
-            <option value="wand_whistle">Magic Wand (whistle)</option>
-            <option value="wand_noisy_room">Magic Wand (noisy room)</option>
-            <option value="rules">Rules (classic)</option>
-            <option value="viterbi">Viterbi (global)</option>
-          </select>
+          />
           <div className="studio-subtext">
             Magic Wand uses tuned presets with a soft key prior. Viterbi uses a global decoder to
             stabilize slides and near-semitone wobble.

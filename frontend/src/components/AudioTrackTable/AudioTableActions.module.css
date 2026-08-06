@@ -75,3 +75,110 @@
     justify-content: flex-end;
     flex-wrap: wrap;
 }
+/* --- Floating selection bar ---------------------------------------------- */
+/* The workflow actions used to be a third header row, present at all times and
+   empty until something was selected — so every list started ~120px lower than
+   it needed to, permanently, to make room for a bar that is only relevant part
+   of the time. This appears over the content when a selection exists. */
+.floatingBar {
+  position: fixed;
+  /* Centred on the content, not on the window. The bar is portalled to <body>,
+     so left: 50% centres it against the viewport — which puts it half the
+     sidebar's width to the left of the pagination it sits above. Spanning from
+     the rail to the right edge and centring inside that lines the two up.
+     --rhymix-rail-w is published by NavigationBar and follows the collapse. */
+  left: var(--rhymix-rail-w, 0px);
+  right: 0;
+  margin: 0 auto;
+  width: fit-content;
+  /* --rhymix-pagination-h is set by AudioTrackTable while the pagination
+     overlay is on screen. That overlay is sticky and cannot be pushed above its
+     own static position, so this bar is the one that steps over it. */
+  bottom: calc(24px + var(--rhymix-pagination-h, 0px));
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - var(--rhymix-rail-w, 0px) - 48px);
+  padding: 10px 12px 10px 18px;
+  border-radius: 999px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  animation: floating-bar-in 180ms ease both;
+}
+
+@keyframes floating-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.floatingCount {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.floatingDivider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 0;
+}
+
+.floatingActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.floatingActions::-webkit-scrollbar {
+  display: none;
+}
+
+.floatingDone {
+  flex: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.floatingDone:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* On a narrow window the bar spans the width instead of centring. */
+@media (max-width: 720px) {
+  .floatingBar {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    border-radius: 18px;
+  }
+  @keyframes floating-bar-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floatingBar {
+    animation: none;
+  }
+}

@@ -22,9 +22,9 @@ import {
   Radio,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import ArrowBackIcon from "@mui/icons-material/ArrowBackOutlined";
+import ModelTrainingIcon from "@mui/icons-material/ModelTrainingOutlined";
+import AccessTimeIcon from "@mui/icons-material/AccessTimeOutlined";
 import PageHeader from "./common/PageHeader";
 import Section from "./common/Section";
 
@@ -122,11 +122,11 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
             borderRadius: '50%',
             background: theme => theme.palette.mode === 'dark'
               ? 'linear-gradient(135deg, rgba(144, 202, 249, 0.1), rgba(144, 202, 249, 0.05))'
-              : 'linear-gradient(135deg, rgba(25, 118, 210, 0.08), rgba(25, 118, 210, 0.04))',
+              : 'linear-gradient(135deg, rgba(10, 132, 255, 0.08), rgba(10, 132, 255, 0.04))',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: theme => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(144, 202, 249, 0.2)' : 'rgba(25, 118, 210, 0.15)'}`,
+            border: theme => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(144, 202, 249, 0.2)' : 'rgba(10, 132, 255, 0.15)'}`,
           }}>
             <CircularProgress size={40} thickness={2} />
           </Box>
@@ -186,8 +186,8 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
                   py: 0.75,
                   backgroundColor: theme.palette.mode === 'dark'
                     ? 'rgba(144, 202, 249, 0.1)'
-                    : 'rgba(25, 118, 210, 0.08)',
-                  border: theme => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(144, 202, 249, 0.2)' : 'rgba(25, 118, 210, 0.15)'}`,
+                    : 'rgba(10, 132, 255, 0.08)',
+                  border: theme => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(144, 202, 249, 0.2)' : 'rgba(10, 132, 255, 0.15)'}`,
                   borderRadius: 1.5,
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -224,9 +224,9 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
             p: 3,
             mb: 4,
             backgroundColor: theme.palette.mode === 'dark'
-              ? 'rgba(244, 67, 54, 0.1)'
-              : 'rgba(244, 67, 54, 0.05)',
-            border: theme => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(244, 67, 54, 0.2)' : 'rgba(244, 67, 54, 0.15)'}`,
+              ? 'rgba(255, 69, 58, 0.1)'
+              : 'rgba(255, 69, 58, 0.05)',
+            border: theme => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 69, 58, 0.2)' : 'rgba(255, 69, 58, 0.15)'}`,
             borderRadius: 2,
           }}>
             <Typography variant="body2" color="error.main">
@@ -290,7 +290,7 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
                 backgroundColor: selectedModel?.name === model.name
                   ? theme.palette.mode === 'dark'
                     ? 'rgba(144, 202, 249, 0.08)'
-                    : 'rgba(25, 118, 210, 0.06)'
+                    : 'rgba(10, 132, 255, 0.06)'
                   : theme.palette.mode === 'dark'
                     ? 'rgba(255, 255, 255, 0.02)'
                     : 'rgba(255, 255, 255, 0.8)',
@@ -306,7 +306,7 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
                   backgroundColor: selectedModel?.name === model.name
                     ? theme.palette.mode === 'dark'
                       ? 'rgba(144, 202, 249, 0.12)'
-                      : 'rgba(25, 118, 210, 0.08)'
+                      : 'rgba(10, 132, 255, 0.08)'
                     : theme.palette.mode === 'dark'
                       ? 'rgba(255, 255, 255, 0.05)'
                       : 'rgba(0, 0, 0, 0.02)',
@@ -404,8 +404,8 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
                     px: 1.5,
                     py: 0.5,
                     backgroundColor: theme.palette.mode === 'dark'
-                      ? 'rgba(33, 150, 243, 0.15)'
-                      : 'rgba(25, 118, 210, 0.12)',
+                      ? 'rgba(10, 132, 255, 0.15)'
+                      : 'rgba(10, 132, 255, 0.12)',
                     borderRadius: 2,
                     display: 'flex',
                     alignItems: 'center',
@@ -448,8 +448,8 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
                             py: 0.25,
                             backgroundColor: checkpoint.isBest
                               ? theme.palette.mode === 'dark'
-                                ? 'rgba(76, 175, 80, 0.15)'
-                                : 'rgba(76, 175, 80, 0.08)'
+                                ? 'rgba(52, 199, 89, 0.15)'
+                                : 'rgba(52, 199, 89, 0.08)'
                               : theme.palette.mode === 'dark'
                                 ? 'rgba(255, 255, 255, 0.03)'
                                 : 'rgba(0, 0, 0, 0.03)',
@@ -508,11 +508,11 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
                     py:1,
                     backgroundColor: model.status === 'completed'
                       ? theme.palette.mode === 'dark'
-                        ? 'rgba(76, 175, 80, 0.15)'
-                        : 'rgba(76, 175, 80, 0.08)'
+                        ? 'rgba(52, 199, 89, 0.15)'
+                        : 'rgba(52, 199, 89, 0.08)'
                       : theme.palette.mode === 'dark'
-                        ? 'rgba(255, 152, 0, 0.15)'
-                        : 'rgba(255, 152, 0, 0.08)',
+                        ? 'rgba(255, 159, 10, 0.15)'
+                        : 'rgba(255, 159, 10, 0.08)',
                     borderRadius: 1,
                   }}>
                     <Typography variant="caption" sx={{
@@ -574,8 +574,8 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
           p: 3,
           backgroundColor: theme.palette.mode === 'dark'
             ? 'rgba(144, 202, 249, 0.06)'
-            : 'rgba(25, 118, 210, 0.04)',
-          border: theme => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(144, 202, 249, 0.15)' : 'rgba(25, 118, 210, 0.1)'}`,
+            : 'rgba(10, 132, 255, 0.04)',
+          border: theme => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(144, 202, 249, 0.15)' : 'rgba(10, 132, 255, 0.1)'}`,
           borderRadius: 2,
           textAlign: 'center',
         }}>
@@ -610,12 +610,12 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
               fontWeight: 600,
               fontSize: '0.9rem',
               boxShadow: theme.palette.mode === 'dark'
-                ? '0 4px 16px rgba(25, 118, 210, 0.3)'
-                : '0 4px 16px rgba(25, 118, 210, 0.2)',
+                ? '0 4px 16px rgba(10, 132, 255, 0.3)'
+                : '0 4px 16px rgba(10, 132, 255, 0.2)',
               '&:hover': {
                 boxShadow: theme.palette.mode === 'dark'
-                  ? '0 6px 20px rgba(25, 118, 210, 0.4)'
-                  : '0 6px 20px rgba(25, 118, 210, 0.3)',
+                  ? '0 6px 20px rgba(10, 132, 255, 0.4)'
+                  : '0 6px 20px rgba(10, 132, 255, 0.3)',
                 transform: 'translateY(-1px)',
               },
               transition: 'all 0.2s ease',
@@ -691,7 +691,7 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
                   backgroundColor: selectedCheckpoint?.filename === checkpoint.filename
                     ? theme.palette.mode === 'dark'
                       ? 'rgba(144, 202, 249, 0.08)'
-                      : 'rgba(25, 118, 210, 0.06)'
+                      : 'rgba(10, 132, 255, 0.06)'
                     : 'transparent',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
@@ -699,7 +699,7 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
                     backgroundColor: selectedCheckpoint?.filename === checkpoint.filename
                       ? theme.palette.mode === 'dark'
                         ? 'rgba(144, 202, 249, 0.12)'
-                        : 'rgba(25, 118, 210, 0.08)'
+                        : 'rgba(10, 132, 255, 0.08)'
                       : theme.palette.mode === 'dark'
                         ? 'rgba(255, 255, 255, 0.02)'
                         : 'rgba(0, 0, 0, 0.02)',
@@ -753,8 +753,8 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
                       px: 1.5,
                       py: 0.5,
                       backgroundColor: theme.palette.mode === 'dark'
-                        ? 'rgba(76, 175, 80, 0.15)'
-                        : 'rgba(76, 175, 80, 0.08)',
+                        ? 'rgba(52, 199, 89, 0.15)'
+                        : 'rgba(52, 199, 89, 0.08)',
                       border: `1px solid ${theme.palette.success.main}`,
                       borderRadius: 1,
                     }}>
@@ -805,15 +805,15 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
               borderRadius: 2,
               fontWeight: 600,
               background: theme.palette.mode === 'dark'
-                ? 'linear-gradient(135deg, #1976D2 0%, #0D47A1 100%)'
-                : 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
+                ? 'linear-gradient(135deg, #0A84FF 0%, #0D47A1 100%)'
+                : 'linear-gradient(135deg, #0A84FF 0%, #0A84FF 100%)',
               boxShadow: theme.palette.mode === 'dark'
-                ? '0 4px 16px rgba(25, 118, 210, 0.3)'
-                : '0 4px 16px rgba(25, 118, 210, 0.2)',
+                ? '0 4px 16px rgba(10, 132, 255, 0.3)'
+                : '0 4px 16px rgba(10, 132, 255, 0.2)',
               '&:hover': {
                 boxShadow: theme.palette.mode === 'dark'
-                  ? '0 6px 20px rgba(25, 118, 210, 0.4)'
-                  : '0 6px 20px rgba(25, 118, 210, 0.3)',
+                  ? '0 6px 20px rgba(10, 132, 255, 0.4)'
+                  : '0 6px 20px rgba(10, 132, 255, 0.3)',
                 transform: 'translateY(-1px)',
               },
               transition: 'all 0.2s ease',

@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Delete as DeleteIcon,
   School as SchoolIcon,
@@ -15,6 +16,9 @@ const AudioTableActions = ({
   handleCoverWithTracks,
   showInferenceResultsActions,
   showHeaderWorkflowActions = true,
+  // Views that render their own Select All / Clear / Delete (Home does, in its
+  // custom header) turn this off so the bar doesn't duplicate them.
+  showSelectionControls = true,
   hideActionBar = false,
   onReturnToModelSelection,
   onReturnToInferenceParams,
@@ -50,7 +54,6 @@ const AudioTableActions = ({
       radiusLg: 18,
       radiusMd: 14,
       primary: isDark ? "rgba(10,132,255,1)" : "#2563EB",
-      purple: "rgba(156,39,176,1)",
       danger: "rgba(255,59,48,1)",
     };
   }, [darkMode]);
@@ -78,29 +81,14 @@ const AudioTableActions = ({
     return () => obs.disconnect();
   }, []);
 
-  const PillCount = () => (
-    <div
-      className={styles.pillCount}
-      style={{
-        color: "white",
-        background: `linear-gradient(180deg, ${t.primary}, rgba(10,132,255,0.78))`,
-        boxShadow: t.shadowSoft,
-        border: `1px solid rgba(10,132,255,0.35)`,
-      }}
-      aria-label={`${selectedRows.length} selected`}
-      title={`${selectedRows.length} selected`}
-    >
-      {selectedRows.length}
-    </div>
-  );
-
   const Btn = ({ children, onClick, variant = "secondary", disabled, title, style, icon }) => {
     const v = {
       primary: { bg: `linear-gradient(135deg, ${t.primary} 0%, rgba(13,71,161,1) 100%)`, fg: "white", bd: "rgba(10,132,255,0.45)" },
-      purple: { bg: `linear-gradient(135deg, ${t.purple} 0%, rgba(123,31,162,1) 100%)`, fg: "white", bd: "rgba(156,39,176,0.45)" },
       secondary: { bg: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`, fg: t.text, bd: t.hairline },
       outline: { bg: "transparent", fg: t.text, bd: t.hairline },
-      danger: { bg: `linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))`, fg: "white", bd: "rgba(255,59,48,0.45)" },
+      danger: { bg: `linear-gradient(180deg, rgba(255,69,58,0.95), rgba(255,69,58,0.78))`, fg: "white", bd: "rgba(255,69,58,0.45)" },
+      // Permanent deletion should not be the brightest thing on the bar.
+      quietDanger: { bg: "transparent", fg: "rgba(255,105,97,0.9)", bd: "rgba(255,69,58,0.28)" },
     }[variant];
 
     return (
@@ -139,6 +127,128 @@ const AudioTableActions = ({
     </span>
   );
 
+  /* The workflow actions used to sit in a third header row that was always
+     present and empty until something was selected, pushing the list down
+     by its full height for nothing. They are the same buttons; they now
+     ride a bar that appears over the content only while a selection
+     exists, which is where iOS and Suno put a selection context. */
+  /* The bar is fixed over the content, so anything anchored to the bottom —
+     the pagination overlay, the last row of the list — ends up underneath it.
+     Publishing its footprint lets those move out of the way in CSS rather than
+     each of them guessing a magic number. Measured rather than hard-coded: the
+     bar grows a second line when the buttons wrap on a narrow window. */
+  const barRef = useRef(null);
+  const barActive = hasSelection && showHeaderWorkflowActions;
+  useEffect(() => {
+    if (!barActive) {
+      document.body.style.removeProperty("--rhymix-bottom-inset");
+      return undefined;
+    }
+    const height = barRef.current?.offsetHeight || 57;
+    document.body.style.setProperty("--rhymix-bottom-inset", `${height + 34}px`);
+    return () => document.body.style.removeProperty("--rhymix-bottom-inset");
+  }, [barActive, selectedRows.length]);
+
+  const workflowActions = (
+    <>
+        {showInferenceResultsActions ? (
+          <>
+            {onReturnToModelSelection && (
+              <Btn
+                variant="primary"
+                title="Model Selection"
+                onClick={onReturnToModelSelection}
+                icon={
+                  <SmallIcon>
+                    <PsychologyIcon />
+                  </SmallIcon>
+                }
+              >
+                Model Selection
+              </Btn>
+            )}
+
+            {onReturnToInferenceParams && (
+              <Btn
+                variant="primary"
+                title="Inference Params"
+                onClick={onReturnToInferenceParams}
+                icon={
+                  <SmallIcon>
+                    <ArrowBackIcon />
+                  </SmallIcon>
+                }
+              >
+                Inference Params
+              </Btn>
+            )}
+
+            {handleCoverWithTracks && (
+              <Btn
+                variant="primary"
+                title="Create Cover"
+                onClick={() => handleCoverWithTracks(getSelectedTracks())}
+                icon={
+                  <SmallIcon>
+                    <PsychologyIcon />
+                  </SmallIcon>
+                }
+              >
+                Cover
+              </Btn>
+            )}
+          </>
+        ) : (
+          <>
+            {handleTrainWithDataset && (
+              <Btn
+                variant="primary"
+                title="Train Model"
+                onClick={() => handleTrainWithDataset(getSelectedTracks())}
+                icon={
+                  <SmallIcon>
+                    <SchoolIcon />
+                  </SmallIcon>
+                }
+              >
+                Train Model
+              </Btn>
+            )}
+
+            {handleInferenceWithTracks && (
+              <Btn
+                variant="primary"
+                title="Run Inference"
+                onClick={() => handleInferenceWithTracks(getSelectedTracks())}
+                icon={
+                  <SmallIcon>
+                    <PsychologyIcon />
+                  </SmallIcon>
+                }
+              >
+                Run Inference
+              </Btn>
+            )}
+
+            {handleCoverWithTracks && (
+              <Btn
+                variant="primary"
+                title="Create Cover"
+                onClick={() => handleCoverWithTracks(getSelectedTracks())}
+                icon={
+                  <SmallIcon>
+                    <PsychologyIcon />
+                  </SmallIcon>
+                }
+              >
+                Cover
+              </Btn>
+            )}
+          </>
+        )}
+    </>
+  );
+
   return (
     <>
       {/* ✅ NEW: sentinel placed just before sticky header */}
@@ -169,19 +279,27 @@ const AudioTableActions = ({
           <div
             className={`${styles.ataGrid} ata-grid`}
             style={{
-              gridTemplateColumns: showHeaderWorkflowActions ? "1fr auto auto" : "1fr auto",
+              gridTemplateColumns: ["1fr", showHeaderWorkflowActions && "auto", showSelectionControls && "auto"]
+                .filter(Boolean)
+                .join(" "),
               transition: "padding 180ms ease",
             }}
           >
             {/* Left */}
             <div className={styles.leftFlex}>
-              {hasSelection ? <PillCount /> : null}
-
+              {/* The count used to be printed twice: a blue pill reading
+                  "1" beside the words "1 track selected". */}
               <div className={styles.minWidthZero}>
+                {/* Once the floating bar is up it carries the count, so printing
+                    it here as well put the same words on screen twice. The
+                    header keeps only the prompt shown before anything is
+                    selected. */}
                 {hasSelection ? (
-                  <div className={styles.selectedText} style={{ color: t.text }}>
-                    {selectedRows.length} track{selectedRows.length !== 1 ? "s" : ""} selected
-                  </div>
+                  showHeaderWorkflowActions ? null : (
+                    <div className={styles.selectedText} style={{ color: t.text }}>
+                      {selectedRows.length} track{selectedRows.length !== 1 ? "s" : ""} selected
+                    </div>
+                  )
                 ) : (
                   <div className={styles.defaultText} style={{ color: t.subtext }}>
                     {defaultLabel || "Select tracks to get started"}
@@ -190,147 +308,76 @@ const AudioTableActions = ({
               </div>
             </div>
 
-            {/* Middle */}
-            {showHeaderWorkflowActions ? (
-              <div
-                className={`${styles.middleActions} ata-actions`}
-                style={{
-                  opacity: hasSelection ? 1 : 0,
-                  pointerEvents: hasSelection ? "auto" : "none",
-                  transition: "opacity 160ms ease",
-                }}
-              >
-                {showInferenceResultsActions ? (
+            {/* Moved out of the flow — see workflowActions above. */}
+            {/* Right */}
+            {showSelectionControls ? (
+              <div className={styles.rightFlex}>
+                <Btn variant="outline" title="Select all" onClick={onSelectAll}>
+                  Select All
+                </Btn>
+
+                {hasSelection ? (
                   <>
-                    {onReturnToModelSelection && (
-                      <Btn
-                        variant="primary"
-                        title="Model Selection"
-                        onClick={onReturnToModelSelection}
-                        icon={
-                          <SmallIcon>
-                            <PsychologyIcon />
-                          </SmallIcon>
-                        }
-                      >
-                        Model Selection
-                      </Btn>
-                    )}
+                    <Btn variant="outline" title="Clear selection" onClick={onClear}>
+                      Clear
+                    </Btn>
 
-                    {onReturnToInferenceParams && (
-                      <Btn
-                        variant="purple"
-                        title="Inference Params"
-                        onClick={onReturnToInferenceParams}
-                        icon={
-                          <SmallIcon>
-                            <ArrowBackIcon />
-                          </SmallIcon>
-                        }
-                      >
-                        Inference Params
-                      </Btn>
-                    )}
-
-                    {handleCoverWithTracks && (
-                      <Btn
-                        variant="primary"
-                        title="Create Cover"
-                        onClick={() => handleCoverWithTracks(getSelectedTracks())}
-                        icon={
-                          <SmallIcon>
-                            <PsychologyIcon />
-                          </SmallIcon>
-                        }
-                      >
-                        Cover
-                      </Btn>
-                    )}
+                    <Btn
+                      variant="quietDanger"
+                      title={`Delete ${selectedRows.length} selected`}
+                      onClick={onDelete}
+                      icon={
+                        <SmallIcon>
+                          <DeleteIcon />
+                        </SmallIcon>
+                      }
+                      style={{ padding: "0 10px" }}
+                    >
+                      Delete
+                    </Btn>
                   </>
-                ) : (
-                  <>
-                    {handleTrainWithDataset && (
-                      <Btn
-                        variant="primary"
-                        title="Train Model"
-                        onClick={() => handleTrainWithDataset(getSelectedTracks())}
-                        icon={
-                          <SmallIcon>
-                            <SchoolIcon />
-                          </SmallIcon>
-                        }
-                      >
-                        Train Model
-                      </Btn>
-                    )}
-
-                    {handleInferenceWithTracks && (
-                      <Btn
-                        variant="purple"
-                        title="Run Inference"
-                        onClick={() => handleInferenceWithTracks(getSelectedTracks())}
-                        icon={
-                          <SmallIcon>
-                            <PsychologyIcon />
-                          </SmallIcon>
-                        }
-                      >
-                        Run Inference
-                      </Btn>
-                    )}
-
-                    {handleCoverWithTracks && (
-                      <Btn
-                        variant="primary"
-                        title="Create Cover"
-                        onClick={() => handleCoverWithTracks(getSelectedTracks())}
-                        icon={
-                          <SmallIcon>
-                            <PsychologyIcon />
-                          </SmallIcon>
-                        }
-                      >
-                        Cover
-                      </Btn>
-                    )}
-                  </>
-                )}
+                ) : null}
               </div>
             ) : null}
-
-            {/* Right */}
-            <div className={styles.rightFlex}>
-              <Btn variant="outline" title="Select all" onClick={onSelectAll}>
-                Select All
-              </Btn>
-
-              {hasSelection ? (
-                <>
-                  <Btn variant="outline" title="Clear selection" onClick={onClear}>
-                    Clear
-                  </Btn>
-
-                  <Btn
-                    variant="danger"
-                    title="Delete selected"
-                    onClick={onDelete}
-                    icon={
-                      <SmallIcon>
-                        <DeleteIcon />
-                      </SmallIcon>
-                    }
-                    style={{ padding: "0 10px" }}
-                  >
-                    Delete
-                  </Btn>
-                </>
-              ) : null}
-            </div>
           </div>
         ) : null}
 
         {/* {children ? children : null} */}
       </div>
+
+      {barActive
+        ? createPortal(
+            <div
+              ref={barRef}
+              className={styles.floatingBar}
+              role="region"
+              aria-label="Selection actions"
+              style={{
+                background: `linear-gradient(180deg, ${t.glassA}, ${t.glassB})`,
+                border: `1px solid ${t.hairline}`,
+                boxShadow: t.shadow,
+              }}
+            >
+              <span className={styles.floatingCount} style={{ color: t.text }}>
+                {selectedRows.length} track{selectedRows.length !== 1 ? "s" : ""} selected
+              </span>
+              <span className={styles.floatingDivider} style={{ background: t.hairline }} />
+              <div className={styles.floatingActions}>{workflowActions}</div>
+              {onClear ? (
+                <button
+                  type="button"
+                  className={styles.floatingDone}
+                  style={{ color: t.subtext }}
+                  onClick={onClear}
+                  title="Clear selection"
+                >
+                  Done
+                </button>
+              ) : null}
+            </div>,
+            document.body
+          )
+        : null}
     </>
   );
 };

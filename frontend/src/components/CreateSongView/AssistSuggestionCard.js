@@ -1,5 +1,5 @@
 import React from "react";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 
 export function AssistActionRow({
   t,

@@ -8,7 +8,11 @@ from pathlib import Path
 from backend.features.inference.models import resolve_checkpoint
 from backend.jobs.registry import active_jobs
 from backend.paths.manager import paths
-from backend.storage.inference_runs import make_run_id, save_inference_run_metadata
+from backend.storage.inference_runs import (
+    load_inference_run_metadata,
+    make_run_id,
+    save_inference_run_metadata,
+)
 from backend.storage.metadata import get_upload_base_name, get_upload_metadata
 
 # Now try importing the core functions
@@ -137,15 +141,34 @@ def run_inference_job(job_id, run_id, model, track, params):
             active_jobs[job_id].update({"status": "failed", "error": f"Model file not found: {model_path}"})
             return
 
-        # Get input audio path (use vocal file)
+        # Get input audio path. Two sources are possible:
+        #  - the original upload's vocals — a plain re-inference
+        #  - a previous run's output — layered inference, one model on top of another
         file_id = track.get("fileId") or track.get("id")
+        source_run_id = track.get("sourceRunId")
         vocals_file_type = track.get("vocalFileType") or track.get("vocalsFileType")
         use_processed = track.get("processed", True)
         if vocals_file_type in {"raw_vocals", "processed_vocals"}:
             use_processed = vocals_file_type == "processed_vocals"
 
         input_path = None
-        if file_id:
+        if source_run_id:
+            source_meta = load_inference_run_metadata(source_run_id)
+            if not source_meta:
+                active_jobs[job_id].update(
+                    {"status": "failed", "error": f"Unknown source run: {source_run_id}"}
+                )
+                return
+            source_path = paths.INFERENCE_RUNS_DIR / source_run_id / source_meta.get(
+                "outputFileName", "inferred.wav"
+            )
+            if not source_path.exists():
+                active_jobs[job_id].update(
+                    {"status": "failed", "error": f"Source run output missing: {source_path.name}"}
+                )
+                return
+            input_path = str(source_path)
+        elif file_id:
             base_name = get_upload_base_name(file_id)
             if not base_name:
                 active_jobs[job_id].update({"status": "failed", "error": f"Unknown fileId: {file_id}"})
@@ -155,8 +178,9 @@ def run_inference_job(job_id, run_id, model, track, params):
             vocal_filename = track.get("vocal", "").split("/").pop().split("\\").pop()
             input_path = str(paths.get_vocal_file_path(vocal_filename, processed=use_processed))
 
-        # Fallback: if file doesn't exist in processed dir, try raw dir
-        if input_path and not os.path.exists(input_path):
+        # Fallback: if the file isn't in the processed dir, try the raw one.
+        # Only applies to upload-sourced input — a run output lives elsewhere entirely.
+        if not source_run_id and input_path and not os.path.exists(input_path):
             fallback_name = None
             if file_id:
                 base_name = get_upload_base_name(file_id)
@@ -281,7 +305,11 @@ def run_inference_job(job_id, run_id, model, track, params):
                     "modelId": model_id,
                     "modelCheckpoint": model_checkpoint,
                     "reaction": "none",
+                    # inputFileId stays the root upload even when layering, so the
+                    # instrumental and display names keep resolving. sourceRunId is
+                    # what records the layer this run was stacked on.
                     "inputFileId": file_id,
+                    "sourceRunId": source_run_id,
                     "inputStoredName": file_record.get("storedName") if file_record else None,
                     "inputOriginalName": file_record.get("originalName") if file_record else None,
                     "inputDisplayName": file_record.get("safeDisplayName") if file_record else None,

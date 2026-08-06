@@ -38,6 +38,7 @@ function ModelsView({
   onModelSelected,
   navContext,
   onNavigate,
+  onResumeTraining,
   darkMode, // optional
 }) {
   // ---- Theme tokens ----
@@ -64,6 +65,8 @@ function ModelsView({
   const [selected, setSelected] = useState(new Set());
 
   const [downloadJobs, setDownloadJobs] = useState({});
+  const [trainingJobs, setTrainingJobs] = useState([]);
+  const [cancellingJobId, setCancellingJobId] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [activeDownloadModel, setActiveDownloadModel] = useState(null);
@@ -92,6 +95,39 @@ function ModelsView({
       setLoading(false);
     }
   }, []);
+
+  // A training run outlives the view that started it, so the list owns showing
+  // it. The backend is the source of truth: this survives a page reload, which
+  // matters when a run takes tens of minutes.
+  const fetchTrainingJobs = useCallback(async () => {
+    try {
+      const res = await fetch("/api/training-jobs");
+      if (!res.ok) return;
+      const data = await res.json();
+      setTrainingJobs(data.jobs || []);
+    } catch {
+      // a failed poll just means no refresh this tick
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTrainingJobs();
+  }, [fetchTrainingJobs]);
+
+  useEffect(() => {
+    const active = trainingJobs.some(
+      (job) => job.status && !["completed", "failed", "cancelled", "interrupted"].includes(job.status)
+    );
+    if (!active) return;
+    const interval = setInterval(fetchTrainingJobs, 2000);
+    return () => clearInterval(interval);
+  }, [trainingJobs, fetchTrainingJobs]);
+
+  // Bring a finished run into the library without waiting for a manual refresh.
+  const finishedTrainingCount = trainingJobs.filter((job) => job.status === "completed").length;
+  useEffect(() => {
+    if (finishedTrainingCount > 0) fetchModels();
+  }, [finishedTrainingCount, fetchModels]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -249,6 +285,7 @@ function ModelsView({
             ...existing,
             status: job.status,
             downloadProgress: job.progress ?? null,
+            downloadPhase: job.phase || null,
             downloadError: job.error || existing.downloadError,
           });
         }
@@ -259,10 +296,41 @@ function ModelsView({
         modelId: job.modelId,
         status: job.status || "downloading",
         downloadProgress: job.progress ?? null,
+        downloadPhase: job.phase || null,
         downloadError: job.error || null,
         checkpoints: [],
         size_mb: job.size_mb || null,
         created: job.started_at || new Date().toISOString(),
+        isOnline: false,
+      });
+    });
+
+    // Oldest first: several runs can share a model name (a retry after an
+    // interrupted one), and they collide on the same card. Applying them in
+    // order leaves the most recent state showing.
+    [...trainingJobs]
+      .sort((a, b) => (a.started_at || 0) - (b.started_at || 0))
+      .forEach((job) => {
+      // A finished or abandoned run has nothing left to show; whatever landed
+      // on disk is already represented by the real model entry.
+      if (job.status === "completed" || job.status === "cancelled") return;
+      // "interrupted" means the backend restarted under it — dead, and worth
+      // saying so rather than leaving a card that pretends to still be running.
+      const isTerminal = job.status === "failed" || job.status === "interrupted";
+      const id = normalizeId(job.model_name);
+      const existing = byId.get(id);
+      const startedAt = job.started_at ? new Date(job.started_at * 1000).toISOString() : null;
+      byId.set(id, {
+        ...(existing || {}),
+        name: job.model_name,
+        modelId: existing?.modelId || job.model_name,
+        status: isTerminal ? "failed" : "training",
+        trainingJobId: job.id,
+        trainingProgress: typeof job.progress === "number" ? job.progress : null,
+        trainingPhase: job.status || null,
+        trainingError: job.error || null,
+        checkpoints: existing?.checkpoints || [],
+        created: existing?.created || startedAt || new Date().toISOString(),
         isOnline: false,
       });
     });
@@ -272,15 +340,19 @@ function ModelsView({
       const bTime = b.created ? Date.parse(b.created) : 0;
       return bTime - aTime;
     });
-  }, [downloadJobs, localModels, normalizeId]);
+  }, [downloadJobs, localModels, normalizeId, trainingJobs]);
 
   const filteredLocalModels = useMemo(() => {
     if (!searchQuery.trim()) return localModelsMerged;
     const q = searchQuery.trim().toLowerCase();
     const qUnderscore = q.replace(/\s+/g, "_");
     return localModelsMerged.filter((model) => {
-      const name = model.name?.toLowerCase() || "";
-      return name.includes(q) || name.includes(qUnderscore);
+      // Match the alias the user chose AND the name it was published under, so
+      // a model saved as "progress_test" is still findable by "ariana".
+      const haystacks = [model.name, model.sourceName]
+        .filter(Boolean)
+        .map((value) => value.toLowerCase());
+      return haystacks.some((value) => value.includes(q) || value.includes(qUnderscore));
     });
   }, [localModelsMerged, searchQuery]);
 
@@ -316,12 +388,37 @@ function ModelsView({
           }
         })
       );
-    }, 2000);
+      // 1s rather than 2s: a progress bar that only moves every other second
+      // reads as stalled. The endpoint is a local dict lookup, so it's cheap.
+    }, 1000);
     return () => clearInterval(interval);
   }, [downloadJobs, fetchModels]);
 
+  const handleCancelTraining = useCallback(
+    async (model) => {
+      const jobId = model?.trainingJobId;
+      if (!jobId || cancellingJobId) return;
+      setCancellingJobId(jobId);
+      try {
+        await fetch(`/api/training-jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" });
+      } catch {
+        // the next poll reports whatever actually happened
+      } finally {
+        setCancellingJobId(null);
+        fetchTrainingJobs();
+        fetchModels();
+      }
+    },
+    [cancellingJobId, fetchTrainingJobs, fetchModels]
+  );
+
   const handleCardClick = (model) => {
     if (model.isOnline) return;
+    // A run in progress reopens where it is, instead of being a dead card.
+    if (model.status === "training" && model.trainingJobId) {
+      onResumeTraining?.(model.trainingJobId);
+      return;
+    }
     if (model.status && ["downloading", "failed"].includes(model.status)) return;
 
     if (isInferenceSelection) {
@@ -425,6 +522,33 @@ function ModelsView({
     return `${n} Hz`;
   };
 
+  // Installing a community model is fetch → unzip → install, never training.
+  // Name the phase the job actually reports, and show how far along it is.
+  const DOWNLOAD_PHASE_LABELS = {
+    starting: "Starting",
+    downloading: "Downloading",
+    extracting: "Extracting",
+    installing: "Installing",
+  };
+
+  const describeDownload = (phase, percent) => {
+    const label = DOWNLOAD_PHASE_LABELS[phase] || "Downloading";
+    return typeof percent === "number" ? `${label} ${percent}%` : label;
+  };
+
+  // The backend reports which stage of the pipeline a run is in.
+  const TRAINING_PHASE_LABELS = {
+    preprocessing: "Preprocessing",
+    extracting: "Extracting features",
+    training: "Training",
+    indexing: "Building index",
+  };
+
+  const describeTraining = (phase, percent) => {
+    const label = TRAINING_PHASE_LABELS[phase] || "Training";
+    return typeof percent === "number" ? `${label} ${percent}%` : label;
+  };
+
 
 
   const sentinelRef = useRef(null);
@@ -484,8 +608,8 @@ function ModelsView({
               {isInferenceSelection ? (
                 <PageHeader title="Select Model for Inference" onBack={handleBack} />
               ) : (
-                <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.02em", color: t.text, margin: 0, textTransform: "uppercase" }}>
-                  Trained Voice Models
+                <h1 style={{ fontSize: 22, fontWeight: 650, letterSpacing: "-0.02em", color: t.text, margin: 0, lineHeight: 1.2 }}>
+                  Trained voice models
                 </h1>
               )}
             </div>
@@ -801,12 +925,12 @@ function ModelsView({
                     onClick={onDelete}
                     disabled={selectedCount === 0}
                     style={{
-                      borderColor: selectedCount > 0 ? "rgba(255,59,48,0.45)" : t.hairline,
+                      borderColor: selectedCount > 0 ? "rgba(255,69,58,0.28)" : t.hairline,
                       background:
                         selectedCount > 0
-                          ? `linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))`
+                          ? `transparent`
                           : `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                      color: selectedCount > 0 ? "white" : t.subtext,
+                      color: selectedCount > 0 ? "rgba(255,105,97,0.92)" : t.subtext,
                     }}
                   >
                    <DeleteIcon style={{ fontSize: 20 }} />
@@ -870,6 +994,7 @@ function ModelsView({
             {filteredLocalModels.map((model, i) => {
               const isSelected = selected.has(model.name);
               const downloadPct = typeof model.downloadProgress === "number" ? model.downloadProgress : null;
+              const trainingPct = typeof model.trainingProgress === "number" ? model.trainingProgress : null;
   
               return (
                 <div
@@ -937,10 +1062,31 @@ function ModelsView({
                           textTransform: "uppercase",
                           letterSpacing: "0.02em",
                           borderRadius: 8,
+                          whiteSpace: "nowrap",
                           animation: "pulse 1.5s ease-in-out infinite",
                         }}
                       >
-                        Training
+                        {describeDownload(model.downloadPhase, downloadPct)}
+                      </span>
+                    )}
+                    {model.status === "training" && (
+                      <span
+                        style={{
+                          position: "relative",
+                          zIndex: 1,
+                          padding: "4px 8px",
+                          background: "#22c55e",
+                          color: "#000",
+                          fontSize: 10,
+                          fontWeight: 800,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.02em",
+                          borderRadius: 8,
+                          whiteSpace: "nowrap",
+                          animation: "pulse 1.5s ease-in-out infinite",
+                        }}
+                      >
+                        {describeTraining(model.trainingPhase, trainingPct)}
                       </span>
                     )}
                     {(model.status === "failed" || model.status === "error") && (
@@ -982,6 +1128,24 @@ function ModelsView({
                       <p style={{ color: t.subtext, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.15em", margin: 0 }}>
                         Voice Model
                       </p>
+                      {/* Published name, shown raw — normaliseModelName strips
+                          accents and brackets, which mangles community titles. */}
+                      {model.sourceName && (
+                        <p
+                          title={model.sourceName}
+                          style={{
+                            color: t.subtext,
+                            fontSize: 12,
+                            margin: 0,
+                            marginTop: 6,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {model.sourceName}
+                        </p>
+                      )}
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -1009,14 +1173,61 @@ function ModelsView({
                       </div>
                     </div>
 
-                    {downloadPct !== null && model.status === "downloading" && (
-                      <div style={{ marginTop: -4 }}>
-                        <ProgressBar value={downloadPct} />
+                    {model.status === "downloading" && (
+                      <div style={{ marginTop: -4, display: "flex", flexDirection: "column", gap: 6 }}>
+                        <ProgressBar value={downloadPct ?? 0} />
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: t.subtext }}>
+                          <span>{DOWNLOAD_PHASE_LABELS[model.downloadPhase] || "Downloading"}</span>
+                          <span style={{ fontFamily: "monospace" }}>
+                            {downloadPct !== null ? `${downloadPct}%` : "—"}
+                          </span>
+                        </div>
                       </div>
                     )}
 
-                    {model.status === "failed" && model.downloadError && (
-                      <span style={{ fontSize: 11, color: t.danger }}>{model.downloadError}</span>
+                    {model.status === "training" && (
+                      <div style={{ marginTop: -4, display: "flex", flexDirection: "column", gap: 6 }}>
+                        <ProgressBar value={trainingPct ?? 0} />
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: t.subtext }}>
+                          <span>{TRAINING_PHASE_LABELS[model.trainingPhase] || "Training"}</span>
+                          <span style={{ fontFamily: "monospace" }}>
+                            {trainingPct !== null ? `${trainingPct}%` : "—"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {model.status === "failed" && (model.downloadError || model.trainingError) && (
+                      <span style={{ fontSize: 11, color: t.danger }}>
+                        {model.downloadError || model.trainingError}
+                      </span>
+                    )}
+
+                    {/* A run in progress can't be selected — offer the way out
+                        instead. Without this a training model is unstoppable
+                        from the UI and keeps the GPU until the process dies. */}
+                    {model.status === "training" && model.trainingJobId && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleCancelTraining(model); }}
+                        disabled={cancellingJobId === model.trainingJobId}
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          marginBottom: 8,
+                          background: "rgba(239,68,68,0.12)",
+                          border: "1px solid rgba(239,68,68,0.45)",
+                          borderRadius: 12,
+                          color: "#ef4444",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.1em",
+                          cursor: cancellingJobId === model.trainingJobId ? "default" : "pointer",
+                        }}
+                      >
+                        {cancellingJobId === model.trainingJobId ? "Cancelling…" : "Cancel training"}
+                      </button>
                     )}
 
                     <button

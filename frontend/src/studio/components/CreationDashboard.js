@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import Select from "../../components/common/Select";
 import { requestGroqAutofill } from "../../utils/groqAutofill";
 import { StudioAssistButton, StudioAssistSuggestion } from "./GroqAssist";
 
@@ -129,11 +130,11 @@ const CreationDashboard = ({
       </div>
       <div className="studio-field">
         <label>Model</label>
-        <select value={model} onChange={(e) => setModel(e.target.value)}>
-          <option value="v3.5">v3.5</option>
-          <option value="v4">v4</option>
-          <option value="v5">v5</option>
-        </select>
+        <Select
+          value={model}
+          onChange={setModel}
+          options={[{ value: "v3.5", label: "v3.5" }, { value: "v4", label: "v4" }, { value: "v5", label: "v5" }]}
+        />
       </div>
       <div className="studio-actions-row">
         <button
@@ -155,17 +156,12 @@ const CreationDashboard = ({
           </button>
         ) : null}
       </div>
-      <div className="studio-actions-grid">
-        <button className="studio-btn ghost" disabled>
-          Upload Audio
-        </button>
-        <button className="studio-btn ghost" disabled>
-          Record
-        </button>
-        <button className="studio-btn ghost" disabled>
-          Add Persona
-        </button>
-      </div>
+      {/* Upload Audio / Record / Add Persona used to sit here as three
+          full-width buttons that were hard-coded `disabled` — they had no
+          handler and no path to ever becoming enabled. Three dead controls at
+          the foot of the panel read as "this app is unfinished", and uploading
+          and recording are both already reachable (the library panel and Live
+          VC). Removed rather than left greyed out. */}
     </div>
   );
 };

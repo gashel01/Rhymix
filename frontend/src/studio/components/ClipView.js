@@ -2,6 +2,47 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import StudioWaveform from "./StudioWaveform";
 import MidiOverlay from "./MidiOverlay";
+import {
+  CLIP_HEIGHT,
+  CLIP_HEIGHT_WITH_LYRICS,
+  CLIP_HEIGHT_WITH_EDITOR,
+  WAVEFORM_HEIGHT,
+  WAVEFORM_HEIGHT_WITH_LYRICS,
+} from "../timelineMetrics";
+
+/* Regions inside a clip that own a gesture of their own, so the clip body must
+   not claim the pointer from them: the trim handles resize, the ⋯ button opens
+   a menu, MIDI notes are dragged individually, and the lyrics and MIDI editors
+   are full interactive surfaces. Everything else is draggable clip body. */
+const OWN_GESTURE = [
+  ".studio-clip-handle",
+  ".studio-clip-actions",
+  ".studio-midi-note",
+  ".studio-midi-editor",
+  ".studio-clip-lyrics-edit",
+  ".studio-clip-lyrics-edit-wrap",
+  ".studio-clip-lyrics-edit-actions",
+  ".studio-clip-lyrics-entry",
+].join(", ");
+
+/* Relative luminance (WCAG), used to decide whether a clip's label and
+   waveform should be drawn dark-on-colour or light-on-colour. */
+const readableInk = (hex) => {
+  const trimmed = String(hex || "").replace("#", "").trim();
+  const full =
+    trimmed.length === 3 ? trimmed.split("").map((c) => c + c).join("") : trimmed;
+  const value = Number.parseInt(full, 16);
+  if (full.length !== 6 || Number.isNaN(value)) return "#0b0b0f";
+  const channel = (c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance =
+    0.2126 * channel((value >> 16) & 255) +
+    0.7152 * channel((value >> 8) & 255) +
+    0.0722 * channel(value & 255);
+  return luminance > 0.35 ? "#0b0b0f" : "#ffffff";
+};
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const hexToRgba = (hex, alpha) => {
@@ -110,7 +151,7 @@ const ClipView = ({
   const hasLyrics = entriesWithRange.length > 0;
   const isAudioClip = clip.clipType !== "midi";
   const showLyrics = isAudioClip && hasLyrics;
-  const waveformHeight = showLyrics ? 28 : 48;
+  const waveformHeight = showLyrics ? WAVEFORM_HEIGHT_WITH_LYRICS : WAVEFORM_HEIGHT;
   const canEditLyrics = showLyrics && entriesWithRange.length > 0;
   const selectionStartRaw = selectionRange
     ? Math.min(Number(selectionRange.start ?? 0), Number(selectionRange.end ?? 0))
@@ -143,7 +184,7 @@ const ClipView = ({
     );
   const matchedEntry = entriesWithRange.find((item) => selectionMatchesEntry(item.timelineRange));
   const showEditor = canEditLyrics && selectionOverlapsClip && Boolean(matchedEntry);
-  const clipHeight = showLyrics ? (showEditor ? 132 : 112) : 90;
+  const clipHeight = showLyrics ? (showEditor ? CLIP_HEIGHT_WITH_EDITOR : CLIP_HEIGHT_WITH_LYRICS) : CLIP_HEIGHT;
   const matchedOriginal = matchedEntry?.entry?.originalText;
   const canRestoreLyrics =
     matchedOriginal != null && String(matchedOriginal || "") !== String(matchedEntry?.entry?.text || "");
@@ -180,8 +221,16 @@ const ClipView = ({
   const editorPlaybackApiRef = useRef({ start: null, stop: null });
   const editorClipboardRef = useRef(null);
   const laneColorSafe = laneColor || "#6aa6ff";
-  const clipBg = hexToRgba(laneColorSafe, 0.12);
-  const clipBorder = hexToRgba(laneColorSafe, 0.45);
+  /* The clip is the colour, not a tint of it. Washing the hue down to 0.07 and
+     drawing a pale waveform on top gave a correct but inert arrangement — you
+     could not tell two lanes apart across the room. Suno paints the whole
+     region in the track colour and cuts the signal out of it in darker ink;
+     that is what makes the timeline readable at a glance. */
+  const clipBg = hexToRgba(laneColorSafe, 0.92);
+  const clipBorder = hexToRgba(laneColorSafe, 1);
+  /* Which ink stays legible depends on the hue: our palette runs from a dark
+     indigo to a bright yellow-green, so this cannot be a fixed colour. */
+  const clipInk = readableInk(laneColorSafe);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -475,25 +524,35 @@ const ClipView = ({
         transform: `translateX(${left}px)`,
         "--lane-clip-bg": clipBg || undefined,
         "--lane-clip-border": clipBorder || undefined,
+        "--lane-clip-ink": clipInk,
       }}
-      onMouseDown={(e) => {
+      /* Dragging and double-click are discoverable from the cursor and from
+         habit; Alt-drag is not, and it is the only way to select a range over
+         a clip that spans the whole view. */
+      title="Drag to move · Alt-drag to select a range · Double-click to select the whole clip"
+      onPointerDown={(e) => {
         if (e.button !== 0) return;
         if (e.defaultPrevented) return;
-        if (e.target.closest(".studio-clip-actions")) return;
-        if (e.target.closest(".studio-clip-handle")) return;
-        if (e.target.closest(".studio-midi-note")) return;
-        if (e.target.closest(".studio-clip-lyrics-edit")) return;
-        if (e.target.closest(".studio-clip-wave")) return;
-        if (clip.clipType !== "midi" && !e.target.closest(".studio-clip-header")) return;
+        // The whole clip is the drag surface. Only the controls that own a
+        // different gesture are carved out, named once in OWN_GESTURE. The
+        // previous rule was the inverse — six negative guards ending in
+        // "audio clips only drag from their header" — which left ~20% of a
+        // clip draggable and the other 80% doing something else entirely.
+        if (e.target.closest(OWN_GESTURE)) return;
+        // Alt hands the clip surface back to the timeline so a range can be
+        // selected across a clip that spans the whole view.
+        if (e.altKey) return;
         e.stopPropagation();
         onDragStart?.(e, clip);
       }}
       onClick={(e) => {
+        if (e.target.closest(OWN_GESTURE)) return;
+        if (e.altKey) return;
         e.stopPropagation();
-        if (e.target.closest(".studio-clip-wave")) return;
         onSelect?.(clip.id);
       }}
       onDoubleClick={(e) => {
+        if (e.target.closest(OWN_GESTURE)) return;
         e.stopPropagation();
         onSelect?.(clip.id);
         onSelectRange?.({
@@ -571,19 +630,21 @@ const ClipView = ({
       </div>
       <div
         className="studio-clip-handle left"
-        onMouseDown={(e) => {
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
           e.stopPropagation();
           onTrimStart?.(e, clip, "left");
         }}
       />
       <div
         className="studio-clip-handle right"
-        onMouseDown={(e) => {
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
           e.stopPropagation();
           onTrimStart?.(e, clip, "right");
         }}
       />
-      <div className="studio-clip-wave" style={showLyrics ? { height: 44 } : undefined}>
+      <div className="studio-clip-wave">
         {clip.clipType === "midi" ? (
           <div className="studio-midi-surface" />
         ) : asset?.url ? (
@@ -592,7 +653,8 @@ const ClipView = ({
             height={waveformHeight}
             clipStartSec={effectiveClip.srcStartSec ?? 0}
             pixelsPerSecond={pxPerSec}
-            color={laneColorSafe}
+            color={clipInk}
+            inkAlpha={0.42}
           />
         ) : (
           <div className="studio-clip-placeholder">No audio</div>
@@ -654,7 +716,7 @@ const ClipView = ({
                   width: Math.min(entryWidthPx, Math.max(24, width - entryLeftPx)),
                 }}
                 title={entry.text || "Lyrics"}
-                onMouseDown={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
                   onSelectRange?.({
@@ -678,7 +740,7 @@ const ClipView = ({
       {showEditor && (
         <div
           className="studio-clip-lyrics-edit-wrap"
-          onMouseDown={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
         >
           <textarea
@@ -698,7 +760,7 @@ const ClipView = ({
                 clipStartAtTranscribe: matchedEntry?.entry?.clipStartAtTranscribe ?? null,
               })
             }
-            onMouseDown={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
             placeholder={matchedEntry?.entry?.status === "transcribing" ? "Transcribing..." : "Edit lyrics..."}
             disabled={matchedEntry?.entry?.status === "transcribing"}
@@ -706,7 +768,7 @@ const ClipView = ({
           />
           <div
             className="studio-clip-lyrics-edit-actions"
-            onMouseDown={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
             style={{ left: actionsLeftPx }}
           >
@@ -766,7 +828,7 @@ const ClipView = ({
         createPortal(
           <div
             className="studio-midi-editor-backdrop"
-            onMouseDown={(event) => {
+            onPointerDown={(event) => {
               event.preventDefault();
               event.stopPropagation();
               if (event.target === event.currentTarget) {
@@ -780,7 +842,7 @@ const ClipView = ({
               event.stopPropagation();
             }}
           >
-            <div className="studio-midi-editor" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="studio-midi-editor" onPointerDown={(event) => event.stopPropagation()}>
               <div className="studio-midi-editor-header">
                 <div className="studio-midi-editor-title">
                   {label} · MIDI Editor

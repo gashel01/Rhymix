@@ -7,8 +7,8 @@ import {
   Chip,
   Checkbox,
 } from '@mui/material';
-import AudiotrackIcon from '@mui/icons-material/Audiotrack';
-import DeleteIcon from '@mui/icons-material/Close';
+import AudiotrackIcon from '@mui/icons-material/AudiotrackOutlined';
+import DeleteIcon from '@mui/icons-material/CloseOutlined';
 import styles from './DatasetSelectionMode.module.css';
 
 /**

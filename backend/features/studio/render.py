@@ -3,7 +3,7 @@ import uuid
 from pathlib import Path
 
 from backend.paths.manager import paths
-from backend.features.studio.assets import probe_audio
+from backend.features.studio.assets import probe_audio, resolve_asset_path
 
 
 def _db_to_gain(db_value: float | None) -> float:
@@ -13,42 +13,32 @@ def _db_to_gain(db_value: float | None) -> float:
         return 1.0
 
 
-def render_mixdown(project_payload: dict) -> dict:
-    project = project_payload.get("project") or {}
-    lanes = project_payload.get("lanes") or []
-    clips = project_payload.get("clips") or []
-    assets = project_payload.get("assets") or {}
+def _safe_stem_name(value: str, fallback: str) -> str:
+    cleaned = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in str(value or ""))
+    cleaned = cleaned.strip("_")
+    return cleaned or fallback
 
+
+def _included_lanes(lanes: list) -> list:
+    """Lanes that count towards a mix: solo wins, otherwise everything unmuted."""
     solo_lanes = {lane["id"] for lane in lanes if lane.get("solo")}
-    include_lanes = []
-    for lane in lanes:
-        if solo_lanes:
-            if lane.get("id") in solo_lanes:
-                include_lanes.append(lane)
-        else:
-            if not lane.get("mute"):
-                include_lanes.append(lane)
+    if solo_lanes:
+        return [lane for lane in lanes if lane.get("id") in solo_lanes]
+    return [lane for lane in lanes if not lane.get("mute")]
 
-    include_lane_ids = {lane.get("id") for lane in include_lanes}
-    lane_gain = {lane.get("id"): float(lane.get("gainDb") or 0.0) for lane in include_lanes}
 
-    usable_clips = [clip for clip in clips if clip.get("laneId") in include_lane_ids]
-    if not usable_clips:
-        raise RuntimeError("No clips available to render")
-
+def _render_clips(clips: list, assets: dict, lane_gain: dict, output_name: str) -> dict:
+    """Mix a set of clips down to one wav via a single ffmpeg pass."""
     inputs = []
     filters = []
     labels = []
 
-    for idx, clip in enumerate(usable_clips):
-        asset_id = clip.get("sourceAssetId")
-        asset = assets.get(asset_id) if isinstance(assets, dict) else None
-        asset_path = asset.get("path") if isinstance(asset, dict) else None
-        if not asset_path:
+    for clip in clips:
+        path = resolve_asset_path(assets, clip.get("sourceAssetId"))
+        if not path:
             continue
-        path = Path(asset_path)
-        if not path.exists():
-            continue
+
+        idx = len(inputs)
         inputs.append(str(path))
 
         src_start = max(0.0, float(clip.get("srcStartSec") or 0.0))
@@ -79,8 +69,10 @@ def render_mixdown(project_payload: dict) -> dict:
             filter_parts.append(f"volume={gain}")
         if delay_ms > 0:
             filter_parts.append(f"adelay={delay_ms}|{delay_ms}")
-        filter_parts.append(f"[{label}]")
-        filters.append(";".join(filter_parts))
+        # Filters inside one chain are comma-separated; ";" separates chains.
+        # Joining with ";" turned the output pad into a chain of its own and
+        # ffmpeg rejected the graph with "No such filter: ''".
+        filters.append(f"{','.join(filter_parts)}[{label}]")
 
     if not inputs:
         raise RuntimeError("No audio sources found for render")
@@ -92,7 +84,6 @@ def render_mixdown(project_payload: dict) -> dict:
         labels_joined = "".join(f"[{label}]" for label in labels)
         filters.append(f"{labels_joined}amix=inputs={len(labels)}:normalize=0:dropout_transition=0[{mix_label}]")
 
-    output_name = f"studio_mix_{uuid.uuid4().hex}.wav"
     output_path = paths.EXPORT_DIR / output_name
 
     cmd = ["ffmpeg", "-y"]
@@ -112,3 +103,69 @@ def render_mixdown(project_payload: dict) -> dict:
         "sampleRate": info.get("sampleRate"),
         "fileName": output_name,
     }
+
+
+def render_mixdown(project_payload: dict) -> dict:
+    lanes = project_payload.get("lanes") or []
+    clips = project_payload.get("clips") or []
+    assets = project_payload.get("assets") or {}
+
+    include_lanes = _included_lanes(lanes)
+    include_lane_ids = {lane.get("id") for lane in include_lanes}
+    lane_gain = {lane.get("id"): float(lane.get("gainDb") or 0.0) for lane in include_lanes}
+
+    usable_clips = [clip for clip in clips if clip.get("laneId") in include_lane_ids]
+    if not usable_clips:
+        raise RuntimeError("No clips available to render")
+
+    return _render_clips(usable_clips, assets, lane_gain, f"studio_mix_{uuid.uuid4().hex}.wav")
+
+
+def render_stems(project_payload: dict) -> dict:
+    """Render one file per lane instead of a single mix.
+
+    This is what makes the arrangement usable outside the app: a mixdown is a
+    finished artefact, stems are material you can take into a DAW. Lanes keep
+    their own gain but are each rendered in isolation, so the files line up on
+    a common timeline when re-imported.
+    """
+    lanes = project_payload.get("lanes") or []
+    clips = project_payload.get("clips") or []
+    assets = project_payload.get("assets") or {}
+
+    # Solo is a monitoring state, not an export intent: honouring it here would
+    # silently export a single lane. Muted lanes are an explicit "off", so those
+    # are still skipped.
+    include_lanes = [lane for lane in lanes if not lane.get("mute")]
+    if not include_lanes:
+        raise RuntimeError("No lanes available to render")
+
+    batch = uuid.uuid4().hex[:8]
+    stems = []
+    skipped = []
+
+    for position, lane in enumerate(include_lanes):
+        lane_id = lane.get("id")
+        lane_clips = [clip for clip in clips if clip.get("laneId") == lane_id]
+        if not lane_clips:
+            continue
+
+        lane_gain = {lane_id: float(lane.get("gainDb") or 0.0)}
+        stem_name = _safe_stem_name(lane.get("name"), f"lane{position + 1}")
+        output_name = f"studio_stem_{batch}_{position + 1:02d}_{stem_name}.wav"
+
+        try:
+            rendered = _render_clips(lane_clips, assets, lane_gain, output_name)
+        except RuntimeError as exc:
+            # One unusable lane shouldn't lose the whole export.
+            skipped.append({"lane": lane.get("name") or lane_id, "reason": str(exc)})
+            continue
+
+        rendered["laneId"] = lane_id
+        rendered["laneName"] = lane.get("name")
+        stems.append(rendered)
+
+    if not stems:
+        raise RuntimeError("No lane produced any audio to export")
+
+    return {"stems": stems, "skipped": skipped, "count": len(stems)}

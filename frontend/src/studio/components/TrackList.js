@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import Select from "../../components/common/Select";
 import { PlusIcon } from "lucide-react";
 const LANE_TYPES = [
   { value: "midi", label: "MIDI" },
@@ -85,13 +86,11 @@ const TrackList = ({
           
           {showAdd && showAddLane && (
             <div className="studio-track-add">
-              <select value={newType} onChange={(e) => setNewType(e.target.value)}>
-                {LANE_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
+              <Select
+                value={newType}
+                onChange={setNewType}
+                options={LANE_TYPES.map((type) => ({ value: type.value, label: type.label }))}
+              />
               <input
                 type="text"
                 placeholder="Lane name"

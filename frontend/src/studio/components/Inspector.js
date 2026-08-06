@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Select from "../../components/common/Select";
 import CreationDashboard from "./CreationDashboard";
 import FoundationPanel from "./FoundationPanel";
 import LiveInferencePanel from "./LiveInferencePanel";
@@ -349,19 +350,11 @@ const ClipAdvancedPanel = ({
           <div className="studio-panel-title">MIDI Sound</div>
           <div className="studio-field">
             <label>SoundFont</label>
-            <select
+            <Select
               value={selectedClip.midi?.soundfont || ""}
-              onChange={(e) => {
-                const soundfont = e.target.value || null;
-                onUpdateClip?.(selectedClip.id, { midi: { ...(selectedClip.midi || {}), soundfont } });
-              }}
-            >
-              {SOUND_FONT_OPTIONS.map((opt) => (
-                <option key={opt.value || "default"} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              onChange={(next) => { const soundfont = next || null; onUpdateClip?.(selectedClip.id, { midi: { ...(selectedClip.midi || {}), soundfont } }); }}
+              options={SOUND_FONT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+            />
           </div>
         </div>
       ) : null}
@@ -542,10 +535,28 @@ const ProjectAdvancedPanel = ({ project, metadata, onUpdateProject }) => (
   </div>
 );
 
+/* Clips carry no label of their own, so the old fallback chain ended on
+   `clip.id` and the panel headlined a raw 32-character uuid — with a second one
+   ("lane da43bec9…") in the subtitle. Neither identifies anything to a person.
+   The source asset and the lane both have real names; use those, and keep the
+   id out of the panel entirely. */
+const describeClip = (clip, assets, lanes) => {
+  const assetLabel = assets?.[clip.sourceAssetId]?.label;
+  const laneName = lanes?.find((lane) => lane.id === clip.laneId)?.name;
+  const name = clip.label || clip.name || assetLabel || laneName || "Clip";
+  return {
+    name,
+    // A clip named after its own lane is the common case ("Vocals" on the
+    // Vocals lane); repeating it in the subtitle says nothing.
+    lane: laneName && laneName !== name ? laneName : null,
+  };
+};
+
 const Inspector = ({
   project,
   lanes,
   clips,
+  assets = {},
   selection,
   onSplit,
   onTrimLeft,
@@ -764,16 +775,18 @@ const Inspector = ({
   const selectionSummary = useMemo(() => {
     if (resolvedRightPanelContext === PANEL_CONTEXT.AUDIO && selectedClip) {
       const bounds = getClipBounds(selectedClip);
+      const { name, lane } = describeClip(selectedClip, assets, lanes);
       return {
-        title: selectedClip.label || selectedClip.name || selectedClip.id,
-        subtitle: `Audio clip · ${formatSeconds(bounds.duration)} · lane ${selectedClip.laneId}`,
+        title: name,
+        subtitle: `Audio clip · ${formatSeconds(bounds.duration)}${lane ? ` · ${lane}` : ""}`,
       };
     }
     if (resolvedRightPanelContext === PANEL_CONTEXT.MIDI && selectedClip) {
       const bounds = getClipBounds(selectedClip);
+      const { name, lane } = describeClip(selectedClip, assets, lanes);
       return {
-        title: selectedClip.label || selectedClip.name || selectedClip.id,
-        subtitle: `MIDI clip · ${formatSeconds(bounds.duration)} · lane ${selectedClip.laneId}`,
+        title: name,
+        subtitle: `MIDI clip · ${formatSeconds(bounds.duration)}${lane ? ` · ${lane}` : ""}`,
       };
     }
     if (resolvedRightPanelContext === PANEL_CONTEXT.RANGE && selectedRange) {
@@ -787,7 +800,7 @@ const Inspector = ({
       title: project?.name || "Project",
       subtitle: `No active source · ${project?.bpm || 120} BPM · ${project?.key || "Key unset"} · ${project?.timeSignature || "4/4"}`,
     };
-  }, [lanes.length, project, resolvedRightPanelContext, selectedAudioClips.length, selectedClip, selectedRange, selection?.laneIds]);
+  }, [assets, lanes, project, resolvedRightPanelContext, selectedAudioClips.length, selectedClip, selectedRange, selection?.laneIds]);
 
   const runAnalyzeQuick = () => {
     if (!canAnalyze || !analyzeRange) return;
@@ -1016,13 +1029,18 @@ const Inspector = ({
     <div className="studio-inspector-shell">
       <div className="studio-inspector studio-inspector-redesigned">
         <div className="studio-inspector-sticky">
-          <div className="studio-context-eyebrow">{activeWorkspaceLabel || "Studio"}</div>
+          {/* This was a constant reading "STUDIO", printed above a panel that
+              is inside the Studio, on a screen whose header also says Studio.
+              The panel's own title carries the information. */}
           <div className="studio-inspector-topline">
             <div>
               <div className="studio-panel-title">{selectionSummary.title}</div>
               <div className="studio-subtext">{selectionSummary.subtitle}</div>
             </div>
-            <div className="studio-context-chip">{resolvedRightPanelContext}</div>
+            {/* This is an internal enum. "nothing" is not a label for a user. */}
+            {resolvedRightPanelContext && resolvedRightPanelContext !== PANEL_CONTEXT.NOTHING ? (
+              <div className="studio-context-chip">{resolvedRightPanelContext}</div>
+            ) : null}
           </div>
           <div className="studio-actions-row">
             {quickActions.map((action) => (
@@ -1037,9 +1055,9 @@ const Inspector = ({
           </div>
         </div>
         <div className="studio-panel-content studio-right-panel-scroll">
+          {/* The sticky header above already shows this exact subtitle; a second
+              copy under a "Selection Summary" heading said nothing new. */}
           <div className="studio-meta-block">
-            <div className="studio-panel-title">Selection Summary</div>
-            <div className="studio-subtext">{selectionSummary.subtitle}</div>
             {resolvedRightPanelContext === PANEL_CONTEXT.NOTHING ? (
               <div className="studio-empty" style={{ marginTop: 10 }}>
                 No active source. Record with Live VC, capture Voice to MIDI, generate with Foundation, or select a clip to unlock source-based tools.
@@ -1159,19 +1177,11 @@ const Inspector = ({
                 ) : null}
                 <div className="studio-field">
                   <label>Sound</label>
-                  <select
+                  <Select
                     value={selectedClip.midi?.soundfont || ""}
-                    onChange={(e) => {
-                      const soundfont = e.target.value || null;
-                      onUpdateClip?.(selectedClip.id, { midi: { ...(selectedClip.midi || {}), soundfont } });
-                    }}
-                  >
-                    {SOUND_FONT_OPTIONS.map((opt) => (
-                      <option key={opt.value || "default"} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(next) => { const soundfont = next || null; onUpdateClip?.(selectedClip.id, { midi: { ...(selectedClip.midi || {}), soundfont } }); }}
+                    options={SOUND_FONT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+                  />
                 </div>
                 <div className="studio-actions-row">
                   <button className="studio-btn ghost" onClick={() => openDrawer("clip")}>
@@ -1319,10 +1329,11 @@ const Inspector = ({
                 <div className="studio-inline">
                   <div className="studio-field">
                     <label>Bars</label>
-                    <select value={foundationBars} onChange={(e) => setFoundationBars(Number(e.target.value) || 4)}>
-                      <option value={4}>4</option>
-                      <option value={8}>8</option>
-                    </select>
+                    <Select
+                      value={String(foundationBars)}
+                      onChange={(next) => setFoundationBars(Number(next) || 4)}
+                      options={[{ value: String(4), label: "4" }, { value: String(8), label: "8" }]}
+                    />
                   </div>
                   <div className="studio-field">
                     <label>BPM</label>
@@ -1331,34 +1342,28 @@ const Inspector = ({
                 </div>
                 <div className="studio-field">
                   <label>Instrument Family</label>
-                  <select value={foundationInstrumentFamily} onChange={(e) => setFoundationInstrumentFamily(e.target.value)}>
-                    {FOUNDATION_INSTRUMENT_OPTIONS.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    value={foundationInstrumentFamily}
+                    onChange={setFoundationInstrumentFamily}
+                    options={FOUNDATION_INSTRUMENT_OPTIONS.map((value) => ({ value: String(value), label: String(value) }))}
+                  />
                 </div>
                 <div className="studio-inline">
                   <div className="studio-field">
                     <label>Key</label>
-                    <select value={foundationKeyNote} onChange={(e) => setFoundationKeyNote(e.target.value)}>
-                      {FOUNDATION_KEY_NOTES.map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      value={foundationKeyNote}
+                      onChange={setFoundationKeyNote}
+                      options={FOUNDATION_KEY_NOTES.map((value) => ({ value: String(value), label: String(value) }))}
+                    />
                   </div>
                   <div className="studio-field">
                     <label>Scale</label>
-                    <select value={foundationKeyScale} onChange={(e) => setFoundationKeyScale(e.target.value)}>
-                      {FOUNDATION_KEY_SCALES.map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      value={foundationKeyScale}
+                      onChange={setFoundationKeyScale}
+                      options={FOUNDATION_KEY_SCALES.map((value) => ({ value: String(value), label: String(value) }))}
+                    />
                   </div>
                 </div>
                 {(resolvedRightPanelContext === PANEL_CONTEXT.RANGE || resolvedRightPanelContext === PANEL_CONTEXT.AUDIO) ? (

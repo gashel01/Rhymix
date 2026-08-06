@@ -47,11 +47,19 @@ def bootstrap_env():
     # backend/env_bootstrap.py  →  ../  →  project root
     _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     applio_path = os.path.join(_project_root, "applio")
-    if applio_path not in sys.path:
-        sys.path.insert(0, applio_path)
-    rvc_path = _project_root  # rvc/ lives at project root, not inside applio/
-    if rvc_path not in sys.path:
-        sys.path.insert(0, rvc_path)
+
+    # Order matters. The project root must come first so first-party packages
+    # (app/, backend/, rvc/) always win a name clash — applio ships its own
+    # top-level applio/app.py, which otherwise shadows our app/ package and
+    # drags the whole Gradio UI into the import graph.
+    if _project_root in sys.path:
+        sys.path.remove(_project_root)
+    sys.path.insert(0, _project_root)
+
+    # applio/ only needs to be importable, never to win a clash → append.
+    if applio_path in sys.path:
+        sys.path.remove(applio_path)
+    sys.path.append(applio_path)
 
 
 def configure_cuda_backend() -> None:

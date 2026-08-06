@@ -21,6 +21,11 @@ from backend.paths.manager import paths
 
 bp = Blueprint("models", __name__)
 
+# voice-models.com's nginx rejects the literal "python-requests/x.y" User-Agent
+# with a 403 — its robots.txt allows crawlers, it just wants a client that names
+# itself. Identify properly rather than pretending to be a browser.
+USER_AGENT = "Rhymix/1.0 (+https://github.com/gashel01/Rhymix)"
+
 
 def _extract_hf_model_id(url: str) -> str:
     if not url:
@@ -106,6 +111,11 @@ def available_models():
             models.append(
                 {
                     "name": folder_name,
+                    # The name the model was published under. The card title is
+                    # the folder the user named it, so without this the origin is
+                    # lost the moment they pick their own alias. None when the
+                    # two are the same — nothing to show, nothing to search.
+                    "sourceName": model_name if model_name != folder_name else None,
                     "modelId": model_id,
                     "created": latest_created,
                     "installed_at": installed_at,
@@ -158,13 +168,27 @@ def search_online_models():
     if not q:
         return jsonify({"models": [], "total_pages": 1})
 
+    # Upstream failures are the directory's problem, not ours — report them as
+    # 502 with a readable message instead of collapsing into an opaque 500.
     try:
-        raw = requests.post(
+        response = requests.post(
             "https://voice-models.com/fetch_data.php",
             data={"page": page, "search": q},
+            headers={"User-Agent": USER_AGENT},
             timeout=10,
-        ).json()
+        )
+        response.raise_for_status()
+        raw = response.json()
+    except requests.RequestException as e:
+        logging.warning("voice-models.com search failed: %s", e)
+        return jsonify({"error": f"Model directory unreachable: {e}", "models": []}), 502
+    except ValueError:
+        logging.warning("voice-models.com returned a non-JSON body for query %r", q)
+        return jsonify(
+            {"error": "Model directory returned an unexpected response", "models": []}
+        ), 502
 
+    try:
         models = []
         html = (raw.get("table") or "").strip()
         if html:
@@ -210,7 +234,10 @@ def search_online_models():
         return jsonify({"models": models, "total_pages": total_pages, "current_page": int(page)})
 
     except Exception as e:
-        return jsonify({"error": str(e), "models": []}), 500
+        # Reaching here means the response parsed as JSON but its HTML payload no
+        # longer matches what we scrape — i.e. the directory changed its markup.
+        logging.exception("Could not parse voice-models.com results")
+        return jsonify({"error": f"Could not parse model directory results: {e}", "models": []}), 500
 
 
 def _safe_model_dir_name(user_query: str, model_name: str, model_id: str) -> str:
@@ -272,14 +299,25 @@ def _copy_metadata_files(root: Path, dest_dir: Path) -> None:
             pass
 
 
-def _download_file(url: str, dest_path: Path) -> None:
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    response = requests.get(url, headers=headers, stream=True, timeout=60)
+def _download_file(url: str, dest_path: Path, on_progress=None) -> None:
+    """Stream a file to disk, reporting (bytes_written, total_bytes) as it goes.
+
+    total_bytes is None when the server sends no Content-Length, so callers can
+    tell "I don't know the size" apart from a real percentage.
+    """
+    response = requests.get(url, headers={"User-Agent": USER_AGENT}, stream=True, timeout=60)
     response.raise_for_status()
+
+    total = int(response.headers.get("Content-Length") or 0) or None
+    written = 0
     with open(dest_path, "wb") as handle:
-        for chunk in response.iter_content(chunk_size=8192):
-            if chunk:
-                handle.write(chunk)
+        for chunk in response.iter_content(chunk_size=65536):
+            if not chunk:
+                continue
+            handle.write(chunk)
+            written += len(chunk)
+            if on_progress:
+                on_progress(written, total)
 
 
 def _install_model_files(model_dir: Path, pth: Path, index_path: Path | None, model_info: dict, metadata_root: Path | None) -> dict:
@@ -313,7 +351,24 @@ def _install_model_files(model_dir: Path, pth: Path, index_path: Path | None, mo
     }
 
 
-def _download_and_install_model(payload: dict) -> dict:
+def _download_and_install_model(payload: dict, on_progress=None) -> dict:
+    def report(percent, phase):
+        if on_progress:
+            on_progress(min(100, max(0, int(percent))), phase)
+
+    def band(start, end):
+        """Map one file's byte progress onto the [start, end] slice of the bar.
+
+        A file of unknown size reports nothing rather than faking movement — the
+        bar holds still and the phase label carries the information instead.
+        """
+
+        def _cb(written, total):
+            if total:
+                report(start + (end - start) * (written / total), "downloading")
+
+        return _cb
+
     model_url = payload.get("model_url") or ""
     model_name = payload.get("model_name") or ""
     user_query = payload.get("user_query") or ""
@@ -334,30 +389,34 @@ def _download_and_install_model(payload: dict) -> dict:
     url_ext = Path(parsed_url.path).suffix.lower()
 
     try:
+        report(0, "downloading")
         if files_info.get("zip") and model_id:
             zip_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['zip']}"
             zip_path = temp_root / "model.zip"
-            _download_file(zip_url, zip_path)
+            _download_file(zip_url, zip_path, band(0, 85))
+            report(85, "extracting")
             extracted_root = temp_root / "extracted"
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(extracted_root)
             pths, indexes = _find_model_artifacts(extracted_root)
             source_url = zip_url
         elif (files_info.get("pth") or files_info.get("index")) and model_id:
+            # The weights dwarf the index file, so give them most of the bar.
             if files_info.get("pth"):
                 pth_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['pth']}"
                 pth_path = temp_root / Path(files_info["pth"]).name
-                _download_file(pth_url, pth_path)
+                _download_file(pth_url, pth_path, band(0, 72))
                 pths = [pth_path]
                 source_url = pth_url
             if files_info.get("index"):
                 index_url = f"https://huggingface.co/{model_id}/resolve/main/{files_info['index']}"
                 index_path = temp_root / Path(files_info["index"]).name
-                _download_file(index_url, index_path)
+                _download_file(index_url, index_path, band(72, 85))
                 indexes = [index_path]
         elif url_ext == ".zip":
             zip_path = temp_root / "model.zip"
-            _download_file(model_url, zip_path)
+            _download_file(model_url, zip_path, band(0, 85))
+            report(85, "extracting")
             extracted_root = temp_root / "extracted"
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(extracted_root)
@@ -366,13 +425,13 @@ def _download_and_install_model(payload: dict) -> dict:
         elif url_ext == ".pth":
             filename = Path(urllib.parse.urlparse(model_url).path).name or "model.pth"
             pth_path = temp_root / filename
-            _download_file(model_url, pth_path)
+            _download_file(model_url, pth_path, band(0, 85))
             pths = [pth_path]
             source_url = model_url
         elif url_ext == ".index":
             filename = Path(urllib.parse.urlparse(model_url).path).name or "model.index"
             index_path = temp_root / filename
-            _download_file(model_url, index_path)
+            _download_file(model_url, index_path, band(0, 85))
             indexes = [index_path]
         else:
             raise Exception("Unable to determine how to download the model")
@@ -394,6 +453,7 @@ def _download_and_install_model(payload: dict) -> dict:
             "rate": rate,
         }
 
+        report(92, "installing")
         install_result = _install_model_files(
             model_dir=model_dir,
             pth=selected_pth,
@@ -428,6 +488,7 @@ def download_model():
         "modelId": resolved_id or dir_name,
         "modelName": resolved_name,
         "status": "downloading",
+        "phase": "starting",
         "progress": 0,
         "started_at": datetime.now().isoformat(),
         "error": None,
@@ -443,11 +504,15 @@ def download_model():
     }
 
     def _runner(job_id_inner, payload_inner):
+        def on_progress(percent, phase):
+            download_jobs[job_id_inner].update({"progress": percent, "phase": phase})
+
         try:
-            result = _download_and_install_model(payload_inner)
+            result = _download_and_install_model(payload_inner, on_progress=on_progress)
             download_jobs[job_id_inner].update(
                 {
                     "status": "completed",
+                    "phase": "done",
                     "progress": 100,
                     "completed_at": datetime.now().isoformat(),
                     "modelId": result.get("model_id") or payload_inner.get("model_id") or dir_name,
@@ -458,7 +523,12 @@ def download_model():
             )
         except Exception as exc:
             download_jobs[job_id_inner].update(
-                {"status": "failed", "error": str(exc), "completed_at": datetime.now().isoformat()}
+                {
+                    "status": "failed",
+                    "phase": "failed",
+                    "error": str(exc),
+                    "completed_at": datetime.now().isoformat(),
+                }
             )
 
     threading.Thread(target=_runner, args=(job_id, payload), daemon=True).start()

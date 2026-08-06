@@ -1,8 +1,8 @@
 import React from 'react';
 import { Box, IconButton, Tooltip, CircularProgress } from '@mui/material';
-import PlayAllIcon from '@mui/icons-material/PlaylistPlay';
-import PauseIcon from '@mui/icons-material/Pause';
-import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
+import PlayAllIcon from '@mui/icons-material/PlaylistPlayOutlined';
+import PauseIcon from '@mui/icons-material/PauseOutlined';
+import CloudDownloadIcon from '@mui/icons-material/CloudDownloadOutlined';
 import { Theme } from '../Homeview/Theme';
 import styles from './TrackControls.module.css';
 

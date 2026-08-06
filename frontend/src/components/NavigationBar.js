@@ -17,13 +17,13 @@ import {
 } from "@mui/material";
 import ClickAwayListener from "@mui/material/ClickAwayListener";
 
-import SettingsIcon from "@mui/icons-material/Settings";
-import CloseIcon from "@mui/icons-material/Close";
-import Brightness4 from "@mui/icons-material/Brightness4";
-import Brightness7 from "@mui/icons-material/Brightness7";
-import VolumeUp from "@mui/icons-material/VolumeUp";
-import VolumeOff from "@mui/icons-material/VolumeOff";
-import MenuIcon from "@mui/icons-material/Menu";
+import SettingsIcon from "@mui/icons-material/SettingsOutlined";
+import CloseIcon from "@mui/icons-material/CloseOutlined";
+import Brightness4 from "@mui/icons-material/Brightness4Outlined";
+import Brightness7 from "@mui/icons-material/Brightness7Outlined";
+import VolumeUp from "@mui/icons-material/VolumeUpOutlined";
+import VolumeOff from "@mui/icons-material/VolumeOffOutlined";
+import MenuIcon from "@mui/icons-material/MenuOutlined";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { BrushCleaning } from "lucide-react";
@@ -86,7 +86,7 @@ function NavigationBar({
     };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("touchstart", onDown);
-    return () => {
+  return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("touchstart", onDown);
     };
@@ -119,6 +119,17 @@ function NavigationBar({
       primaryWash2: isDark ? "rgba(10,132,255,0.10)" : "rgba(0,122,255,0.08)",
     };
   }, [darkMode, sidebarCollapsed]);
+
+  /* Anything rendered through a portal to <body> — the floating selection bar —
+     is positioned against the viewport, not against the content area, so
+     centring it puts it half the sidebar's width to the left of everything it
+     belongs with. Publish the rail's width so those can centre on the content
+     instead. */
+  useEffect(() => {
+    document.body.style.setProperty("--rhymix-rail-w", `${tokens.sidebarW}px`);
+    return () => document.body.style.removeProperty("--rhymix-rail-w");
+  }, [tokens.sidebarW]);
+
 
   const pct = Math.max(0, Math.min(100, Math.round((volume ?? 0) * 100)));
   const [groqApiKey, setGroqApiKey] = useState("");
@@ -516,7 +527,14 @@ function NavigationBar({
                     </IconCircleButton>
                   </div>
 
+                  {/* Clipped to zero height, but max-height and opacity alone
+                      leave the API key field and its buttons in the tab order:
+                      you would tab from the sidebar into controls you cannot
+                      see. `inert` takes the whole subtree out of focus and of
+                      the accessibility tree while it is closed. */}
                   <div
+                      inert={open ? undefined : ""}
+                      aria-hidden={open ? undefined : "true"}
                       style={{
                         maxHeight: open ? 360 : 0,
                         opacity: open ? 1 : 0,

@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import MusicNoteIcon from "@mui/icons-material/MusicNote";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import PauseIcon from "@mui/icons-material/Pause";
-import DownloadIcon from "@mui/icons-material/Download";
-import DeleteIcon from "@mui/icons-material/Delete";
-import MicIcon from "@mui/icons-material/Mic";
+import MusicNoteIcon from "@mui/icons-material/MusicNoteOutlined";
+import PlayArrowIcon from "@mui/icons-material/PlayArrowOutlined";
+import PauseIcon from "@mui/icons-material/PauseOutlined";
+import DownloadIcon from "@mui/icons-material/DownloadOutlined";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import MicIcon from "@mui/icons-material/MicOutlined";
 import AudioWaveform from "../AudioWaveform";
 import {
   API_BASE,
@@ -108,7 +108,7 @@ export const GeneratedPanel = React.memo(function GeneratedPanel({
                 key={s.id}
                 style={{
                   borderRadius: t.radiusMd,
-                  border: `1px solid ${isFailed ? "rgba(255,59,48,0.35)" : t.hairline}`,
+                  border: `1px solid ${isFailed ? "rgba(255,69,58,0.35)" : t.hairline}`,
                   background: t.isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
                   padding: 16,
                   opacity: isFailed ? 0.85 : 1,
@@ -225,7 +225,7 @@ export const GeneratedPanel = React.memo(function GeneratedPanel({
                       onClick={() => onDeleteSong(s.id)}
                       style={{
                         width: 36, height: 36, borderRadius: 12, boxShadow: "none",
-                        borderColor: isGenerating ? t.hairline : "rgba(255,59,48,0.35)",
+                        borderColor: isGenerating ? t.hairline : "rgba(255,69,58,0.35)",
                         color: isGenerating ? t.subtext : t.danger,
                       }}
                     >

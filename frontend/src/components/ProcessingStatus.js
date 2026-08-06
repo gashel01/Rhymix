@@ -11,11 +11,11 @@ import {
   ListItemText,
   Divider,
 } from "@mui/material";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import MusicNoteIcon from "@mui/icons-material/MusicNote";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ErrorIcon from "@mui/icons-material/Error";
-import WarningIcon from "@mui/icons-material/Warning";
+import AccessTimeIcon from "@mui/icons-material/AccessTimeOutlined";
+import MusicNoteIcon from "@mui/icons-material/MusicNoteOutlined";
+import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
+import ErrorIcon from "@mui/icons-material/ErrorOutlined";
+import WarningIcon from "@mui/icons-material/WarningOutlined";
 
 function ProcessingStatus({ jobStatus }) {
   if (!jobStatus) {

@@ -1,5 +1,5 @@
 import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Button } from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 
 const DeleteDialog = ({ deleteDialogOpen, setDeleteDialogOpen, selectedRows, isDeleting, confirmDelete }) => {
   return (

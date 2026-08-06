@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import StopIcon from "@mui/icons-material/Stop";
-import AddIcon from "@mui/icons-material/Add";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import PlayArrowIcon from "@mui/icons-material/PlayArrowOutlined";
+import StopIcon from "@mui/icons-material/StopOutlined";
+import AddIcon from "@mui/icons-material/AddOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import { ChevronDownIcon, SearchIcon } from "./StudioIcons";
 
 const CATEGORY_ORDER = ["vocals", "drums", "bass", "music", "midi", "generated", "other"];
 
@@ -143,9 +144,12 @@ const LibraryPanel = ({
           <button className="studio-btn ghost" onClick={onOpenProjectManager}>Project Switcher</button>
         </div>
         <div className="studio-panel-title">{embedded ? "Assets" : "Library & Workspace"}</div>
-        <div className="studio-field">
+        {/* A bare rounded box gave no clue what it searched; the glyph says it
+            before the placeholder is read. */}
+        <div className="studio-field studio-search-field">
+          <SearchIcon size={15} />
           <input
-            placeholder="Search assets..."
+            placeholder="Search assets"
             value={libraryQuery}
             onChange={(e) => setLibraryQuery(e.target.value)}
           />
@@ -170,8 +174,12 @@ const LibraryPanel = ({
                 </div>
                 <div className="studio-library-group-right">
                   <div className="studio-library-group-count">{group.items.length}</div>
-                  <div className="studio-library-group-chevron">
-                    {collapsedCategories[group.id] ? "+" : "-"}
+                  {/* Was a literal "+" / "-" character, which reads as add and
+                      remove rather than expand and collapse. */}
+                  <div
+                    className={`studio-library-group-chevron${collapsedCategories[group.id] ? " collapsed" : ""}`}
+                  >
+                    <ChevronDownIcon size={14} />
                   </div>
                 </div>
               </button>

@@ -10,9 +10,19 @@ const JOB_LABELS = {
   stem_extract: "Stem Extract",
   stem_extract_uvr: "UVR Stems",
   render: "Export",
+  render_stems: "Export Stems",
+  repaint: "Regenerate",
+  replace_section: "Replace Section",
+  extend: "Extend",
+  cover: "Cover",
+  vocal2bgm: "Vocals → Backing",
+  lrc: "Lyrics Timing",
+  quality_score: "Quality Score",
 };
 
-const JobToasts = ({ jobs, onDismiss }) => {
+const TERMINAL = new Set(["completed", "failed", "cancelled"]);
+
+const JobToasts = ({ jobs, onDismiss, onCancel }) => {
   if (!jobs.length) return null;
   return (
     <div className="studio-job-toasts">
@@ -27,6 +37,13 @@ const JobToasts = ({ jobs, onDismiss }) => {
           </div>
           <div className="studio-job-progress">
             <span>{job.progress ?? 0}%</span>
+            {/* A running job holds the GPU; dismissing the toast only hides it,
+                so offer the way to actually stop the work. */}
+            {!TERMINAL.has(job.status) && onCancel ? (
+              <button className="studio-mini danger" onClick={() => onCancel(job.id)}>
+                Cancel
+              </button>
+            ) : null}
             <button className="studio-mini" onClick={() => onDismiss(job.id)}>
               Dismiss
             </button>

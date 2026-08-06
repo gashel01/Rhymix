@@ -9,9 +9,9 @@ import {
   IconButton,
   Alert,
 } from "@mui/material";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import DeleteIcon from "@mui/icons-material/Delete";
-import WarningIcon from "@mui/icons-material/Warning";
+import CloudUploadIcon from "@mui/icons-material/CloudUploadOutlined";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import WarningIcon from "@mui/icons-material/WarningOutlined";
 
 function TalkFileUpload({ files, setFiles, setError, loading }) {
   const onDrop = useCallback(

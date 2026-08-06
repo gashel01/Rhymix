@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { createPortal } from "react-dom";
-import CloseIcon from "@mui/icons-material/Close";
+import CloseIcon from "@mui/icons-material/CloseOutlined";
 
 export function useThemedUI(t) {
   return useMemo(() => {
@@ -42,8 +42,8 @@ export function useThemedUI(t) {
         neutral: { bg: t.isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)", fg: t.text, bd: t.hairline },
         primary: { bg: t.primaryWash, fg: t.primary, bd: "rgba(10,132,255,0.28)" },
         success: { bg: t.successWash, fg: t.success, bd: "rgba(52,199,89,0.28)" },
-        danger: { bg: t.dangerWash, fg: t.danger, bd: "rgba(255,59,48,0.28)" },
-        warning: { bg: "rgba(255,149,0,0.14)", fg: t.warning, bd: "rgba(255,149,0,0.28)" },
+        danger: { bg: t.dangerWash, fg: t.danger, bd: "rgba(255,69,58,0.28)" },
+        warning: { bg: "rgba(255,159,10,0.14)", fg: t.warning, bd: "rgba(255,159,10,0.28)" },
       }[tone];
       const clickable = !!onClick;
       return (
@@ -95,7 +95,7 @@ export function useThemedUI(t) {
         primary: { bg: "linear-gradient(180deg, rgba(10,132,255,0.95), rgba(10,132,255,0.78))", fg: "white", bd: "rgba(10,132,255,0.45)" },
         secondary: { bg: `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`, fg: t.text, bd: t.hairline },
         outline: { bg: "transparent", fg: t.text, bd: t.hairline },
-        danger: { bg: "linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))", fg: "white", bd: "rgba(255,59,48,0.45)" },
+        danger: { bg: "linear-gradient(180deg, rgba(255,69,58,0.95), rgba(255,69,58,0.78))", fg: "white", bd: "rgba(255,69,58,0.45)" },
       }[variant];
       return (
         <button
@@ -236,7 +236,7 @@ export function useThemedUI(t) {
         <div
           style={{
             borderRadius: 16, border: `1px solid ${t.hairline}`,
-            background: tone === "danger" ? t.dangerWash : tone === "success" ? t.successWash : "rgba(255,149,0,0.14)",
+            background: tone === "danger" ? t.dangerWash : tone === "success" ? t.successWash : "rgba(255,159,10,0.14)",
             padding: "10px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: t.text, fontWeight: 750,
           }}
         >

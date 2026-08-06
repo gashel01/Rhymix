@@ -1,5 +1,5 @@
 import React from "react";
-import MusicNoteIcon from "@mui/icons-material/MusicNote";
+import MusicNoteIcon from "@mui/icons-material/MusicNoteOutlined";
 
 export function SourceSongPanel({ ui, t, sourceSong, loading, error }) {
   const { Panel } = ui;
@@ -39,8 +39,8 @@ export function SourceSongPanel({ ui, t, sourceSong, loading, error }) {
             style={{
               padding: "4px 10px",
               borderRadius: 999,
-              border: `1px solid ${hasAudio ? "rgba(52,199,89,0.35)" : "rgba(255,59,48,0.35)"}`,
-              background: hasAudio ? "rgba(52,199,89,0.12)" : "rgba(255,59,48,0.12)",
+              border: `1px solid ${hasAudio ? "rgba(52,199,89,0.35)" : "rgba(255,69,58,0.35)"}`,
+              background: hasAudio ? "rgba(52,199,89,0.12)" : "rgba(255,69,58,0.12)",
               color: hasAudio ? t.success : t.danger,
               fontSize: 11,
               fontWeight: 800,

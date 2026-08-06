@@ -4,10 +4,11 @@ import threading
 import uuid
 from pathlib import Path
 
-from backend.features.studio.ai_adapters import get_ai_adapter
-from backend.features.studio.assets import probe_audio
+from backend.features.studio.ai_adapters import get_ai_adapter, terminate_ai_adapter
+from backend.features.studio.assets import probe_audio, resolve_asset_path
 from backend.features.studio.foundation_one import run_foundation_studio_job
-from backend.features.studio.render import render_mixdown
+from backend.features.studio.midi_export import export_midi
+from backend.features.studio.render import render_mixdown, render_stems
 from backend.features.studio.stage_drums import run_stage_drums_job
 from backend.features.studio.uvr_stems import extract_uvr_multi_stems
 from backend.features.studio.storage import (
@@ -1096,6 +1097,12 @@ def run_orchestrate_song_job(job_id: str, project_id: str, payload: dict):
                 pass
 
 
+def _asset_source_path(assets: dict, asset_id):
+    """String form of resolve_asset_path, for payloads sent to the AI bridge."""
+    resolved = resolve_asset_path(assets, asset_id)
+    return str(resolved) if resolved else None
+
+
 def _record_result(project_record: dict, job_type: str, payload: dict, result: dict):
     if job_type in {"understand", "lrc", "quality_score"}:
         metadata = project_record.get("metadata") or {}
@@ -1168,6 +1175,116 @@ def run_render_job(job_id: str, project_id: str):
         save_project(project_record)
 
         update_job(job_id, status="completed", progress=100, result={"assetId": asset_id})
+        append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
+    except Exception as exc:
+        update_job(job_id, status="failed", progress=100, error=str(exc))
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
+
+
+TERMINAL_JOB_STATUSES = {"completed", "failed", "cancelled"}
+
+
+def cancel_job(job_id: str):
+    """Stop a running job.
+
+    The AI work happens in a bridge subprocess that holds the models and the
+    GPU, so cancelling means killing it — there is no cooperative stop to ask
+    for. The flag is written first: the worker thread checks it before writing
+    a terminal status, so the kill isn't reported as a failure.
+    """
+    job = get_job(job_id)
+    if not job:
+        return None, "not_found"
+    if job.get("status") in TERMINAL_JOB_STATUSES:
+        return job, "already_finished"
+
+    update_job(
+        job_id,
+        status="cancelled",
+        progress=100,
+        error="Cancelled",
+        statusMessage="Cancelled",
+    )
+    stopped = terminate_ai_adapter()
+    append_job_event(
+        job_id,
+        {"type": "status", "status": "cancelled", "progress": 100, "stoppedBridge": stopped},
+    )
+    return get_job(job_id), None
+
+
+def _job_cancelled(job_id: str) -> bool:
+    job = get_job(job_id)
+    return bool(job and job.get("status") == "cancelled")
+
+
+def run_stems_render_job(job_id: str, project_id: str):
+    """Export one file per lane.
+
+    Unlike the mixdown these aren't added to the timeline as a clip — they are
+    an output of the project, not new material for it. They're registered as
+    assets so the UI can list and download them.
+    """
+    update_job(job_id, status="running", progress=0, statusMessage="Rendering stems...")
+    append_job_event(job_id, {"type": "status", "status": "running", "progress": 0})
+
+    project_record = get_project(project_id)
+    if not project_record:
+        update_job(job_id, status="failed", error="Project not found", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+
+    try:
+        output = render_stems(project_record)
+        project_record = _reload_project_for_async_write(project_id, project_record)
+
+        for index, stem in enumerate(output.get("stems", [])):
+            asset = {
+                "id": f"stem:{job_id}:{index}",
+                "kind": "derived",
+                "label": f"Stem · {stem.get('laneName') or index + 1}",
+                "path": stem.get("path"),
+                "url": stem.get("url"),
+                "durationSec": stem.get("durationSec", 0.0),
+                "sampleRate": stem.get("sampleRate"),
+            }
+            _register_asset(project_record, asset)
+
+        save_project(project_record)
+
+        update_job(job_id, status="completed", progress=100, result=output)
+        append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
+    except Exception as exc:
+        update_job(job_id, status="failed", progress=100, error=str(exc))
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
+
+
+def run_midi_export_job(job_id: str, project_id: str):
+    update_job(job_id, status="running", progress=0, statusMessage="Exporting MIDI...")
+    append_job_event(job_id, {"type": "status", "status": "running", "progress": 0})
+
+    project_record = get_project(project_id)
+    if not project_record:
+        update_job(job_id, status="failed", error="Project not found", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+
+    try:
+        output = export_midi(project_record)
+        project_record = _reload_project_for_async_write(project_id, project_record)
+        _register_asset(
+            project_record,
+            {
+                "id": f"midi:{job_id}",
+                "kind": "derived",
+                "label": "MIDI Export",
+                "path": output.get("path"),
+                "url": output.get("url"),
+            },
+        )
+        save_project(project_record)
+
+        update_job(job_id, status="completed", progress=100, result=output)
         append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
     except Exception as exc:
         update_job(job_id, status="failed", progress=100, error=str(exc))
@@ -1299,14 +1416,15 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
         assets = project_record.get("assets") if isinstance(project_record.get("assets"), dict) else {}
         if isinstance(payload, dict):
             source_id = payload.get("sourceAssetId")
-            if source_id and assets.get(source_id) and assets[source_id].get("path"):
-                payload["sourceAssetPath"] = assets[source_id]["path"]
+            source_path = _asset_source_path(assets, source_id)
+            if source_path:
+                payload["sourceAssetPath"] = source_path
             ref_id = payload.get("referenceAssetId")
-            if ref_id and assets.get(ref_id) and assets[ref_id].get("path"):
-                payload["referenceAssetPath"] = assets[ref_id]["path"]
-            if job_type == "cover" and not payload.get("referenceAssetPath"):
-                if source_id and assets.get(source_id) and assets[source_id].get("path"):
-                    payload["referenceAssetPath"] = assets[source_id]["path"]
+            ref_path = _asset_source_path(assets, ref_id)
+            if ref_path:
+                payload["referenceAssetPath"] = ref_path
+            if job_type == "cover" and not payload.get("referenceAssetPath") and source_path:
+                payload["referenceAssetPath"] = source_path
 
         adapter = None
         if job_type in {
@@ -1368,6 +1486,11 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
         else:
             raise RuntimeError(f"Unknown job type: {job_type}")
 
+        # Killing the bridge mid-run surfaces here as a normal return or an
+        # exception; either way the user asked for it, so don't overwrite it.
+        if _job_cancelled(job_id):
+            return
+
         if isinstance(result, dict):
             project_record = _reload_project_for_async_write(project_id, project_record)
             _record_result(project_record, job_type, payload, result)
@@ -1377,6 +1500,8 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
         update_job(job_id, status="completed", progress=100, result=result)
         append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
     except Exception as exc:
+        if _job_cancelled(job_id):
+            return
         update_job(job_id, status="failed", progress=100, error=str(exc))
         append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
     finally:

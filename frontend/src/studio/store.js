@@ -83,8 +83,13 @@ const snapshotState = (state) => ({
   selection: deepClone(state.selection),
 });
 
+// Each entry is a deep copy of the whole EDL, so an unbounded stack grows with
+// every edit for the life of the session. Fifty steps is far more than anyone
+// reaches for, and it keeps a long editing session flat in memory.
+const MAX_HISTORY = 50;
+
 const applyEdlChange = (state, nextEdl) => {
-  const past = [...state.history.past, snapshotState(state)];
+  const past = [...state.history.past, snapshotState(state)].slice(-MAX_HISTORY);
   return {
     ...state,
     ...nextEdl,
@@ -364,7 +369,7 @@ const studioReducer = (state, action) => {
         ...previous,
         history: {
           past,
-          future: [snapshotState(state), ...state.history.future],
+          future: [snapshotState(state), ...state.history.future].slice(0, MAX_HISTORY),
         },
       };
     }
@@ -376,7 +381,7 @@ const studioReducer = (state, action) => {
         ...state,
         ...next,
         history: {
-          past: [...state.history.past, snapshotState(state)],
+          past: [...state.history.past, snapshotState(state)].slice(-MAX_HISTORY),
           future,
         },
       };

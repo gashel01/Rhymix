@@ -19,13 +19,13 @@ import {
   AccordionSummary,
   AccordionDetails,
 } from "@mui/material";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
-import TuneIcon from "@mui/icons-material/Tune";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import AudioFileIcon from "@mui/icons-material/AudioFile";
-import GraphicEqIcon from "@mui/icons-material/GraphicEq";
-import SurroundSoundIcon from "@mui/icons-material/SurroundSound";
-import PaletteIcon from "@mui/icons-material/Palette";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
+import TuneIcon from "@mui/icons-material/TuneOutlined";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMoreOutlined";
+import AudioFileIcon from "@mui/icons-material/AudioFileOutlined";
+import GraphicEqIcon from "@mui/icons-material/GraphicEqOutlined";
+import SurroundSoundIcon from "@mui/icons-material/SurroundSoundOutlined";
+import PaletteIcon from "@mui/icons-material/PaletteOutlined";
 import { useTheme } from "@mui/material/styles";
 import PageHeader from "./common/PageHeader";
 
@@ -289,6 +289,25 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
     effectiveModel?.name || effectiveModel?.modelName || effectiveModel?.id || effectiveModel?.modelId
   );
 
+  // Tracks coming from the Inference view carry the run they were produced by,
+  // which makes two different jobs possible: convert the original vocals again,
+  // or stack this model on top of the previous conversion.
+  const [sourceMode, setSourceMode] = useState("original");
+  const layerableTracks = useMemo(
+    () => (selectedTracks || []).filter((track) => track?.sourceRunId),
+    [selectedTracks]
+  );
+  const canLayer = layerableTracks.length > 0;
+  const previousModelName = useMemo(() => {
+    const named = layerableTracks.find((track) => track?.sourceModelName);
+    return named?.sourceModelName || null;
+  }, [layerableTracks]);
+
+  // A selection without any run behind it can only be re-inferred from source.
+  useEffect(() => {
+    if (!canLayer) setSourceMode("original");
+  }, [canLayer]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -395,9 +414,17 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
       // keep Applio name if needed: rms_mix_rate = volumeEnvelope maybe, etc.
     };
 
+    // Only a layered run keeps sourceRunId — stripping it is what tells the
+    // backend to go back to the original upload's vocals.
+    const tracks = (Array.isArray(selectedTracks) ? selectedTracks : []).map((track) => {
+      if (sourceMode === "layered" && track?.sourceRunId) return track;
+      const { sourceRunId, ...rest } = track || {};
+      return rest;
+    });
+
     onStartInference({
       model: effectiveModel,
-      tracks: Array.isArray(selectedTracks) ? selectedTracks : [],
+      tracks,
       params: payloadParams,
     });
   };
@@ -476,15 +503,15 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
                   borderRadius: "50%",
                   background:
                     theme.palette.mode === "dark"
-                      ? "linear-gradient(135deg, #1976D2 0%, #0D47A1 100%)"
-                      : "linear-gradient(135deg, #2196F3 0%, #1976D2 100%)",
+                      ? "linear-gradient(135deg, #0A84FF 0%, #0D47A1 100%)"
+                      : "linear-gradient(135deg, #0A84FF 0%, #0A84FF 100%)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   boxShadow:
                     theme.palette.mode === "dark"
-                      ? "0 4px 16px rgba(25, 118, 210, 0.3)"
-                      : "0 4px 16px rgba(25, 118, 210, 0.2)",
+                      ? "0 4px 16px rgba(10, 132, 255, 0.3)"
+                      : "0 4px 16px rgba(10, 132, 255, 0.2)",
                 }}
               >
                 <TuneIcon sx={{ fontSize: 28, color: "white" }} />
@@ -506,7 +533,7 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
                 <Box
                   sx={{
                     p: 3,
-                    backgroundColor: theme.palette.mode === "dark" ? "rgba(144, 202, 249, 0.08)" : "rgba(25, 118, 210, 0.06)",
+                    backgroundColor: theme.palette.mode === "dark" ? "rgba(144, 202, 249, 0.08)" : "rgba(10, 132, 255, 0.06)",
                     borderRadius: 2,
                     textAlign: "center",
                   }}
@@ -529,7 +556,7 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
                 <Box
                   sx={{
                     p: 3,
-                    backgroundColor: theme.palette.mode === "dark" ? "rgba(76, 175, 80, 0.08)" : "rgba(76, 175, 80, 0.06)",
+                    backgroundColor: theme.palette.mode === "dark" ? "rgba(52, 199, 89, 0.08)" : "rgba(52, 199, 89, 0.06)",
                     borderRadius: 2,
                     textAlign: "center",
                   }}
@@ -552,6 +579,63 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
         </Grid>
       </Paper>
 
+      {/* Input source — only meaningful when the selection came from a past run */}
+      {canLayer && (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            mb: 3,
+            borderRadius: 3,
+            border: `1px solid ${theme.palette.divider}`,
+            backgroundColor:
+              theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "rgba(255, 255, 255, 0.8)",
+          }}
+        >
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+            Input source
+          </Typography>
+          <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 2 }}>
+            {layerableTracks.length} of {trackCount} selected track{trackCount !== 1 ? "s" : ""} came from
+            a previous conversion.
+          </Typography>
+
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+            <Button
+              variant={sourceMode === "original" ? "contained" : "outlined"}
+              onClick={() => setSourceMode("original")}
+              sx={{ textTransform: "none", flex: "1 1 260px", justifyContent: "flex-start", py: 1.5 }}
+            >
+              <Box sx={{ textAlign: "left" }}>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  Original vocals
+                </Typography>
+                <Typography variant="caption" sx={{ opacity: 0.8, display: "block" }}>
+                  Convert the source track again, ignoring the earlier result
+                </Typography>
+              </Box>
+            </Button>
+
+            <Button
+              variant={sourceMode === "layered" ? "contained" : "outlined"}
+              onClick={() => setSourceMode("layered")}
+              sx={{ textTransform: "none", flex: "1 1 260px", justifyContent: "flex-start", py: 1.5 }}
+            >
+              <Box sx={{ textAlign: "left" }}>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  Layered
+                </Typography>
+                <Typography variant="caption" sx={{ opacity: 0.8, display: "block" }}>
+                  {previousModelName
+                    ? `Stack ${modelName} on top of the ${previousModelName} result`
+                    : `Stack ${modelName} on top of the previous result`}
+                </Typography>
+              </Box>
+            </Button>
+          </Box>
+        </Paper>
+      )}
+
       {/* Core Voice Conversion */}
       <SectionAccordion
         defaultExpanded
@@ -560,8 +644,8 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
         icon={<GraphicEqIcon sx={{ fontSize: 24, color: "white" }} />}
         gradient={
           theme.palette.mode === "dark"
-            ? "linear-gradient(135deg, #1976D2 0%, #0D47A1 100%)"
-            : "linear-gradient(135deg, #2196F3 0%, #1976D2 100%)"
+            ? "linear-gradient(135deg, #0A84FF 0%, #0D47A1 100%)"
+            : "linear-gradient(135deg, #0A84FF 0%, #0A84FF 100%)"
         }
       >
         <Grid container spacing={4}>
@@ -633,8 +717,8 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
         icon={<AudioFileIcon sx={{ fontSize: 24, color: "white" }} />}
         gradient={
           theme.palette.mode === "dark"
-            ? "linear-gradient(135deg, #FF9800 0%, #F57C00 100%)"
-            : "linear-gradient(135deg, #FFB74D 0%, #FF9800 100%)"
+            ? "linear-gradient(135deg, #FF9F0A 0%, #D98200 100%)"
+            : "linear-gradient(135deg, #FFB340 0%, #FF9F0A 100%)"
         }
       >
         <Grid container spacing={3}>
@@ -891,9 +975,9 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
           alignItems: "center",
           mt: 4,
           p: 4,
-          backgroundColor: theme.palette.mode === "dark" ? "rgba(25, 118, 210, 0.08)" : "rgba(25, 118, 210, 0.06)",
+          backgroundColor: theme.palette.mode === "dark" ? "rgba(10, 132, 255, 0.08)" : "rgba(10, 132, 255, 0.06)",
           border: `1px solid ${
-            theme.palette.mode === "dark" ? "rgba(25, 118, 210, 0.2)" : "rgba(25, 118, 210, 0.15)"
+            theme.palette.mode === "dark" ? "rgba(10, 132, 255, 0.2)" : "rgba(10, 132, 255, 0.15)"
           }`,
           borderRadius: 3,
         }}
@@ -930,9 +1014,9 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
             borderRadius: 2,
             fontWeight: 600,
             fontSize: "1.1rem",
-            boxShadow: theme.palette.mode === "dark" ? "0 6px 20px rgba(25, 118, 210, 0.4)" : "0 6px 20px rgba(25, 118, 210, 0.3)",
+            boxShadow: theme.palette.mode === "dark" ? "0 6px 20px rgba(10, 132, 255, 0.4)" : "0 6px 20px rgba(10, 132, 255, 0.3)",
             "&:hover": {
-              boxShadow: theme.palette.mode === "dark" ? "0 8px 25px rgba(25, 118, 210, 0.5)" : "0 8px 25px rgba(25, 118, 210, 0.4)",
+              boxShadow: theme.palette.mode === "dark" ? "0 8px 25px rgba(10, 132, 255, 0.5)" : "0 8px 25px rgba(10, 132, 255, 0.4)",
               transform: "translateY(-1px)",
             },
             transition: "all 0.2s ease",

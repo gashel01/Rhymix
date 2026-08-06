@@ -6,7 +6,7 @@ import {
   Button,
   Chip,
 } from "@mui/material";
-import ReplayIcon from "@mui/icons-material/Replay";
+import ReplayIcon from "@mui/icons-material/ReplayOutlined";
 import AudioTrackTable from "./AudioTrackTable";
 import ErrorBoundary from "./ErrorBoundary";
 import { useAudioPlayback } from "../hooks/useAudioPlayback";

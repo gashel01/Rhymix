@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState, memo } from "react";
 import { useVolume } from "../contexts/VolumeContext";
-import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
-import AddIcon from "@mui/icons-material/Add";
-import SearchIcon from "@mui/icons-material/Search";
-import CloseIcon from "@mui/icons-material/Close";
-import DeleteIcon from "@mui/icons-material/Delete";
+import LibraryMusicIcon from "@mui/icons-material/LibraryMusicOutlined";
+import AddIcon from "@mui/icons-material/AddOutlined";
+import SearchIcon from "@mui/icons-material/SearchOutlined";
+import CloseIcon from "@mui/icons-material/CloseOutlined";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 
 import AudioTrackTable from "./AudioTrackTable";
 import ErrorBoundary from "./ErrorBoundary";
@@ -211,6 +211,10 @@ function HomeView({
                 >
 
 
+                  {/* The action bar is shown here because it carries Train Model,
+                      which has no other entry point: training needs a multi-track
+                      selection, so a per-row menu can't host it. Select All /
+                      Clear / Delete stay in this view's own header. */}
                   <AudioTrackTable
                     darkMode={darkMode}
                     trackPairs={filteredTrackPairs}
@@ -229,7 +233,7 @@ function HomeView({
                     handleInferenceWithTracks={onInferenceWithTracks}
                     onRowModelSelection={handleRowModelSelection}
                     handleCoverWithTracks={onCoverWithTracks}
-                    hideActionBar
+                    showSelectionControls={false}
                     volume={volumeRef.current}
                     header={({ selectedCount, onSelectAll, onClear, onDelete }) => (
                       <div className={styles.headerWrapper}>
@@ -300,31 +304,25 @@ function HomeView({
                                   <div className={styles.deleteBtnOuter}>
                                     <IconBtn
                                       t={t}
-                                      title="Delete selected"
+                                      title={selectedCount > 0 ? `Delete ${selectedCount} selected` : "Delete selected"}
                                       onClick={onDelete}
                                       disabled={selectedCount === 0}
                                       style={{
-                                        borderColor: selectedCount > 0 ? "rgba(255,59,48,0.45)" : t.hairline,
+                                        borderColor: selectedCount > 0 ? "rgba(255,69,58,0.28)" : t.hairline,
                                         background:
                                           selectedCount > 0
-                                            ? "linear-gradient(180deg, rgba(255,59,48,0.95), rgba(255,59,48,0.78))"
+                                            ? "transparent"
                                             : `linear-gradient(180deg, ${t.cardA}, ${t.cardB})`,
-                                        color: selectedCount > 0 ? "white" : t.subtext,
+                                        color: selectedCount > 0 ? "rgba(255,105,97,0.92)" : t.subtext,
                                       }}
                                     >
                                       <DeleteIcon style={{ fontSize: 20 }} />
                                     </IconBtn>
-                                    {selectedCount > 0 && (
-                                      <div
-                                        className={styles.deleteBadge}
-                                        style={{
-                                          border: `2px solid ${t.isDark ? "rgba(18,18,20,0.8)" : t.cardA}`,
-                                          boxShadow: t.shadowSoft,
-                                        }}
-                                      >
-                                        {selectedCount}
-                                      </div>
-                                    )}
+                                    {/* A red notification badge on a destructive
+                                        control read as "you have 1 thing", not
+                                        "this deletes 1 thing" — and the count was
+                                        already on screen twice. It lives in the
+                                        tooltip now. */}
                                   </div>
                                 </div>
                               </div>

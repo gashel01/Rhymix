@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
-import PersonIcon from "@mui/icons-material/Person";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import PersonIcon from "@mui/icons-material/PersonOutlined";
 import { GENRE_RECS, normalize, toKey } from "./constants";
 import { Segmented } from "../Homeview/Segmented";
 import { AssistActionRow, AssistSuggestionCard } from "./AssistSuggestionCard";

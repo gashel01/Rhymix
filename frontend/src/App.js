@@ -21,10 +21,10 @@ import {
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import { GlobalStyles } from "@mui/material";
-import HomeIcon from "@mui/icons-material/Home";
-import AudioFileIcon from "@mui/icons-material/AudioFile";
-import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
-import SpaceDashboardIcon from "@mui/icons-material/SpaceDashboard";
+import HomeIcon from "@mui/icons-material/HomeOutlined";
+import AudioFileIcon from "@mui/icons-material/AudioFileOutlined";
+import ModelTrainingIcon from "@mui/icons-material/ModelTrainingOutlined";
+import SpaceDashboardIcon from "@mui/icons-material/SpaceDashboardOutlined";
 import FileUpload from "./components/FileUpload";
 // import DownloadResults from "./components/DownloadResults";
 import HomeView from "./components/HomeView";
@@ -35,7 +35,7 @@ import InferenceView from "./components/InferenceView";
 import InferenceParams from "./components/InferenceParams";
 import ModelsView from "./components/ModelsView";
 import CreateSongView from "./components/CreateSongView";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import NavigationBar from "./components/NavigationBar";
 import { uploadFiles, startProcessing, getTrackStatuses, cleanDirectories } from "./utils/apiService";
 import { mergeProcessingUpdate, processingEquals, isTerminalProcessingState } from "./utils/processingStatus";
@@ -48,14 +48,18 @@ const createAppTheme = (mode) => createTheme({
     mode,
     ...(mode === 'dark'
       ? {
-        // Dark theme - Tesla inspired
+        /* Apple publishes two sets of system colours: one for light, one for
+           dark. This branch is the dark theme but was using the light values —
+           #007AFF against Theme.js's #0A84FF, side by side on the same screen.
+           The dark variants are lifted a few points precisely so they hold up
+           on a near-black background. */
         primary: {
-          main: '#007AFF', // iOS blue
+          main: '#0A84FF', // systemBlue, dark
           light: '#4DA3FF',
           dark: '#0056CC',
         },
         secondary: {
-          main: '#FF3B30', // iOS red
+          main: '#FF453A', // systemRed, dark
           light: '#FF6B66',
           dark: '#CC2F26',
         },
@@ -70,13 +74,13 @@ const createAppTheme = (mode) => createTheme({
         },
         divider: '#38383A',
         success: {
-          main: '#34C759', // iOS green
+          main: '#30D158', // systemGreen, dark
         },
         warning: {
-          main: '#FF9500', // iOS orange
+          main: '#FF9F0A', // systemOrange, dark
         },
         error: {
-          main: '#FF3B30',
+          main: '#FF453A', // systemRed, dark
         },
       }
       : {
@@ -246,6 +250,30 @@ const globalStylesInputProps = {
   },
 };
 
+// Views that can be restored from the URL hash. Every view that handleNavigation
+// writes a hash for must be listed here, or reloading/going back lands on Home
+// while the URL still claims otherwise.
+const HASH_VIEWS = [
+  "datasets",
+  "training",
+  "talking-workflow",
+  "models",
+  "inference-model-selection",
+  "inference-params",
+  "inference",
+  "create-song",
+];
+
+// Parse the current hash into { view, query }, or null for Home / anything
+// we don't recognise. Studio is deliberately absent: it routes on /studio.
+const readHashRoute = () => {
+  const hash = window.location.hash.substring(1);
+  if (!hash || hash === "home") return null;
+  const [view, query] = hash.split("?");
+  if (!HASH_VIEWS.includes(view)) return null;
+  return { view, query: query || null };
+};
+
 function App() {
   const isBeatboxCalibrationRoute = window.location.pathname.startsWith("/beatbox-calibration");
 
@@ -265,6 +293,8 @@ function App() {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [createDatasetModalOpen, setCreateDatasetModalOpen] = useState(false);
   const [currentView, setCurrentView] = useState("home");
+  // Set when opening an already-running training run from the Models list.
+  const [resumeTrainingJobId, setResumeTrainingJobId] = useState(null);
   const [selectedVocalsForTraining, setSelectedVocalsForTraining] =
     useState(null);
   const [showVoiceConversion, setShowVoiceConversion] = useState(false);
@@ -317,14 +347,42 @@ function App() {
 
   const theme = createAppTheme(darkMode ? 'dark' : 'light');
 
-  const [open, setOpen] = React.useState(!sidebarCollapsed);
-  React.useEffect(() => { if (!sidebarCollapsed) setOpen(true); }, [sidebarCollapsed]);;
+  /* The settings drawer holds the Groq API key and the output volume — set
+     once, then never again. It opened by default and sat at the foot of the
+     sidebar, so on a short window it ran over the nav items above it.
+     The effect below it was worse than the default: it forced the drawer back
+     open every time the sidebar was expanded, so closing it never stuck. */
+  const [open, setOpen] = React.useState(false);
+
+  // Drive the view from the URL. Used both on first paint and on every
+  // back/forward, so the address bar and what's on screen can't drift apart.
+  const applyHashRoute = useCallback(() => {
+    const route = readHashRoute();
+    if (!route) {
+      setCurrentView("home");
+      setShowHomeView(true);
+      return;
+    }
+    setCurrentView(route.view);
+    setShowHomeView(false);
+    if (route.view === "create-song" && route.query) {
+      const sp = new URLSearchParams(route.query);
+      setCreateSongNav({
+        mode: sp.get("mode") === "cover" ? "cover" : "create",
+        sourceSongId: sp.get("sourceSongId") || null,
+        sourceSong: null,
+      });
+    }
+  }, []);
 
   useEffect(() => {
-    const handlePopState = () => setStudioRouteInfo(getStudioRouteInfo());
+    const handlePopState = () => {
+      setStudioRouteInfo(getStudioRouteInfo());
+      applyHashRoute();
+    };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [getStudioRouteInfo]);
+  }, [getStudioRouteInfo, applyHashRoute]);
 
 
   const onVolumeChange = (v01) => setVolume(Math.max(0, Math.min(1, v01)));
@@ -428,6 +486,7 @@ function App() {
     setCurrentView(view);
     setShowHomeView(view === "home");
     setSelectedVocalsForTraining(null);
+    setResumeTrainingJobId(null);
     setSelectedTracksForInference(null);
     setSelectedModelForInference(null);
     setInferenceParams(null);
@@ -442,11 +501,14 @@ function App() {
     }
     if (view !== "inference") setLiveInferenceData(null);
     setDrawerOpen(false);
-    // Update URL hash for navigation persistence
-    if (view !== "home") {
-      window.history.replaceState(null, '', `#${view}`);
-    } else {
-      window.history.replaceState(null, '', window.location.pathname);
+    // Push, don't replace: each view change gets its own history entry so the
+    // browser Back button walks back through views instead of leaving the app.
+    // Guarded so re-clicking the current item doesn't stack duplicates.
+    const base = `${window.location.pathname}${window.location.search}`;
+    const nextUrl = view === "home" ? window.location.pathname : `${base}#${view}`;
+    const currentUrl = `${base}${window.location.hash}`;
+    if (nextUrl !== currentUrl) {
+      window.history.pushState(null, '', nextUrl);
     }
   }, [getStudioRouteInfo]);
 
@@ -570,25 +632,10 @@ function App() {
     [updateInferenceContext]
   );
 
-  // Handle URL hash routing for navigation persistence
+  // Restore the view from the URL hash on first paint.
   useEffect(() => {
-    const hash = window.location.hash.substring(1); // Remove the '#'
-    if (hash && hash !== 'home') {
-      const [hashView, hashQuery] = hash.split("?");
-      // Only set the view if it's a valid navigation hash
-      const validViews = ['datasets', 'training', 'talking-workflow', 'inference-model-selection', 'inference-params', 'inference', 'create-song'];
-      if (validViews.includes(hashView)) {
-        setCurrentView(hashView);
-        setShowHomeView(false);
-        if (hashView === "create-song" && hashQuery) {
-          const sp = new URLSearchParams(hashQuery);
-          const mode = sp.get("mode") === "cover" ? "cover" : "create";
-          const sourceSongId = sp.get("sourceSongId") || null;
-          setCreateSongNav({ mode, sourceSongId, sourceSong: null });
-        }
-      }
-    }
-  }, []);
+    applyHashRoute();
+  }, [applyHashRoute]);
 
   useEffect(() => {
     const candidates = (optimisticTracks || []).filter((track) => {
@@ -761,11 +808,31 @@ function App() {
     setOptimisticTracks([]);
   };
 
+  // Open a training run that is already going, from its card in the Models list.
+  const handleResumeTraining = useCallback((jobId) => {
+    if (!jobId) return;
+    setResumeTrainingJobId(jobId);
+    setSelectedVocalsForTraining(null);
+    setCurrentView("training");
+    setShowHomeView(false);
+    const base = `${window.location.pathname}${window.location.search}`;
+    if (`${base}#training` !== `${base}${window.location.hash}`) {
+      window.history.pushState(null, '', `${base}#training`);
+    }
+  }, []);
+
   const handleTrainWithDataset = useCallback((selectedVocals) => {
+    setResumeTrainingJobId(null);
     setSelectedVocalsForTraining(selectedVocals);
     setCurrentView("training");
     setShowHomeView(false);
     setShowVoiceConversion(false);
+    // Push the entry by hand: handleNavigation can't be used here because it
+    // clears selectedVocalsForTraining, which is exactly what we just set.
+    const base = `${window.location.pathname}${window.location.search}`;
+    if (`${base}#training` !== `${base}${window.location.hash}`) {
+      window.history.pushState(null, '', `${base}#training`);
+    }
   }, []);
 
 
@@ -913,6 +980,7 @@ function App() {
         return (
           <TrainingView
             selectedVocals={selectedVocalsForTraining}
+            resumeJobId={resumeTrainingJobId}
             onBack={() => handleNavigation("home")}
           />
         );
@@ -929,7 +997,7 @@ function App() {
         );
 
       case "models":
-        return <ModelsView darkMode={darkMode} />;
+        return <ModelsView darkMode={darkMode} onResumeTraining={handleResumeTraining} />;
 
       case "inference":
         return (

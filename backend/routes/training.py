@@ -2,15 +2,27 @@ import json
 import logging
 import os
 import re
+import subprocess
 import threading
 import time
 import uuid
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
+from werkzeug.utils import secure_filename
 
 from backend.jobs.registry import active_jobs
 from backend.paths.manager import paths
+
+
+def _safe_model_name(raw):
+    """Reduce a client-supplied model name to a single safe path segment.
+
+    The name becomes a directory under the dataset and logs roots, so anything
+    like "../.." would write outside them. Returns "" when nothing usable is
+    left, which callers reject.
+    """
+    return secure_filename((raw or "").strip())
 
 bp = Blueprint("training", __name__)
 
@@ -24,13 +36,13 @@ def prepare_training_dataset():
         if not files[0].filename:
             return jsonify({"error": "No audio files selected"}), 400
 
-        name = request.form.get("modelName", "unnamed_model")
+        name = _safe_model_name(request.form.get("modelName"))
+        if not name:
+            return jsonify({"error": "Invalid model name"}), 400
         _sr = int(request.form.get("sampleRate", 48000))  # kept for parity, even if unused here
 
         d = paths.APPLIO_DATASET_DIR / name
         d.mkdir(parents=True, exist_ok=True)
-
-        from werkzeug.utils import secure_filename
 
         for f in files:
             f.save(str(d / secure_filename(f.filename)))
@@ -50,7 +62,7 @@ def prepare_training_dataset():
 def start_training():
     try:
         d = request.json or {}
-        model = d.get("modelName")
+        model = _safe_model_name(d.get("modelName"))
         if not model:
             return jsonify({"error": "Model name is required"}), 400
 
@@ -63,12 +75,16 @@ def start_training():
         job_id = str(uuid.uuid4())
         active_jobs[job_id] = {
             "id": job_id,
+            # active_jobs is shared with inference; tag the kind so the job can be
+            # listed and reattached to after the user navigates away.
+            "type": "training",
             "model_name": model,
             "status": "preprocessing",
             "progress": 0,
             "logs": ["Starting preprocessing..."],
             "started_at": time.time(),
         }
+        _persist_jobs()
 
         # keep same defaults + arg order to run_training_pipeline
         args = (
@@ -102,6 +118,146 @@ def start_training():
 
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+# Applio's run_*_script helpers call subprocess.run() internally and hand back
+# no handle, so a running worker can only be reached by looking it up. These
+# markers identify one: the scripts all live under rvc/train.
+_TRAINING_SCRIPT_MARKERS = ("rvc\\train", "rvc/train")
+
+
+def _python_processes():
+    """Return (pid, command line) for every python process on the machine.
+
+    The query takes no arguments on purpose. Model names come from the client,
+    and interpolating one into a shell command would be an injection hole — the
+    filtering happens in Python instead.
+    """
+    script = (
+        "Get-CimInstance Win32_Process -Filter \"Name like '%python%'\" | "
+        "Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress"
+    )
+    try:
+        raw = subprocess.check_output(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+            text=True,
+            timeout=30,
+            stderr=subprocess.DEVNULL,
+        )
+        data = json.loads(raw or "[]")
+    except (OSError, subprocess.SubprocessError, ValueError):
+        logging.getLogger(__name__).warning("Could not enumerate python processes", exc_info=True)
+        return []
+
+    if isinstance(data, dict):  # a single match isn't wrapped in a list
+        data = [data]
+    return [(int(p["ProcessId"]), p.get("CommandLine") or "") for p in data if p.get("ProcessId")]
+
+
+def _stop_training_processes(model_name=None):
+    """Kill Applio training workers. Returns the pids stopped.
+
+    With no model name, stops every training worker on the machine — used at
+    startup, where nothing running can belong to this process.
+    """
+    stopped = []
+    for pid, cmdline in _python_processes():
+        if model_name is not None and model_name not in cmdline:
+            continue
+        if not any(marker in cmdline for marker in _TRAINING_SCRIPT_MARKERS):
+            continue
+        try:
+            # /T so the worker's own children go with it.
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                check=False,
+                capture_output=True,
+                timeout=30,
+            )
+            stopped.append(pid)
+        except (OSError, subprocess.SubprocessError):
+            logging.getLogger(__name__).warning("Could not stop training pid %s", pid)
+    return stopped
+
+
+def _jobs_file():
+    return paths.METADATA_DIR / "training_jobs.json"
+
+
+def _persist_jobs():
+    """Snapshot training jobs to disk so a restart doesn't lose the history.
+
+    Called on status transitions rather than on every progress tick — after a
+    restart a run is finished either way, so the exact percentage is worthless.
+    """
+    try:
+        paths.METADATA_DIR.mkdir(parents=True, exist_ok=True)
+        payload = []
+        for job in active_jobs.values():
+            if job.get("type") != "training":
+                continue
+            snapshot = {k: v for k, v in job.items() if k != "logs"}
+            snapshot["logs"] = job.get("logs", [])[-50:]
+            payload.append(snapshot)
+        _jobs_file().write_text(json.dumps(payload), encoding="utf-8")
+    except (OSError, TypeError, ValueError):
+        logging.getLogger(__name__).warning("Could not persist training jobs", exc_info=True)
+
+
+def restore_training_jobs():
+    """Reload persisted jobs and stop whatever the previous process left behind.
+
+    Applio's workers are not killed when the backend dies, and the new process
+    has no way to talk to them — they would just hold the GPU while the UI shows
+    nothing. Stop them, and mark any run that was live as interrupted.
+    """
+    log = logging.getLogger(__name__)
+
+    stopped = _stop_training_processes()
+    if stopped:
+        log.warning("Stopped %d orphaned training worker(s) from a previous run: %s", len(stopped), stopped)
+
+    path = _jobs_file()
+    if not path.exists():
+        return
+
+    try:
+        saved = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        log.warning("Could not read persisted training jobs", exc_info=True)
+        return
+
+    for job in saved:
+        if not job.get("id"):
+            continue
+        if job.get("status") not in ("completed", "failed", "cancelled", "interrupted"):
+            job["status"] = "interrupted"
+            job["error"] = "The backend restarted while this run was in progress"
+            job.setdefault("logs", []).append("Interrupted: the backend restarted")
+        active_jobs[job["id"]] = job
+
+    _persist_jobs()
+
+
+@bp.route("/api/training-jobs/<job_id>/cancel", methods=["POST"])
+def cancel_training(job_id):
+    job = active_jobs.get(job_id)
+    if not job or job.get("type") != "training":
+        return jsonify({"error": "Job not found"}), 404
+    if job["status"] in ("completed", "failed", "cancelled", "interrupted"):
+        return jsonify({"error": f"Job already {job['status']}"}), 409
+
+    # Flag before killing: the pipeline thread checks this between steps so it
+    # doesn't march on to the next one once the current worker dies.
+    job["cancelled"] = True
+    stopped = _stop_training_processes(job["model_name"])
+    job["status"] = "cancelled"
+    job["error"] = "Cancelled"
+    job["completed_at"] = time.time()
+    job["logs"].append(f"Cancelled — stopped {len(stopped)} process(es)")
+    _persist_jobs()
+
+    return jsonify({"jobId": job_id, "status": "cancelled", "stopped": stopped})
 
 
 def run_training_pipeline(
@@ -186,6 +342,8 @@ def run_training_pipeline(
                 overlap_len=0.3,
                 normalization_mode="none",
             )
+            if job.get("cancelled"):
+                return {"success": False, "message": "Cancelled"}
             job["logs"].append("✅ Preprocessing completed successfully")
             job["progress"] = 33
 
@@ -200,6 +358,8 @@ def run_training_pipeline(
                 embedder_model_custom=None,
                 include_mutes=2,
             )
+            if job.get("cancelled"):
+                return {"success": False, "message": "Cancelled"}
             job["logs"].append("✅ Feature extraction completed successfully")
             job["progress"] = 66
 
@@ -225,6 +385,10 @@ def run_training_pipeline(
                 vocoder="HiFi-GAN",
                 checkpointing=False,
             )
+            # A killed worker makes subprocess.run() return normally, so the
+            # cancel flag is the only thing telling success apart from abort.
+            if job.get("cancelled"):
+                return {"success": False, "message": "Cancelled"}
             job["logs"].append("✅ Training completed successfully")
             job["progress"] = 100
             result = {"success": True, "message": "Training completed successfully"}
@@ -251,6 +415,7 @@ def run_training_pipeline(
             f"Training completed. Result: {result}",
             f"Training took {int(job['completed_at'] - job['started_at'])} seconds",
         ]
+        _persist_jobs()
         return result
 
     except Exception as e:
@@ -258,8 +423,15 @@ def run_training_pipeline(
         import traceback
 
         traceback.print_exc()
+        # Killing a worker usually surfaces here as an exception. That isn't a
+        # failure — don't let it overwrite the cancellation the user asked for.
+        if job.get("cancelled"):
+            job["logs"].append("Pipeline stopped after cancellation")
+            _persist_jobs()
+            return "Training cancelled"
         job.update(status="failed", error=str(e))
         job["logs"].append(f"Error: {e}")
+        _persist_jobs()
         return f"Training failed: {e}"
 
 
@@ -281,3 +453,28 @@ def training_status(job_id):
             "error": j.get("error"),
         }
     )
+
+
+@bp.route("/api/training-jobs")
+def training_jobs():
+    """Training runs the UI can reattach to.
+
+    A run outlives the view that started it, so the Models list needs a way to
+    show it and hand the job id back. Logs are omitted here — they can be long,
+    and /api/training-status/<id> already serves them.
+    """
+    jobs = [
+        {
+            "id": j["id"],
+            "model_name": j["model_name"],
+            "status": j["status"],
+            "progress": j.get("progress", 0),
+            "started_at": j.get("started_at"),
+            "completed_at": j.get("completed_at"),
+            "error": j.get("error"),
+        }
+        for j in active_jobs.values()
+        if j.get("type") == "training"
+    ]
+    jobs.sort(key=lambda j: j.get("started_at") or 0, reverse=True)
+    return jsonify({"jobs": jobs})

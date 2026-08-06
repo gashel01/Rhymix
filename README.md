@@ -199,7 +199,10 @@ setup.bat          # venv, deps, AI repos, whisperX venv, npm install
 run_all.bat        # starts Flask + FastAPI + React dev server
 ```
 
-Open **http://localhost:3001**
+Open **http://127.0.0.1:3001**
+
+> Use `127.0.0.1`, not `localhost`. The dev server binds IPv4 (`0.0.0.0`) while
+> Chrome resolves `localhost` to IPv6 `::1` first, which yields a connection error.
 
 For configuration (60+ env vars) see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 For model weights see [docs/SETUP_MODELS.md](docs/SETUP_MODELS.md).

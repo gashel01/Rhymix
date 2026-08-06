@@ -1,6 +1,6 @@
 import React from "react";
-import StarIcon from "@mui/icons-material/Star";
-import StarBorderIcon from "@mui/icons-material/StarBorder";
+import StarIcon from "@mui/icons-material/StarOutlined";
+import StarBorderIcon from "@mui/icons-material/StarBorderOutlined";
 export const FavBtn = ({ isFavorite, handleFavoriteClick, t }) => {
 
   return (

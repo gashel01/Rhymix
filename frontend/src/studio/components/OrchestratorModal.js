@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Select from "../../components/common/Select";
 import { requestGroqAutofill } from "../../utils/groqAutofill";
 
 const FOUNDATION_INSTRUMENT_OPTIONS = [
@@ -346,13 +347,11 @@ const OrchestratorModal = ({
             </div>
             <div className="studio-field">
               <label>Total Bars</label>
-              <select value={totalBars} onChange={(event) => setTotalBars(Number(event.target.value) || 16)}>
-                {TOTAL_BAR_OPTIONS.map((value) => (
-                  <option key={value} value={value}>
-                    {value} bars
-                  </option>
-                ))}
-              </select>
+              <Select
+                value={String(totalBars)}
+                onChange={(next) => setTotalBars(Number(next) || 16)}
+                options={TOTAL_BAR_OPTIONS.map((value) => ({ value: String(value), label: `${value} bars` }))}
+              />
             </div>
             {planError ? <div className="studio-empty">{planError}</div> : null}
             <div className="studio-actions-row">
@@ -391,33 +390,19 @@ const OrchestratorModal = ({
                 </div>
                 <div className="studio-field">
                   <label>Key</label>
-                  <select
+                  <Select
                     value={plan.global.keyNote}
-                    onChange={(event) =>
-                      setPlan((prev) => ({ ...prev, global: { ...prev.global, keyNote: event.target.value } }))
-                    }
-                  >
-                    {KEY_NOTES.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(next) => setPlan((prev) => ({ ...prev, global: { ...prev.global, keyNote: next } }))}
+                    options={KEY_NOTES.map((value) => ({ value: value, label: value }))}
+                  />
                 </div>
                 <div className="studio-field">
                   <label>Scale</label>
-                  <select
+                  <Select
                     value={plan.global.scale}
-                    onChange={(event) =>
-                      setPlan((prev) => ({ ...prev, global: { ...prev.global, scale: event.target.value } }))
-                    }
-                  >
-                    {SCALE_OPTIONS.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(next) => setPlan((prev) => ({ ...prev, global: { ...prev.global, scale: next } }))}
+                    options={SCALE_OPTIONS.map((value) => ({ value: value, label: value }))}
+                  />
                 </div>
                 <div className="studio-field">
                   <label>Total Bars</label>
@@ -464,26 +449,19 @@ const OrchestratorModal = ({
                     </div>
                     <div className="studio-field">
                       <label>Instrument</label>
-                      <select
+                      <Select
                         value={role.instrumentFamily}
-                        onChange={(event) => updateRole(role.id, { instrumentFamily: event.target.value })}
-                      >
-                        {FOUNDATION_INSTRUMENT_OPTIONS.map((value) => (
-                          <option key={value} value={value}>
-                            {value}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(next) => updateRole(role.id, { instrumentFamily: next })}
+                        options={FOUNDATION_INSTRUMENT_OPTIONS.map((value) => ({ value: value, label: value }))}
+                      />
                     </div>
                     <div className="studio-field">
                       <label>FX Preset</label>
-                      <select value={role.fxPreset} onChange={(event) => updateRole(role.id, { fxPreset: event.target.value })}>
-                        {FX_PRESET_OPTIONS.map((item) => (
-                          <option key={item.value} value={item.value}>
-                            {item.label}
-                          </option>
-                        ))}
-                      </select>
+                      <Select
+                        value={role.fxPreset}
+                        onChange={(next) => updateRole(role.id, { fxPreset: next })}
+                        options={FX_PRESET_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
+                      />
                     </div>
                   </div>
                   <div className="studio-field">
@@ -533,10 +511,11 @@ const OrchestratorModal = ({
                     </div>
                     <div className="studio-field">
                       <label>Bars</label>
-                      <select value={section.bars} onChange={(event) => updateSection(section.id, { bars: Number(event.target.value) || 4 })}>
-                        <option value={4}>4 bars</option>
-                        <option value={8}>8 bars</option>
-                      </select>
+                      <Select
+                        value={String(section.bars)}
+                        onChange={(next) => updateSection(section.id, { bars: Number(next) || 4 })}
+                        options={[{ value: String(4), label: "4 bars" }, { value: String(8), label: "8 bars" }]}
+                      />
                     </div>
                   </div>
                   {(section.steps || []).map((step) => (
@@ -556,13 +535,11 @@ const OrchestratorModal = ({
                       </div>
                       <div className="studio-field">
                         <label>Role</label>
-                        <select value={step.roleId} onChange={(event) => updateStep(section.id, step.id, { roleId: event.target.value })}>
-                          {plan.roles.map((role) => (
-                            <option key={role.id} value={role.id}>
-                              {role.laneName}
-                            </option>
-                          ))}
-                        </select>
+                        <Select
+                          value={step.roleId}
+                          onChange={(next) => updateStep(section.id, step.id, { roleId: next })}
+                          options={plan.roles.map((role) => ({ value: role.id, label: role.laneName }))}
+                        />
                       </div>
                       <div className="studio-field">
                         <label>Prompt Override</label>

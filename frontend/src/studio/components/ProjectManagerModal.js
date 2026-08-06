@@ -1,20 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Box,
-  Button,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  List,
-  ListItem,
-  ListItemText,
-  Typography,
-} from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
-import {
   createProject,
   deleteProject,
   getAllProjects,
@@ -23,18 +8,35 @@ import {
 } from "../api";
 import { getAvailableFiles } from "../../utils/apiService";
 
+/* Same six gradients the Models view cycles through, so a project card and a
+   model card are visibly the same kind of object. */
+const CARD_GRADIENTS = [
+  "linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)",
+  "linear-gradient(135deg, #ec4899 0%, #9333ea 100%)",
+  "linear-gradient(135deg, #f59e0b 0%, #ea580c 100%)",
+  "linear-gradient(135deg, #10b981 0%, #0d9488 100%)",
+  "linear-gradient(135deg, #8b5cf6 0%, #c026d3 100%)",
+  "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+];
+
+const cardGradient = (index) => CARD_GRADIENTS[index % CARD_GRADIENTS.length];
+
 const projMeta = (item) => item?.project || {};
 
-const getProjectLabel = (item) => {
+/* Neither of these may fall back to an id. `Project 983882` is a slice of a
+   uuid wearing a label, and getSourceLabel used to return the raw 32-character
+   assetId whenever a project's source was no longer in the catalogue — which
+   is also what titled every group in the list. */
+const getProjectLabel = (item, sourceMap) => {
   const meta = projMeta(item);
   if (meta.name) return meta.name;
-  if (!meta.assetId) return "Blank Studio Project";
-  return meta.id ? `Project ${meta.id.substring(0, 6)}` : "Unnamed Project";
+  if (!meta.assetId) return "Blank project";
+  return sourceMap?.get(meta.assetId)?.label || "Untitled project";
 };
 
 const getSourceLabel = (assetId, sourceMap) => {
-  if (!assetId) return "Blank project";
-  return sourceMap.get(assetId)?.label || assetId;
+  if (!assetId) return "Blank";
+  return sourceMap?.get(assetId)?.label || "Unavailable";
 };
 
 const buildSourceCatalog = (filesResponse, inferenceResponse) => {
@@ -153,32 +155,6 @@ const ProjectManagerModal = ({
     });
   }, [projects]);
 
-  const groupedProjects = useMemo(() => {
-    if (scope !== "all") {
-      return [
-        {
-          key: assetId || "current",
-          label: assetId ? getSourceLabel(assetId, sourceMap) : "Current track",
-          projects: sortedProjects,
-        },
-      ];
-    }
-    const groups = new Map();
-    sortedProjects.forEach((project) => {
-      const meta = projMeta(project);
-      const key = meta.assetId || "__blank__";
-      if (!groups.has(key)) {
-        groups.set(key, {
-          key,
-          label: meta.assetId ? getSourceLabel(meta.assetId, sourceMap) : "Blank projects",
-          projects: [],
-        });
-      }
-      groups.get(key).projects.push(project);
-    });
-    return Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [assetId, scope, sortedProjects, sourceMap]);
-
   const handleCreate = async (nextAssetId = null) => {
     setActionLoading(true);
     setError(null);
@@ -232,167 +208,183 @@ const ProjectManagerModal = ({
     }
   };
 
+  if (!open) return null;
+
+  const title = scope === "all" ? "Studio Projects" : "Project Switcher";
+
   return (
-    <Dialog open={open} onClose={() => !actionLoading && onClose()} maxWidth="md" fullWidth>
-      <DialogTitle>{scope === "all" ? "Studio Projects" : "Project Switcher"}</DialogTitle>
-      <DialogContent dividers>
-        {error && (
-          <Typography color="error" gutterBottom>
-            {error}
-          </Typography>
-        )}
-        {loading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Box sx={{ display: "grid", gap: 3 }}>
-            {scope === "all" ? (
-              <>
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                    Start from scratch
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                    Open a completely blank Studio project with no source track attached.
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    onClick={() => handleCreate(null)}
-                    disabled={actionLoading}
-                  >
-                    New Blank Project
-                  </Button>
-                </Box>
+    <div className="studio-modal-backdrop" onClick={() => !actionLoading && onClose()}>
+      <div
+        className="studio-modal-panel wide"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="studio-modal-head">
+          <div>
+            <div className="studio-panel-title">{title}</div>
+            <div className="studio-subtext">
+              {scope === "all"
+                ? "Open a project, or start a new one from a track."
+                : "Projects created from this source track."}
+            </div>
+          </div>
+          <button className="studio-mini" onClick={onClose} disabled={actionLoading}>
+            Close
+          </button>
+        </div>
 
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                    Start from track
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                    Pick any available track or inference result and start a fresh Studio project from it.
-                  </Typography>
-                  {groupedSources.length ? (
-                    <List sx={{ display: "grid", gap: 1 }}>
-                      {groupedSources.map((source) => (
-                        <ListItem
-                          key={source.assetId}
-                          sx={{
-                            border: "1px solid",
-                            borderColor: "divider",
-                            borderRadius: 2,
-                            alignItems: "center",
-                            gap: 2,
-                          }}
+        <div className="studio-modal-body">
+          {error ? <div className="studio-modal-error">{error}</div> : null}
+
+          {loading ? (
+            <div className="studio-empty">Loading projects...</div>
+          ) : (
+            <>
+              <section className="studio-modal-section">
+                <div className="studio-modal-section-title">
+                  {scope === "all" ? "All projects" : "Existing projects"}
+                </div>
+                {sortedProjects.length ? (
+                  /* One flat grid. Grouping by source track put every project
+                     in a group of its own — each headed by the source's raw
+                     assetId — so the list was one card per row with a uuid
+                     above it. The Models view this borrows from is flat too. */
+                  <div className="studio-card-grid">
+                    {sortedProjects.map((item, index) => {
+                      const meta = projMeta(item);
+                      const projId = meta.id;
+                      const isActive = projId === currentProjectId;
+                      const timestamp = meta.updatedAt || meta.createdAt;
+                      return (
+                        <article
+                          key={projId}
+                          className={`studio-card${isActive ? " active" : ""}`}
                         >
-                          <ListItemText
-                            primary={source.label}
-                            secondary={`${source.kind} · ${source.subtext}${source.projectCount ? ` · ${source.projectCount} existing project${source.projectCount === 1 ? "" : "s"}` : ""}`}
-                          />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={() => handleCreate(source.assetId)}
-                            disabled={actionLoading}
+                          <div
+                            className="studio-card-head"
+                            style={{ background: cardGradient(index) }}
                           >
-                            New Project
-                          </Button>
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      No track sources are available yet.
-                    </Typography>
-                  )}
-                </Box>
-              </>
-            ) : null}
-
-            <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                Existing projects
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                {scope === "all"
-                  ? "All Studio projects across every source track."
-                  : "Projects already created from this source track."}
-              </Typography>
-              {sortedProjects.length ? (
-                <Box sx={{ display: "grid", gap: 2 }}>
-                  {groupedProjects.map((group) => (
-                    <Box key={group.key}>
-                      {scope === "all" ? (
-                        <Typography variant="body2" sx={{ fontWeight: 700, mb: 1, color: "text.secondary" }}>
-                          {group.label}
-                        </Typography>
-                      ) : null}
-                      <List sx={{ display: "grid", gap: 1 }}>
-                        {group.projects.map((item) => {
-                          const meta = projMeta(item);
-                          const projId = meta.id;
-                          const isActive = projId === currentProjectId;
-                          const timestamp = meta.updatedAt || meta.createdAt;
-                          return (
-                            <ListItem
-                              key={projId}
-                              sx={{
-                                border: "1px solid",
-                                borderColor: isActive ? "primary.main" : "divider",
-                                borderRadius: 2,
-                                bgcolor: isActive ? "action.selected" : "transparent",
-                                alignItems: "center",
-                                gap: 2,
-                              }}
-                            >
-                              <ListItemText
-                                primary={getProjectLabel(item)}
-                                secondary={timestamp ? new Date(timestamp).toLocaleString() : null}
-                              />
-                              <Button
-                                variant={isActive ? "outlined" : "contained"}
-                                size="small"
+                            <span className="studio-card-glyph" aria-hidden="true">
+                              &#9835;
+                            </span>
+                            {isActive ? <span className="studio-card-badge">Open</span> : null}
+                          </div>
+                          <div className="studio-card-body">
+                            <div>
+                              <h3
+                                className="studio-card-title"
+                                title={getProjectLabel(item, sourceMap)}
+                              >
+                                {getProjectLabel(item, sourceMap)}
+                              </h3>
+                              <p className="studio-card-kicker">Studio Project</p>
+                            </div>
+                            <div className="studio-card-meta">
+                              <div className="studio-card-stat">
+                                <p className="studio-card-stat-label">Source</p>
+                                <p className="studio-card-stat-value">
+                                  {getSourceLabel(meta.assetId, sourceMap)}
+                                </p>
+                              </div>
+                              <div className="studio-card-stat">
+                                <p className="studio-card-stat-label">Updated</p>
+                                <p className="studio-card-stat-value">
+                                  {timestamp ? new Date(timestamp).toLocaleDateString() : "\u2014"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="studio-card-actions">
+                              <button
+                                className="studio-card-btn"
                                 onClick={() => handleSwitch(projId)}
                                 disabled={actionLoading || isActive}
                               >
-                                {isActive ? "Active" : "Open"}
-                              </Button>
-                              <IconButton
-                                edge="end"
-                                aria-label="delete"
-                                color="error"
+                                {isActive ? "Current" : "Open"}
+                              </button>
+                              <button
+                                className="studio-card-btn danger"
+                                aria-label="Delete project"
+                                title="Delete project"
                                 disabled={actionLoading}
                                 onClick={() => handleDelete(projId)}
                               >
-                                <DeleteIcon />
-                              </IconButton>
-                            </ListItem>
-                          );
-                        })}
-                      </List>
-                    </Box>
-                  ))}
-                </Box>
-              ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
-                  No projects yet.
-                </Typography>
-              )}
-            </Box>
-          </Box>
-        )}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={actionLoading}>
-          Close
-        </Button>
+                                &#10005;
+                              </button>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="studio-empty">No projects yet.</div>
+                )}
+              </section>
+
+              {scope === "all" ? (
+                <section className="studio-modal-section">
+                  <div className="studio-modal-section-title">Start something new</div>
+                  <div className="studio-subtext">
+                    Begin from a track or an inference result, or open a blank project.
+                  </div>
+                  <div className="studio-picker-list">
+                    <div className="studio-picker-row">
+                      <div className="studio-picker-main">
+                        <div className="studio-picker-name">Blank project</div>
+                        <div className="studio-picker-meta">No source track attached</div>
+                      </div>
+                      <button
+                        className="studio-picker-action"
+                        onClick={() => handleCreate(null)}
+                        disabled={actionLoading}
+                      >
+                        Create
+                      </button>
+                    </div>
+                    {groupedSources.map((source) => (
+                      <div key={source.assetId} className="studio-picker-row">
+                        <div className="studio-picker-main">
+                          <div className="studio-picker-name">{source.label}</div>
+                          <div className="studio-picker-meta">
+                            {source.kind}
+                            {" \u00b7 "}
+                            {source.subtext}
+                            {source.projectCount
+                              ? ` \u00b7 ${source.projectCount} project${source.projectCount === 1 ? "" : "s"}`
+                              : ""}
+                          </div>
+                        </div>
+                        <button
+                          className="studio-picker-action"
+                          onClick={() => handleCreate(source.assetId)}
+                          disabled={actionLoading}
+                        >
+                          New Project
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </>
+          )}
+        </div>
+
         {scope !== "all" ? (
-          <Button onClick={() => handleCreate(assetId)} color="primary" variant="contained" disabled={actionLoading}>
-            New Project From Track
-          </Button>
+          <div className="studio-modal-foot">
+            <button
+              className="studio-btn accent"
+              onClick={() => handleCreate(assetId)}
+              disabled={actionLoading}
+            >
+              New Project From Track
+            </button>
+          </div>
         ) : null}
-      </DialogActions>
-    </Dialog>
+      </div>
+    </div>
   );
 };
 

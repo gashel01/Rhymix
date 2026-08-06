@@ -1,12 +1,21 @@
 .studio-page {
-  --studio-bg: radial-gradient(circle at 10% 20%, #18212a 0%, #0b0f14 55%, #050607 100%);
-  --studio-panel: rgba(18, 25, 34, 0.85);
-  --studio-panel-border: rgba(255, 255, 255, 0.08);
-  --studio-accent: #00c2ff;
-  --studio-accent-strong: #ffb454;
-  --studio-text: #f5f7fb;
-  --studio-subtext: rgba(245, 247, 251, 0.65);
+  /* Same palette as the Models view: a neutral near-black page, panels made of
+     very low-alpha white rather than their own blue, and one accent — the
+     system blue — instead of a cyan plus an orange fighting each other. */
+  --studio-bg: #0b0b0f;
+  --studio-panel: rgba(255, 255, 255, 0.04);
+  --studio-panel-strong: rgba(255, 255, 255, 0.06);
+  --studio-panel-border: rgba(255, 255, 255, 0.10);
+  --studio-accent: #0a84ff;
+  --studio-accent-wash: rgba(10, 132, 255, 0.18);
+  --studio-accent-strong: #0a84ff;
+  --studio-danger: #ff453a;
+  --studio-text: rgba(255, 255, 255, 0.92);
+  --studio-subtext: rgba(255, 255, 255, 0.62);
   --studio-muted: rgba(255, 255, 255, 0.12);
+  --studio-radius-lg: 22px;
+  --studio-radius-md: 16px;
+  --studio-shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.45);
   --studio-track-top: 96px;
   color: var(--studio-text);
   position: fixed;
@@ -14,7 +23,8 @@
   height: 100dvh;
   min-height: 100dvh;
   background: var(--studio-bg);
-  font-family: "Space Grotesk", "Rubik", "Poppins", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  font-feature-settings: "tnum" 1;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
@@ -180,8 +190,8 @@
 }
 
 .studio-transport-pill.active {
-  background: rgba(0, 194, 255, 0.16);
-  border-color: rgba(0, 194, 255, 0.35);
+  background: rgba(10, 132, 255, 0.16);
+  border-color: rgba(10, 132, 255, 0.35);
 }
 
 .studio-shortcut-row {
@@ -330,8 +340,8 @@
 }
 
 .studio-btn.active {
-  background: rgba(0, 194, 255, 0.16);
-  border-color: rgba(0, 194, 255, 0.35);
+  background: rgba(10, 132, 255, 0.16);
+  border-color: rgba(10, 132, 255, 0.35);
   color: var(--studio-text);
 }
 
@@ -664,7 +674,7 @@
 }
 
 .studio-lane.drop-target {
-  background: rgba(0, 194, 255, 0.08);
+  background: rgba(10, 132, 255, 0.08);
 }
 
 .studio-clip {
@@ -687,7 +697,7 @@
   top: 0;
   bottom: 0;
   width: 8px;
-  background: rgba(0, 194, 255, 0.25);
+  background: rgba(10, 132, 255, 0.25);
   cursor: ew-resize;
   opacity: 0;
   transition: opacity 0.15s ease;
@@ -897,8 +907,8 @@
 
 .studio-clip-lyrics-entry.active {
   color: var(--studio-text);
-  border-color: rgba(0, 194, 255, 0.45);
-  background: rgba(0, 194, 255, 0.18);
+  border-color: rgba(10, 132, 255, 0.45);
+  background: rgba(10, 132, 255, 0.18);
 }
 
 .studio-clip-lyrics-entry-text {
@@ -1136,8 +1146,8 @@
 .studio-selection {
   position: absolute;
   top: 0;
-  background: rgba(0, 194, 255, 0.15);
-  border: 1px dashed rgba(0, 194, 255, 0.5);
+  background: rgba(10, 132, 255, 0.15);
+  border: 1px dashed rgba(10, 132, 255, 0.5);
   pointer-events: none;
   z-index: 5;
 }
@@ -1263,8 +1273,8 @@
 }
 
 .studio-ai-card.expanded {
-  border-color: rgba(0, 194, 255, 0.26);
-  box-shadow: 0 0 0 1px rgba(0, 194, 255, 0.08);
+  border-color: rgba(10, 132, 255, 0.26);
+  box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.08);
 }
 
 .studio-ai-card-head {
@@ -1532,8 +1542,8 @@
   gap: 10px;
   padding: 10px;
   border-radius: 12px;
-  border: 1px solid rgba(0, 194, 255, 0.22);
-  background: rgba(0, 194, 255, 0.08);
+  border: 1px solid rgba(10, 132, 255, 0.22);
+  background: rgba(10, 132, 255, 0.08);
 }
 
 .studio-assist-label {
@@ -1881,8 +1891,8 @@
 }
 
 .studio-library-icon-btn.active {
-  background: rgba(0, 194, 255, 0.14);
-  border-color: rgba(0, 194, 255, 0.28);
+  background: rgba(10, 132, 255, 0.14);
+  border-color: rgba(10, 132, 255, 0.28);
 }
 
 .studio-library-icon-btn.danger {
@@ -2081,4 +2091,2019 @@
 .studio-orchestrator-step-item.complete {
   border-color: rgba(91, 214, 118, 0.42);
   background: rgba(91, 214, 118, 0.08);
+}
+
+/* Selection actions — appear under the timeline once a range is selected.
+   Kept next to the selection itself: regenerating a region is a gesture on
+   what you just highlighted, not a command hidden in a side panel. */
+.studio-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-top: 8px;
+  border: 1px solid var(--studio-panel-border);
+  border-radius: 12px;
+  background: rgba(10, 132, 255, 0.06);
+}
+
+.studio-selection-actions__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.studio-selection-actions__range {
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--studio-text);
+  opacity: 0.75;
+}
+
+.studio-selection-actions__prompt {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--studio-text);
+  font-size: 12px;
+}
+
+.studio-selection-actions__prompt::placeholder {
+  color: var(--studio-text);
+  opacity: 0.4;
+}
+
+.studio-selection-actions__prompt:disabled {
+  opacity: 0.5;
+}
+
+.studio-selection-actions__action {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--studio-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.studio-mini.danger {
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #ef4444;
+}
+
+/* ==========================================================================
+   Frost pass — brings the Studio in line with the Models view.
+
+   The rules below are deliberately grouped at the end rather than edited into
+   the 47 places that drew a border: the goal is one legible layer that says
+   what changed and why, not a diff scattered across 2000 lines.
+   ========================================================================== */
+
+/* --- Depth by fill, not by outline ------------------------------------- */
+/* Page > panel > sub-panel > card each drew their own border, so a lane fader
+   sat inside four nested outlines. Keep the outer panel, drop the rest. */
+.studio-panel {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-panel-border);
+  border-radius: var(--studio-radius-lg);
+  box-shadow: var(--studio-shadow-soft);
+  backdrop-filter: blur(18px);
+}
+
+.studio-panel .studio-panel,
+.studio-lane-row,
+.studio-track-row,
+.studio-lane-card {
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* --- Slim context strip ------------------------------------------------- */
+.studio-context-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px 10px;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+.studio-context-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.studio-context-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- One accent --------------------------------------------------------- */
+/* Mute/solo used to be bright cyan pills that pulled the eye harder than the
+   audio did. States read as fills now; the accent is reserved for actions. */
+.studio-lane-toggle.active,
+.studio-mini.active {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--studio-text);
+}
+
+.studio-btn.accent {
+  background: var(--studio-accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+.studio-btn.accent:hover {
+  filter: brightness(1.08);
+}
+
+.studio-transport-pill.active {
+  background: var(--studio-accent-wash);
+  border-color: rgba(10, 132, 255, 0.35);
+}
+
+/* --- Lane controls on demand -------------------------------------------- */
+/* Eight controls per lane, permanently visible, is a pro-DAW density. At rest
+   a lane shows its name and level; the rest arrives on hover or selection. */
+.studio-lane-secondary {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.studio-lane:hover .studio-lane-secondary,
+.studio-lane:focus-within .studio-lane-secondary,
+.studio-lane.selected .studio-lane-secondary {
+  opacity: 1;
+}
+
+/* --- Type ---------------------------------------------------------------- */
+/* Space Grotesk is a display face; at 11px its letterforms fight legibility
+   and its figures aren't tabular, so the transport clock jitters while
+   playing. Keep it for section titles only. */
+.studio-panel-title,
+.studio-section-title {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.studio-time,
+.studio-transport-pill,
+.studio-lane-db,
+.studio-selection-actions__range {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Motion -------------------------------------------------------------- */
+/* Panels and generated clips used to pop into existence. */
+.studio-panel,
+.studio-selection-actions,
+.studio-job-toast {
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+@keyframes studio-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.studio-selection-actions,
+.studio-job-toast {
+  animation: studio-fade-in 200ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-panel,
+  .studio-selection-actions,
+  .studio-job-toast {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* --- Destructive actions demoted ---------------------------------------- */
+/* "Delete All" sat next to "Lanes +" at equal weight. */
+.studio-btn.danger,
+.studio-mini.danger {
+  background: transparent;
+  border-color: rgba(255, 69, 58, 0.35);
+  color: var(--studio-danger);
+}
+
+.studio-btn.danger:hover,
+.studio-mini.danger:hover {
+  background: rgba(255, 69, 58, 0.12);
+}
+
+/* --- Contrast on the new accent ----------------------------------------- */
+/* Several buttons painted near-black text (#041018) on the old light cyan.
+   The system blue is darker, so that text no longer reads. */
+.studio-btn,
+.studio-rail-btn.active {
+  color: #fff;
+}
+
+.studio-btn.ghost {
+  color: var(--studio-text);
+}
+
+.studio-btn:hover {
+  transform: none;
+  filter: brightness(1.08);
+}
+
+.studio-context-eyebrow {
+  color: var(--studio-subtext);
+}
+
+.studio-job-status {
+  color: var(--studio-subtext);
+}
+
+/* --- Lane row: quiet at rest -------------------------------------------- */
+/* A lane carried grip + colour + name + menu + fader + dB + M + S, all at the
+   same weight, all the time — eight controls times however many lanes. At rest
+   it now reads name, colour and level; the handles arrive on hover. Mute and
+   solo stay visible while engaged, because that's state, not a control. */
+.studio-track-row .studio-track-grip,
+.studio-track-row .studio-track-menu-wrap,
+.studio-track-row .studio-mini:not(.active) {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.studio-track-row:hover .studio-track-grip,
+.studio-track-row:hover .studio-track-menu-wrap,
+.studio-track-row:hover .studio-mini,
+.studio-track-row:focus-within .studio-track-grip,
+.studio-track-row:focus-within .studio-track-menu-wrap,
+.studio-track-row:focus-within .studio-mini {
+  opacity: 1;
+}
+
+.studio-track-row .studio-db {
+  color: var(--studio-subtext);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-track-row .studio-track-grip,
+  .studio-track-row .studio-track-menu-wrap,
+  .studio-track-row .studio-mini:not(.active) {
+    opacity: 1;
+    transition: none;
+  }
+}
+
+/* --- Export menu --------------------------------------------------------- */
+/* Mixdown, stems and MIDI were three buttons competing with each other; they
+   are three shapes of the same intent, so they share one. */
+.studio-export-wrap {
+  position: relative;
+}
+
+.studio-export-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  min-width: 240px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(22, 22, 26, 0.92);
+  border: 1px solid var(--studio-panel-border);
+  border-radius: var(--studio-radius-md);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(18px);
+  animation: studio-fade-in 160ms ease both;
+  z-index: 400;
+}
+
+.studio-export-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--studio-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.studio-export-item span {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--studio-subtext);
+}
+
+.studio-export-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.studio-export-item.danger {
+  color: var(--studio-danger);
+}
+
+.studio-export-item.danger:hover {
+  background: rgba(255, 69, 58, 0.12);
+}
+
+/* Transport clock: the thing you read while it moves. */
+.studio-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 600;
+  min-width: 92px;
+}
+
+/* "Delete All" wipes every lane and clip. It sat beside "Lanes +" at equal
+   weight; it keeps its place but stops advertising itself. */
+.studio-tracklist-header .studio-mini.danger {
+  border-color: transparent;
+  color: var(--studio-subtext);
+  opacity: 0;
+  transition: opacity 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.studio-tracklist-header:hover .studio-mini.danger,
+.studio-tracklist-header:focus-within .studio-mini.danger {
+  opacity: 1;
+}
+
+.studio-tracklist-header .studio-mini.danger:hover {
+  color: var(--studio-danger);
+  border-color: rgba(255, 69, 58, 0.35);
+}
+
+/* ==========================================================================
+   Frost pass, part two — right panel, left panel, modals.
+   ========================================================================== */
+
+/* --- Form fields: give them a shape -------------------------------------- */
+/* BPM and Key rendered as bare labels with an invisible input next to them,
+   so the panel looked like it was showing dead metadata. */
+.studio-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.studio-field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--studio-subtext);
+}
+
+.studio-field input,
+.studio-field select,
+.studio-field textarea,
+.studio-inspector textarea,
+.studio-inspector input[type="text"],
+.studio-inspector input[type="number"],
+.studio-inspector select {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--studio-text);
+  font-size: 13px;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.studio-field input:focus,
+.studio-field select:focus,
+.studio-inspector textarea:focus,
+.studio-inspector input:focus,
+.studio-inspector select:focus {
+  outline: none;
+  border-color: rgba(10, 132, 255, 0.55);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.studio-field input::placeholder,
+.studio-inspector textarea::placeholder,
+.studio-inspector input::placeholder {
+  color: rgba(255, 255, 255, 0.32);
+}
+
+/* --- Right panel: stop nesting cards ------------------------------------- */
+/* A block inside a block inside the panel, each with its own outline. Group by
+   spacing and a single hairline instead. */
+/* The scroll container is a flex column that already sets `gap`, so a
+   margin-bottom here stacked on top of it: 22px margin + 12px gap + 22px
+   padding-top gave 56px between sections, and the hairline sat 12px under one
+   block and 22px above the next — visibly off-centre. One rule owns the
+   rhythm: the gap is zeroed and each section pays 20px on both sides of its
+   own separator. */
+.studio-right-panel-scroll {
+  gap: 0;
+  padding-bottom: 24px;
+}
+
+.studio-meta-block {
+  border: none;
+  background: none;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.studio-meta-block + .studio-meta-block {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.studio-embedded-card {
+  border: none;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--studio-radius-md);
+  padding: 14px;
+  margin-bottom: 0;
+}
+
+.studio-embedded-card + .studio-embedded-card {
+  margin-top: 10px;
+  padding-top: 14px;
+  border-top: none;
+}
+
+.studio-empty {
+  color: var(--studio-subtext);
+  font-size: 12px;
+  line-height: 1.5;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--studio-radius-md);
+  padding: 14px;
+}
+
+/* Stacked full-width buttons all shouting equally. Let the row breathe and
+   let the primary keep the accent on its own. */
+.studio-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.studio-inspector-sticky {
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 18px;
+}
+
+/* --- Left panel: hide the machine ---------------------------------------- */
+/* Every asset row printed its internal id — 40-odd characters of hex the user
+   can do nothing with, at the same weight as the name. */
+.studio-library-id {
+  display: none;
+}
+
+.studio-library-item-actions {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.studio-library-item:hover .studio-library-item-actions,
+.studio-library-item:focus-within .studio-library-item-actions {
+  opacity: 1;
+}
+
+.studio-library-item {
+  border: none;
+  border-radius: 12px;
+  padding: 8px 10px;
+  transition: background 160ms ease;
+}
+
+.studio-library-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* The VOX / BAS / MUS / GEN badges were the loudest thing in the column. */
+.studio-library-group-badge,
+.studio-library-kind-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  color: var(--studio-subtext);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.studio-library-meta {
+  color: var(--studio-subtext);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Modals: centred, frosted, primary on the right ---------------------- */
+.studio-modal-backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(20px);
+  align-items: center;
+  animation: studio-fade-in 180ms ease both;
+}
+
+.studio-orchestrator-modal {
+  width: min(720px, calc(100vw - 56px));
+  border-radius: var(--studio-radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(22, 22, 26, 0.92);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.7);
+  animation: studio-fade-in 200ms ease both;
+}
+
+.studio-orchestrator-head {
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.studio-orchestrator-body {
+  padding: 20px 24px 24px;
+  gap: 18px;
+}
+
+.studio-orchestrator-card,
+.studio-orchestrator-step {
+  border: none;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--studio-radius-md);
+  padding: 14px;
+}
+
+/* The primary action sat small and bottom-left, where nothing looks for it. */
+.studio-orchestrator-body > .studio-btn,
+.studio-orchestrator-actions {
+  justify-self: end;
+  align-self: end;
+}
+
+.studio-orchestrator-body > .studio-btn {
+  padding: 11px 22px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-modal-backdrop,
+  .studio-orchestrator-modal {
+    animation: none;
+  }
+}
+
+/* The modal's primary action sat small and bottom-left. In a dialog the eye
+   finishes bottom-right, which is where the commitment belongs. */
+.studio-orchestrator-body .studio-actions-row {
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.studio-orchestrator-body .studio-actions-row .studio-btn {
+  padding: 11px 22px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+/* "Close" was a text button competing with the title. */
+.studio-orchestrator-head .studio-mini,
+.studio-orchestrator-head .studio-btn.ghost {
+  border-color: transparent;
+  color: var(--studio-subtext);
+}
+
+.studio-orchestrator-head .studio-mini:hover,
+.studio-orchestrator-head .studio-btn.ghost:hover {
+  color: var(--studio-text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ==========================================================================
+   Frost pass, part three — faders, lanes, and the last MUI island.
+   ========================================================================== */
+
+/* --- Faders: the browser default was the loudest control on screen ------- */
+/* Every lane drew an unstyled input[type=range]: a thick saturated blue bar
+   across the full column width with a large white knob. Five of them stacked
+   read as the primary content of the track list. A fader is a value you set
+   once and glance at — it should be a thin neutral rail. */
+.studio-page input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.studio-page input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.studio-page input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.studio-page input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -4.5px;
+  border-radius: 50%;
+  background: #f2f2f7;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: transform 120ms ease;
+}
+
+.studio-page input[type="range"]::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #f2f2f7;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.studio-page input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+.studio-page input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px var(--studio-accent-wash);
+}
+
+/* The gain readout was orphaned on its own line under the fader. Put it on the
+   rail's line, right-aligned, in tabular figures so it stops shifting. */
+.studio-lane-db {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-size: 11px;
+  color: var(--studio-subtext);
+}
+
+/* --- Lanes: colour belongs to the clip, not to the whole row ------------- */
+/* Each lane painted its colour as a wash across the entire timeline width,
+   empty lanes included, so five lanes meant five saturated horizontal bands.
+   In Logic the row is neutral and the region carries the colour; the lane is
+   identified by a spine at its left edge. */
+.studio-lane {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02), transparent 140px),
+    rgba(255, 255, 255, 0.012);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* The spine: 3px of the lane's own colour, and the only place it appears at
+   full saturation. Set as a pseudo-element so the inline borderLeft that
+   Timeline.js writes stays overridden regardless of specificity. */
+.studio-lane::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--lane-color, transparent);
+  opacity: 0.85;
+  border-radius: 0 2px 2px 0;
+}
+
+.studio-lane.drop-target {
+  background: var(--studio-accent-wash);
+}
+
+/* --- Project manager: was the last Material-UI island in the Studio ------ */
+/* It shipped MUI's own Dialog, buttons and list, so it ignored every token
+   here: no frost, its own blue, its own radii, and six outlined "New Project"
+   buttons stacked down the page. Rebuilt on the house components. */
+.studio-modal-panel {
+  width: min(760px, calc(100vw - 56px));
+  max-height: min(84vh, 900px);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--studio-radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(22, 22, 26, 0.92);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.7);
+  animation: studio-fade-in 200ms ease both;
+  overflow: hidden;
+}
+
+.studio-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.studio-modal-head .studio-panel-title {
+  font-size: 17px;
+}
+
+.studio-modal-head .studio-mini {
+  border-color: transparent;
+  color: var(--studio-subtext);
+}
+
+.studio-modal-head .studio-mini:hover {
+  color: var(--studio-text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.studio-modal-body {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+  display: grid;
+  gap: 26px;
+  min-height: 0;
+}
+
+.studio-modal-section {
+  display: grid;
+  gap: 6px;
+}
+
+.studio-modal-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--studio-text);
+}
+
+.studio-modal-section .studio-actions-row {
+  margin-top: 10px;
+}
+
+.studio-modal-error {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  color: #ffb4ae;
+  background: rgba(255, 69, 58, 0.12);
+}
+
+.studio-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* A picker is a list, not a stack of cards. Rows share one surface and are
+   parted by hairlines; the action is text until you point at the row. */
+.studio-picker-list {
+  margin-top: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+.studio-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  transition: background 140ms ease;
+}
+
+.studio-picker-row + .studio-picker-row {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.studio-picker-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.studio-picker-row.active {
+  background: var(--studio-accent-wash);
+}
+
+.studio-picker-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.studio-picker-name {
+  font-size: 13.5px;
+  color: var(--studio-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studio-picker-meta {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--studio-subtext);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studio-picker-action {
+  flex: none;
+  border: none;
+  background: none;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--studio-accent);
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.studio-picker-action:hover {
+  background: rgba(10, 132, 255, 0.14);
+}
+
+.studio-picker-action:disabled {
+  color: var(--studio-subtext);
+  cursor: default;
+  background: none;
+}
+
+.studio-picker-badge {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--studio-subtext);
+  padding: 0 4px;
+}
+
+/* Deleting a project cannot be undone, so it stays invisible at rest. */
+.studio-picker-delete {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--studio-subtext);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.studio-picker-row:hover .studio-picker-delete,
+.studio-picker-delete:focus-visible {
+  opacity: 1;
+}
+
+.studio-picker-delete:hover {
+  color: var(--studio-danger);
+  background: rgba(255, 69, 58, 0.14);
+}
+
+.studio-picker-group + .studio-picker-group {
+  margin-top: 16px;
+}
+
+.studio-picker-group-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--studio-subtext);
+  margin-top: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-modal-panel {
+    animation: none;
+  }
+}
+
+/* --- Segmented control --------------------------------------------------- */
+/* "Custom Mode / Simple Mode" are two states of one setting, but they rendered
+   as two separate bordered buttons with a gap, which is the shape of two
+   independent actions. iOS gives a pair like this a single recessed track with
+   the selection riding inside it. */
+.studio-toggle-group {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  flex-wrap: nowrap;
+  width: fit-content;
+}
+
+.studio-toggle-group .studio-mini {
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  padding: 5px 13px;
+  color: var(--studio-subtext);
+  box-shadow: none;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.studio-toggle-group .studio-mini:hover {
+  color: var(--studio-text);
+  background: transparent;
+}
+
+.studio-toggle-group .studio-mini.active {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--studio-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* ==========================================================================
+   Frost pass, part four — the right panel's vertical rhythm.
+   ========================================================================== */
+
+/* The scroll area reserves 4px on the right for its scrollbar but the sticky
+   header does not, so the header's hairline overshot every section hairline
+   below it by exactly that much. Same gutter for both. */
+.studio-inspector-sticky {
+  padding-right: 4px;
+}
+
+/* One panel title, then section titles under it. All three were rendered at
+   the same size and weight, so "Project", "Create" and "Relevant Controls"
+   read as three peers with no parent. */
+.studio-right-panel-scroll .studio-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--studio-subtext);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* An empty state is a sentence, not a component. It had a border and a fill,
+   which made the one place with nothing in it the most boxed-in thing on the
+   panel. */
+.studio-right-panel-scroll .studio-empty {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--studio-subtext);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* Fields: label sits close to its control, controls breathe between each
+   other. Previously both gaps were the same, so a label floated equidistant
+   between the input above it and the input below. */
+.studio-right-panel-scroll .studio-field {
+  display: grid;
+  gap: 6px;
+}
+
+.studio-right-panel-scroll .studio-field + .studio-field {
+  margin-top: 14px;
+}
+
+.studio-right-panel-scroll .studio-field label {
+  font-size: 11.5px;
+  color: var(--studio-subtext);
+}
+
+/* A lyrics box that opens at 120px of empty height dominates the panel before
+   anything has been typed into it. */
+.studio-right-panel-scroll .studio-field textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+/* The row of actions under a section is part of that section, not a new one. */
+.studio-right-panel-scroll .studio-actions-row {
+  margin-top: 14px;
+  gap: 8px;
+}
+
+/* The sticky header needs to be opaque so scrolled content does not show
+   through it — but it was painting a blue-grey (#121922) left over from the
+   old palette, on a panel that is now neutral white-on-near-black. It read as
+   a tinted card pinned to the top of the panel rather than as the panel's own
+   surface. Same trick as the modals: a neutral fill plus a blur. */
+.studio-inspector-sticky {
+  background: rgba(20, 20, 24, 0.94);
+  backdrop-filter: blur(12px);
+}
+
+/* A section that renders nothing in the current context still drew its own
+   separator, so two hairlines appeared back to back with dead space between
+   them. This catches the case where the block has no child nodes at all;
+   a block whose only child is itself conditionally empty still needs the
+   condition handled in the JSX. */
+.studio-right-panel-scroll .studio-meta-block:empty {
+  display: none;
+}
+
+/* `display: none` hides a block but does not remove it from sibling selectors,
+   so the section after an empty one still drew its top separator — landing a
+   second hairline ~40px under the sticky header's own bottom border, with
+   nothing in between. When the previous block is empty, this one is visually
+   first and owns no separator. */
+.studio-right-panel-scroll .studio-meta-block:empty + .studio-meta-block {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* ==========================================================================
+   Timeline pointer affordances.
+   ========================================================================== */
+
+/* The clip declared `cursor: pointer` over its whole surface while only its
+   18px header (20% of a 90px clip) could actually be dragged — the cursor
+   promised something the element did not do. Now the body is the drag surface,
+   so it says so. */
+.studio-clip {
+  cursor: grab;
+}
+
+.studio-clip:active,
+.studio-clip.dragging {
+  cursor: grabbing;
+}
+
+/* Regions inside the clip that own a different gesture keep their own cursor
+   (kept in sync with OWN_GESTURE in ClipView.js). */
+.studio-clip-actions,
+.studio-clip-menu-btn,
+.studio-clip-lyrics-entry,
+.studio-clip-lyrics-edit,
+.studio-clip-lyrics-edit-btn {
+  cursor: pointer;
+}
+
+.studio-clip-lyrics-edit-wrap textarea {
+  cursor: text;
+}
+
+/* Empty lane background is where a range is dragged out. */
+.studio-lane {
+  cursor: crosshair;
+}
+
+/* The ruler scrubs on press-and-hold, so the whole strip reads as draggable
+   rather than just the small handle. */
+.studio-ruler-inner {
+  cursor: ew-resize;
+}
+
+/* A drag that crosses the timeline must not turn into a text selection. */
+.studio-timeline-body,
+.studio-clip,
+.studio-ruler-inner {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.studio-clip-lyrics-edit-wrap,
+.studio-clip-lyrics-edit-wrap textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ==========================================================================
+   Density — the waveform becomes the clip, the clip becomes the lane.
+   ========================================================================== */
+
+/* A 110px lane held a 90px clip holding a 34px waveform: 69% of every track
+   showed nothing. The title row and the duration label each took a line of
+   their own above and below the signal. Both now float over the waveform, the
+   way a region label does in Logic, and the signal gets the whole box. */
+.studio-clip {
+  padding: 0;
+  gap: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  height: auto;
+}
+
+.studio-clip-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  padding: 3px 8px;
+  font-size: 10.5px;
+  line-height: 1.2;
+  /* The label sits on top of the signal, so it needs its own contrast — and it
+     must not swallow the press that starts a drag. */
+  background: linear-gradient(rgba(0, 0, 0, 0.45), transparent);
+  pointer-events: none;
+}
+
+/* …except the controls inside it, which have their own gesture. */
+.studio-clip-actions,
+.studio-clip-actions * {
+  pointer-events: auto;
+}
+
+.studio-clip-wave {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+
+/* The duration is already in the inspector and on the library row; a third
+   copy stamped inside every clip earned a line of its own. */
+.studio-clip-length {
+  position: absolute;
+  right: 6px;
+  bottom: 3px;
+  z-index: 2;
+  font-size: 10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.studio-clip:hover .studio-clip-length {
+  opacity: 0.75;
+}
+
+/* --- Track list: one row per lane, exactly as tall as its lane ------------ */
+/* --studio-lane-height is published from timelineMetrics.js by StudioPage.js.
+   Rows were a hard-coded 100px plus a 12px gap against a 110px lane, so each
+   fader drifted 2px further from the lane it controls — 10px over five lanes.
+   The gap is now folded into the row so the two columns cannot desynchronise. */
+.studio-tracklist,
+.studio-tracklist.compact {
+  gap: 0;
+}
+
+.studio-track-row,
+.studio-tracklist.compact .studio-track-row {
+  height: var(--studio-lane-height, 68px);
+  min-height: var(--studio-lane-height, 68px);
+  max-height: var(--studio-lane-height, 68px);
+  box-sizing: border-box;
+  padding: 6px 10px;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+}
+
+.studio-track-row + .studio-track-row {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.studio-track-header {
+  margin-bottom: 0;
+  gap: 7px;
+}
+
+/* Fader and its readout on one line. "0 dB" used to sit on a line of its own
+   under the fader, left-aligned, which is what made a track 130px tall. */
+.studio-track-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.studio-track-controls > input[type="range"] {
+  grid-column: 1;
+}
+
+.studio-track-controls > div {
+  grid-column: 2;
+}
+
+.studio-db {
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  color: var(--studio-subtext);
+  white-space: nowrap;
+}
+
+.studio-track-controls .studio-mini {
+  padding: 2px 7px;
+  font-size: 10.5px;
+}
+
+/* The ruler and the track-list header must stay the same height or the first
+   lane starts level with the wrong row. */
+.studio-tracklist-top {
+  height: var(--studio-track-top);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+}
+
+/* --- Panels meet, instead of floating apart ------------------------------ */
+/* Three rounded cards on a black field, each with its own border and a gutter
+   between them, is a dashboard. A workspace is one surface divided by rules —
+   which is also how the space stops being spent on margins. */
+.studio-workspace {
+  padding: 0;
+  gap: 0;
+}
+
+.studio-workspace > .studio-left-column,
+.studio-workspace > .studio-center-column,
+.studio-workspace > .studio-right-column {
+  padding: 0;
+}
+
+.studio-left-column > .studio-panel,
+.studio-center-column > .studio-panel,
+.studio-right-column > .studio-panel,
+.studio-panel.studio-details-panel,
+.studio-panel.studio-timeline-panel,
+.studio-panel.studio-library-panel {
+  border-radius: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+/* One hairline between columns carries the separation the borders used to. */
+.studio-center-column {
+  border-left: 1px solid rgba(255, 255, 255, 0.07);
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* The left rail reads as a sidebar: slightly recessed, like Finder's. */
+.studio-left-column {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+/* --- The right panel was cut off at the bottom --------------------------- */
+/* .studio-details-panel had its own 16px padding inside a column that already
+   ends at the transport bar, so its last section ("Relevant Controls", the BPM
+   and Key fields) fell under the fold with no way to reach it. */
+.studio-right-column,
+.studio-left-column {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.studio-panel.studio-details-panel {
+  padding: 16px 16px 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.studio-inspector-shell,
+.studio-inspector {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Align the fader column with the lanes it controls -------------------- */
+/* The lanes are absolutely positioned from the top of the scroll body, so they
+   ignore .studio-timeline-inner's padding-top — which therefore bought nothing
+   but 96px of dead height at the bottom of every project. */
+.studio-timeline-inner {
+  padding-top: 0;
+}
+
+/* Both columns scroll in step (LANE_HEIGHT each), so only their starting
+   offsets have to agree. The ruler block above the lanes is 30px of ruler plus
+   the 6px gap under it; the track list header must be exactly as tall or every
+   fader sits one lane off — it was 96px, a 60px error down the whole column. */
+.studio-tracklist-top {
+  height: 36px;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+/* The right panel scrolls (657px of viewport for ~1400px of content), but
+   nothing said so: the last section simply stopped at the panel edge, which
+   reads as truncation rather than as "there is more below". A fade at the
+   boundary is the cue — the same one the Music app uses. */
+.studio-panel.studio-details-panel {
+  position: relative;
+}
+
+.studio-panel.studio-details-panel::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30px;
+  background: linear-gradient(transparent, var(--studio-bg));
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* The library column scrolls for the same reason and deserves the same cue. */
+.studio-left-column {
+  position: relative;
+}
+
+/* --- Breathing room at the top ------------------------------------------- */
+/* Removing the gutters between the three columns also removed the margin
+   above them, so every panel's first line — "Project Switcher", "Multitrack
+   Timeline", "Project" — started hard against the window edge. The columns
+   still meet each other; they just no longer touch the top. */
+.studio-workspace {
+  padding-top: 18px;
+}
+
+.studio-tracklist-top,
+.studio-timeline-ruler {
+  scroll-margin-top: 18px;
+}
+
+/* The left rail's first control needs the same air as the other two columns. */
+.studio-library-header {
+  padding-top: 2px;
+}
+
+/* ==========================================================================
+   Cards — the Models view's language, reused for Studio projects.
+   ========================================================================== */
+/* The project manager had been rebuilt as a hairline list, which was tidier
+   than the six stacked outlined buttons it replaced but said nothing about
+   what a project *is*. The Models view already answers that: a card with a
+   coloured header, a name, a kicker, two stat blocks and one full-width
+   action. Same tokens, same gradients, same radii. */
+.studio-modal-panel.wide {
+  width: min(1080px, calc(100vw - 56px));
+}
+
+.studio-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.studio-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--studio-radius-md);
+  border: 1px solid var(--studio-panel-border);
+  background: #16161a;
+  box-shadow: var(--studio-shadow-soft);
+  overflow: hidden;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.studio-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.studio-card.active {
+  border-color: rgba(10, 132, 255, 0.45);
+}
+
+.studio-card-head {
+  position: relative;
+  height: 76px;
+  padding: 12px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+/* The Models cards darken their gradient so white sits on it safely. */
+.studio-card-head::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+.studio-card-glyph {
+  position: relative;
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 19px;
+  line-height: 1;
+}
+
+.studio-card-badge {
+  position: relative;
+  z-index: 1;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #000;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.studio-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  flex: 1;
+}
+
+.studio-card-title {
+  margin: 0 0 3px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--studio-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-card-kicker {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--studio-subtext);
+}
+
+.studio-card-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.studio-card-stat {
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--studio-panel-border);
+  min-width: 0;
+}
+
+.studio-card-stat-label {
+  margin: 0 0 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--studio-subtext);
+}
+
+.studio-card-stat-value {
+  margin: 0;
+  font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--studio-accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.studio-card-btn {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--studio-text);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.studio-card-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.studio-card-btn:disabled {
+  color: var(--studio-subtext);
+  cursor: default;
+}
+
+.studio-card-btn.danger {
+  flex: none;
+  width: 40px;
+  letter-spacing: 0;
+  color: var(--studio-subtext);
+}
+
+.studio-card-btn.danger:hover:not(:disabled) {
+  color: var(--studio-danger);
+  border-color: rgba(255, 69, 58, 0.35);
+  background: rgba(255, 69, 58, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-card:hover {
+    transform: none;
+  }
+}
+
+/* --- Empty state: no project open ---------------------------------------- */
+/* This used to render as a .studio-panel inside the workspace grid, so it
+   stretched full width and its text sat pinned to the top-left of an otherwise
+   empty black page. It is a single message with a single action — centre it
+   and let it be the size of what it says. */
+.studio-empty-page {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.studio-empty-back {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+}
+
+.studio-empty-card {
+  width: min(420px, 100%);
+  padding: 32px 28px;
+  border-radius: var(--studio-radius-lg);
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: var(--studio-shadow-soft);
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.studio-empty-glyph {
+  width: 52px;
+  height: 52px;
+  margin-bottom: 4px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+}
+
+.studio-empty-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--studio-text);
+}
+
+.studio-empty-text {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--studio-subtext);
+}
+
+.studio-empty-page .studio-btn.accent {
+  padding: 10px 22px;
+  border-radius: 12px;
+  font-size: 13.5px;
+}
+
+/* ==========================================================================
+   Clips read as blocks of colour (Suno), not tinted boxes (Logic).
+   ========================================================================== */
+/* --lane-clip-ink is set per clip by ClipView from the lane colour's relative
+   luminance, so the label stays legible on a bright yellow-green and on a dark
+   indigo alike. */
+.studio-clip {
+  border-width: 1px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* The label is stamped on the colour, in the same ink as the waveform, the way
+   a region name is in Suno — not floated on a dark scrim over it. */
+.studio-clip-header {
+  background: none;
+  color: var(--lane-clip-ink, #0b0b0f);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.studio-clip-title .studio-tag {
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+  border-color: transparent;
+}
+
+.studio-clip-menu-btn {
+  color: var(--lane-clip-ink, #0b0b0f);
+  opacity: 0.6;
+}
+
+.studio-clip-menu-btn:hover {
+  opacity: 1;
+}
+
+.studio-clip-length {
+  color: var(--lane-clip-ink, #0b0b0f);
+}
+
+/* Selection has to survive on top of a saturated fill, where a coloured
+   outline would vanish. A white ring plus a dark halo works on every hue. */
+.studio-clip.selected {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.92),
+    0 0 0 4px rgba(0, 0, 0, 0.55);
+  border-color: transparent;
+}
+
+/* A muted lane greys its clips out rather than hiding them — Suno keeps the
+   region visible and drains the colour. */
+.studio-lane.muted .studio-clip {
+  filter: saturate(0.15) brightness(0.7);
+}
+
+/* Bar lines behind the clips give the arrangement a rhythm to read against. */
+.studio-lane {
+  background-image:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02), transparent 140px);
+}
+
+.studio-timeline-inner {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.055) 0 1px,
+    transparent 1px 100%
+  );
+  background-size: var(--studio-bar-px, 0) 100%;
+  background-repeat: repeat-x;
+}
+
+/* ==========================================================================
+   Controls — shape, weight and type.
+   ========================================================================== */
+
+/* --- Type scale ----------------------------------------------------------- */
+/* Everything sat within a couple of points of everything else, so nothing led.
+   Four steps: panel title, section label, body, meta. */
+.studio-page {
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+.studio-panel-title {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.studio-subtext {
+  font-size: 12px;
+}
+
+/* Numbers that change while you watch must not reflow the row around them. */
+.studio-time,
+.studio-transport-pill,
+.studio-card-stat-value,
+.studio-db,
+.studio-clip-length {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* --- The one round control ------------------------------------------------ */
+.studio-transport-play {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border: none;
+  border-radius: 50%;
+  background: var(--studio-accent);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(10, 132, 255, 0.35);
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.studio-transport-play:hover {
+  filter: brightness(1.08);
+}
+
+.studio-transport-play:active {
+  transform: scale(0.94);
+}
+
+.studio-transport-play svg {
+  margin-left: 1px; /* optical centring: a triangle's mass sits left */
+}
+
+/* --- Icon-only buttons ---------------------------------------------------- */
+.studio-icon-btn {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--studio-subtext);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.studio-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--studio-text);
+}
+
+.studio-icon-btn:active {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.studio-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: none;
+}
+
+/* --- Toggle buttons: icon + word, state carried by fill ------------------- */
+.studio-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--studio-subtext);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.studio-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--studio-text);
+}
+
+.studio-toggle-btn.active {
+  background: var(--studio-accent-wash);
+  color: #ffffff;
+}
+
+.studio-toggle-btn svg {
+  flex: none;
+  opacity: 0.9;
+}
+
+/* --- Back ----------------------------------------------------------------- */
+.studio-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 10px 5px 6px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--studio-subtext);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.studio-back-button:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--studio-text);
+}
+
+/* --- Buttons that keep their words ---------------------------------------- */
+.studio-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 550;
+}
+
+.studio-btn.accent {
+  box-shadow: 0 1px 8px rgba(10, 132, 255, 0.28);
+}
+
+/* --- Selects: the native arrow is the one Chrome part left showing -------- */
+.studio-page select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-opacity='0.55' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5 12 15l5.5-5.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  padding-right: 30px;
+}
+
+/* --- Transport bar layout ------------------------------------------------- */
+.studio-bottom-left,
+.studio-bottom-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.studio-time {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--studio-text);
+  padding: 0 4px 0 8px;
+  min-width: 78px;
+}
+
+.studio-transport-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+  color: var(--studio-text);
+}
+
+.studio-transport-pill span {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--studio-subtext);
+}
+
+.studio-job-status {
+  font-size: 11.5px;
+  color: var(--studio-subtext);
+  padding-right: 6px;
+}
+
+/* --- "Lanes +" ------------------------------------------------------------ */
+/* The + was a blue square jammed against the word with no gap. */
+.studio-tracklist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+/* --- Search field: glyph inside the box ---------------------------------- */
+.studio-search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.studio-search-field svg {
+  position: absolute;
+  left: 10px;
+  color: var(--studio-subtext);
+  pointer-events: none;
+}
+
+.studio-search-field input {
+  padding-left: 32px;
+}
+
+/* --- Assist trigger ------------------------------------------------------- */
+/* "AI Assist" was a bordered box the same weight as the field's own label. */
+.studio-assist-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(10, 132, 255, 0.14);
+  color: #6cb6ff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.studio-assist-trigger:hover:not(:disabled) {
+  background: rgba(10, 132, 255, 0.24);
+  color: #ffffff;
+}
+
+.studio-assist-trigger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.studio-assist-trigger.active svg {
+  animation: studio-assist-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes studio-assist-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+/* --- Library group chevron ------------------------------------------------ */
+.studio-library-group-chevron {
+  display: inline-flex;
+  align-items: center;
+  color: var(--studio-subtext);
+  transition: transform 160ms ease;
+}
+
+.studio-library-group-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+/* --- "Lanes" header ------------------------------------------------------- */
+.studio-tracklist-header .studio-panel-title {
+  margin: 0;
+}
+
+.studio-tracklist-header .studio-mini,
+.studio-tracklist-header button[title*="lane" i] {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-assist-trigger.active svg,
+  .studio-library-group-chevron {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* The shared Select sizes itself to its container; in the timeline toolbar it
+   sits beside pills, so it needs to be as compact as they are. */
+.studio-inline-select {
+  width: auto;
+  min-width: 92px;
+  min-height: 30px;
+  padding: 4px 10px;
+  border-radius: 9px;
+  font-size: 12px;
 }

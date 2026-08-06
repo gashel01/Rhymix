@@ -23,59 +23,83 @@ def _sanitize_download_name(value, fallback):
     return name or fallback
 
 
+def resolve_media_path(file_type, filename):
+    """Resolve a (file_type, fileId) pair to an audio file on disk.
+
+    Returns (path, None) on success, or (None, (payload, status)) so every
+    caller reports the same errors this route has always reported.
+    """
+    filename = os.path.basename(urllib.parse.unquote(filename))
+
+    dir_map = {
+        "raw_vocals": paths.UVR_RAW_DIR,
+        "processed_vocals": paths.UVR_PROCESSED_DIR,
+        "exports": paths.EXPORT_DIR,
+        "instrumental": paths.INSTRUMENTAL_DIR,
+    }
+    if file_type not in dir_map:
+        return None, ({"error": f"Invalid file type: {file_type}"}, 400)
+
+    target_dir = dir_map[file_type]
+    if not target_dir.exists():
+        return None, (
+            {"error": f"Directory {file_type} does not exist", "directory": str(target_dir)},
+            404,
+        )
+
+    existing = [f.name for f in target_dir.glob("*.wav")]
+
+    file_path = target_dir / filename
+    if file_type in {"raw_vocals", "processed_vocals", "instrumental"}:
+        base_name = get_upload_base_name(filename)
+        if not base_name:
+            return None, ({"error": f"Unknown fileId: {filename}"}, 404)
+        suffix = "_instrumental.wav" if file_type == "instrumental" else "_vocals.wav"
+        filename = f"{base_name}{suffix}"
+        file_path = target_dir / filename
+
+    if not file_path.exists():
+        matches = [f for f in existing if filename.lower() in f.lower() or f.lower() in filename.lower()]
+        return None, (
+            {
+                "error": f"File {filename} not found in {target_dir}",
+                "requested_filename": filename,
+                "available_files": existing,
+                "similar_matches": matches[:10],
+            },
+            404,
+        )
+
+    return file_path, None
+
+
+def resolve_inference_path(run_id):
+    """Resolve an inference run id to its output file, or None if missing."""
+    run_id = urllib.parse.unquote(run_id)
+    run_meta = load_inference_run_metadata(run_id)
+
+    if run_meta:
+        output_name = run_meta.get("outputFileName", "inferred.wav")
+        file_path = paths.INFERENCE_RUNS_DIR / run_id / output_name
+    else:
+        # Legacy fallback
+        file_path = paths.get_inference_file_path(run_id)
+
+    return file_path if file_path.exists() else None
+
+
 @bp.route("/api/download/<file_type>/<path:filename>")
 def download_file(file_type, filename):
     try:
         logger.debug("Download request type=%s filename=%s", file_type, filename)
-        filename = os.path.basename(urllib.parse.unquote(filename))
         requested_download_name = request.args.get("downloadName")
 
-        dir_map = {
-            "raw_vocals": paths.UVR_RAW_DIR,
-            "processed_vocals": paths.UVR_PROCESSED_DIR,
-            "exports": paths.EXPORT_DIR,
-            "instrumental": paths.INSTRUMENTAL_DIR,
-        }
-        if file_type not in dir_map:
-            return jsonify({"error": f"Invalid file type: {file_type}"}), 400
+        file_path, error = resolve_media_path(file_type, filename)
+        if error:
+            payload, status = error
+            return jsonify(payload), status
 
-        target_dir = dir_map[file_type]
-
-        if not target_dir.exists():
-            return (
-                jsonify({"error": f"Directory {file_type} does not exist", "directory": str(target_dir)}),
-                404,
-            )
-
-        existing = [f.name for f in target_dir.glob("*.wav")]
-
-        file_path = target_dir / filename
-        file_id = filename
-        if file_type in {"raw_vocals", "processed_vocals", "instrumental"}:
-            base_name = get_upload_base_name(file_id)
-            if not base_name:
-                return jsonify({"error": f"Unknown fileId: {file_id}"}), 404
-            if file_type == "instrumental":
-                filename = f"{base_name}_instrumental.wav"
-            else:
-                filename = f"{base_name}_vocals.wav"
-            file_path = target_dir / filename
-
-        if not file_path.exists():
-            matches = [f for f in existing if filename.lower() in f.lower() or f.lower() in filename.lower()]
-            return (
-                jsonify(
-                    {
-                        "error": f"File {filename} not found in {dir_map[file_type]}",
-                        "requested_filename": filename,
-                        "available_files": existing,
-                        "similar_matches": matches[:10],
-                    }
-                ),
-                404,
-            )
-
-        download_name = _sanitize_download_name(requested_download_name, filename)
+        download_name = _sanitize_download_name(requested_download_name, file_path.name)
         return send_file(file_path, mimetype="audio/wav", as_attachment=True, download_name=download_name)
 
     except Exception as e:
@@ -141,6 +165,12 @@ def _resolve_download_source(source):
                 return candidate
             legacy = paths.get_inference_file_path(src_id)
             return legacy if legacy.exists() else None
+        if src_type == "exports":
+            # Generated audio (Foundation, Studio AI, renders) lives here and is
+            # addressed by filename. The download route already serves it; without
+            # this branch anything reusing such an asset as a source can't find it.
+            candidate = paths.EXPORT_DIR / os.path.basename(src_id)
+            return candidate if candidate.exists() else None
         return None
 
     if isinstance(source, str):
