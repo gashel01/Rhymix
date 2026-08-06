@@ -26,6 +26,16 @@ import ProjectManagerModal from "./components/ProjectManagerModal";
 import { useStudioPlayback } from './hooks/useStudioPlayback';
 import { useLyricsActions } from './hooks/useLyricsActions';
 import { useStudioKeyboardShortcuts } from './hooks/useStudioKeyboardShortcuts';
+import { LANE_HEIGHT, fitZoom, sliderToZoom, zoomToSlider } from "./timelineMetrics";
+import {
+  ChevronLeftIcon,
+  FitIcon,
+  FocusIcon,
+  LoopIcon,
+  MagnetIcon,
+  MetronomeIcon,
+  SparklesIcon,
+} from "./components/StudioIcons";
 
 const JOB_TYPE_LABELS = {
   understand: "Analyze",
@@ -45,6 +55,11 @@ const summarizeJob = (job) => {
   return `${label} · ${job.statusMessage || job.error || job.status || "idle"}`;
 };
 
+/* The lane height lives in timelineMetrics.js and is published to CSS here,
+   so the track list rows, the timeline lanes and the selection overlay can
+   never drift apart again. They already had: rows were 100px + a 12px gap
+   against a 110px lane, so the faders slid 2px per track out of line with
+   the lane they control. */
 const getUiStorageKey = (projectId) => `rhymix:studio-ui:${projectId}`;
 
 const readUiPrefs = (projectId) => {
@@ -80,6 +95,9 @@ const StudioPageInner = ({ assetId, projectId }) => {
   const [libraryQuery, setLibraryQuery] = useState("");
   const [timelineScrollTop, setTimelineScrollTop] = useState(0);
   const trackScrollRef = useRef(null);
+  const timelineCanvasRef = useRef(null);
+  const didFitZoomRef = useRef(false);
+  const didAutoOpenSwitcherRef = useRef(false);
   const suppressTrackHeaderScrollRef = useRef(false);
   const focusMode = Boolean(state.ui.focusMode);
 
@@ -324,16 +342,48 @@ const StudioPageInner = ({ assetId, projectId }) => {
     return "No active selection";
   }, [selectedClip, selectedLane, state.selection, state.lanes.length, state.clips.length]);
 
+  /* Same span Timeline computes for itself. */
+  const projectDurationSec = useMemo(() => {
+    let maxEnd = state.project?.durationSec || 0;
+    state.clips.forEach((clip) => {
+      const end = (clip.timelineStartSec ?? 0) + (clip.srcEndSec ?? 0) - (clip.srcStartSec ?? 0);
+      if (end > maxEnd) maxEnd = end;
+    });
+    return Math.max(10, maxEnd);
+  }, [state.project, state.clips]);
+
+  /* Landing on /studio with no project showed a near-empty page whose only
+     action was a button reading "Open Project Switcher" — a screen that exists
+     only to ask you to press the one thing on it. Open the switcher instead.
+     Once per mount, so closing it does not immediately reopen it; the empty
+     state stays behind with the button still available. */
+  useEffect(() => {
+    if (loading || error || state.project) return;
+    if (didAutoOpenSwitcherRef.current) return;
+    didAutoOpenSwitcherRef.current = true;
+    setShowProjectManager(true);
+  }, [loading, error, state.project]);
+
+  const handleFitZoom = useCallback(() => {
+    const width = timelineCanvasRef.current?.clientWidth;
+    if (!width) return;
+    actions.setUi({ zoom: fitZoom(projectDurationSec, width) });
+  }, [actions, projectDurationSec]);
+
+  /* A project opens framed. The zoom defaulted to 1 — 80px/s — so a
+     three-minute track opened showing its first six seconds, and no position
+     of the old slider could show more than a ninth of it. Fires once per
+     project; after that the zoom belongs to the user. */
+  useEffect(() => {
+    if (didFitZoomRef.current) return;
+    if (!state.project || !state.clips.length) return;
+    const width = timelineCanvasRef.current?.clientWidth;
+    if (!width) return;
+    didFitZoomRef.current = true;
+    actions.setUi({ zoom: fitZoom(projectDurationSec, width) });
+  }, [state.project, state.clips.length, projectDurationSec, actions]);
+
   const currentWorkspaceLabel = "Studio";
-  const shortcutHints = useMemo(
-    () => [
-      "Space Play/Pause",
-      "Del Delete",
-      "S Split",
-      "Drag Trim/Move",
-    ],
-    []
-  );
 
   const syncStudioRoute = useCallback(
     (nextProjectData) => {
@@ -642,37 +692,32 @@ const StudioPageInner = ({ assetId, projectId }) => {
   const jobStatus = summarizeJob(currentJob);
 
   if (loading) {
-    return <div className="studio-page">Loading Studio...</div>;
+    return <div className="studio-page" style={{ "--studio-lane-height": `${LANE_HEIGHT}px` }}>Loading Studio...</div>;
   }
 
   if (error) {
-    return <div className="studio-page">Error: {error}</div>;
+    return <div className="studio-page" style={{ "--studio-lane-height": `${LANE_HEIGHT}px` }}>Error: {error}</div>;
   }
 
   if (!state.project) {
     return (
-      <div className="studio-page">
-        <div className="studio-shell">
-          <div className="studio-workspace">
-            <div className="studio-center-column">
-              <div className="studio-panel studio-empty-shell">
-                <div className="studio-context-heading">
-                  <button className="studio-mini studio-back-button" onClick={handleBack}>
-                    Back
-                  </button>
-                  <div className="studio-context-eyebrow">{currentWorkspaceLabel}</div>
-                </div>
-                <div className="studio-panel-title">Open or Create a Studio Project</div>
-                <div className="studio-subtext">
-                  Pick an existing project, start a new one from a track, or create a blank project.
-                </div>
-                <div className="studio-actions-row" style={{ marginTop: 16 }}>
-                  <button className="studio-btn" onClick={() => setShowProjectManager(true)}>
-                    Open Project Switcher
-                  </button>
-                </div>
-              </div>
-            </div>
+      <div className="studio-page" style={{ "--studio-lane-height": `${LANE_HEIGHT}px` }}>
+        <div className="studio-empty-page">
+          <button className="studio-mini studio-empty-back" onClick={handleBack}>
+            Back
+          </button>
+          {/* Centred, and sized to its own content — it used to be a panel
+              stretched across the workspace grid, so the text sat in the top
+              left corner of an otherwise black screen. */}
+          <div className="studio-empty-card">
+            <div className="studio-empty-glyph" aria-hidden="true">&#9835;</div>
+            <h1 className="studio-empty-title">No project open</h1>
+            <p className="studio-empty-text">
+              Open an existing Studio project, start one from a track, or create a blank project.
+            </p>
+            <button className="studio-btn accent" onClick={() => setShowProjectManager(true)}>
+              Browse projects
+            </button>
           </div>
         </div>
         <ProjectManagerModal
@@ -691,7 +736,7 @@ const StudioPageInner = ({ assetId, projectId }) => {
   }
 
   return (
-    <div className="studio-page">
+    <div className="studio-page" style={{ "--studio-lane-height": `${LANE_HEIGHT}px` }}>
       <div className="studio-shell">
         <div className={`studio-workspace ${focusMode ? "focus-mode" : ""}`}>
           <div className="studio-left-column">
@@ -713,7 +758,8 @@ const StudioPageInner = ({ assetId, projectId }) => {
                 so all this box did was repeat them across ~120px of height. */}
             <div className="studio-context-strip">
               <div className="studio-context-main">
-                <button className="studio-mini studio-back-button" onClick={handleBack}>
+                <button className="studio-back-button" onClick={handleBack}>
+                  <ChevronLeftIcon size={15} />
                   Back
                 </button>
                 <div className="studio-context-eyebrow">{currentWorkspaceLabel}</div>
@@ -724,14 +770,18 @@ const StudioPageInner = ({ assetId, projectId }) => {
                     {`${activeJobs.length} active job${activeJobs.length === 1 ? "" : "s"}`}
                   </div>
                 ) : null}
-                <button className="studio-mini" onClick={() => setShowOrchestrator(true)}>
-                  AI Orchestrator
+                <button className="studio-toggle-btn" onClick={() => setShowOrchestrator(true)}>
+                  <SparklesIcon size={15} />
+                  Orchestrator
                 </button>
                 <button
-                  className={`studio-mini ${focusMode ? "active" : ""}`}
+                  className={`studio-toggle-btn ${focusMode ? "active" : ""}`}
+                  aria-pressed={focusMode}
+                  title={focusMode ? "Leave focus mode" : "Focus mode"}
                   onClick={() => actions.setUi({ focusMode: !focusMode })}
                 >
-                  {focusMode ? "Exit Focus" : "Focus Mode"}
+                  <FocusIcon size={15} />
+                  Focus
                 </button>
               </div>
             </div>
@@ -761,34 +811,57 @@ const StudioPageInner = ({ assetId, projectId }) => {
                       <option value={8}>1/32</option>
                     </select>
                   </div>
+                  {/* Three toggles that used to be three identical word-boxes:
+                      nothing but a faint fill said which were on. An icon plus
+                      aria-pressed makes the state readable and announceable. */}
                   <button
-                    className={`studio-mini ${state.ui.snap ? "active" : ""}`}
+                    className={`studio-toggle-btn ${state.ui.snap ? "active" : ""}`}
+                    aria-pressed={Boolean(state.ui.snap)}
+                    title="Snap to grid"
                     onClick={() => actions.setUi({ snap: !state.ui.snap })}
                   >
+                    <MagnetIcon size={15} />
                     Snap
                   </button>
                   <button
-                    className={`studio-mini ${state.ui.metronome ? "active" : ""}`}
+                    className={`studio-toggle-btn ${state.ui.metronome ? "active" : ""}`}
+                    aria-pressed={Boolean(state.ui.metronome)}
+                    title="Metronome"
                     onClick={() => actions.setUi({ metronome: !state.ui.metronome })}
                   >
-                    Metronome
+                    <MetronomeIcon size={15} />
+                    Click
                   </button>
                   <button
-                    className={`studio-mini ${state.ui.loop ? "active" : ""}`}
+                    className={`studio-toggle-btn ${state.ui.loop ? "active" : ""}`}
+                    aria-pressed={Boolean(state.ui.loop)}
+                    title="Loop playback"
                     onClick={() => actions.setUi({ loop: !state.ui.loop })}
                   >
+                    <LoopIcon size={15} />
                     Loop
                   </button>
                   <div className="studio-zoom">
                     <span>Zoom</span>
+                    {/* Logarithmic: the useful range spans 200:1, so a linear
+                        slider would bunch every song-length position into its
+                        first few pixels. */}
                     <input
                       type="range"
-                      min="0.5"
-                      max="2.5"
-                      step="0.1"
-                      value={state.ui.zoom}
-                      onChange={(e) => actions.setUi({ zoom: Number(e.target.value) })}
+                      min="0"
+                      max="1"
+                      step="0.001"
+                      value={zoomToSlider(state.ui.zoom)}
+                      onChange={(e) => actions.setUi({ zoom: sliderToZoom(e.target.value) })}
                     />
+                    <button
+                      className="studio-icon-btn"
+                      onClick={handleFitZoom}
+                      aria-label="Fit project in view"
+                      title="Fit the whole project in view"
+                    >
+                      <FitIcon size={15} />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -831,7 +904,7 @@ const StudioPageInner = ({ assetId, projectId }) => {
                   />
                 </div>
 
-                <div className="studio-timeline-canvas">
+                <div className="studio-timeline-canvas" ref={timelineCanvasRef}>
                   <Timeline
                     project={state.project}
                     lanes={state.lanes}
@@ -903,6 +976,7 @@ const StudioPageInner = ({ assetId, projectId }) => {
                   project={state.project}
                   lanes={state.lanes}
                   clips={state.clips}
+                  assets={state.assets}
                   selection={state.selection}
                   metadata={state.metadata}
                   lyricsSelection={lyricsSelection}
@@ -961,10 +1035,6 @@ const StudioPageInner = ({ assetId, projectId }) => {
         contextActions={transportActions}
         jobCount={activeJobs.length}
         bpm={state.project?.bpm || 120}
-        snap={state.ui.snap}
-        loop={state.ui.loop}
-        zoom={state.ui.zoom}
-        workspaceLabel={currentWorkspaceLabel}
         selectionSummary={selectionSummary}
       />
 
