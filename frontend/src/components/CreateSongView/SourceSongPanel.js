@@ -1,5 +1,5 @@
 import React from "react";
-import MusicNoteIcon from "@mui/icons-material/MusicNote";
+import MusicNoteIcon from "@mui/icons-material/MusicNoteOutlined";
 
 export function SourceSongPanel({ ui, t, sourceSong, loading, error }) {
   const { Panel } = ui;

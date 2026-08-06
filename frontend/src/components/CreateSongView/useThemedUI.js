@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { createPortal } from "react-dom";
-import CloseIcon from "@mui/icons-material/Close";
+import CloseIcon from "@mui/icons-material/CloseOutlined";
 
 export function useThemedUI(t) {
   return useMemo(() => {

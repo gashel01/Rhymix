@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import MusicNoteIcon from "@mui/icons-material/MusicNote";
-import LyricsIcon from "@mui/icons-material/Lyrics";
-import PersonIcon from "@mui/icons-material/Person";
+import MusicNoteIcon from "@mui/icons-material/MusicNoteOutlined";
+import LyricsIcon from "@mui/icons-material/LyricsOutlined";
+import PersonIcon from "@mui/icons-material/PersonOutlined";
 import { AceStepSection } from "./AceStepSection";
 import { CustomizeContent } from "./OptionsBlock";
 import { GENRE_RECS, toKey } from "./constants";

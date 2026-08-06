@@ -19,13 +19,13 @@ import {
   AccordionSummary,
   AccordionDetails,
 } from "@mui/material";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
-import TuneIcon from "@mui/icons-material/Tune";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import AudioFileIcon from "@mui/icons-material/AudioFile";
-import GraphicEqIcon from "@mui/icons-material/GraphicEq";
-import SurroundSoundIcon from "@mui/icons-material/SurroundSound";
-import PaletteIcon from "@mui/icons-material/Palette";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
+import TuneIcon from "@mui/icons-material/TuneOutlined";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMoreOutlined";
+import AudioFileIcon from "@mui/icons-material/AudioFileOutlined";
+import GraphicEqIcon from "@mui/icons-material/GraphicEqOutlined";
+import SurroundSoundIcon from "@mui/icons-material/SurroundSoundOutlined";
+import PaletteIcon from "@mui/icons-material/PaletteOutlined";
 import { useTheme } from "@mui/material/styles";
 import PageHeader from "./common/PageHeader";
 

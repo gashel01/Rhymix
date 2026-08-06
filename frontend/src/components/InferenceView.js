@@ -1,10 +1,10 @@
 import React, { useState, useCallback, memo, useEffect, useRef, useMemo } from "react";
 import { useVolume } from "../contexts/VolumeContext";
-import AudioFileIcon from "@mui/icons-material/AudioFile";
-import PsychologyIcon from "@mui/icons-material/Psychology";
-import SearchIcon from "@mui/icons-material/Search";
-import CloseIcon from "@mui/icons-material/Close";
-import DeleteIcon from "@mui/icons-material/Delete";
+import AudioFileIcon from "@mui/icons-material/AudioFileOutlined";
+import PsychologyIcon from "@mui/icons-material/PsychologyOutlined";
+import SearchIcon from "@mui/icons-material/SearchOutlined";
+import CloseIcon from "@mui/icons-material/CloseOutlined";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import AudioTrackTable from "./AudioTrackTable/AudioTrackTable";
 import DeleteDialog from "./AudioTrackTable/InferenceResult/DeleteDialog";
 import ErrorBoundary from "./ErrorBoundary";

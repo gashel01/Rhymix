@@ -21,10 +21,10 @@ import {
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import { GlobalStyles } from "@mui/material";
-import HomeIcon from "@mui/icons-material/Home";
-import AudioFileIcon from "@mui/icons-material/AudioFile";
-import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
-import SpaceDashboardIcon from "@mui/icons-material/SpaceDashboard";
+import HomeIcon from "@mui/icons-material/HomeOutlined";
+import AudioFileIcon from "@mui/icons-material/AudioFileOutlined";
+import ModelTrainingIcon from "@mui/icons-material/ModelTrainingOutlined";
+import SpaceDashboardIcon from "@mui/icons-material/SpaceDashboardOutlined";
 import FileUpload from "./components/FileUpload";
 // import DownloadResults from "./components/DownloadResults";
 import HomeView from "./components/HomeView";
@@ -35,7 +35,7 @@ import InferenceView from "./components/InferenceView";
 import InferenceParams from "./components/InferenceParams";
 import ModelsView from "./components/ModelsView";
 import CreateSongView from "./components/CreateSongView";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import NavigationBar from "./components/NavigationBar";
 import { uploadFiles, startProcessing, getTrackStatuses, cleanDirectories } from "./utils/apiService";
 import { mergeProcessingUpdate, processingEquals, isTerminalProcessingState } from "./utils/processingStatus";
@@ -48,14 +48,18 @@ const createAppTheme = (mode) => createTheme({
     mode,
     ...(mode === 'dark'
       ? {
-        // Dark theme - Tesla inspired
+        /* Apple publishes two sets of system colours: one for light, one for
+           dark. This branch is the dark theme but was using the light values —
+           #007AFF against Theme.js's #0A84FF, side by side on the same screen.
+           The dark variants are lifted a few points precisely so they hold up
+           on a near-black background. */
         primary: {
-          main: '#007AFF', // iOS blue
+          main: '#0A84FF', // systemBlue, dark
           light: '#4DA3FF',
           dark: '#0056CC',
         },
         secondary: {
-          main: '#FF3B30', // iOS red
+          main: '#FF453A', // systemRed, dark
           light: '#FF6B66',
           dark: '#CC2F26',
         },
@@ -70,13 +74,13 @@ const createAppTheme = (mode) => createTheme({
         },
         divider: '#38383A',
         success: {
-          main: '#34C759', // iOS green
+          main: '#30D158', // systemGreen, dark
         },
         warning: {
-          main: '#FF9500', // iOS orange
+          main: '#FF9F0A', // systemOrange, dark
         },
         error: {
-          main: '#FF3B30',
+          main: '#FF453A', // systemRed, dark
         },
       }
       : {
@@ -343,8 +347,12 @@ function App() {
 
   const theme = createAppTheme(darkMode ? 'dark' : 'light');
 
-  const [open, setOpen] = React.useState(!sidebarCollapsed);
-  React.useEffect(() => { if (!sidebarCollapsed) setOpen(true); }, [sidebarCollapsed]);;
+  /* The settings drawer holds the Groq API key and the output volume — set
+     once, then never again. It opened by default and sat at the foot of the
+     sidebar, so on a short window it ran over the nav items above it.
+     The effect below it was worse than the default: it forced the drawer back
+     open every time the sidebar was expanded, so closing it never stuck. */
+  const [open, setOpen] = React.useState(false);
 
   // Drive the view from the URL. Used both on first paint and on every
   // back/forward, so the address bar and what's on screen can't drift apart.

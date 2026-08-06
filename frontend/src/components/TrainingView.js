@@ -28,15 +28,15 @@ import {
   DialogActions,
   TextField,
 } from "@mui/material";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
-import TuneIcon from "@mui/icons-material/Tune";
-import SettingsIcon from "@mui/icons-material/Settings";
-import AudioFileIcon from "@mui/icons-material/AudioFile";
-import GraphicEqIcon from "@mui/icons-material/GraphicEq";
-import SchoolIcon from "@mui/icons-material/School";
-import MemoryIcon from "@mui/icons-material/Memory";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import ScheduleIcon from "@mui/icons-material/Schedule";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
+import TuneIcon from "@mui/icons-material/TuneOutlined";
+import SettingsIcon from "@mui/icons-material/SettingsOutlined";
+import AudioFileIcon from "@mui/icons-material/AudioFileOutlined";
+import GraphicEqIcon from "@mui/icons-material/GraphicEqOutlined";
+import SchoolIcon from "@mui/icons-material/SchoolOutlined";
+import MemoryIcon from "@mui/icons-material/MemoryOutlined";
+import ArrowBackIcon from "@mui/icons-material/ArrowBackOutlined";
+import ScheduleIcon from "@mui/icons-material/ScheduleOutlined";
 import { useTheme } from "@mui/material/styles";
 import PageHeader from "./common/PageHeader";
 import Section from "./common/Section";

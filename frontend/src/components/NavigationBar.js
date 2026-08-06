@@ -17,13 +17,13 @@ import {
 } from "@mui/material";
 import ClickAwayListener from "@mui/material/ClickAwayListener";
 
-import SettingsIcon from "@mui/icons-material/Settings";
-import CloseIcon from "@mui/icons-material/Close";
-import Brightness4 from "@mui/icons-material/Brightness4";
-import Brightness7 from "@mui/icons-material/Brightness7";
-import VolumeUp from "@mui/icons-material/VolumeUp";
-import VolumeOff from "@mui/icons-material/VolumeOff";
-import MenuIcon from "@mui/icons-material/Menu";
+import SettingsIcon from "@mui/icons-material/SettingsOutlined";
+import CloseIcon from "@mui/icons-material/CloseOutlined";
+import Brightness4 from "@mui/icons-material/Brightness4Outlined";
+import Brightness7 from "@mui/icons-material/Brightness7Outlined";
+import VolumeUp from "@mui/icons-material/VolumeUpOutlined";
+import VolumeOff from "@mui/icons-material/VolumeOffOutlined";
+import MenuIcon from "@mui/icons-material/MenuOutlined";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { BrushCleaning } from "lucide-react";
@@ -516,7 +516,14 @@ function NavigationBar({
                     </IconCircleButton>
                   </div>
 
+                  {/* Clipped to zero height, but max-height and opacity alone
+                      leave the API key field and its buttons in the tab order:
+                      you would tab from the sidebar into controls you cannot
+                      see. `inert` takes the whole subtree out of focus and of
+                      the accessibility tree while it is closed. */}
                   <div
+                      inert={open ? undefined : ""}
+                      aria-hidden={open ? undefined : "true"}
                       style={{
                         maxHeight: open ? 360 : 0,
                         opacity: open ? 1 : 0,

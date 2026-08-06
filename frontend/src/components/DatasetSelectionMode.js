@@ -7,8 +7,8 @@ import {
   Chip,
   Checkbox,
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Close';
-import SchoolIcon from '@mui/icons-material/School';
+import DeleteIcon from '@mui/icons-material/CloseOutlined';
+import SchoolIcon from '@mui/icons-material/SchoolOutlined';
 import styles from './DatasetSelectionMode.module.css';
 
 /**

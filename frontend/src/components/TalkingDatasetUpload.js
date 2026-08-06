@@ -13,11 +13,11 @@ import {
   ListItemText,
   Divider,
 } from "@mui/material";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import AudioFileIcon from "@mui/icons-material/AudioFile";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ErrorIcon from "@mui/icons-material/Error";
-import PeopleIcon from "@mui/icons-material/People";
+import CloudUploadIcon from "@mui/icons-material/CloudUploadOutlined";
+import AudioFileIcon from "@mui/icons-material/AudioFileOutlined";
+import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
+import ErrorIcon from "@mui/icons-material/ErrorOutlined";
+import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import axios from "axios";
 
 function TalkingDatasetUpload({ onBack }) {

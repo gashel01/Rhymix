@@ -22,9 +22,9 @@ import {
   Radio,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import ArrowBackIcon from "@mui/icons-material/ArrowBackOutlined";
+import ModelTrainingIcon from "@mui/icons-material/ModelTrainingOutlined";
+import AccessTimeIcon from "@mui/icons-material/AccessTimeOutlined";
 import PageHeader from "./common/PageHeader";
 import Section from "./common/Section";
 

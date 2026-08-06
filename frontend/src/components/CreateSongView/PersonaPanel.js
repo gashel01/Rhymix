@@ -1,5 +1,5 @@
 import React from "react";
-import PersonIcon from "@mui/icons-material/Person";
+import PersonIcon from "@mui/icons-material/PersonOutlined";
 
 export function PersonaPanel({ ui, t, loadingModels, availableModels, selectedModel, selectedCheckpoint, onSelectModel, onSelectCheckpoint, onClearPersona }) {
   const { Panel, Pill, Spinner } = ui;

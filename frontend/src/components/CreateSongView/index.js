@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import {
   API_BASE,
   clamp,

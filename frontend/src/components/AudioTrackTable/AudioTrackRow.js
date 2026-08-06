@@ -1,10 +1,10 @@
 import React, { useRef, useCallback, useEffect, useState } from "react";
 import { Tooltip } from "@mui/material";
-import ErrorIcon from "@mui/icons-material/Error";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
+import ErrorIcon from "@mui/icons-material/ErrorOutlined";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRightOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import MoreHorizIcon from "@mui/icons-material/MoreHorizOutlined";
 
 // keep existing local components (NOT changing icons)
 import TextOverflow from "../TextOverflow.tsx";

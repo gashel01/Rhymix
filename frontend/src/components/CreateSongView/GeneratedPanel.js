@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import MusicNoteIcon from "@mui/icons-material/MusicNote";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import PauseIcon from "@mui/icons-material/Pause";
-import DownloadIcon from "@mui/icons-material/Download";
-import DeleteIcon from "@mui/icons-material/Delete";
-import MicIcon from "@mui/icons-material/Mic";
+import MusicNoteIcon from "@mui/icons-material/MusicNoteOutlined";
+import PlayArrowIcon from "@mui/icons-material/PlayArrowOutlined";
+import PauseIcon from "@mui/icons-material/PauseOutlined";
+import DownloadIcon from "@mui/icons-material/DownloadOutlined";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import MicIcon from "@mui/icons-material/MicOutlined";
 import AudioWaveform from "../AudioWaveform";
 import {
   API_BASE,

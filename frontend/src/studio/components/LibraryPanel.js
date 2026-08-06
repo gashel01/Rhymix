@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import StopIcon from "@mui/icons-material/Stop";
-import AddIcon from "@mui/icons-material/Add";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import PlayArrowIcon from "@mui/icons-material/PlayArrowOutlined";
+import StopIcon from "@mui/icons-material/StopOutlined";
+import AddIcon from "@mui/icons-material/AddOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import { ChevronDownIcon, SearchIcon } from "./StudioIcons";
 
 const CATEGORY_ORDER = ["vocals", "drums", "bass", "music", "midi", "generated", "other"];

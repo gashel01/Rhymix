@@ -12,11 +12,11 @@ import {
   Divider,
   Button,
 } from "@mui/material";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ErrorIcon from "@mui/icons-material/Error";
-import WarningIcon from "@mui/icons-material/Warning";
+import AccessTimeIcon from "@mui/icons-material/AccessTimeOutlined";
+import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOverOutlined";
+import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
+import ErrorIcon from "@mui/icons-material/ErrorOutlined";
+import WarningIcon from "@mui/icons-material/WarningOutlined";
 
 function TalkProcessingStatus({ jobStatus, forceNextStep }) {
   if (!jobStatus) {
