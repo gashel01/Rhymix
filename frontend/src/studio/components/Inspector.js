@@ -542,10 +542,28 @@ const ProjectAdvancedPanel = ({ project, metadata, onUpdateProject }) => (
   </div>
 );
 
+/* Clips carry no label of their own, so the old fallback chain ended on
+   `clip.id` and the panel headlined a raw 32-character uuid — with a second one
+   ("lane da43bec9…") in the subtitle. Neither identifies anything to a person.
+   The source asset and the lane both have real names; use those, and keep the
+   id out of the panel entirely. */
+const describeClip = (clip, assets, lanes) => {
+  const assetLabel = assets?.[clip.sourceAssetId]?.label;
+  const laneName = lanes?.find((lane) => lane.id === clip.laneId)?.name;
+  const name = clip.label || clip.name || assetLabel || laneName || "Clip";
+  return {
+    name,
+    // A clip named after its own lane is the common case ("Vocals" on the
+    // Vocals lane); repeating it in the subtitle says nothing.
+    lane: laneName && laneName !== name ? laneName : null,
+  };
+};
+
 const Inspector = ({
   project,
   lanes,
   clips,
+  assets = {},
   selection,
   onSplit,
   onTrimLeft,
@@ -764,16 +782,18 @@ const Inspector = ({
   const selectionSummary = useMemo(() => {
     if (resolvedRightPanelContext === PANEL_CONTEXT.AUDIO && selectedClip) {
       const bounds = getClipBounds(selectedClip);
+      const { name, lane } = describeClip(selectedClip, assets, lanes);
       return {
-        title: selectedClip.label || selectedClip.name || selectedClip.id,
-        subtitle: `Audio clip · ${formatSeconds(bounds.duration)} · lane ${selectedClip.laneId}`,
+        title: name,
+        subtitle: `Audio clip · ${formatSeconds(bounds.duration)}${lane ? ` · ${lane}` : ""}`,
       };
     }
     if (resolvedRightPanelContext === PANEL_CONTEXT.MIDI && selectedClip) {
       const bounds = getClipBounds(selectedClip);
+      const { name, lane } = describeClip(selectedClip, assets, lanes);
       return {
-        title: selectedClip.label || selectedClip.name || selectedClip.id,
-        subtitle: `MIDI clip · ${formatSeconds(bounds.duration)} · lane ${selectedClip.laneId}`,
+        title: name,
+        subtitle: `MIDI clip · ${formatSeconds(bounds.duration)}${lane ? ` · ${lane}` : ""}`,
       };
     }
     if (resolvedRightPanelContext === PANEL_CONTEXT.RANGE && selectedRange) {
@@ -787,7 +807,7 @@ const Inspector = ({
       title: project?.name || "Project",
       subtitle: `No active source · ${project?.bpm || 120} BPM · ${project?.key || "Key unset"} · ${project?.timeSignature || "4/4"}`,
     };
-  }, [lanes.length, project, resolvedRightPanelContext, selectedAudioClips.length, selectedClip, selectedRange, selection?.laneIds]);
+  }, [assets, lanes, project, resolvedRightPanelContext, selectedAudioClips.length, selectedClip, selectedRange, selection?.laneIds]);
 
   const runAnalyzeQuick = () => {
     if (!canAnalyze || !analyzeRange) return;
@@ -1016,7 +1036,9 @@ const Inspector = ({
     <div className="studio-inspector-shell">
       <div className="studio-inspector studio-inspector-redesigned">
         <div className="studio-inspector-sticky">
-          <div className="studio-context-eyebrow">{activeWorkspaceLabel || "Studio"}</div>
+          {/* This was a constant reading "STUDIO", printed above a panel that
+              is inside the Studio, on a screen whose header also says Studio.
+              The panel's own title carries the information. */}
           <div className="studio-inspector-topline">
             <div>
               <div className="studio-panel-title">{selectionSummary.title}</div>

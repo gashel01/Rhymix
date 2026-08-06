@@ -155,17 +155,12 @@ const CreationDashboard = ({
           </button>
         ) : null}
       </div>
-      <div className="studio-actions-grid">
-        <button className="studio-btn ghost" disabled>
-          Upload Audio
-        </button>
-        <button className="studio-btn ghost" disabled>
-          Record
-        </button>
-        <button className="studio-btn ghost" disabled>
-          Add Persona
-        </button>
-      </div>
+      {/* Upload Audio / Record / Add Persona used to sit here as three
+          full-width buttons that were hard-coded `disabled` — they had no
+          handler and no path to ever becoming enabled. Three dead controls at
+          the foot of the panel read as "this app is unfinished", and uploading
+          and recording are both already reachable (the library panel and Live
+          VC). Removed rather than left greyed out. */}
     </div>
   );
 };

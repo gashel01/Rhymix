@@ -1,4 +1,5 @@
 import React from "react";
+import { SparklesIcon } from "./StudioIcons";
 
 export function StudioAssistButton({
   onRequest,
@@ -7,12 +8,14 @@ export function StudioAssistButton({
 }) {
   return (
     <button
-      className={`studio-mini studio-assist-trigger${loading ? " active" : ""}`}
+      className={`studio-assist-trigger${loading ? " active" : ""}`}
       type="button"
       onClick={onRequest}
       disabled={disabled || loading}
+      title="Suggest with AI"
     >
-      {loading ? "Thinking..." : "AI Assist"}
+      <SparklesIcon size={13} />
+      {loading ? "Thinking" : "Assist"}
     </button>
   );
 }
