@@ -708,24 +708,25 @@ const StudioPageInner = ({ assetId, projectId }) => {
           </div>
 
           <div className="studio-center-column">
-            <div className="studio-panel studio-context-strip">
+            {/* One slim row. The title and the selection summary that used to
+                live here are already shown in the transport and the inspector,
+                so all this box did was repeat them across ~120px of height. */}
+            <div className="studio-context-strip">
               <div className="studio-context-main">
-                <div className="studio-context-heading">
-                  <button className="studio-mini studio-back-button" onClick={handleBack}>
-                    Back
-                  </button>
-                  <div className="studio-context-eyebrow">{currentWorkspaceLabel}</div>
-                </div>
-                <div className="studio-panel-title">Current Context</div>
-                <div className="studio-subtext">{selectionSummary}</div>
+                <button className="studio-mini studio-back-button" onClick={handleBack}>
+                  Back
+                </button>
+                <div className="studio-context-eyebrow">{currentWorkspaceLabel}</div>
               </div>
               <div className="studio-context-meta">
+                {activeJobs.length ? (
+                  <div className="studio-context-chip">
+                    {`${activeJobs.length} active job${activeJobs.length === 1 ? "" : "s"}`}
+                  </div>
+                ) : null}
                 <button className="studio-mini" onClick={() => setShowOrchestrator(true)}>
                   AI Orchestrator
                 </button>
-                <div className="studio-context-chip">
-                  {activeJobs.length ? `${activeJobs.length} active job${activeJobs.length === 1 ? "" : "s"}` : "No active jobs"}
-                </div>
                 <button
                   className={`studio-mini ${focusMode ? "active" : ""}`}
                   onClick={() => actions.setUi({ focusMode: !focusMode })}
@@ -733,13 +734,6 @@ const StudioPageInner = ({ assetId, projectId }) => {
                   {focusMode ? "Exit Focus" : "Focus Mode"}
                 </button>
               </div>
-              {/* <div className="studio-shortcut-row">
-                {shortcutHints.map((hint) => (
-                  <span key={hint} className="studio-context-chip subtle">
-                    {hint}
-                  </span>
-                ))}
-              </div> */}
             </div>
 
             <div className="studio-panel studio-timeline-panel">

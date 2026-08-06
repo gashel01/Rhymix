@@ -1,12 +1,21 @@
 .studio-page {
-  --studio-bg: radial-gradient(circle at 10% 20%, #18212a 0%, #0b0f14 55%, #050607 100%);
-  --studio-panel: rgba(18, 25, 34, 0.85);
-  --studio-panel-border: rgba(255, 255, 255, 0.08);
-  --studio-accent: #00c2ff;
-  --studio-accent-strong: #ffb454;
-  --studio-text: #f5f7fb;
-  --studio-subtext: rgba(245, 247, 251, 0.65);
+  /* Same palette as the Models view: a neutral near-black page, panels made of
+     very low-alpha white rather than their own blue, and one accent — the
+     system blue — instead of a cyan plus an orange fighting each other. */
+  --studio-bg: #0b0b0f;
+  --studio-panel: rgba(255, 255, 255, 0.04);
+  --studio-panel-strong: rgba(255, 255, 255, 0.06);
+  --studio-panel-border: rgba(255, 255, 255, 0.10);
+  --studio-accent: #0a84ff;
+  --studio-accent-wash: rgba(10, 132, 255, 0.18);
+  --studio-accent-strong: #0a84ff;
+  --studio-danger: #ff453a;
+  --studio-text: rgba(255, 255, 255, 0.92);
+  --studio-subtext: rgba(255, 255, 255, 0.62);
   --studio-muted: rgba(255, 255, 255, 0.12);
+  --studio-radius-lg: 22px;
+  --studio-radius-md: 16px;
+  --studio-shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.45);
   --studio-track-top: 96px;
   color: var(--studio-text);
   position: fixed;
@@ -14,7 +23,8 @@
   height: 100dvh;
   min-height: 100dvh;
   background: var(--studio-bg);
-  font-family: "Space Grotesk", "Rubik", "Poppins", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  font-feature-settings: "tnum" 1;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
@@ -2146,3 +2156,298 @@
   border-color: rgba(239, 68, 68, 0.45);
   color: #ef4444;
 }
+
+/* ==========================================================================
+   Frost pass — brings the Studio in line with the Models view.
+
+   The rules below are deliberately grouped at the end rather than edited into
+   the 47 places that drew a border: the goal is one legible layer that says
+   what changed and why, not a diff scattered across 2000 lines.
+   ========================================================================== */
+
+/* --- Depth by fill, not by outline ------------------------------------- */
+/* Page > panel > sub-panel > card each drew their own border, so a lane fader
+   sat inside four nested outlines. Keep the outer panel, drop the rest. */
+.studio-panel {
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-panel-border);
+  border-radius: var(--studio-radius-lg);
+  box-shadow: var(--studio-shadow-soft);
+  backdrop-filter: blur(18px);
+}
+
+.studio-panel .studio-panel,
+.studio-lane-row,
+.studio-track-row,
+.studio-lane-card {
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* --- Slim context strip ------------------------------------------------- */
+.studio-context-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px 10px;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+.studio-context-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.studio-context-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- One accent --------------------------------------------------------- */
+/* Mute/solo used to be bright cyan pills that pulled the eye harder than the
+   audio did. States read as fills now; the accent is reserved for actions. */
+.studio-lane-toggle.active,
+.studio-mini.active {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--studio-text);
+}
+
+.studio-btn.accent {
+  background: var(--studio-accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+.studio-btn.accent:hover {
+  filter: brightness(1.08);
+}
+
+.studio-transport-pill.active {
+  background: var(--studio-accent-wash);
+  border-color: rgba(10, 132, 255, 0.35);
+}
+
+/* --- Lane controls on demand -------------------------------------------- */
+/* Eight controls per lane, permanently visible, is a pro-DAW density. At rest
+   a lane shows its name and level; the rest arrives on hover or selection. */
+.studio-lane-secondary {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.studio-lane:hover .studio-lane-secondary,
+.studio-lane:focus-within .studio-lane-secondary,
+.studio-lane.selected .studio-lane-secondary {
+  opacity: 1;
+}
+
+/* --- Type ---------------------------------------------------------------- */
+/* Space Grotesk is a display face; at 11px its letterforms fight legibility
+   and its figures aren't tabular, so the transport clock jitters while
+   playing. Keep it for section titles only. */
+.studio-panel-title,
+.studio-section-title {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.studio-time,
+.studio-transport-pill,
+.studio-lane-db,
+.studio-selection-actions__range {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Motion -------------------------------------------------------------- */
+/* Panels and generated clips used to pop into existence. */
+.studio-panel,
+.studio-selection-actions,
+.studio-job-toast {
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+@keyframes studio-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.studio-selection-actions,
+.studio-job-toast {
+  animation: studio-fade-in 200ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-panel,
+  .studio-selection-actions,
+  .studio-job-toast {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* --- Destructive actions demoted ---------------------------------------- */
+/* "Delete All" sat next to "Lanes +" at equal weight. */
+.studio-btn.danger,
+.studio-mini.danger {
+  background: transparent;
+  border-color: rgba(255, 69, 58, 0.35);
+  color: var(--studio-danger);
+}
+
+.studio-btn.danger:hover,
+.studio-mini.danger:hover {
+  background: rgba(255, 69, 58, 0.12);
+}
+
+/* --- Contrast on the new accent ----------------------------------------- */
+/* Several buttons painted near-black text (#041018) on the old light cyan.
+   The system blue is darker, so that text no longer reads. */
+.studio-btn,
+.studio-rail-btn.active {
+  color: #fff;
+}
+
+.studio-btn.ghost {
+  color: var(--studio-text);
+}
+
+.studio-btn:hover {
+  transform: none;
+  filter: brightness(1.08);
+}
+
+.studio-context-eyebrow {
+  color: var(--studio-subtext);
+}
+
+.studio-job-status {
+  color: var(--studio-subtext);
+}
+
+/* --- Lane row: quiet at rest -------------------------------------------- */
+/* A lane carried grip + colour + name + menu + fader + dB + M + S, all at the
+   same weight, all the time — eight controls times however many lanes. At rest
+   it now reads name, colour and level; the handles arrive on hover. Mute and
+   solo stay visible while engaged, because that's state, not a control. */
+.studio-track-row .studio-track-grip,
+.studio-track-row .studio-track-menu-wrap,
+.studio-track-row .studio-mini:not(.active) {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.studio-track-row:hover .studio-track-grip,
+.studio-track-row:hover .studio-track-menu-wrap,
+.studio-track-row:hover .studio-mini,
+.studio-track-row:focus-within .studio-track-grip,
+.studio-track-row:focus-within .studio-track-menu-wrap,
+.studio-track-row:focus-within .studio-mini {
+  opacity: 1;
+}
+
+.studio-track-row .studio-db {
+  color: var(--studio-subtext);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-track-row .studio-track-grip,
+  .studio-track-row .studio-track-menu-wrap,
+  .studio-track-row .studio-mini:not(.active) {
+    opacity: 1;
+    transition: none;
+  }
+}
+
+/* --- Export menu --------------------------------------------------------- */
+/* Mixdown, stems and MIDI were three buttons competing with each other; they
+   are three shapes of the same intent, so they share one. */
+.studio-export-wrap {
+  position: relative;
+}
+
+.studio-export-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  min-width: 240px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(22, 22, 26, 0.92);
+  border: 1px solid var(--studio-panel-border);
+  border-radius: var(--studio-radius-md);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(18px);
+  animation: studio-fade-in 160ms ease both;
+  z-index: 400;
+}
+
+.studio-export-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--studio-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.studio-export-item span {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--studio-subtext);
+}
+
+.studio-export-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.studio-export-item.danger {
+  color: var(--studio-danger);
+}
+
+.studio-export-item.danger:hover {
+  background: rgba(255, 69, 58, 0.12);
+}
+
+/* Transport clock: the thing you read while it moves. */
+.studio-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 600;
+  min-width: 92px;
+}
+
+/* "Delete All" wipes every lane and clip. It sat beside "Lanes +" at equal
+   weight; it keeps its place but stops advertising itself. */
+.studio-tracklist-header .studio-mini.danger {
+  border-color: transparent;
+  color: var(--studio-subtext);
+  opacity: 0;
+  transition: opacity 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.studio-tracklist-header:hover .studio-mini.danger,
+.studio-tracklist-header:focus-within .studio-mini.danger {
+  opacity: 1;
+}
+
+.studio-tracklist-header .studio-mini.danger:hover {
+  color: var(--studio-danger);
+  border-color: rgba(255, 69, 58, 0.35);
+}
+
