@@ -16,6 +16,15 @@ from .audio_preprocess import preprocess_audio
 from .crepe_adapter import transcribe_crepe
 from .dsp_melody import MelodyProcessor, NoteEvent
 from .dsp_rhythm import RhythmProcessor, RhythmEvent
+from .note_math import (
+    apply_swing,
+    estimate_bpm_from_onsets,
+    merge_adjacent_notes,
+    parse_key_string,
+    quantize_tick,
+    snap_notes_to_scale,
+    ticks_per_second,
+)
 from .midi_export import notes_to_midi_base64
 from .basic_pitch_adapter import transcribe_basic_pitch
 from .ddsp_adapter import transcribe_ddsp, synthesize_ddsp_audio
@@ -47,39 +56,6 @@ try:
     from backend.paths.manager import paths
 except Exception:  # pragma: no cover
     paths = None
-
-
-def estimate_bpm_from_onsets(onset_times: List[float]) -> Optional[float]:
-    if len(onset_times) < 2:
-        return None
-    intervals = [b - a for a, b in zip(onset_times[:-1], onset_times[1:]) if b > a]
-    if not intervals:
-        return None
-    median = float(np.median(intervals))
-    if median <= 0:
-        return None
-    bpm = 60.0 / median
-    return max(60.0, min(200.0, bpm))
-
-
-def ticks_per_second(bpm: float, ppq: int) -> float:
-    return (bpm * ppq) / 60.0
-
-
-def quantize_tick(value: int, grid: int) -> int:
-    if grid <= 1:
-        return value
-    return int(round(value / grid) * grid)
-
-
-def apply_swing(start_tick: int, grid: int, swing: float) -> int:
-    if swing <= 0 or grid <= 0:
-        return start_tick
-    # Swing every other grid (odd index)
-    step = start_tick // grid
-    if step % 2 == 1:
-        return int(start_tick + grid * swing * 0.5)
-    return start_tick
 
 
 @dataclass
@@ -335,12 +311,12 @@ class TranscriptionSession:
             else:
                 grid = int(ppq)
 
-        notes = _merge_adjacent_notes(notes, gap_sec=merge_gap)
+        notes = merge_adjacent_notes(notes, gap_sec=merge_gap)
         if self.target_key and self.mode in {"melody", "dubler_melody"}:
             if self.mode == "dubler_melody" and any("midiRaw" in n for n in notes):
                 pass
             else:
-                notes = _snap_notes_to_scale(notes, self.target_key)
+                notes = snap_notes_to_scale(notes, self.target_key)
 
         out_notes = []
         for n in notes:
@@ -798,7 +774,7 @@ class TranscriptionSession:
                 root = None
                 scale = None
                 if self.target_key:
-                    parsed = _parse_key_string(self.target_key)
+                    parsed = parse_key_string(self.target_key)
                     if parsed:
                         root, scale = parsed
                 decode_mode_use = decode_mode if decode_mode in {"rules", "viterbi"} else "rules"
@@ -979,93 +955,3 @@ class TranscriptionSession:
             "durationSec": asset.get("durationSec"),
             "laneId": lane.get("id"),
         }
-
-
-def _merge_adjacent_notes(notes: List[Dict], gap_sec: float = 0.04) -> List[Dict]:
-    if not notes:
-        return []
-    notes_sorted = sorted(notes, key=lambda n: (n["startSec"], n["endSec"]))
-    merged = [notes_sorted[0].copy()]
-    for note in notes_sorted[1:]:
-        prev = merged[-1]
-        if note["note"] == prev["note"] and note["startSec"] - prev["endSec"] <= gap_sec:
-            prev["endSec"] = max(prev["endSec"], note["endSec"])
-            prev["velocity"] = max(prev["velocity"], note.get("velocity", prev["velocity"]))
-        else:
-            merged.append(note.copy())
-    return merged
-
-
-def _parse_key_string(key: str):
-    if not key:
-        return None
-    key = key.strip().lower()
-    parts = key.replace("major", "maj").replace("minor", "min").split()
-    if not parts:
-        return None
-    root = parts[0]
-    mode = "maj"
-    if len(parts) > 1:
-        if "min" in parts[1]:
-            mode = "min"
-        elif "maj" in parts[1]:
-            mode = "maj"
-    return root, mode
-
-
-def _note_name_to_pc(name: str):
-    mapping = {
-        "c": 0,
-        "c#": 1,
-        "db": 1,
-        "d": 2,
-        "d#": 3,
-        "eb": 3,
-        "e": 4,
-        "f": 5,
-        "f#": 6,
-        "gb": 6,
-        "g": 7,
-        "g#": 8,
-        "ab": 8,
-        "a": 9,
-        "a#": 10,
-        "bb": 10,
-        "b": 11,
-    }
-    return mapping.get(name)
-
-
-def _snap_notes_to_scale(notes: List[Dict], key: str) -> List[Dict]:
-    parsed = _parse_key_string(key)
-    if not parsed:
-        return notes
-    root, mode = parsed
-    root_pc = _note_name_to_pc(root)
-    if root_pc is None:
-        return notes
-    if mode == "min":
-        scale = {0, 2, 3, 5, 7, 8, 10}
-    else:
-        scale = {0, 2, 4, 5, 7, 9, 11}
-    scale_pcs = {(root_pc + step) % 12 for step in scale}
-    snapped = []
-    for note in notes:
-        midi = int(note["note"])
-        best = midi
-        best_dist = 12
-        for delta in range(-6, 7):
-            candidate = midi + delta
-            if candidate < 0 or candidate > 127:
-                continue
-            if candidate % 12 in scale_pcs:
-                dist = abs(delta)
-                if dist < best_dist:
-                    best_dist = dist
-                    best = candidate
-                    if dist == 0:
-                        break
-        snapped_note = note.copy()
-        snapped_note["note"] = best
-        snapped.append(snapped_note)
-    return snapped
