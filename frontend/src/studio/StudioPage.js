@@ -60,6 +60,14 @@ import {
    against a 110px lane, so the faders slid 2px per track out of line with
    the lane they control. */
 
+/* Everything offered on a timeline selection. All of them read a stretch of
+   an existing asset, so they need a source clip and a range.
+
+   At module scope rather than in the component: `new Set([...])` in a render
+   body is a new Set every render, so every memo that depends on it was
+   rebuilt every render. */
+const SELECTION_ACTION_JOBS = new Set(["repaint", "extend", "vocal2bgm", "cover"]);
+
 const StudioPageInner = ({ assetId, projectId }) => {
   const { state, actions } = useStudioStore();
   const [showProjectManager, setShowProjectManager] = useState(false);
@@ -166,9 +174,13 @@ const StudioPageInner = ({ assetId, projectId }) => {
   }, []);
 
   useEffect(() => {
+    /* Safe to capture: the Map is created once by useRef and never
+       reassigned, only filled and emptied. So this local is the same Map the
+       cleanup would have read anyway. */
+    const subscriptions = jobSubscriptionsRef.current;
     return () => {
-      jobSubscriptionsRef.current.forEach((unsubscribe) => unsubscribe());
-      jobSubscriptionsRef.current.clear();
+      subscriptions.forEach((unsubscribe) => unsubscribe());
+      subscriptions.clear();
     };
   }, []);
 
@@ -381,10 +393,6 @@ const StudioPageInner = ({ assetId, projectId }) => {
       console.error("Failed to refresh project", err);
     }
   };
-
-  // Everything offered on a timeline selection. All of them read a stretch of
-  // an existing asset, so they need a source clip and a range.
-  const SELECTION_ACTION_JOBS = new Set(["repaint", "extend", "vocal2bgm", "cover"]);
 
   // Jobs that regenerate part of an existing asset rather than creating one
   // from nothing: the timeline selection has to be mapped onto source offsets.

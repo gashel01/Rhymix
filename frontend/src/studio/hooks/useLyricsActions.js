@@ -212,7 +212,8 @@ export const useLyricsActions = ({ handleStartJob }) => {
       return false;
     });
     return idx >= 0 ? entries[idx] : null;
-  }, [lyricsSelection, lyricsMap, normalizeLyricsEntries, findLyricsEntryIndex]);
+    // findLyricsEntryIndex is not called here — the search is inlined above.
+  }, [lyricsSelection, lyricsMap, normalizeLyricsEntries]);
 
   const detectLyricsLanguage = React.useCallback((text) => {
     const sample = String(text || "");

@@ -186,9 +186,15 @@ function CreateSongView({
     loadExistingSongs();
     loadAvailableModels();
     return () => {
+      /* Read at cleanup on purpose. These hold an interval id and an abort
+         controller assigned long after mount, so copying them into locals
+         here — what the rule suggests — would capture null and leak whatever
+         was started afterwards. The rule assumes a ref holds a DOM node. */
+      /* eslint-disable react-hooks/exhaustive-deps */
       if (pollRef.current) clearInterval(pollRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
       if (pollAbortRef.current) pollAbortRef.current.abort();
+      /* eslint-enable react-hooks/exhaustive-deps */
     };
   }, []);
 

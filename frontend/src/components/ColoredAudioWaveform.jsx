@@ -621,7 +621,10 @@ const ColoredAudioWaveform = forwardRef(
           }
         }
       };
-    }, [wavesurferRef.current, ready, onTimeUpdate, onSeek]);
+      // `wavesurferRef.current` was listed here but mutating a ref does not
+      // re-render, so it could never trigger this effect. `ready` is the real
+      // signal — it flips once the instance exists.
+    }, [ready, onTimeUpdate, onSeek]);
 
     // Add method to set current time programmatically
     const setCurrentTime = (time) => {
