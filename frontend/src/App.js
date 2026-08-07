@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { VolumeProvider } from "./contexts/VolumeContext";
 import {
+  buildCoverSourceSong,
+  buildNavContext,
+  createSongHash,
+  nextNavigationUrl,
+  parseCreateSongQuery,
+  readHashRoute,
+  readStudioRoute,
+} from "./appRoutes";
+import {
   Box,
   Container,
   Typography,
@@ -250,30 +259,6 @@ const globalStylesInputProps = {
   },
 };
 
-// Views that can be restored from the URL hash. Every view that handleNavigation
-// writes a hash for must be listed here, or reloading/going back lands on Home
-// while the URL still claims otherwise.
-const HASH_VIEWS = [
-  "datasets",
-  "training",
-  "talking-workflow",
-  "models",
-  "inference-model-selection",
-  "inference-params",
-  "inference",
-  "create-song",
-];
-
-// Parse the current hash into { view, query }, or null for Home / anything
-// we don't recognise. Studio is deliberately absent: it routes on /studio.
-const readHashRoute = () => {
-  const hash = window.location.hash.substring(1);
-  if (!hash || hash === "home") return null;
-  const [view, query] = hash.split("?");
-  if (!HASH_VIEWS.includes(view)) return null;
-  return { view, query: query || null };
-};
-
 function App() {
   const isBeatboxCalibrationRoute = window.location.pathname.startsWith("/beatbox-calibration");
 
@@ -322,24 +307,7 @@ function App() {
     sourceSong: null,
   });
 
-  const getStudioRouteInfo = useCallback(() => {
-    const path = window.location.pathname || "";
-    if (path === "/studio" || path === "/studio/") {
-      const params = new URLSearchParams(window.location.search || "");
-      return {
-        assetId: null,
-        projectId: params.get("projectId") || null,
-        sourceFileId: params.get("sourceFileId") || null,
-      };
-    }
-    const match = path.match(/^\/studio\/(.+)$/);
-    if (!match) return null;
-    const assetId = decodeURIComponent(match[1]);
-    const search = window.location.search || "";
-    const params = new URLSearchParams(search);
-    const sourceFileId = params.get("sourceFileId") || null;
-    return { assetId, projectId: params.get("projectId") || null, sourceFileId };
-  }, []);
+  const getStudioRouteInfo = useCallback(() => readStudioRoute(window.location), []);
 
   const [studioRouteInfo, setStudioRouteInfo] = useState(() => getStudioRouteInfo());
   // Keep legacy studioAssetId alias for remaining references
@@ -357,7 +325,7 @@ function App() {
   // Drive the view from the URL. Used both on first paint and on every
   // back/forward, so the address bar and what's on screen can't drift apart.
   const applyHashRoute = useCallback(() => {
-    const route = readHashRoute();
+    const route = readHashRoute(window.location.hash);
     if (!route) {
       setCurrentView("home");
       setShowHomeView(true);
@@ -366,12 +334,7 @@ function App() {
     setCurrentView(route.view);
     setShowHomeView(false);
     if (route.view === "create-song" && route.query) {
-      const sp = new URLSearchParams(route.query);
-      setCreateSongNav({
-        mode: sp.get("mode") === "cover" ? "cover" : "create",
-        sourceSongId: sp.get("sourceSongId") || null,
-        sourceSong: null,
-      });
+      setCreateSongNav(parseCreateSongQuery(route.query));
     }
   }, []);
 
@@ -493,65 +456,34 @@ function App() {
     setInferenceData(null);
     setNavContext(null);
     setInferenceParamsOrigin(null);
-    if (view === "create-song") {
-      setCreateSongNav({ mode: "create", sourceSongId: null, sourceSong: null });
-    }
-    if (view !== "create-song") {
-      setCreateSongNav({ mode: "create", sourceSongId: null, sourceSong: null });
-    }
+    // Both branches of the old code set the same thing: navigating anywhere,
+    // including to create-song itself, starts it from a clean slate.
+    setCreateSongNav({ mode: "create", sourceSongId: null, sourceSong: null });
     if (view !== "inference") setLiveInferenceData(null);
     setDrawerOpen(false);
     // Push, don't replace: each view change gets its own history entry so the
     // browser Back button walks back through views instead of leaving the app.
-    // Guarded so re-clicking the current item doesn't stack duplicates.
-    const base = `${window.location.pathname}${window.location.search}`;
-    const nextUrl = view === "home" ? window.location.pathname : `${base}#${view}`;
-    const currentUrl = `${base}${window.location.hash}`;
-    if (nextUrl !== currentUrl) {
+    // nextNavigationUrl returns null when nothing would change, so re-clicking
+    // the current nav item doesn't stack duplicates.
+    const nextUrl = nextNavigationUrl(view, window.location);
+    if (nextUrl !== null) {
       window.history.pushState(null, '', nextUrl);
     }
   }, [getStudioRouteInfo]);
 
-  const toCoverSourceId = useCallback((track, source) => {
-    if (!track || typeof track !== "object") return null;
-    if (source === "inference" && track.runId) return `run:${track.runId}`;
-    if (track.fileId) return `upload:${track.fileId}`;
-    if (track.id && source === "inference") return `run:${track.id}`;
-    if (track.id) return `upload:${track.id}`;
-    return null;
+  const openCreateCover = useCallback(({ source, track }) => {
+    const sourceSong = buildCoverSourceSong(track, source);
+    if (!sourceSong) return;
+    setCreateSongNav({
+      mode: "cover",
+      sourceSongId: sourceSong.sourceSongId,
+      sourceSong,
+    });
+    setCurrentView("create-song");
+    setShowHomeView(false);
+    setDrawerOpen(false);
+    window.history.replaceState(null, "", createSongHash(sourceSong.sourceSongId));
   }, []);
-
-  const openCreateCover = useCallback(
-    ({ source, track }) => {
-      const sourceSongId = toCoverSourceId(track, source);
-      if (!sourceSongId) return;
-      const sourceSong = {
-        sourceSongId,
-        title: track?.displayName || track?.name || track?.originalName || "Untitled source",
-        artist: track?.artist || null,
-        duration: track?.duration || null,
-        audioUrl: track?.audioUrl || track?.vocalUrl || track?.instrumentalUrl || null,
-        instrumentalUrl: track?.instrumentalUrl || null,
-        vocalsUrl: track?.vocalUrl || track?.originalVocalUrl || null,
-        source,
-      };
-
-      setCreateSongNav({
-        mode: "cover",
-        sourceSongId,
-        sourceSong,
-      });
-      setCurrentView("create-song");
-      setShowHomeView(false);
-      setDrawerOpen(false);
-      window.history.replaceState(
-        null,
-        "",
-        `#create-song?mode=cover&sourceSongId=${encodeURIComponent(sourceSongId)}`
-      );
-    },
-    [toCoverSourceId]
-  );
 
   const handleHomeCoverTrack = useCallback(
     (track) => {
@@ -583,31 +515,13 @@ function App() {
     [handleInferenceCoverTrack]
   );
 
-  const getTrackId = useCallback((track) => {
-    return track?.fileId || track?.trackId || track?.id || track?.runId || track?.tempId || null;
-  }, []);
-
-  const buildNavContext = useCallback(
-    ({ source, selectedTracks = [], selectedModel = null }) => {
-      const ids = (selectedTracks || []).map(getTrackId).filter(Boolean);
-      const uniqueIds = Array.from(new Set(ids));
-      return {
-        source,
-        selectedTrackIds: uniqueIds,
-        selectedModelId: selectedModel?.id || selectedModel?.modelId || null,
-        selectedModelName: selectedModel?.name || selectedModel?.modelName || null,
-      };
-    },
-    [getTrackId]
-  );
-
   const updateInferenceContext = useCallback(
     ({ source, selectedTracks = [], selectedModel = null }) => {
       setSelectedTracksForInference(selectedTracks);
       setSelectedModelForInference(selectedModel);
       setNavContext(buildNavContext({ source, selectedTracks, selectedModel }));
     },
-    [buildNavContext]
+    []
   );
 
   const openInferenceModelSelection = useCallback(
