@@ -19,6 +19,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
 import ErrorIcon from "@mui/icons-material/ErrorOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import axios from "axios";
+import { devLog } from "../utils/logger";
 
 function TalkingDatasetUpload({ onBack }) {
   const [file, setFile] = useState(null);
@@ -68,7 +69,7 @@ function TalkingDatasetUpload({ onBack }) {
       });
 
       setUploadSuccess(true);
-      console.log("Upload successful:", response.data);
+      devLog("Upload successful:", response.data);
 
       // Start processing automatically after successful upload
       handleProcess(response.data.filename);

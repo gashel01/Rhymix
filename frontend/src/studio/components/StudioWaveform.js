@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { hexToRgba } from "../../utils/color";
 
 const DOWNLOAD_PREFIX = "/api/download/";
 const WAVEFORM_PREFIX = "/api/waveform/";
@@ -6,26 +7,6 @@ const WAVEFORM_PREFIX = "/api/waveform/";
 // One entry per asset URL. A timeline shows the same asset across several
 // clips, and each of them would otherwise refetch the same peaks.
 const peaksCache = new Map();
-
-const hexToRgba = (hex, alpha) => {
-  if (!hex || typeof hex !== "string") return null;
-  const trimmed = hex.replace("#", "").trim();
-  if (trimmed.length !== 3 && trimmed.length !== 6) return null;
-  const full =
-    trimmed.length === 3
-      ? trimmed
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : trimmed;
-  const intVal = Number.parseInt(full, 16);
-  if (Number.isNaN(intVal)) return null;
-  const r = (intVal >> 16) & 255;
-  const g = (intVal >> 8) & 255;
-  const b = intVal & 255;
-  const a = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
-};
 
 const loadPeaks = (url) => {
   if (!url) return Promise.resolve(null);

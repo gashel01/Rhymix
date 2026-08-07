@@ -1,3 +1,4 @@
+import logging
 import queue
 import threading
 import time
@@ -186,7 +187,7 @@ def process_audio_files_thread(job_id, segment, process, export, clean):
                 message=f"Processing failed: {e}",
                 progress=0,
             )
-        print(f"Error in processing thread: {e}")
+        logging.error(f"Error in processing thread: {e}")
         import traceback
 
         traceback.print_exc()

@@ -9,8 +9,7 @@ try:
     bootstrap_env()
     configure_cuda_backend()   # TF32 + cudnn.benchmark for RTX/Ampere
 except Exception as _bootstrap_err:
-    import sys as _sys
-    print(f"[rhymix] WARNING: env_bootstrap failed: {_bootstrap_err}", file=_sys.stderr)
+    logging.warning(f"[rhymix] WARNING: env_bootstrap failed: {_bootstrap_err}")
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
@@ -59,21 +58,22 @@ async def studio_live_infer_ws(websocket: WebSocket):
                     if not session:
                         try:
                             await websocket.send_json({"type": "error", "message": "No active session"})
-                        except:
-                            pass
+                        except Exception:
+                            # Client already gone; nothing to report to.
+                            logging.debug("send_json failed (no active session)", exc_info=True)
                         continue
                     try:
                         await websocket.send_json({"type": "status", "state": "processing", "progress": 0.8})
-                    except:
-                        pass
+                    except Exception:
+                        logging.debug("send_json failed (processing status)", exc_info=True)
                     result = await session.stop()
                     if sender_task:
                         await sender_task
                     try:
                         await websocket.send_json({"type": "final", "commit": result})
                         await websocket.send_json({"type": "status", "state": "done", "progress": 1.0})
-                    except:
-                        pass
+                    except Exception:
+                        logging.debug("send_json failed (final commit)", exc_info=True)
                     break
                 elif msg_type == "cancel":
                     if session:
@@ -93,8 +93,8 @@ async def studio_live_infer_ws(websocket: WebSocket):
             else:
                 try:
                     await websocket.send_json({"type": "error", "message": "Unsupported message"})
-                except:
-                    pass
+                except Exception:
+                    logging.debug("send_json failed (unsupported message)", exc_info=True)
     except WebSocketDisconnect:
         if session:
             await session.cancel()

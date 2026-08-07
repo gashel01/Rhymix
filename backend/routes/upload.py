@@ -1,3 +1,4 @@
+import logging
 import time
 import shutil
 from datetime import datetime
@@ -34,7 +35,7 @@ def upload_files():
             f.save(path)
             record = register_upload_metadata(f.filename, stored_name, file_id)
             records.append(record)
-            print(f"Saved file: {path}")
+            logging.info(f"Saved file: {path}")
 
         return jsonify(
             {
@@ -44,7 +45,7 @@ def upload_files():
         )
 
     except Exception as e:
-        print(f"Upload error: {e}")
+        logging.info(f"Upload error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -104,7 +105,7 @@ def get_available_files():
 
         return jsonify({"files": pairs, "message": f"Found {len(pairs)} processed files"})
     except Exception as e:
-        print(f"Error getting available files: {e}")
+        logging.error(f"Error getting available files: {e}")
         import traceback
 
         traceback.print_exc()
@@ -125,7 +126,7 @@ def get_track_statuses():
             results.append({"trackId": track_id, "processing": processing})
         return jsonify(results)
     except Exception as e:
-        print(f"Error getting track statuses: {e}")
+        logging.error(f"Error getting track statuses: {e}")
         import traceback
 
         traceback.print_exc()
@@ -143,7 +144,7 @@ def delete_files():
             return jsonify({"error": "Filenames must be a list"}), 400
 
         results = []
-        print(f"Deleting files for {len(fns)} tracks...")
+        logging.info(f"Deleting files for {len(fns)} tracks...")
         to_remove = []
 
         for fn in fns:
@@ -154,7 +155,7 @@ def delete_files():
                 )
                 continue
 
-            print(f"Processing track: {base}")
+            logging.info(f"Processing track: {base}")
             deleted, failed = [], []
             for p, t in [
                 (paths.UVR_RAW_DIR / f"{base}_vocals.wav", "raw vocals"),
@@ -166,13 +167,13 @@ def delete_files():
                         time.sleep(0.1)
                         p.unlink(missing_ok=True)
                         deleted.append(f"{t}: {p.name}")
-                        print(f"  [DELETED] {t}: {p.name}")
+                        logging.info(f"  [DELETED] {t}: {p.name}")
                     else:
-                        print(f"  [WARNING] File not found: {p}")
+                        logging.info(f"  [WARNING] File not found: {p}")
                 except Exception as e:
                     msg = f"Failed to delete {t}: {e}"
                     failed.append(msg)
-                    print(f"  [ERROR] {msg}")
+                    logging.info(f"  [ERROR] {msg}")
 
             if deleted or failed:
                 results.append({"track": base, "deleted": deleted, "failed": failed})
@@ -195,7 +196,7 @@ def delete_files():
         )
 
     except Exception as e:
-        print(f"Error in delete_files: {e}")
+        logging.error(f"Error in delete_files: {e}")
         import traceback
 
         traceback.print_exc()

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { hexToRgba } from "../../utils/color";
 
 const ticksToSec = (ticks, bpm, ppq) => {
   const safeBpm = Number(bpm) || 120;
@@ -8,26 +9,6 @@ const ticksToSec = (ticks, bpm, ppq) => {
 };
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-const hexToRgba = (hex, alpha) => {
-  if (!hex || typeof hex !== "string") return null;
-  const trimmed = hex.replace("#", "").trim();
-  if (trimmed.length !== 3 && trimmed.length !== 6) return null;
-  const full =
-    trimmed.length === 3
-      ? trimmed
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : trimmed;
-  const intVal = Number.parseInt(full, 16);
-  if (Number.isNaN(intVal)) return null;
-  const r = (intVal >> 16) & 255;
-  const g = (intVal >> 8) & 255;
-  const b = intVal & 255;
-  const a = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
-};
-
 const MidiOverlay = ({
   notes = [],
   bpm = 120,

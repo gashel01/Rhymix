@@ -13,6 +13,7 @@ import { useAudioPlayback } from "../hooks/useAudioPlayback";
 import { useVocalMode } from "../hooks/useVocalMode";
 import { useVolume } from "../contexts/VolumeContext";
 import { downloadFile } from "../utils/audioUtils";
+import { devLog } from "../utils/logger";
 
 function DownloadResults({ jobStatus, handleReset, volume: volumeProp }) {
   const { volumeRef } = useVolume();
@@ -52,9 +53,9 @@ function DownloadResults({ jobStatus, handleReset, volume: volumeProp }) {
 
   useEffect(() => {
     if (jobStatus?.output_files) {
-      console.log("Raw vocals:", raw_vocals);
-      console.log("Processed vocals:", processed_vocals);
-      console.log("Current mode:", vocalMode);
+      devLog("Raw vocals:", raw_vocals);
+      devLog("Processed vocals:", processed_vocals);
+      devLog("Current mode:", vocalMode);
     }
   }, [jobStatus, vocalMode, raw_vocals, processed_vocals]);
 

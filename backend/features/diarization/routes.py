@@ -43,8 +43,8 @@ def upload_talking_file():
         input_audio_path = paths.DIARIZATION_INPUT / original_filename
         f.save(input_audio_path)
 
-        print(f"Saved audio file to: {input_audio_path}")
-        print(f"Using speaker directory at: {paths.SPEAKER_DIR}")
+        logging.info(f"Saved audio file to: {input_audio_path}")
+        logging.info(f"Using speaker directory at: {paths.SPEAKER_DIR}")
 
         active_jobs[job_id] = {
             "status": "preprocessing",
@@ -68,7 +68,7 @@ def upload_talking_file():
             }
         )
     except Exception as e:
-        print(f"Error in upload-talking: {e}")
+        logging.error(f"Error in upload-talking: {e}")
         traceback.print_exc()
         return jsonify({"error": f"Upload failed: {str(e)}"}), 500
 
@@ -77,8 +77,8 @@ def upload_talking_file():
 def talking_status(job_id):
     try:
         if job_id not in active_jobs:
-            print(f"Job ID not found in active_jobs: {job_id}")
-            print(f"Available job IDs: {list(active_jobs.keys())}")
+            logging.info(f"Job ID not found in active_jobs: {job_id}")
+            logging.info(f"Available job IDs: {list(active_jobs.keys())}")
             return jsonify({"error": "Job not found", "job_id": job_id}), 404
 
         job, now = active_jobs[job_id], int(time.time())
@@ -105,12 +105,12 @@ def talking_status(job_id):
                     if d.startswith("speaker_") and os.path.isdir(os.path.join(spkdir, d))
                 ]
                 if subs:
-                    print(f"Found {len(subs)} speaker directories in {spkdir}")
+                    logging.info(f"Found {len(subs)} speaker directories in {spkdir}")
                 else:
-                    print(f"No speaker subdirectories found in {spkdir}")
+                    logging.info(f"No speaker subdirectories found in {spkdir}")
                     job["status"] = "completed_but_no_speakers"
             else:
-                print(f"Speaker directory not found: {spkdir}")
+                logging.info(f"Speaker directory not found: {spkdir}")
                 job["status"] = "completed_but_no_directory"
 
         job_status_cache[job_id] = (job["status"], now)
@@ -124,7 +124,7 @@ def talking_status(job_id):
         )
 
     except Exception as e:
-        print(f"Error in talking status: {e}")
+        logging.error(f"Error in talking status: {e}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -180,7 +180,7 @@ def available_talking_datasets():
 
         return jsonify({"datasets": sorted(ds, key=lambda x: x["name"])})
     except Exception as e:
-        print(f"Error fetching talking datasets: {e}")
+        logging.error(f"Error fetching talking datasets: {e}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -241,7 +241,7 @@ def get_speaker_samples(job_id, speaker_name):
         return jsonify({"speaker": speaker_name, "job_id": job_id, "samples": samples_for(sp)})
 
     except Exception as e:
-        print(f"Error getting speaker samples: {e}")
+        logging.error(f"Error getting speaker samples: {e}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -304,7 +304,7 @@ def play_original_audio(job_id):
 
 @bp.route("/api/diarization-timeline/<job_id>")
 def get_diarization_timeline(job_id):
-    print(f"Getting diarization timeline for job {job_id}")
+    logging.info(f"Getting diarization timeline for job {job_id}")
     try:
         files = glob.glob(str(paths.TALKING_RESULTS_DIR / "*_diarization.txt"))
         if not files:

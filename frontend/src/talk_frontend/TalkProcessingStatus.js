@@ -17,6 +17,7 @@ import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOverOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
 import ErrorIcon from "@mui/icons-material/ErrorOutlined";
 import WarningIcon from "@mui/icons-material/WarningOutlined";
+import { devLog } from "../utils/logger";
 
 function TalkProcessingStatus({ jobStatus, forceNextStep }) {
   if (!jobStatus) {
@@ -155,7 +156,7 @@ function TalkProcessingStatus({ jobStatus, forceNextStep }) {
             variant="outlined"
             color="secondary"
             onClick={() => {
-              console.log(
+              devLog(
                 "Force proceeding to results with jobStatus:",
                 jobStatus
               );

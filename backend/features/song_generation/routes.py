@@ -170,7 +170,7 @@ def start_song_generation():
         return jsonify({"job_id": job_id})
 
     except Exception as e:
-        print(f"Error starting song generation: {e}")
+        logging.error(f"Error starting song generation: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -245,7 +245,7 @@ def start_cover_generation():
         return jsonify({"job_id": job_id})
     except Exception as e:
         logger.exception("[cover] Failed to start cover generation")
-        print(f"Error starting cover generation: {e}")
+        logging.error(f"Error starting cover generation: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -418,7 +418,7 @@ def list_song_generation_jobs():
                     }
                 )
     except Exception as e:
-        print(f"Error scanning job directories: {e}")
+        logging.error(f"Error scanning job directories: {e}")
 
     # Also scan for existing generated songs on disk
     try:
@@ -441,7 +441,7 @@ def list_song_generation_jobs():
                     }
                 )
     except Exception as e:
-        print(f"Error scanning generated songs: {e}")
+        logging.error(f"Error scanning generated songs: {e}")
 
     # Sort by created_at descending
     jobs.sort(key=lambda x: x.get("created_at", ""), reverse=True)

@@ -137,10 +137,10 @@ def get_past_inference_results():
         return jsonify({"results": results})
 
     except Exception as e:
-        print(f"Error getting past inference results: {e}")
+        logging.error(f"Error getting past inference results: {e}")
         import traceback
 
-        print(traceback.format_exc())
+        logging.info(traceback.format_exc())
         return jsonify({"error": f"Failed to get results: {str(e)}"}), 500
 
 

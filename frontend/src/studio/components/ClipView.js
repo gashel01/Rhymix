@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { hexToRgba, readableInk } from "../../utils/color";
 import { createPortal } from "react-dom";
 import StudioWaveform from "./StudioWaveform";
 import MidiOverlay from "./MidiOverlay";
@@ -25,46 +26,7 @@ const OWN_GESTURE = [
   ".studio-clip-lyrics-entry",
 ].join(", ");
 
-/* Relative luminance (WCAG), used to decide whether a clip's label and
-   waveform should be drawn dark-on-colour or light-on-colour. */
-const readableInk = (hex) => {
-  const trimmed = String(hex || "").replace("#", "").trim();
-  const full =
-    trimmed.length === 3 ? trimmed.split("").map((c) => c + c).join("") : trimmed;
-  const value = Number.parseInt(full, 16);
-  if (full.length !== 6 || Number.isNaN(value)) return "#0b0b0f";
-  const channel = (c) => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  };
-  const luminance =
-    0.2126 * channel((value >> 16) & 255) +
-    0.7152 * channel((value >> 8) & 255) +
-    0.0722 * channel(value & 255);
-  return luminance > 0.35 ? "#0b0b0f" : "#ffffff";
-};
-
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-const hexToRgba = (hex, alpha) => {
-  if (!hex || typeof hex !== "string") return null;
-  const trimmed = hex.replace("#", "").trim();
-  if (trimmed.length !== 3 && trimmed.length !== 6) return null;
-  const full =
-    trimmed.length === 3
-      ? trimmed
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : trimmed;
-  const intVal = Number.parseInt(full, 16);
-  if (Number.isNaN(intVal)) return null;
-  const r = (intVal >> 16) & 255;
-  const g = (intVal >> 8) & 255;
-  const b = intVal & 255;
-  const a = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
-};
-
 const ClipView = ({
   clip,
   asset,

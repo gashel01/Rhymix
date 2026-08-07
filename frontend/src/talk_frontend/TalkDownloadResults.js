@@ -58,6 +58,7 @@ import {
   School as SchoolIcon,
 } from "@mui/icons-material";
 import AudioWaveform from "../components/AudioWaveform";
+import { devLog } from "../utils/logger";
 import ColoredAudioWaveform from "../components/ColoredAudioWaveform";
 import { styled } from "@mui/material/styles";
 
@@ -163,7 +164,7 @@ function TalkDownloadResults({
 
   // Cleanup audio on unmount
   useEffect(() => {
-    console.log("TalkDownloadResults jobStatus:", jobStatus);
+    devLog("TalkDownloadResults jobStatus:", jobStatus);
 
     return () => {
       // Stop any playing audio
@@ -192,7 +193,7 @@ function TalkDownloadResults({
       const audioUrl = `/api/play-original-audio/${
         jobStatus.job_id
       }?filename=${encodeURIComponent(filename)}`;
-      console.log("Setting original audio URL:", audioUrl);
+      devLog("Setting original audio URL:", audioUrl);
       setOriginalAudioUrl(audioUrl);
 
       // Verify the audio URL is accessible
@@ -264,7 +265,7 @@ function TalkDownloadResults({
         return;
       }
 
-      console.log("Timeline data fetched:", timelineData);
+      devLog("Timeline data fetched:", timelineData);
 
       // Set timeline data directly from API response (which now includes Unknown segments)
       const sortedTimeline = timelineData.timeline.sort(
@@ -280,7 +281,7 @@ function TalkDownloadResults({
       const uniqueSpeakers = [
         ...new Set(sortedTimeline.map((segment) => segment.speaker)),
       ];
-      console.log("Unique speakers from timeline:", uniqueSpeakers);
+      devLog("Unique speakers from timeline:", uniqueSpeakers);
     } catch (error) {
       // Don't log AbortError as it's expected when component unmounts
       if (error.name !== 'AbortError') {
@@ -342,7 +343,7 @@ function TalkDownloadResults({
   // Handle segment selection in timeline
   const handleTimelineSegmentClick = useCallback(
     (segment) => {
-      console.log("Timeline segment clicked:", segment);
+      devLog("Timeline segment clicked:", segment);
       setHighlightedSegment(segment);
 
       if (!segment) return;
@@ -393,7 +394,7 @@ function TalkDownloadResults({
         const speakerSegments = timelineData.filter(
           (s) => s.speaker === segment.speaker
         );
-        console.log(
+        devLog(
           `Looking for segment ${segment.id} for speaker ${segment.speaker}`,
           segment
         );
@@ -404,18 +405,18 @@ function TalkDownloadResults({
         // Check if we have a numeric segment ID
         if (segment.id && segment.id.startsWith("segment-")) {
           const segmentIndex = parseInt(segment.id.replace("segment-", ""), 10);
-          console.log(`Looking for segment index ${segmentIndex}`);
+          devLog(`Looking for segment index ${segmentIndex}`);
 
           // Attempt to find segment by index
           if (!isNaN(segmentIndex) && segmentIndex < speakerSegments.length) {
             matchedSegment = speakerSegments[segmentIndex];
-            console.log(`Found by index: ${matchedSegment}`);
+            devLog(`Found by index: ${matchedSegment}`);
           }
         }
 
         // If not found by ID, try to match by timestamp
         if (!matchedSegment) {
-          console.log(
+          devLog(
             `Trying to match by timestamp: ${segment.start}-${segment.end}`
           );
 
@@ -427,13 +428,13 @@ function TalkDownloadResults({
           });
 
           if (matchedSegment) {
-            console.log(`Found by timestamp match:`, matchedSegment);
+            devLog(`Found by timestamp match:`, matchedSegment);
           }
         }
 
         // If still no match, use the first segment as fallback
         if (!matchedSegment && speakerSegments.length > 0) {
-          console.log(`No exact match found, using first segment as fallback`);
+          devLog(`No exact match found, using first segment as fallback`);
           matchedSegment = speakerSegments[0];
         }
 
@@ -527,7 +528,7 @@ function TalkDownloadResults({
 
   // Segment waveform handlers
   const handleSegmentWaveformReady = useCallback((waveform) => {
-    console.log("Segment waveform ready");
+    devLog("Segment waveform ready");
     setSegmentPlayerWaveform(waveform);
   }, []);
 
