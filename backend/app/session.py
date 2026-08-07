@@ -37,6 +37,12 @@ except Exception:  # pragma: no cover
     get_project = None
     save_project = None
 
+from backend.features.studio.project_edits import (
+    append_clip,
+    register_asset,
+    update_project_duration,
+)
+
 try:
     from backend.paths.manager import paths
 except Exception:  # pragma: no cover
@@ -54,12 +60,6 @@ def estimate_bpm_from_onsets(onset_times: List[float]) -> Optional[float]:
         return None
     bpm = 60.0 / median
     return max(60.0, min(200.0, bpm))
-
-
-def _now_iso():
-    from datetime import datetime
-
-    return datetime.now().isoformat()
 
 
 def ticks_per_second(bpm: float, ppq: int) -> float:
@@ -943,9 +943,7 @@ class TranscriptionSession:
             "durationSec": synth_info.get("durationSec", 0.0),
             "sampleRate": synth_info.get("sampleRate"),
         }
-        assets = project_record.get("assets") or {}
-        assets[asset_id] = asset
-        project_record["assets"] = assets
+        register_asset(project_record, asset)
 
         lanes = project_record.get("lanes") or []
         lane = None
@@ -966,30 +964,14 @@ class TranscriptionSession:
             lanes.append(lane)
             project_record["lanes"] = lanes
 
-        clips = project_record.get("clips") or []
-        clip = {
-            "id": uuid.uuid4().hex,
-            "laneId": lane["id"],
-            "sourceAssetId": asset_id,
-            "srcStartSec": 0.0,
-            "srcEndSec": max(0.01, float(asset.get("durationSec") or 0.0)),
-            "timelineStartSec": max(0.0, float(self.insert_at_sec or 0.0)),
-            "fadeInSec": 0.0,
-            "fadeOutSec": 0.0,
-            "gainDb": 0.0,
-        }
-        clips.append(clip)
-        project_record["clips"] = clips
-
-        # Update project duration
-        duration = 0.0
-        for clip_item in clips:
-            end = float(clip_item.get("timelineStartSec") or 0.0) + float(clip_item.get("srcEndSec") or 0.0)
-            duration = max(duration, end)
-        project = project_record.get("project") or {}
-        project["durationSec"] = duration
-        project["updatedAt"] = _now_iso()
-        project_record["project"] = project
+        append_clip(
+            project_record,
+            lane["id"],
+            asset_id,
+            self.insert_at_sec,
+            asset.get("durationSec"),
+        )
+        update_project_duration(project_record)
         save_project(project_record)
         return {
             "assetId": asset_id,
