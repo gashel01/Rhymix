@@ -18,7 +18,24 @@ import IconBtn from "./Homeview/IconBtn.js"
 import {Modal} from "./Homeview/Modal.js"
 import Btn from "./Homeview/Btn.js"
 import {Pill} from "./ModelView/Pill.js"
- 
+import {
+  describeDownload,
+  describeTraining,
+  downloadPhaseLabel,
+  filterModels,
+  formatSampleRate,
+  formatSelectionPreview,
+  getCardGradient,
+  getInstalledIds,
+  getSelectableModels,
+  getSelectionNames,
+  mergeModelCatalog,
+  normaliseModelName,
+  normalizeId,
+  resolveBackTarget,
+  trainingPhaseLabel,
+} from "./modelsCatalog";
+
 /**
  * ModelsView (no MUI)
  * - True responsive grid: multiple cards per row
@@ -222,142 +239,32 @@ function ModelsView({
     });
   }, [searchQuery]);
 
-  const normalizeId = useCallback((value) => {
-    if (!value) return "";
-    return String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
-  }, []);
-
-  const selectionNames = useMemo(() => {
-    return (selectedTracks || [])
-      .map((track) => track?.displayName || track?.safeDisplayName || track?.originalName || track?.name || track?.fileId || track?.id)
-      .filter(Boolean);
-  }, [selectedTracks]);
-
-  const selectionPreview = useMemo(() => {
-    const list = selectionNames.slice(0, 3);
-    const extra = selectionNames.length - list.length;
-    const base = list.join(", ");
-    return extra > 0 ? `${base} +${extra} more` : base;
-  }, [selectionNames]);
+  const selectionNames = useMemo(() => getSelectionNames(selectedTracks), [selectedTracks]);
+  const selectionPreview = useMemo(() => formatSelectionPreview(selectionNames), [selectionNames]);
 
   const handleBack = useCallback(() => {
-    if (ctx?.source === "home") {
-      if (onNavigate) {
-        onNavigate("home");
-        return;
-      }
-      onBack?.();
-      return;
-    }
-    if (ctx?.source === "inference") {
-      if (onNavigate) {
-        onNavigate("inference");
-        return;
-      }
-      onBack?.();
+    const target = resolveBackTarget(ctx?.source);
+    if (target && onNavigate) {
+      onNavigate(target);
       return;
     }
     onBack?.();
   }, [ctx?.source, onBack, onNavigate]);
 
-  const installedIds = useMemo(() => {
-    const ids = new Set();
-    localModels.forEach((model) => {
-      if (model.modelId) ids.add(normalizeId(model.modelId));
-      if (model.name) ids.add(normalizeId(model.name));
-    });
-    return ids;
-  }, [localModels, normalizeId]);
+  const installedIds = useMemo(() => getInstalledIds(localModels), [localModels]);
 
-  const localModelsMerged = useMemo(() => {
-    const byId = new Map();
-    localModels.forEach((model) => {
-      const id = model.modelId || model.name;
-      byId.set(normalizeId(id), { ...model, isOnline: false, status: model.status || "completed" });
-    });
+  const localModelsMerged = useMemo(
+    () => mergeModelCatalog({ localModels, downloadJobs, trainingJobs }),
+    [downloadJobs, localModels, trainingJobs]
+  );
 
-    Object.values(downloadJobs).forEach((job) => {
-      const id = normalizeId(job.modelId || job.modelName);
-      const existing = byId.get(id);
-      if (existing) {
-        if (job.status && job.status !== "completed") {
-          byId.set(id, {
-            ...existing,
-            status: job.status,
-            downloadProgress: job.progress ?? null,
-            downloadPhase: job.phase || null,
-            downloadError: job.error || existing.downloadError,
-          });
-        }
-        return;
-      }
-      byId.set(id, {
-        name: job.modelName || job.modelId || "New Model",
-        modelId: job.modelId,
-        status: job.status || "downloading",
-        downloadProgress: job.progress ?? null,
-        downloadPhase: job.phase || null,
-        downloadError: job.error || null,
-        checkpoints: [],
-        size_mb: job.size_mb || null,
-        created: job.started_at || new Date().toISOString(),
-        isOnline: false,
-      });
-    });
-
-    // Oldest first: several runs can share a model name (a retry after an
-    // interrupted one), and they collide on the same card. Applying them in
-    // order leaves the most recent state showing.
-    [...trainingJobs]
-      .sort((a, b) => (a.started_at || 0) - (b.started_at || 0))
-      .forEach((job) => {
-      // A finished or abandoned run has nothing left to show; whatever landed
-      // on disk is already represented by the real model entry.
-      if (job.status === "completed" || job.status === "cancelled") return;
-      // "interrupted" means the backend restarted under it — dead, and worth
-      // saying so rather than leaving a card that pretends to still be running.
-      const isTerminal = job.status === "failed" || job.status === "interrupted";
-      const id = normalizeId(job.model_name);
-      const existing = byId.get(id);
-      const startedAt = job.started_at ? new Date(job.started_at * 1000).toISOString() : null;
-      byId.set(id, {
-        ...(existing || {}),
-        name: job.model_name,
-        modelId: existing?.modelId || job.model_name,
-        status: isTerminal ? "failed" : "training",
-        trainingJobId: job.id,
-        trainingProgress: typeof job.progress === "number" ? job.progress : null,
-        trainingPhase: job.status || null,
-        trainingError: job.error || null,
-        checkpoints: existing?.checkpoints || [],
-        created: existing?.created || startedAt || new Date().toISOString(),
-        isOnline: false,
-      });
-    });
-
-    return Array.from(byId.values()).sort((a, b) => {
-      const aTime = a.created ? Date.parse(a.created) : 0;
-      const bTime = b.created ? Date.parse(b.created) : 0;
-      return bTime - aTime;
-    });
-  }, [downloadJobs, localModels, normalizeId, trainingJobs]);
-
-  const filteredLocalModels = useMemo(() => {
-    if (!searchQuery.trim()) return localModelsMerged;
-    const q = searchQuery.trim().toLowerCase();
-    const qUnderscore = q.replace(/\s+/g, "_");
-    return localModelsMerged.filter((model) => {
-      // Match the alias the user chose AND the name it was published under, so
-      // a model saved as "progress_test" is still findable by "ariana".
-      const haystacks = [model.name, model.sourceName]
-        .filter(Boolean)
-        .map((value) => value.toLowerCase());
-      return haystacks.some((value) => value.includes(q) || value.includes(qUnderscore));
-    });
-  }, [localModelsMerged, searchQuery]);
+  const filteredLocalModels = useMemo(
+    () => filterModels(localModelsMerged, searchQuery),
+    [localModelsMerged, searchQuery]
+  );
 
   const selectableLocalModels = useMemo(
-    () => filteredLocalModels.filter((model) => model.status === "completed"),
+    () => getSelectableModels(filteredLocalModels),
     [filteredLocalModels]
   );
 
@@ -498,58 +405,6 @@ function ModelsView({
   const onSelectAll = () => setSelected(new Set(selectableLocalModels.map((m) => m.name)));
   const onClear = () => setSelected(new Set());
   const onDelete = () => setDeleteOpen(true);
-
-  const normaliseModelName = (name) => {
-    name = name.charAt(0).toUpperCase() + name.slice(1);
-    return name.replace(/[^a-zA-Z0-9]/g, " ");
-  };
-
-  // Card header gradient palette (reference-style)
-  const CARD_GRADIENTS = [
-    "linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)",
-    "linear-gradient(135deg, #ec4899 0%, #9333ea 100%)",
-    "linear-gradient(135deg, #f59e0b 0%, #ea580c 100%)",
-    "linear-gradient(135deg, #10b981 0%, #0d9488 100%)",
-    "linear-gradient(135deg, #8b5cf6 0%, #c026d3 100%)",
-    "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-  ];
-  const getCardGradient = (index) => CARD_GRADIENTS[index % CARD_GRADIENTS.length];
-
-  const formatSampleRate = (hz) => {
-    if (!hz) return "—";
-    const n = Number(hz);
-    if (n >= 1000) return `${n / 1000}k`;
-    return `${n} Hz`;
-  };
-
-  // Installing a community model is fetch → unzip → install, never training.
-  // Name the phase the job actually reports, and show how far along it is.
-  const DOWNLOAD_PHASE_LABELS = {
-    starting: "Starting",
-    downloading: "Downloading",
-    extracting: "Extracting",
-    installing: "Installing",
-  };
-
-  const describeDownload = (phase, percent) => {
-    const label = DOWNLOAD_PHASE_LABELS[phase] || "Downloading";
-    return typeof percent === "number" ? `${label} ${percent}%` : label;
-  };
-
-  // The backend reports which stage of the pipeline a run is in.
-  const TRAINING_PHASE_LABELS = {
-    preprocessing: "Preprocessing",
-    extracting: "Extracting features",
-    training: "Training",
-    indexing: "Building index",
-  };
-
-  const describeTraining = (phase, percent) => {
-    const label = TRAINING_PHASE_LABELS[phase] || "Training";
-    return typeof percent === "number" ? `${label} ${percent}%` : label;
-  };
-
-
 
   const sentinelRef = useRef(null);
   const [isStuck, setIsStuck] = useState(false);
@@ -1177,7 +1032,7 @@ function ModelsView({
                       <div style={{ marginTop: -4, display: "flex", flexDirection: "column", gap: 6 }}>
                         <ProgressBar value={downloadPct ?? 0} />
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: t.subtext }}>
-                          <span>{DOWNLOAD_PHASE_LABELS[model.downloadPhase] || "Downloading"}</span>
+                          <span>{downloadPhaseLabel(model.downloadPhase)}</span>
                           <span style={{ fontFamily: "monospace" }}>
                             {downloadPct !== null ? `${downloadPct}%` : "—"}
                           </span>
@@ -1189,7 +1044,7 @@ function ModelsView({
                       <div style={{ marginTop: -4, display: "flex", flexDirection: "column", gap: 6 }}>
                         <ProgressBar value={trainingPct ?? 0} />
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: t.subtext }}>
-                          <span>{TRAINING_PHASE_LABELS[model.trainingPhase] || "Training"}</span>
+                          <span>{trainingPhaseLabel(model.trainingPhase)}</span>
                           <span style={{ fontFamily: "monospace" }}>
                             {trainingPct !== null ? `${trainingPct}%` : "—"}
                           </span>
