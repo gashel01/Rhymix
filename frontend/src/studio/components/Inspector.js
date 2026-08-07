@@ -8,155 +8,28 @@ import VoiceToMidiPanel from "./VoiceToMidiPanel";
 import { requestGroqAutofill } from "../../utils/groqAutofill";
 import { StudioAssistButton, StudioAssistSuggestion } from "./GroqAssist";
 
-const SOUND_FONT_OPTIONS = [
-  { value: "", label: "Use lane default" },
-  { value: "acoustic_grand_piano", label: "Piano" },
-  { value: "electric_guitar_clean", label: "Guitar (Clean)" },
-  { value: "acoustic_bass", label: "Bass" },
-  { value: "string_ensemble_1", label: "Strings" },
-  { value: "synth_pad_1_new_age", label: "Synth Pad" },
-  { value: "synth_drum", label: "Synth Drum" },
-  { value: "choir_aahs", label: "Choir" },
-  { value: "flute", label: "Flute" },
-  { value: "alto_sax", label: "Sax" },
-  { value: "trumpet", label: "Trumpet" },
-];
-
-const FOUNDATION_INSTRUMENT_OPTIONS = [
-  "Keys",
-  "Synth",
-  "Strings",
-  "Guitar",
-  "Bass",
-  "Brass",
-  "Woodwinds",
-  "Choir",
-  "Pluck",
-  "Pad",
-  "FX",
-];
-
-const FOUNDATION_KEY_NOTES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
-const FOUNDATION_KEY_SCALES = ["major", "minor"];
-
-const JOB_LABELS = {
-  understand: "Analyze",
-  orchestrate_song: "AI Orchestrator",
-  foundation_generate: "Foundation Generate",
-  foundation_restyle: "Foundation Restyle",
-  foundation_extend: "Foundation Extend",
-  stage_drums_generate: "STAGE Drums",
-  stem_extract: "Stem Extract",
-  stem_extract_uvr: "UVR Stem Extract",
-  render: "Export",
-};
-
-const JOB_TOOL_MAP = {
-  understand: "analyze",
-  foundation_generate: "foundation",
-  foundation_restyle: "foundation",
-  foundation_extend: "foundation",
-  stage_drums_generate: "drums",
-};
-
-const DRAWER_TITLES = {
-  clip: "More Clip Controls",
-  lane: "Lane Controls & FX",
-  project: "Project Settings",
-  foundation: "Foundation",
-  drums: "STAGE Drums",
-  live: "Live Voice Conversion",
-  voice: "Voice to MIDI",
-};
-
-const PANEL_CONTEXT = {
-  RANGE: "range",
-  MIDI: "midi",
-  AUDIO: "audio",
-  NOTHING: "nothing",
-};
-
-const resolveRightPanelContext = (selectedRange, selectedClip) => {
-  if (selectedRange) return PANEL_CONTEXT.RANGE;
-  if (selectedClip?.clipType === "midi") return PANEL_CONTEXT.MIDI;
-  if (selectedClip) return PANEL_CONTEXT.AUDIO;
-  return PANEL_CONTEXT.NOTHING;
-};
-
-const getVisibleAiCards = ({ resolvedRightPanelContext, canAnalyze, canGenerateDrums }) => {
-  switch (resolvedRightPanelContext) {
-    case PANEL_CONTEXT.RANGE:
-      return [
-        canAnalyze ? "analyze" : null,
-        "foundation",
-        canGenerateDrums ? "drums" : null,
-      ].filter(Boolean);
-    case PANEL_CONTEXT.MIDI:
-      return [];
-    case PANEL_CONTEXT.AUDIO:
-      return [
-        canAnalyze ? "analyze" : null,
-        "foundation",
-        canGenerateDrums ? "drums" : null,
-      ].filter(Boolean);
-    case PANEL_CONTEXT.NOTHING:
-    default:
-      return ["live", "foundation", "voice"];
-  }
-};
-
-const normalizeRange = (range) => {
-  if (!range) return null;
-  const start = Math.min(Number(range.start ?? 0), Number(range.end ?? 0));
-  const end = Math.max(Number(range.start ?? 0), Number(range.end ?? 0));
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
-  return { start, end };
-};
-
-const getClipBounds = (clip) => {
-  const start = Number(clip?.timelineStartSec ?? 0);
-  const duration = Math.max(0.01, Number(clip?.srcEndSec ?? 0) - Number(clip?.srcStartSec ?? 0));
-  return { start, end: start + duration, duration };
-};
-
-const formatSeconds = (value) => `${(Number(value) || 0).toFixed(2)}s`;
-const makeRandomSeed = () => Math.floor(Math.random() * 1000000000);
-const parseKeyParts = (rawKey) => {
-  const normalized = String(rawKey || "").trim().replace("-", " ").replace("_", " ");
-  if (!normalized) return { note: "C", scale: "major" };
-  const parts = normalized.split(/\s+/);
-  const note = FOUNDATION_KEY_NOTES.includes(parts[0]) ? parts[0] : "C";
-  const scale = parts.some((part) => part.toLowerCase().startsWith("min")) ? "minor" : "major";
-  return { note, scale };
-};
-const formatKeyParts = (note, scale) => `${note || "C"} ${scale || "major"}`.trim();
-
-const summarizeJob = (job) => {
-  if (!job) return "No recent activity";
-  const label = JOB_LABELS[job.type] || String(job.type || "job").replace(/_/g, " ");
-  const detail = job.error || job.statusMessage || job.status || "idle";
-  return `${label} · ${detail}`;
-};
-
-const nextStepForJob = (job) => {
-  if (!job) return "";
-  if (job.status === "failed") return "Open the tool, adjust the source or settings, then retry.";
-  if (job.status === "completed") return "Review the new lane or refreshed timeline result.";
-  if (job.status === "running") return "You can keep editing while this runs in the background.";
-  if (job.status === "queued") return "The job is queued and will start automatically.";
-  return "Check the activity list for details.";
-};
-
-const getActivityJobs = (jobs, filter) => {
-  const list = [...(jobs || [])].reverse();
-  if (filter === "active") {
-    return list.filter((job) => !["completed", "failed", "cancelled"].includes(job.status));
-  }
-  if (filter === "errors") {
-    return list.filter((job) => job.status === "failed");
-  }
-  return list;
-};
+import {
+  DRAWER_TITLES,
+  FOUNDATION_INSTRUMENT_OPTIONS,
+  FOUNDATION_KEY_NOTES,
+  FOUNDATION_KEY_SCALES,
+  JOB_LABELS,
+  JOB_TOOL_MAP,
+  PANEL_CONTEXT,
+  SOUND_FONT_OPTIONS,
+  describeClip,
+  formatKeyParts,
+  formatSeconds,
+  getActivityJobs,
+  getClipBounds,
+  getVisibleAiCards,
+  makeRandomSeed,
+  nextStepForJob,
+  normalizeRange,
+  parseKeyParts,
+  resolveRightPanelContext,
+  summarizeJob,
+} from "./inspectorModel";
 
 const RightDrawer = ({ open, title, onClose, children }) => (
   <div className={`studio-right-drawer ${open ? "open" : ""}`}>
@@ -535,22 +408,6 @@ const ProjectAdvancedPanel = ({ project, metadata, onUpdateProject }) => (
   </div>
 );
 
-/* Clips carry no label of their own, so the old fallback chain ended on
-   `clip.id` and the panel headlined a raw 32-character uuid — with a second one
-   ("lane da43bec9…") in the subtitle. Neither identifies anything to a person.
-   The source asset and the lane both have real names; use those, and keep the
-   id out of the panel entirely. */
-const describeClip = (clip, assets, lanes) => {
-  const assetLabel = assets?.[clip.sourceAssetId]?.label;
-  const laneName = lanes?.find((lane) => lane.id === clip.laneId)?.name;
-  const name = clip.label || clip.name || assetLabel || laneName || "Clip";
-  return {
-    name,
-    // A clip named after its own lane is the common case ("Vocals" on the
-    // Vocals lane); repeating it in the subtitle says nothing.
-    lane: laneName && laneName !== name ? laneName : null,
-  };
-};
 
 const Inspector = ({
   project,

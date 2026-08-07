@@ -14,6 +14,7 @@ import { styled } from "@mui/material/styles";
 import TalkFileUpload from "./TalkFileUpload";
 import TalkProcessingStatus from "./TalkProcessingStatus";
 import TalkDownloadResults from "./TalkDownloadResults";
+import { devLog } from "../utils/logger";
 
 const steps = ["Upload Audio", "Process", "Results"];
 
@@ -48,17 +49,17 @@ function TalkWorkflowPage({ onBack, handleTrainWithDataset }) {
     let intervalId = null;
 
     if (jobId && processing) {
-      console.log(`Setting up polling for job ${jobId}...`);
+      devLog(`Setting up polling for job ${jobId}...`);
 
       const checkStatus = () => {
-        console.log(`Checking status for job ${jobId}...`);
+        devLog(`Checking status for job ${jobId}...`);
 
         // Increment polling count
         setPollingCount((prev) => {
           const newCount = prev + 1;
           // Stop polling after max attempts
           if (newCount >= MAX_POLLING_ATTEMPTS) {
-            console.log(
+            devLog(
               `Reached max polling attempts (${MAX_POLLING_ATTEMPTS}), stopping poll`
             );
             if (intervalId) {
@@ -76,7 +77,7 @@ function TalkWorkflowPage({ onBack, handleTrainWithDataset }) {
 
         fetch(`/api/talking-status/${jobId}`)
           .then((res) => {
-            console.log("Status response:", res.status, res.statusText);
+            devLog("Status response:", res.status, res.statusText);
             if (!res.ok) {
               throw new Error(
                 `Status response error: ${res.status} ${res.statusText}`
@@ -85,18 +86,18 @@ function TalkWorkflowPage({ onBack, handleTrainWithDataset }) {
             return res.json();
           })
           .then((data) => {
-            console.log("Job status data:", data);
+            devLog("Job status data:", data);
             setJobStatus(data);
 
             // Check if job is complete and move to results step
             if (data.status === "completed" || data.status === "failed") {
-              console.log("Job complete, moving to results step");
+              devLog("Job complete, moving to results step");
               setProcessing(false);
               setActiveStep(2); // Move to results step
 
               // Clear polling
               if (intervalId) {
-                console.log("Clearing polling interval");
+                devLog("Clearing polling interval");
                 clearInterval(intervalId);
                 intervalId = null;
               }
@@ -130,15 +131,15 @@ function TalkWorkflowPage({ onBack, handleTrainWithDataset }) {
     // Cleanup function
     return () => {
       if (intervalId) {
-        console.log("Cleaning up polling interval on component unmount");
+        devLog("Cleaning up polling interval on component unmount");
         clearInterval(intervalId);
       }
     };
   }, [jobId, processing]);
 
   useEffect(() => {
-    console.log("TalkWorkflowPage - currentStep:", activeStep);
-    console.log("TalkWorkflowPage - jobStatus:", jobStatus);
+    devLog("TalkWorkflowPage - currentStep:", activeStep);
+    devLog("TalkWorkflowPage - jobStatus:", jobStatus);
   }, [activeStep, jobStatus]);
 
   const handleStartProcessing = () => {
@@ -162,7 +163,7 @@ function TalkWorkflowPage({ onBack, handleTrainWithDataset }) {
     })
       .then((res) => res.json())
       .then((data) => {
-        console.log("Processing started:", data);
+        devLog("Processing started:", data);
         if (data.job_id) {
           setJobId(data.job_id);
           setProcessing(true);
@@ -242,7 +243,7 @@ function TalkWorkflowPage({ onBack, handleTrainWithDataset }) {
           />
         );
       case 2:
-        console.log("Rendering TalkDownloadResults with jobStatus:", jobStatus);
+        devLog("Rendering TalkDownloadResults with jobStatus:", jobStatus);
         return (
           
           <TalkDownloadResults

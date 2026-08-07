@@ -5,11 +5,24 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from clean_vocals import clean_directories
 from backend.jobs.registry import active_jobs
 from backend.paths.manager import paths
+import logging
 
 bp = Blueprint("maintenance", __name__)
+
+
+def clean_directories(*args, **kwargs):
+    """Imported where it is used, like ace_step and applio.core below.
+
+    clean_vocals pulls in the separation stack, so importing it at module
+    level made every blueprint — and therefore create_app() — depend on it.
+    That is why the Flask route tests could not run anywhere the models are
+    not installed, CI included.
+    """
+    from clean_vocals import clean_directories as _clean_directories
+
+    return _clean_directories(*args, **kwargs)
 
 
 def _coerce_bool(value, default: bool = True) -> bool:
@@ -113,16 +126,16 @@ def clean_directory(d, force=False, show_empty=True):
                         n += 1
                     except Exception:
                         pass
-        print(f"  ✅ {d.name} cleaned ({n} items removed)")
+        logging.info(f"  ✅ {d.name} cleaned ({n} items removed)")
     except Exception as e:
-        print(f"  ❌ Error cleaning {d}: {e}")
+        logging.info(f"  ❌ Error cleaning {d}: {e}")
 
 
 def clean_diarization_directories(include_input=False, force=False):
     for d in [paths.TALKING_RESULTS_DIR, paths.TALKING_TEMP_DIR] + (
         [paths.TALKING_UPLOADS_DIR] if include_input else []
     ):
-        print(f"Cleaning diarization directory: {d}")
+        logging.info(f"Cleaning diarization directory: {d}")
         clean_directory(d, force=force)
 
 
@@ -131,32 +144,32 @@ def clean_all():
     d = request.json or {}
     include_input, force = d.get("include_input", True), d.get("force", True)
 
-    print("\n" + "=" * 48 + "\n           CLEANING ALL DIRECTORIES\n" + "=" * 48)
-    print("\n--- Cleaning Singing/Vocal Directories ---")
+    logging.info("\n" + "=" * 48 + "\n           CLEANING ALL DIRECTORIES\n" + "=" * 48)
+    logging.info("\n--- Cleaning Singing/Vocal Directories ---")
     clean_directories(include_input=include_input, force=force)
 
-    print("\n--- Cleaning Job Directories ---")
+    logging.info("\n--- Cleaning Job Directories ---")
     if paths.SINGING_JOBS_DIR.exists():
-        print(f"Cleaning job directory: {paths.SINGING_JOBS_DIR}")
+        logging.info(f"Cleaning job directory: {paths.SINGING_JOBS_DIR}")
         clean_directory(paths.SINGING_JOBS_DIR, force=force)
 
-    print("\n--- Cleaning Diarization/Talking Directories ---")
+    logging.info("\n--- Cleaning Diarization/Talking Directories ---")
     clean_diarization_directories(include_input=include_input, force=force)
 
     if include_input:
-        print("\n--- Cleaning Original Audio Directory ---")
+        logging.info("\n--- Cleaning Original Audio Directory ---")
         clean_directory(paths.ORIGINAL_AUDIO_DIR, force=force)
 
-    print("\n--- Cleaning Additional Temp Directories ---")
+    logging.info("\n--- Cleaning Additional Temp Directories ---")
     for p, label in [
         (Path("diarization/pyannote-diarization/temp_segments"), "diarization temp segments"),
         (Path("temp"), "general temp directory"),
     ]:
         if p.exists():
-            print(f"Cleaning {label}: {p}")
+            logging.info(f"Cleaning {label}: {p}")
             clean_directory(p, force=force)
 
-    print("\n" + "=" * 48 + "\n     ALL DIRECTORIES CLEANED SUCCESSFULLY\n" + "=" * 48 + "\n")
+    logging.info("\n" + "=" * 48 + "\n     ALL DIRECTORIES CLEANED SUCCESSFULLY\n" + "=" * 48 + "\n")
     return jsonify(
         {
             "message": "All directories cleaned successfully",
@@ -179,7 +192,7 @@ def prepare_processing():
         clean_directories(include_input=False, force=True)
         return jsonify({"status": "ready"})
     except Exception as e:
-        print(f"Error preparing for processing: {e}")
+        logging.error(f"Error preparing for processing: {e}")
         return jsonify({"error": str(e)}), 500
 
 

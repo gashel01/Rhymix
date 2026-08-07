@@ -14,7 +14,15 @@ concurrency:
 jobs:
   # ---------------------------------------------------------------------------
   # Backend unit tests — pure-Python, no GPU, no model checkpoints.
-  # Only runs the dubler / magic-wand tests in tests/.
+  #
+  # Runs the dubler / magic-wand tests in tests/ AND the Flask route tests in
+  # backend/tests/. The latter existed but were never executed by CI, which is
+  # how a NameError in the studio job-cancellation path survived in main: the
+  # test that catches it was already written.
+  #
+  # backend/tests/test_dubler_melody.py is excluded by name — it is the only
+  # one that transitively imports torch, torchaudio and torchcrepe, and
+  # installing a GPU stack to run one file would cost more than it returns.
   # ---------------------------------------------------------------------------
   backend-tests:
     name: Backend tests (pytest)
@@ -45,13 +53,18 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          pytest tests/ -v --tb=short
+          pytest tests/ backend/tests/ -v --tb=short \
+            --ignore=backend/tests/test_dubler_melody.py
 
   # ---------------------------------------------------------------------------
-  # Frontend build — proves the React app compiles cleanly.
+  # Frontend — runs the jest suite, then proves the app compiles.
+  #
+  # The test step is new. @testing-library was never listed in package.json, so
+  # `npm test` reported "Cannot find module" for two of the three suites and
+  # nobody saw it; they had never run since the day they were written.
   # ---------------------------------------------------------------------------
   frontend-build:
-    name: Frontend build (React)
+    name: Frontend tests + build (React)
     runs-on: ubuntu-latest
 
     defaults:
@@ -68,7 +81,15 @@ jobs:
           node-version: "18"
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        # --legacy-peer-deps: typescript@5 is installed against react-scripts@5,
+        # which declares a peerOptional of ^3 || ^4. Pre-existing, unrelated to
+        # the test libraries, and npm refuses to resolve without it.
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+
+      - name: Test
+        env:
+          CI: "true"
+        run: npm test -- --watchAll=false
 
       - name: Build
         env:

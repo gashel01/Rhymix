@@ -8,6 +8,7 @@ import {
   duplicateSelection,
 } from "./edlOps";
 import { ensureLaneColors, resolveLaneColor } from "./laneColors";
+import { ticksToSec } from "./audioMath";
 
 const StudioStateContext = createContext(null);
 const StudioDispatchContext = createContext(null);
@@ -66,13 +67,6 @@ const makeId = () => {
     return crypto.randomUUID();
   }
   return `lane-${Math.random().toString(16).slice(2)}`;
-};
-
-const ticksToSec = (ticks, bpm, ppq) => {
-  const safeBpm = Number(bpm) || 120;
-  const safePpq = Number(ppq) || 480;
-  const tps = (safeBpm * safePpq) / 60;
-  return ticks / tps;
 };
 
 const snapshotState = (state) => ({

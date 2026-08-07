@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
+import { ticksToSec } from "../audioMath";
+import { hexToRgba, readableInk } from "../../utils/color";
 import { createPortal } from "react-dom";
 import StudioWaveform from "./StudioWaveform";
 import MidiOverlay from "./MidiOverlay";
@@ -25,46 +27,7 @@ const OWN_GESTURE = [
   ".studio-clip-lyrics-entry",
 ].join(", ");
 
-/* Relative luminance (WCAG), used to decide whether a clip's label and
-   waveform should be drawn dark-on-colour or light-on-colour. */
-const readableInk = (hex) => {
-  const trimmed = String(hex || "").replace("#", "").trim();
-  const full =
-    trimmed.length === 3 ? trimmed.split("").map((c) => c + c).join("") : trimmed;
-  const value = Number.parseInt(full, 16);
-  if (full.length !== 6 || Number.isNaN(value)) return "#0b0b0f";
-  const channel = (c) => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  };
-  const luminance =
-    0.2126 * channel((value >> 16) & 255) +
-    0.7152 * channel((value >> 8) & 255) +
-    0.0722 * channel(value & 255);
-  return luminance > 0.35 ? "#0b0b0f" : "#ffffff";
-};
-
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-const hexToRgba = (hex, alpha) => {
-  if (!hex || typeof hex !== "string") return null;
-  const trimmed = hex.replace("#", "").trim();
-  if (trimmed.length !== 3 && trimmed.length !== 6) return null;
-  const full =
-    trimmed.length === 3
-      ? trimmed
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : trimmed;
-  const intVal = Number.parseInt(full, 16);
-  if (Number.isNaN(intVal)) return null;
-  const r = (intVal >> 16) & 255;
-  const g = (intVal >> 8) & 255;
-  const b = intVal & 255;
-  const a = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
-};
-
 const ClipView = ({
   clip,
   asset,
@@ -265,20 +228,17 @@ const ClipView = ({
       if (isMod && key === "c") {
         event.preventDefault();
         if (!selectedNoteIndices || selectedNoteIndices.size === 0) return;
-        const ticksToSec = (ticks) => {
-          const tps = (midiBpm * midiPpq) / 60;
-          return Number(ticks || 0) / (tps || 1);
-        };
+        const toSec = (ticks) => ticksToSec(ticks, midiBpm, midiPpq);
         const selected = Array.from(selectedNoteIndices)
           .map((idx) => {
             const note = midiNotes[idx];
             if (!note) return null;
             const startSecRaw = Number.isFinite(note.startSec)
               ? Number(note.startSec)
-              : ticksToSec(note.startTick);
+              : toSec(note.startTick);
             const durationSecRaw = Number.isFinite(note.durationSec)
               ? Number(note.durationSec)
-              : ticksToSec(note.durationTick);
+              : toSec(note.durationTick);
             return {
               note: note.note,
               midi: note.midi,
@@ -370,6 +330,10 @@ const ClipView = ({
     editorPlayheadSec,
     effectiveClip.srcStartSec,
     lengthSec,
+    // The handler calls onUpdateClip(clip.id, ...). Timeline keys ClipView by
+    // clip.id so today a change remounts rather than re-runs, but the effect
+    // should not depend on that staying true.
+    clip.id,
     clip.midi,
     onUpdateClip,
     onStopPreviewMidiNote,
@@ -417,10 +381,7 @@ const ClipView = ({
       clamp(127 - Math.floor((clamp(y, 0, usableHeight) / usableHeight) * range), 0, 127);
     const maxNote = noteAtY(minY);
     const minNote = noteAtY(maxY);
-    const ticksToSec = (ticks) => {
-      const tps = (midiBpm * midiPpq) / 60;
-      return Number(ticks || 0) / (tps || 1);
-    };
+    const toSec = (ticks) => ticksToSec(ticks, midiBpm, midiPpq);
     const clipStart = Number(effectiveClip.srcStartSec || 0);
     const next = new Set();
     midiNotes.forEach((note, idx) => {
@@ -428,10 +389,10 @@ const ClipView = ({
       if (noteNum < minNote || noteNum > maxNote) return;
       const startSecRaw = Number.isFinite(note.startSec)
         ? Number(note.startSec)
-        : ticksToSec(note.startTick);
+        : toSec(note.startTick);
       const durationSecRaw = Number.isFinite(note.durationSec)
         ? Number(note.durationSec)
-        : ticksToSec(note.durationTick);
+        : toSec(note.durationTick);
       const relStart = startSecRaw - clipStart;
       const relEnd = relStart + Math.max(0.01, durationSecRaw || 0);
       if (relEnd >= startSec && relStart <= endSec) {

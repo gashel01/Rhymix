@@ -754,12 +754,12 @@ def guided_session(
 
     for _ in range(int(rounds)):
         for label in LABELS:
-            print(f"\nLabel: {label}. Get ready...")
+            logging.info(f"\nLabel: {label}. Get ready...")
             for i in range(3, 0, -1):
-                print(f"{i}...")
+                logging.info(f"{i}...")
                 _beep(sr, 0.06, 880.0)
                 time.sleep(0.5)
-            print("Record!")
+            logging.info("Record!")
             result = collect_take_from_mic(
                 label=label,
                 base_dir=base_dir,
@@ -770,7 +770,7 @@ def guided_session(
                 review=review,
             )
             if result.get("status") != "ok":
-                print(f"Error: {result.get('error')}")
+                logging.error(f"Error: {result.get('error')}")
                 continue
             added[label] += int(result.get("kept", 0))
             skipped[label] += int(result.get("skipped", 0))
@@ -787,10 +787,10 @@ def guided_session(
                 ]
                 sanity = _sanity_check_model(model, feats, label)
                 if sanity["consistency"] is not None and sanity["consistency"] < 0.6:
-                    print(f"Low consistency for {label} ({sanity['consistency']:.2f}). Try again.")
+                    logging.info(f"Low consistency for {label} ({sanity['consistency']:.2f}). Try again.")
 
         report = train_and_save_model(base_dir=base_dir)
-        print(json.dumps(report, indent=2))
+        logging.info(json.dumps(report, indent=2))
 
     extra_rounds = 0
     while extra_rounds < 4:
@@ -801,12 +801,12 @@ def guided_session(
             break
         extra_rounds += 1
         for label in need:
-            print(f"\nExtra take for {label} (needs {target_hits_per_label - counts.get(label, 0)} more)...")
+            logging.info(f"\nExtra take for {label} (needs {target_hits_per_label - counts.get(label, 0)} more)...")
             for i in range(3, 0, -1):
-                print(f"{i}...")
+                logging.info(f"{i}...")
                 _beep(sr, 0.06, 880.0)
                 time.sleep(0.5)
-            print("Record!")
+            logging.info("Record!")
             result = collect_take_from_mic(
                 label=label,
                 base_dir=base_dir,
@@ -817,7 +817,7 @@ def guided_session(
                 review=review,
             )
             if result.get("status") != "ok":
-                print(f"Error: {result.get('error')}")
+                logging.error(f"Error: {result.get('error')}")
                 continue
             added[label] += int(result.get("kept", 0))
             skipped[label] += int(result.get("skipped", 0))
@@ -972,23 +972,23 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.command == "devices":
         if sd is None:
-            print(json.dumps({"status": "error", "error": "sounddevice not installed"}, indent=2))
+            logging.info(json.dumps({"status": "error", "error": "sounddevice not installed"}, indent=2))
             return 1
-        print(json.dumps(list_audio_devices(), indent=2))
+        logging.info(json.dumps(list_audio_devices(), indent=2))
         return 0
 
     if args.command == "level":
         try:
             result = mic_level_check(device=args.device, sr=args.sr, seconds=2.0)
         except RuntimeError as exc:
-            print(json.dumps({"status": "error", "error": str(exc)}, indent=2))
+            logging.info(json.dumps({"status": "error", "error": str(exc)}, indent=2))
             return 1
-        print(json.dumps(result, indent=2))
+        logging.info(json.dumps(result, indent=2))
         return 0
 
     if args.command == "rollback":
         result = delete_last_samples(base_dir=base_dir, n=args.n, label=args.label)
-        print(json.dumps(result, indent=2))
+        logging.info(json.dumps(result, indent=2))
         return 0
 
     if args.command == "session":
@@ -1004,9 +1004,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 review=args.review,
             )
         except RuntimeError as exc:
-            print(json.dumps({"status": "error", "error": str(exc)}, indent=2))
+            logging.info(json.dumps({"status": "error", "error": str(exc)}, indent=2))
             return 1
-        print(json.dumps(result, indent=2))
+        logging.info(json.dumps(result, indent=2))
         return 0
 
     if args.command == "add":
@@ -1017,17 +1017,17 @@ def main(argv: Optional[List[str]] = None) -> int:
             base_dir=base_dir,
             window_sec=args.window_sec,
         )
-        print(json.dumps(result, indent=2))
+        logging.info(json.dumps(result, indent=2))
         return 0
 
     if args.command == "train":
         result = train_and_save_model(base_dir=base_dir)
-        print(json.dumps(result, indent=2))
+        logging.info(json.dumps(result, indent=2))
         return 0
 
     if args.command == "transcribe":
         notes = transcribe_drum_hits(args.file, sample_rate=args.sr, base_dir=base_dir, window_sec=args.window_sec)
-        print(json.dumps(notes, indent=2))
+        logging.info(json.dumps(notes, indent=2))
         return 0
 
     return 1

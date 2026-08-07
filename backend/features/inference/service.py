@@ -25,8 +25,7 @@ try:
         run_index_script,
     )
 except ImportError as e:
-    import sys as _sys
-    print(f"[rhymix] WARNING: applio not installed - inference unavailable ({e})", file=_sys.stderr)
+    logging.warning(f"[rhymix] WARNING: applio not installed - inference unavailable ({e})")
     # Stubs so dependent modules can import without crashing.
     # All will raise a clear error if actually called before setup.bat runs.
     run_infer_script = None
@@ -85,7 +84,7 @@ def run_inference_job(job_id, run_id, model, track, params):
             logger.disabled = True
 
         # Since we're in a separate process, use file-based status updates
-        print(f"Inference process started for job {job_id}")
+        logging.info(f"Inference process started for job {job_id}")
 
         # Import required modules
         from core import run_infer_script
@@ -126,16 +125,16 @@ def run_inference_job(job_id, run_id, model, track, params):
         index_path = model.get("indexPath")
 
         # Debug: Check if model file exists
-        print(f"Selected checkpoint: {selected_checkpoint}")
-        print(f"Raw model path: {model_path}")
+        logging.info(f"Selected checkpoint: {selected_checkpoint}")
+        logging.info(f"Raw model path: {model_path}")
 
         # Convert relative path to absolute path
         if not os.path.isabs(model_path):
             model_path = str(paths.APPLIO_MODELS_DIR / model_path)
-            print(f"Absolute model path: {model_path}")
+            logging.info(f"Absolute model path: {model_path}")
 
-        print(f"Model file exists: {os.path.exists(model_path)}")
-        print(f"APPLIO_MODELS_DIR: {paths.APPLIO_MODELS_DIR}")
+        logging.info(f"Model file exists: {os.path.exists(model_path)}")
+        logging.info(f"APPLIO_MODELS_DIR: {paths.APPLIO_MODELS_DIR}")
 
         if not os.path.exists(model_path):
             active_jobs[job_id].update({"status": "failed", "error": f"Model file not found: {model_path}"})
@@ -192,7 +191,7 @@ def run_inference_job(job_id, run_id, model, track, params):
             alt_path = str(paths.get_vocal_file_path(fallback_name, processed=not use_processed))
             if os.path.exists(alt_path):
                 input_path = alt_path
-                print(f"[Inference] Using {'raw' if not use_processed else 'processed'} vocals: {input_path}")
+                logging.info(f"[Inference] Using {'raw' if not use_processed else 'processed'} vocals: {input_path}")
 
         # Create output directory
         run_dir = paths.INFERENCE_RUNS_DIR / run_id

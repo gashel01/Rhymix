@@ -3,61 +3,23 @@ import React, {
   useEffect,
   useRef,
   useCallback,
-  useMemo,
-} from "react";
+  useMemo } from "react";
 import {
   Box,
   Typography,
-  Grid,
   Button,
   Paper,
   Chip,
   Tab,
   Tabs,
   Card,
-  CardContent,
-  CardActions,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Alert,
-  Table,
-  TableHead,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableRow,
-  TextField,
-  FormControl,
-  Select,
-  MenuItem,
-} from "@mui/material";
+  Alert } from "@mui/material";
 import {
-  DownloadOutlined as DownloadIcon,
-  PlayArrow as PlayIcon,
-  Pause as PauseIcon,
   Replay as ReplayIcon,
-  CloudDownload as CloudDownloadIcon,
   FolderZip as ZipIcon,
-  Person as PersonIcon,
-  Stop as StopIcon,
-  Refresh as RefreshIcon,
-  Timeline as TimelineIcon,
-  Audiotrack as AudiotrackIcon,
-  Textsms as TextsmsIcon,
-  FilterNone as FilterNoneIcon,
-  ZoomIn as ZoomInIcon,
-  ZoomOut as ZoomOutIcon,
-  Fullscreen as FullscreenIcon,
-  NavigateBefore as NavigateBeforeIcon,
-  NavigateNext as NavigateNextIcon,
-  Edit as EditIcon,
-  SwapHoriz as SwapHorizIcon,
-  School as SchoolIcon,
-} from "@mui/icons-material";
+  Person as PersonIcon } from "@mui/icons-material";
 import AudioWaveform from "../components/AudioWaveform";
+import { devLog } from "../utils/logger";
 import ColoredAudioWaveform from "../components/ColoredAudioWaveform";
 import { styled } from "@mui/material/styles";
 
@@ -71,8 +33,7 @@ import SpeakerRenameDialog from "./components/SpeakerRenameDialog";
 import {
   formatDuration,
   getSpeakerColor,
-  speakerColors,
-} from "./utils/audioUtils";
+  speakerColors } from "./utils/audioUtils";
 
 // Styled components
 const SpeakerCard = styled(Card)(({ theme, color }) => ({
@@ -83,8 +44,7 @@ const SpeakerCard = styled(Card)(({ theme, color }) => ({
   transition: "transform 0.2s ease-in-out",
   "&:hover": {
     transform: "translateY(-5px)",
-    boxShadow: theme.shadows[8],
-  },
+    boxShadow: theme.shadows[8] },
   "&::before": {
     content: '""',
     position: "absolute",
@@ -94,16 +54,13 @@ const SpeakerCard = styled(Card)(({ theme, color }) => ({
     height: "6px",
     backgroundColor: color || theme.palette.primary.main,
     borderTopLeftRadius: theme.shape.borderRadius,
-    borderTopRightRadius: theme.shape.borderRadius,
-  },
-}));
+    borderTopRightRadius: theme.shape.borderRadius } }));
 
 function TalkDownloadResults({
   jobStatus,
   handleReset,
   showHeader = true,
-  onTrainWithSpeaker,
-}) {
+  onTrainWithSpeaker }) {
   // Core state
   const [playing, setPlaying] = useState(null);
   const [error, setError] = useState(null);
@@ -141,8 +98,7 @@ function TalkDownloadResults({
   const [isProcessing, setIsProcessing] = useState(false);
   const [notification, setNotification] = useState({
     message: "",
-    severity: "",
-  });
+    severity: "" });
 
   // Clear playback timer on unmount
   useEffect(() => {
@@ -163,7 +119,7 @@ function TalkDownloadResults({
 
   // Cleanup audio on unmount
   useEffect(() => {
-    console.log("TalkDownloadResults jobStatus:", jobStatus);
+    devLog("TalkDownloadResults jobStatus:", jobStatus);
 
     return () => {
       // Stop any playing audio
@@ -192,7 +148,7 @@ function TalkDownloadResults({
       const audioUrl = `/api/play-original-audio/${
         jobStatus.job_id
       }?filename=${encodeURIComponent(filename)}`;
-      console.log("Setting original audio URL:", audioUrl);
+      devLog("Setting original audio URL:", audioUrl);
       setOriginalAudioUrl(audioUrl);
 
       // Verify the audio URL is accessible
@@ -233,8 +189,7 @@ function TalkDownloadResults({
     setSpeakersList(
       uniqueSpeakers.map((speaker, index) => ({
         name: speaker,
-        color: getSpeakerColor(speaker, index),
-      }))
+        color: getSpeakerColor(speaker, index) }))
     );
   }, [timelineData]);
 
@@ -264,7 +219,7 @@ function TalkDownloadResults({
         return;
       }
 
-      console.log("Timeline data fetched:", timelineData);
+      devLog("Timeline data fetched:", timelineData);
 
       // Set timeline data directly from API response (which now includes Unknown segments)
       const sortedTimeline = timelineData.timeline.sort(
@@ -280,7 +235,7 @@ function TalkDownloadResults({
       const uniqueSpeakers = [
         ...new Set(sortedTimeline.map((segment) => segment.speaker)),
       ];
-      console.log("Unique speakers from timeline:", uniqueSpeakers);
+      devLog("Unique speakers from timeline:", uniqueSpeakers);
     } catch (error) {
       // Don't log AbortError as it's expected when component unmounts
       if (error.name !== 'AbortError') {
@@ -342,7 +297,7 @@ function TalkDownloadResults({
   // Handle segment selection in timeline
   const handleTimelineSegmentClick = useCallback(
     (segment) => {
-      console.log("Timeline segment clicked:", segment);
+      devLog("Timeline segment clicked:", segment);
       setHighlightedSegment(segment);
 
       if (!segment) return;
@@ -393,7 +348,7 @@ function TalkDownloadResults({
         const speakerSegments = timelineData.filter(
           (s) => s.speaker === segment.speaker
         );
-        console.log(
+        devLog(
           `Looking for segment ${segment.id} for speaker ${segment.speaker}`,
           segment
         );
@@ -404,18 +359,18 @@ function TalkDownloadResults({
         // Check if we have a numeric segment ID
         if (segment.id && segment.id.startsWith("segment-")) {
           const segmentIndex = parseInt(segment.id.replace("segment-", ""), 10);
-          console.log(`Looking for segment index ${segmentIndex}`);
+          devLog(`Looking for segment index ${segmentIndex}`);
 
           // Attempt to find segment by index
           if (!isNaN(segmentIndex) && segmentIndex < speakerSegments.length) {
             matchedSegment = speakerSegments[segmentIndex];
-            console.log(`Found by index: ${matchedSegment}`);
+            devLog(`Found by index: ${matchedSegment}`);
           }
         }
 
         // If not found by ID, try to match by timestamp
         if (!matchedSegment) {
-          console.log(
+          devLog(
             `Trying to match by timestamp: ${segment.start}-${segment.end}`
           );
 
@@ -427,13 +382,13 @@ function TalkDownloadResults({
           });
 
           if (matchedSegment) {
-            console.log(`Found by timestamp match:`, matchedSegment);
+            devLog(`Found by timestamp match:`, matchedSegment);
           }
         }
 
         // If still no match, use the first segment as fallback
         if (!matchedSegment && speakerSegments.length > 0) {
-          console.log(`No exact match found, using first segment as fallback`);
+          devLog(`No exact match found, using first segment as fallback`);
           matchedSegment = speakerSegments[0];
         }
 
@@ -509,8 +464,7 @@ function TalkDownloadResults({
   const handleWaveformReady = useCallback((sampleId, waveform) => {
     setWaveforms((prev) => ({
       ...prev,
-      [sampleId]: waveform,
-    }));
+      [sampleId]: waveform }));
   }, []);
 
   // Download segment handler
@@ -527,7 +481,7 @@ function TalkDownloadResults({
 
   // Segment waveform handlers
   const handleSegmentWaveformReady = useCallback((waveform) => {
-    console.log("Segment waveform ready");
+    devLog("Segment waveform ready");
     setSegmentPlayerWaveform(waveform);
   }, []);
 
@@ -636,8 +590,7 @@ function TalkDownloadResults({
     if (speakerToRename && newSpeakerName.trim()) {
       setSpeakerNameMap((prev) => ({
         ...prev,
-        [speakerToRename]: newSpeakerName.trim(),
-      }));
+        [speakerToRename]: newSpeakerName.trim() }));
     }
     setRenameDialogOpen(false);
   }, [speakerToRename, newSpeakerName]);
@@ -653,8 +606,7 @@ function TalkDownloadResults({
       if (segment.start === undefined || segment.end === undefined) {
         setNotification({
           message: "Cannot reassign segment: Missing time information",
-          severity: "error",
-        });
+          severity: "error" });
         return;
       }
 
@@ -680,8 +632,7 @@ function TalkDownloadResults({
         const response = await fetch("/api/reassign-segment", {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
-          },
+            "Content-Type": "application/json" },
           body: JSON.stringify({
             job_id: jobStatus.job_id,
             segment_id: segment.id,
@@ -691,9 +642,7 @@ function TalkDownloadResults({
             target_speaker: targetSpeaker,
             is_unknown: isUnknown,
             speaker_segment_index: speakerSegmentIndex,
-            maintain_playback: true,
-          }),
-        });
+            maintain_playback: true }) });
 
         const data = await response.json();
 
@@ -709,8 +658,7 @@ function TalkDownloadResults({
           if (highlightedSegment?.id === segment.id) {
             setHighlightedSegment({
               ...highlightedSegment,
-              speaker: targetSpeaker,
-            });
+              speaker: targetSpeaker });
 
             // Don't update the player URL or reload the player
             // This keeps the current playback state
@@ -718,24 +666,20 @@ function TalkDownloadResults({
 
           setNotification({
             message: `Segment reassigned to ${targetSpeaker}`,
-            severity: "success",
-          });
+            severity: "success" });
 
           // After UI update is complete, tell backend to move the file
           // This happens after we've already updated the UI
           const moveResponse = await fetch("/api/move-segment", {
             method: "POST",
             headers: {
-              "Content-Type": "application/json",
-            },
+              "Content-Type": "application/json" },
             body: JSON.stringify({
               job_id: jobStatus.job_id,
               segment_id: segment.id,
               original_speaker: segment.speaker,
               target_speaker: targetSpeaker,
-              part_number: data.part_number,
-            }),
-          });
+              part_number: data.part_number }) });
 
           if (!moveResponse.ok) {
             console.error("Error moving segment file");
@@ -744,8 +688,7 @@ function TalkDownloadResults({
         } else {
           setNotification({
             message: `Error: ${data.error}`,
-            severity: "error",
-          });
+            severity: "error" });
         }
       } catch (error) {
         // Don't log AbortError as it's expected when component unmounts
@@ -753,8 +696,7 @@ function TalkDownloadResults({
           console.error("Error reassigning segment:", error);
           setNotification({
             message: "An unexpected error occurred",
-            severity: "error",
-          });
+            severity: "error" });
         }
       } finally {
         setIsProcessing(false);
@@ -824,8 +766,7 @@ function TalkDownloadResults({
         start: segment.start,
         end: segment.end,
         speaker: segment.speaker,
-        id: segment.id,
-      }));
+        id: segment.id }));
 
       // Get the segment URLs that can be used as audio files
       const segmentUrls = speakerSegments.map((segment) =>
@@ -842,9 +783,7 @@ function TalkDownloadResults({
             jobId: jobStatus.job_id,
             speakerName,
             segments: segmentsData,
-            originalFilename: jobStatus.original_filename,
-          },
-        });
+            originalFilename: jobStatus.original_filename } });
       }
     },
     [jobStatus, onTrainWithSpeaker, getSegmentUrl]
@@ -895,8 +834,7 @@ function TalkDownloadResults({
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            mb: 3,
-          }}
+            mb: 3 }}
         >
           <Typography variant="h5" gutterBottom>
             Diarization Complete!

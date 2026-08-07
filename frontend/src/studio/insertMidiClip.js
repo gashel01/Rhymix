@@ -1,9 +1,3 @@
-const ticksToSec = (ticks, bpm, ppq) => {
-  const safeBpm = Number(bpm) || 120;
-  const safePpq = Number(ppq) || 480;
-  return ticks / ((safeBpm * safePpq) / 60);
-};
-
 const makeLaneId = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();

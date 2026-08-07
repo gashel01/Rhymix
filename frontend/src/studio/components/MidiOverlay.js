@@ -1,33 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-const ticksToSec = (ticks, bpm, ppq) => {
-  const safeBpm = Number(bpm) || 120;
-  const safePpq = Number(ppq) || 480;
-  const tps = (safeBpm * safePpq) / 60;
-  return Number(ticks || 0) / tps;
-};
+import { ticksToSec } from "../audioMath";
+import { hexToRgba } from "../../utils/color";
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-const hexToRgba = (hex, alpha) => {
-  if (!hex || typeof hex !== "string") return null;
-  const trimmed = hex.replace("#", "").trim();
-  if (trimmed.length !== 3 && trimmed.length !== 6) return null;
-  const full =
-    trimmed.length === 3
-      ? trimmed
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : trimmed;
-  const intVal = Number.parseInt(full, 16);
-  if (Number.isNaN(intVal)) return null;
-  const r = (intVal >> 16) & 255;
-  const g = (intVal >> 8) & 255;
-  const b = intVal & 255;
-  const a = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
-};
-
 const MidiOverlay = ({
   notes = [],
   bpm = 120,
@@ -125,7 +100,9 @@ const MidiOverlay = ({
         },
       };
     });
-  }, [notes, bpm, ppq, pxPerSec, height, clipStartSec, clipDurationSec]);
+  // noteRange is read above (it clamps minNote/maxNote) but was missing here,
+  // so changing the visible pitch range left the notes drawn at the old one.
+  }, [notes, bpm, ppq, pxPerSec, height, clipStartSec, clipDurationSec, noteRange]);
 
   const startDrag = useCallback(
     (event, info, mode = "move") => {
@@ -215,7 +192,9 @@ const MidiOverlay = ({
         dragRef.current.lastPreviewAt = performance.now();
       }
     },
-    [editable, onUpdateNotes, clipStartSec, clipDurationSec, bpm, ppq, onPreviewNote, selectedSet, onSelectionChange]
+    // onSelectionChange is not referenced in this callback; listing it only
+    // rebuilt startDrag whenever the parent passed a new function identity.
+    [editable, onUpdateNotes, clipStartSec, clipDurationSec, bpm, ppq, onPreviewNote, selectedSet]
   );
 
   useEffect(() => {

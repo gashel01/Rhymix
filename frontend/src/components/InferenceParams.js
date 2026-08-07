@@ -1,5 +1,19 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import {
+  DEFAULT_PARAMS,
+  applyFormantPreset as applyPreset,
+  buildInferenceRequest,
+  canStartInference,
+  describeModel,
+  getExistingCheckpoint,
+  getLayerableTracks,
+  getPreviousModelName,
+  matchCatalogModel,
+  mergeResolvedModel,
+  selectCheckpoint,
+} from "./inferenceParamsModel";
+import { formatSelectionPreview, getSelectionNames } from "./modelsCatalog";
+import {
   Box,
   Typography,
   Button,
@@ -177,82 +191,6 @@ function SwitchTile({ label, checked, onChange, tooltip }) {
   );
 }
 
-const DEFAULT_PARAMS = {
-  // Core
-  pitch: 0, // semitones
-  indexRate: 0.75,
-  protectVoiced: 0.5,
-  f0Method: "rmvpe",
-
-  // Audio processing (toggles)
-  splitAudio: false,
-  autotune: false,
-  autotuneStrength: 1.0,
-  proposedPitch: false,
-  proposedPitchThreshold: 155.0,
-  cleanAudio: false,
-  cleanStrength: 0.5,
-  exportFormat: "WAV",
-
-  // Volume envelope: UI as boolean, convert to numeric if needed
-  volumeEnvelopeEnabled: true,
-
-  // Formant shifting
-  formantShifting: false,
-  formantPreset: "none",
-  formantQfrency: 1.0,
-  formantTimbre: 1.0,
-
-  // Post-processing
-  postProcess: false,
-  reverb: false,
-  reverbRoomSize: 0.5,
-  reverbDamping: 0.5,
-  reverbWetGain: 0.33,
-  reverbDryGain: 0.4,
-  reverbWidth: 1.0,
-  reverbFreezeMode: 0.0,
-
-  pitchShift: false,
-  pitchShiftSemitones: 0.0,
-
-  limiter: false,
-  limiterThreshold: -6.0,
-  limiterReleaseTime: 0.05,
-
-  gain: false,
-  gainDb: 0.0,
-
-  distortion: false,
-  distortionGain: 25.0,
-
-  chorus: false,
-  chorusRate: 1.0,
-  chorusDepth: 0.25,
-  chorusCenterDelay: 7.0,
-  chorusFeedback: 0.0,
-  chorusMix: 0.5,
-
-  bitcrush: false,
-  bitcrushBitDepth: 8,
-
-  clipping: false,
-  clippingThreshold: -6.0,
-
-  compressor: false,
-  compressorThreshold: 0.0,
-  compressorRatio: 1.0,
-  compressorAttack: 1.0,
-  compressorRelease: 100.0,
-
-  delay: false,
-  delaySeconds: 0.5,
-  delayFeedback: 0.0,
-  delayMix: 0.5,
-
-  sid: 0,
-};
-
 export default function InferenceParams({ selectedModel, selectedTracks, onBack, onStartInference, navContext, onGoToModelSelection }) {
   const theme = useTheme();
   const [params, setParams] = useState(DEFAULT_PARAMS);
@@ -260,48 +198,27 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
 
   const trackCount = Array.isArray(selectedTracks) ? selectedTracks.length : 0;
   const effectiveModel = resolvedModel || selectedModel;
-  const displayBaseName =
-    typeof effectiveModel?.name === "string"
-      ? effectiveModel.name
-      : typeof effectiveModel?.modelName === "string"
-        ? effectiveModel.modelName
-        : "Model";
-  const modelName = displayBaseName.split("_")[0];
-  const modelEpoch =
-    effectiveModel?.selectedCheckpoint?.epochs ??
-    effectiveModel?.selectedCheckpoint?.epoch ??
-    effectiveModel?.modelCheckpoint?.epoch ??
-    "Unknown";
-  const selectionNames = useMemo(
-    () =>
-      (selectedTracks || [])
-        .map((track) => track?.displayName || track?.safeDisplayName || track?.originalName || track?.name || track?.fileId || track?.id)
-        .filter(Boolean),
-    [selectedTracks]
+  const { modelName, epoch: modelEpoch, hasModel } = useMemo(
+    () => describeModel(effectiveModel),
+    [effectiveModel]
   );
-  const selectionPreview = useMemo(() => {
-    const list = selectionNames.slice(0, 4);
-    const extra = selectionNames.length - list.length;
-    const base = list.join(", ");
-    return extra > 0 ? `${base} +${extra} more` : base;
-  }, [selectionNames]);
-  const hasModel = Boolean(
-    effectiveModel?.name || effectiveModel?.modelName || effectiveModel?.id || effectiveModel?.modelId
+
+  const selectionNames = useMemo(() => getSelectionNames(selectedTracks), [selectedTracks]);
+  const selectionPreview = useMemo(
+    () => formatSelectionPreview(selectionNames, 4),
+    [selectionNames]
   );
 
   // Tracks coming from the Inference view carry the run they were produced by,
   // which makes two different jobs possible: convert the original vocals again,
   // or stack this model on top of the previous conversion.
   const [sourceMode, setSourceMode] = useState("original");
-  const layerableTracks = useMemo(
-    () => (selectedTracks || []).filter((track) => track?.sourceRunId),
-    [selectedTracks]
-  );
+  const layerableTracks = useMemo(() => getLayerableTracks(selectedTracks), [selectedTracks]);
   const canLayer = layerableTracks.length > 0;
-  const previousModelName = useMemo(() => {
-    const named = layerableTracks.find((track) => track?.sourceModelName);
-    return named?.sourceModelName || null;
-  }, [layerableTracks]);
+  const previousModelName = useMemo(
+    () => getPreviousModelName(layerableTracks),
+    [layerableTracks]
+  );
 
   // A selection without any run behind it can only be re-inferred from source.
   useEffect(() => {
@@ -311,37 +228,13 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
   useEffect(() => {
     let cancelled = false;
 
-    const selectCheckpoint = (checkpoints, hint) => {
-      if (!Array.isArray(checkpoints) || !checkpoints.length) return null;
-      const hintEpochRaw = hint?.epoch ?? hint?.epochs;
-      const hintEpoch = hintEpochRaw == null ? null : Number(hintEpochRaw);
-      const hasHintEpoch = Number.isFinite(hintEpoch);
-      const hintFile = hint?.pthFile || hint?.filename || null;
-      if (hintFile) {
-        const byFile = checkpoints.find(
-          (cp) => cp?.filename === hintFile || (cp?.path && cp.path.endsWith(hintFile))
-        );
-        if (byFile) return byFile;
-      }
-      if (hasHintEpoch) {
-        const byEpoch = checkpoints.find((cp) => Number(cp?.epochs) === hintEpoch);
-        if (byEpoch) return byEpoch;
-      }
-      const best = checkpoints.find((cp) => cp?.isBest);
-      return best || checkpoints[0];
-    };
-
     const resolveModel = async () => {
       if (!selectedModel) {
         if (!cancelled) setResolvedModel(selectedModel);
         return;
       }
 
-      const existingCheckpoint =
-        selectedModel.selectedCheckpoint ||
-        selectedModel.modelCheckpoint ||
-        selectedModel.bestCheckpoint ||
-        null;
+      const existingCheckpoint = getExistingCheckpoint(selectedModel);
 
       if (existingCheckpoint?.path) {
         if (!cancelled) setResolvedModel(selectedModel);
@@ -361,24 +254,12 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
         if (!response.ok) throw new Error("Failed to fetch available models");
         const data = await response.json();
         const models = data?.models || [];
-        const targetId = selectedModel.id || selectedModel.modelId || null;
-        const targetName = selectedModel.name || selectedModel.modelName || null;
-        const matched = models.find((model) => {
-          if (targetId && (model.modelId === targetId || model.name === targetId)) return true;
-          if (targetName && (model.name === targetName || model.modelId === targetName)) return true;
-          return false;
-        });
+        const matched = matchCatalogModel(models, selectedModel);
         if (!matched) {
           if (!cancelled) setResolvedModel(selectedModel);
           return;
         }
-        const picked = selectCheckpoint(matched.checkpoints, existingCheckpoint);
-        const merged = {
-          ...matched,
-          ...selectedModel,
-          selectedCheckpoint: picked || matched.bestCheckpoint || matched.checkpoints?.[0] || null,
-        };
-        if (!cancelled) setResolvedModel(merged);
+        if (!cancelled) setResolvedModel(mergeResolvedModel(matched, selectedModel));
       } catch (err) {
         if (!cancelled) setResolvedModel(selectedModel);
       }
@@ -395,38 +276,19 @@ export default function InferenceParams({ selectedModel, selectedTracks, onBack,
   }, []);
 
   const applyFormantPreset = useCallback((preset) => {
-    setParams((prev) => {
-      const next = { ...prev, formantPreset: preset };
-      if (preset === "f2m") return { ...next, formantQfrency: 1.0, formantTimbre: 0.8 };
-      if (preset === "m2f") return { ...next, formantQfrency: 1.0, formantTimbre: 1.2 };
-      if (preset === "random") return { ...next, formantQfrency: 32.0, formantTimbre: 9.8 };
-      return next;
-    });
+    setParams((prev) => applyPreset(prev, preset));
   }, []);
 
   const handleStartInference = () => {
-    if (!onStartInference || !hasModel || trackCount === 0) return;
-
-    // If your backend expects Applio numeric fields, map here:
-    const payloadParams = {
-      ...params,
-      volumeEnvelope: params.volumeEnvelopeEnabled ? 1 : 0, // map UI boolean -> numeric
-      // keep Applio name if needed: rms_mix_rate = volumeEnvelope maybe, etc.
-    };
-
-    // Only a layered run keeps sourceRunId — stripping it is what tells the
-    // backend to go back to the original upload's vocals.
-    const tracks = (Array.isArray(selectedTracks) ? selectedTracks : []).map((track) => {
-      if (sourceMode === "layered" && track?.sourceRunId) return track;
-      const { sourceRunId, ...rest } = track || {};
-      return rest;
-    });
-
-    onStartInference({
-      model: effectiveModel,
-      tracks,
-      params: payloadParams,
-    });
+    if (!onStartInference || !canStartInference({ hasModel, trackCount })) return;
+    onStartInference(
+      buildInferenceRequest({
+        params,
+        model: effectiveModel,
+        selectedTracks,
+        sourceMode,
+      })
+    );
   };
 
   return (

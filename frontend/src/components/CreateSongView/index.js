@@ -8,6 +8,14 @@ import {
   toKey,
   getBestAssetKey,
 } from "./constants";
+import {
+  buildCoverParams,
+  buildInferParams,
+  describeEngine,
+  extractMissingDeps,
+  mapJobToSong,
+  resolveGenerateGate,
+} from "./createSongModel";
 import { getTheme } from "./theme";
 import { useThemedUI } from "./useThemedUI";
 import { GeneratedPanel } from "./GeneratedPanel";
@@ -144,14 +152,7 @@ function CreateSongView({
 
   const effectiveSourceSongId =
     sourceSongId || initialSourceSong?.sourceSongId || hashSourceSongId;
-  const isCaptionEngine = promptEngine === "caption";
-  const useLmCodes = promptEngine === "llm";
-  const initializeLm = promptEngine === "llm";
-  const engineLabel = promptEngine === "fast"
-    ? "Standard"
-    : promptEngine === "caption"
-      ? "Direct caption"
-      : "Quality";
+  const { initializeLm, label: engineLabel } = describeEngine(promptEngine);
 
   const handleSelectEngine = (engine) => {
     setPromptEngine(engine);
@@ -242,26 +243,12 @@ function CreateSongView({
     setTitle(`${sourceSong.title} (Cover)`);
   }, [flowMode, sourceSong?.title, title]);
 
-  const extractMissingDeps = useCallback((msg) => {
-    if (!msg) return null;
-    const missingMatch = msg.match(/Missing packages:\s*([^\n.]+)/i);
-    const pipMatch = msg.match(/pip install [^\n]+/i);
-    if (!missingMatch && !pipMatch) return null;
-    const packages = missingMatch
-      ? missingMatch[1].split(",").map((s) => s.trim()).filter(Boolean)
-      : [];
-    return { packages, pip: pipMatch ? pipMatch[0] : "" };
+  const applyError = useCallback((msg) => {
+    if (!msg) return;
+    setError(msg);
+    const parsed = extractMissingDeps(msg);
+    if (parsed) setMissingDeps(parsed);
   }, []);
-
-  const applyError = useCallback(
-    (msg) => {
-      if (!msg) return;
-      setError(msg);
-      const parsed = extractMissingDeps(msg);
-      if (parsed) setMissingDeps(parsed);
-    },
-    [extractMissingDeps]
-  );
 
   const loadAvailableModels = async () => {
     try {
@@ -276,53 +263,6 @@ function CreateSongView({
     } finally {
       setLoadingModels(false);
     }
-  };
-
-  const mapJobToSong = (job) => {
-    const hasAssets = job && typeof job.assets === "object" && job.assets !== null;
-    const params = job?.params || {};
-    const paramsGenres = Array.isArray(params.genres) ? params.genres.filter(Boolean) : [];
-    let promptGenres = [];
-    if (!paramsGenres.length && typeof params.prompt === "string") {
-      const line = params.prompt.split("\n").find((l) => l.trim().toLowerCase().startsWith("genres:"));
-      if (line) {
-        promptGenres = line
-          .split(":")
-          .slice(1)
-          .join(":")
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-      }
-    }
-    const genres = paramsGenres.length ? paramsGenres : promptGenres;
-    const personaName = job?.model_name || params?.model_name || null;
-    const enhanceVocals = params?.enhance_vocals ?? job?.enhance_vocals ?? null;
-    return {
-      id: job.id,
-      title: job.title || "Untitled",
-      duration: 0,
-      genres,
-      createdAt: job.created_at || job.createdAt,
-      audioUrl: job.audio_url,
-      vocalsUrl: job.vocals_url,
-      instrumentalUrl: job.instrumental_url,
-      processed: job.processed,
-      inferenceCompleted: job.inference_completed,
-      modelName: job.model_name,
-      personaName,
-      enhanceVocals,
-      status: job.status,
-      progress: job.progress,
-      assets: hasAssets ? job.assets : undefined,
-      hasAssets,
-      selectedAssetKey: hasAssets ? getBestAssetKey(job.assets) : null,
-      request: job.params || null,
-      derivationType: job.derivation_type || job.derivationType || null,
-      sourceSongId: job.source_song_id || job.sourceSongId || null,
-      sourceTitle: job.source_title || job.sourceTitle || null,
-      autoFull: true,
-    };
   };
 
   const loadExistingSongs = async () => {
@@ -530,66 +470,49 @@ function CreateSongView({
     clearAssist("lyrics");
   }, [assistSuggestion.lyrics, clearAssist]);
 
-  const buildPrompt = () => {
-    const bits = [];
-    if (mode === "prompt" && describePrompt.trim()) bits.push(describePrompt.trim());
-    if (mode !== "prompt" && genreTokens.length) bits.push(`Genres: ${genreTokens.join(", ")}`);
-    if (instrumentalOnly) bits.push("Instrumental only, no vocals");
-    return bits.join("\n");
-  };
-
-  const buildCaptionInput = () => {
-    const basePrompt = buildPrompt();
-    if (!isCaptionEngine) return basePrompt;
-    const caption = captionOverride.trim();
-    return caption || basePrompt;
-  };
-
-  const buildInferParams = () => {
-    let modelForInference = null;
-    if (selectedModel && selectedCheckpoint) {
-      modelForInference = {
-        name: selectedModel.name,
-        selectedCheckpoint,
-        indexPath: selectedModel.indexPath,
-        checkpoints: selectedModel.checkpoints,
-      };
-    }
-    const captionInput = buildCaptionInput();
-    const durationValue = autoDuration ? null : duration;
-    const out = {
-      title: title.trim(),
-      audio_duration: durationValue,
-      duration: durationValue,
-      auto_duration: autoDuration,
-      enhance_vocals: enhanceVocals,
-      prompt: buildPrompt(),
-      genres: [...genreTokens],
-      lyrics: instrumentalOnly ? "" : lyrics,
-      caption_override: isCaptionEngine ? (captionInput || null) : null,
-      prompt_engine: promptEngine,
-      thinking: useLmCodes,
-      lm_negative_prompt: useNegativePrompt ? (negativePrompt.trim() || "NO USER INPUT") : "NO USER INPUT",
-      model_name: selectedModel?.name || null,
-      model: modelForInference,
-      main_model_path: mainModelPath,
-      lm_model_path: lmModelPath,
-      device,
-      lm_backend: lmBackend,
-      initialize_lm: initializeLm,
-      use_flash_attention: useFlashAttention,
-      offload_to_cpu: offloadToCpu,
-      offload_dit_to_cpu: offloadDitToCpu,
-      compile_model: compileModel,
-      int8_quantization: int8Quantization,
-    };
-    if (String(bpm).trim()) out.bpm = Number(bpm);
-    if (keyscale.trim()) out.keyscale = keyscale.trim();
-    if (timeSignature.trim()) out.timesignature = timeSignature.trim();
-    if (String(ditInferenceSteps).trim()) out.dit_inference_steps = Number(ditInferenceSteps);
-    if (String(shift).trim()) out.shift = Number(shift);
-    return out;
-  };
+  /* Every piece of state the payload builders read, in one object. Called at
+     submit time rather than memoised: nothing renders from it, and a memo over
+     thirty-odd dependencies is a dependency list nobody can keep correct. */
+  const readForm = () => ({
+    mode,
+    title,
+    describePrompt,
+    genreTokens,
+    lyrics,
+    instrumentalOnly,
+    promptEngine,
+    captionOverride,
+    duration,
+    autoDuration,
+    enhanceVocals,
+    useNegativePrompt,
+    negativePrompt,
+    selectedModel,
+    selectedCheckpoint,
+    mainModelPath,
+    lmModelPath,
+    device,
+    lmBackend,
+    useFlashAttention,
+    offloadToCpu,
+    offloadDitToCpu,
+    compileModel,
+    int8Quantization,
+    bpm,
+    keyscale,
+    timeSignature,
+    ditInferenceSteps,
+    shift,
+    effectiveSourceSongId,
+    coverSelectedModel,
+    coverPitchShift,
+    coverStylePrompt,
+    coverLyrics,
+    coverLyricsMode,
+    coverPreserveTempo,
+    coverOutputFormat,
+    coverStrength,
+  });
 
   const syncDuration = (val) => {
     const v = clamp(Math.round(val), 30, 240);
@@ -641,32 +564,22 @@ function CreateSongView({
     };
   }, [engineMenuOpen]);
 
-  const hasLyricsInput = instrumentalOnly || lyrics.trim().length > 0;
-  const hasDescribeInput = describePrompt.trim().length > 0;
-  const hasGenreInput = genreText.trim().length > 0;
-  const hasCaptionInput = mode === "lyrics" && captionOverride.trim().length > 0;
-  const hasBasePrompt = mode === "prompt"
-    ? hasDescribeInput
-    : (hasGenreInput || hasLyricsInput);
-  const hasPromptOrCaption = isCaptionEngine ? (hasCaptionInput || hasBasePrompt) : hasBasePrompt;
-  const hasCoverSourceAudio = Boolean(
-    sourceSong?.audioUrl || sourceSong?.instrumentalUrl || sourceSong?.vocalsUrl
-  );
-
-  const canGenerateCreate =
-    !generating &&
-    title.trim().length > 0 &&
-    (mode === "prompt" ? hasPromptOrCaption : hasPromptOrCaption && hasLyricsInput);
-
-  const canGenerateCover =
-    !generating &&
-    title.trim().length > 0 &&
-    !!effectiveSourceSongId &&
-    hasCoverSourceAudio &&
-    !loadingSourceSong &&
-    !sourceSongError;
-
-  const canGenerate = flowMode === "cover" ? canGenerateCover : canGenerateCreate;
+  const { canGenerate, hasCoverSourceAudio } = resolveGenerateGate({
+    flowMode,
+    generating,
+    title,
+    mode,
+    promptEngine,
+    describePrompt,
+    genreText,
+    lyrics,
+    captionOverride,
+    instrumentalOnly,
+    sourceSong,
+    effectiveSourceSongId,
+    loadingSourceSong,
+    sourceSongError,
+  });
 
   const requestDescribeAssist = useCallback(() => {
     runAssist("describe", "create_describe_prompt", {
@@ -724,7 +637,7 @@ function CreateSongView({
   }, [coverPitchShift, coverPreserveTempo, coverStylePrompt, runAssist, sourceSong]);
 
   const generateCreate = async () => {
-    const params = buildInferParams();
+    const params = buildInferParams(readForm());
     let res = await fetch(`${API_BASE}/api/song-generation`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -769,18 +682,7 @@ function CreateSongView({
   };
 
   const generateCover = async () => {
-    const params = {
-      title: title.trim(),
-      source_song_id: effectiveSourceSongId,
-      target_voice: coverSelectedModel?.name || null,
-      pitch_shift: Number.isFinite(Number(coverPitchShift)) ? Number(coverPitchShift) : 0,
-      style_prompt: coverStylePrompt.trim() || null,
-      lyrics: coverLyricsMode === "lyrics" ? (coverLyrics.trim() || null) : null,
-      cover_mode: "full",
-      preserve_tempo: !!coverPreserveTempo,
-      output_format: coverOutputFormat || "wav",
-      audio_cover_strength: coverStrength,
-    };
+    const params = buildCoverParams(readForm());
     const data = await startCoverGeneration(params);
     const jobId = data.job_id;
     if (!jobId) throw new Error("Cover job did not return a job id");

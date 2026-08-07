@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import SmoothedProgress from "./SmoothedProgress";
+import { devLog } from "../utils/logger";
 
 const DiarizationProgress = ({ jobId }) => {
   const [status, setStatus] = useState({});
@@ -9,19 +10,19 @@ const DiarizationProgress = ({ jobId }) => {
   // Timer ID for cleanup
   const timerRef = useRef(null);
  
-  console.log(`DiarizationProgress rendering with jobId: ${jobId}`);
+  devLog(`DiarizationProgress rendering with jobId: ${jobId}`);
 
   
 
   useEffect(() => {
-    console.log(`DiarizationProgress useEffect called with jobId: ${jobId}`);
+    devLog(`DiarizationProgress useEffect called with jobId: ${jobId}`);
     const instanceId = Math.random().toString(36).substr(2, 9);
-    console.log(`Instance ID: ${instanceId}`);
+    devLog(`Instance ID: ${instanceId}`);
 
    
     // Clean up on unmount
     return () => {
-      console.log(`DiarizationProgress with instance ${instanceId} unmounting`);
+      devLog(`DiarizationProgress with instance ${instanceId} unmounting`);
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }

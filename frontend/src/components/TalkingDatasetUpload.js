@@ -11,14 +11,13 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Divider,
-} from "@mui/material";
+  Divider } from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUploadOutlined";
 import AudioFileIcon from "@mui/icons-material/AudioFileOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
-import ErrorIcon from "@mui/icons-material/ErrorOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import axios from "axios";
+import { devLog } from "../utils/logger";
 
 function TalkingDatasetUpload({ onBack }) {
   const [file, setFile] = useState(null);
@@ -63,12 +62,10 @@ function TalkingDatasetUpload({ onBack }) {
     try {
       const response = await axios.post("/api/upload-talking", formData, {
         headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+          "Content-Type": "multipart/form-data" } });
 
       setUploadSuccess(true);
-      console.log("Upload successful:", response.data);
+      devLog("Upload successful:", response.data);
 
       // Start processing automatically after successful upload
       handleProcess(response.data.filename);
@@ -91,8 +88,7 @@ function TalkingDatasetUpload({ onBack }) {
 
     try {
       const response = await axios.post("/api/process-talking", {
-        filename: filename || file.name,
-      });
+        filename: filename || file.name });
 
       setJobId(response.data.job_id);
 ;
@@ -111,7 +107,13 @@ function TalkingDatasetUpload({ onBack }) {
   // Clean up interval on component unmount
   React.useEffect(() => {
     return () => {
+      /* Reading the ref at cleanup time is the point. The rule assumes a ref
+         holds a DOM node and warns it may have changed since mount; here it
+         holds an interval id, and the id that must be cleared is precisely the
+         current one. Copying it into a local at mount — what the rule suggests
+         — would capture null and leak the interval started afterwards. */
       if (statusCheckIntervalRef.current) {
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         clearInterval(statusCheckIntervalRef.current);
       }
     };
@@ -188,9 +190,7 @@ function TalkingDatasetUpload({ onBack }) {
             cursor: "pointer",
             "&:hover": {
               borderColor: "primary.main",
-              backgroundColor: "rgba(0, 0, 0, 0.01)",
-            },
-          }}
+              backgroundColor: "rgba(0, 0, 0, 0.01)" } }}
           onClick={() => fileInputRef.current.click()}
         >
           <input

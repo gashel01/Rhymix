@@ -27,6 +27,22 @@ import { useStudioPlayback } from './hooks/useStudioPlayback';
 import { useLyricsActions } from './hooks/useLyricsActions';
 import { useStudioKeyboardShortcuts } from './hooks/useStudioKeyboardShortcuts';
 import { LANE_HEIGHT, fitZoom, sliderToZoom, zoomToSlider } from "./timelineMetrics";
+import {
+  buildStudioUrl,
+  describeSelection,
+  filterAssets,
+  findDefaultSourceClip,
+  findSelectedClip,
+  findSelectedLane,
+  findSelectionSourceClip,
+  getActiveJobs,
+  getCurrentJob,
+  getProjectDurationSec,
+  listAssets,
+  readUiPrefs,
+  summarizeJob,
+  writeUiPrefs,
+} from "./studioSelectors";
 import Select from "../components/common/Select";
 import {
   ChevronLeftIcon,
@@ -38,49 +54,12 @@ import {
   SparklesIcon,
 } from "./components/StudioIcons";
 
-const JOB_TYPE_LABELS = {
-  understand: "Analyze",
-  orchestrate_song: "AI Orchestrator",
-  foundation_generate: "Foundation Generate",
-  foundation_restyle: "Foundation Restyle",
-  foundation_extend: "Foundation Extend",
-  stage_drums_generate: "STAGE Drums",
-  stem_extract: "Stem Extract",
-  stem_extract_uvr: "UVR Stem Extract",
-  render: "Export",
-};
-
-const summarizeJob = (job) => {
-  if (!job) return "Idle";
-  const label = JOB_TYPE_LABELS[job.type] || String(job.type || "job").replace(/_/g, " ");
-  return `${label} · ${job.statusMessage || job.error || job.status || "idle"}`;
-};
-
 /* The lane height lives in timelineMetrics.js and is published to CSS here,
    so the track list rows, the timeline lanes and the selection overlay can
    never drift apart again. They already had: rows were 100px + a 12px gap
    against a 110px lane, so the faders slid 2px per track out of line with
    the lane they control. */
-const getUiStorageKey = (projectId) => `rhymix:studio-ui:${projectId}`;
 
-const readUiPrefs = (projectId) => {
-  if (!projectId || typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(getUiStorageKey(projectId));
-    return raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    return null;
-  }
-};
-
-const writeUiPrefs = (projectId, prefs) => {
-  if (!projectId || typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(getUiStorageKey(projectId), JSON.stringify(prefs));
-  } catch (error) {
-    // Ignore storage failures.
-  }
-};
 const StudioPageInner = ({ assetId, projectId }) => {
   const { state, actions } = useStudioStore();
   const [showProjectManager, setShowProjectManager] = useState(false);
@@ -264,94 +243,54 @@ const StudioPageInner = ({ assetId, projectId }) => {
     [style, lyrics]
   );
 
-  const assetList = useMemo(
-    () =>
-      Object.entries(state.assets || {}).map(([id, asset]) => ({
-        id: asset.id || id,
-        ...asset,
-      })),
-    [state.assets]
+  const assetList = useMemo(() => listAssets(state.assets), [state.assets]);
+
+  const filteredAssets = useMemo(
+    () => filterAssets(assetList, libraryQuery),
+    [assetList, libraryQuery]
   );
 
-  const filteredAssets = useMemo(() => {
-    const query = libraryQuery.trim().toLowerCase();
-    if (!query) return assetList;
-    return assetList.filter((asset) => {
-      const label = `${asset.label || ""} ${asset.id || ""}`.toLowerCase();
-      return label.includes(query);
-    });
-  }, [assetList, libraryQuery]);
-
   const selectedClip = useMemo(
-    () => state.clips.find((clip) => state.selection?.clipIds?.[0] === clip.id),
+    () => findSelectedClip(state.clips, state.selection),
     [state.clips, state.selection]
   );
 
-  const selectionSourceClip = useMemo(() => {
-    const range = state.selection?.range;
-    if (!range) return null;
-    const start = Math.min(range.start ?? 0, range.end ?? 0);
-    const end = Math.max(range.start ?? 0, range.end ?? 0);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
-    const laneIds = Array.isArray(state.selection?.laneIds) ? state.selection.laneIds : null;
-    const candidates = state.clips.filter((clip) => {
-      if (clip.clipType === "midi") return false;
-      if (laneIds?.length && !laneIds.includes(clip.laneId)) return false;
-      const clipStart = clip.timelineStartSec ?? 0;
-      const clipEnd = clipStart + Math.max(0.01, (clip.srcEndSec ?? 0) - (clip.srcStartSec ?? 0));
-      return end > clipStart && start < clipEnd;
-    });
-    return candidates[0] || null;
-  }, [state.clips, state.selection]);
-
-  const defaultSourceClip = useMemo(() => {
-    const mixLane = state.lanes.find((lane) => lane.type === "mix");
-    const mixClip = state.clips.find((clip) => clip.laneId === mixLane?.id && clip.clipType !== "midi");
-    if (mixClip) return mixClip;
-    return state.clips.find((clip) => clip.clipType !== "midi" && clip.sourceAssetId) || null;
-  }, [state.clips, state.lanes]);
-
-  const selectedLane = useMemo(() => {
-    const selectedLaneId = state.selection?.laneIds?.[0] || selectedClip?.laneId;
-    return state.lanes.find((lane) => lane.id === selectedLaneId) || null;
-  }, [state.lanes, state.selection?.laneIds, selectedClip]);
-
-  const activeJobs = useMemo(
-    () => jobs.filter((job) => !["completed", "failed", "cancelled"].includes(job.status)),
-    [jobs]
+  const selectionSourceClip = useMemo(
+    () => findSelectionSourceClip(state.clips, state.selection),
+    [state.clips, state.selection]
   );
 
-  const currentJob = useMemo(() => activeJobs[activeJobs.length - 1] || jobs[jobs.length - 1] || null, [activeJobs, jobs]);
+  const defaultSourceClip = useMemo(
+    () => findDefaultSourceClip(state.clips, state.lanes),
+    [state.clips, state.lanes]
+  );
 
-  const selectionSummary = useMemo(() => {
-    if (selectedClip) {
-      const clipLen = Math.max(0, (selectedClip.srcEndSec ?? 0) - (selectedClip.srcStartSec ?? 0));
-      return `Clip · ${selectedClip.label || selectedClip.name || selectedClip.id} · ${clipLen.toFixed(2)}s`;
-    }
-    if (state.selection?.range) {
-      const start = Math.min(state.selection.range.start ?? 0, state.selection.range.end ?? 0);
-      const end = Math.max(state.selection.range.start ?? 0, state.selection.range.end ?? 0);
-      const laneCount = Array.isArray(state.selection?.laneIds) ? state.selection.laneIds.length : state.lanes.length;
-      return `Range · ${start.toFixed(2)}s to ${end.toFixed(2)}s · ${laneCount} lane${laneCount === 1 ? "" : "s"}`;
-    }
-    if (selectedLane) {
-      return `Lane · ${selectedLane.name}`;
-    }
-    if (!state.clips.length) {
-      return "No clips yet. Use the create tools in the right panel or add clips to begin.";
-    }
-    return "No active selection";
-  }, [selectedClip, selectedLane, state.selection, state.lanes.length, state.clips.length]);
+  const selectedLane = useMemo(
+    () => findSelectedLane(state.lanes, state.selection, selectedClip),
+    [state.lanes, state.selection, selectedClip]
+  );
+
+  const activeJobs = useMemo(() => getActiveJobs(jobs), [jobs]);
+
+  const currentJob = useMemo(() => getCurrentJob(jobs), [jobs]);
+
+  const selectionSummary = useMemo(
+    () =>
+      describeSelection({
+        selectedClip,
+        selectedLane,
+        selection: state.selection,
+        lanes: state.lanes,
+        clips: state.clips,
+      }),
+    [selectedClip, selectedLane, state.selection, state.lanes, state.clips]
+  );
 
   /* Same span Timeline computes for itself. */
-  const projectDurationSec = useMemo(() => {
-    let maxEnd = state.project?.durationSec || 0;
-    state.clips.forEach((clip) => {
-      const end = (clip.timelineStartSec ?? 0) + (clip.srcEndSec ?? 0) - (clip.srcStartSec ?? 0);
-      if (end > maxEnd) maxEnd = end;
-    });
-    return Math.max(10, maxEnd);
-  }, [state.project, state.clips]);
+  const projectDurationSec = useMemo(
+    () => getProjectDurationSec(state.project, state.clips),
+    [state.project, state.clips]
+  );
 
   /* Landing on /studio with no project showed a near-empty page whose only
      action was a button reading "Open Project Switcher" — a screen that exists
@@ -389,15 +328,11 @@ const StudioPageInner = ({ assetId, projectId }) => {
   const syncStudioRoute = useCallback(
     (nextProjectData) => {
       if (typeof window === "undefined") return;
-      const nextProjectId = nextProjectData?.project?.id || null;
-      let nextUrl = "/studio";
-      if (!isDirectStudioEntry && assetId) {
-        nextUrl = `/studio/${encodeURIComponent(assetId)}`;
-      }
-      if (nextProjectId) {
-        const joiner = nextUrl.includes("?") ? "&" : "?";
-        nextUrl = `${nextUrl}${joiner}projectId=${encodeURIComponent(nextProjectId)}`;
-      }
+      const nextUrl = buildStudioUrl({
+        assetId,
+        isDirectStudioEntry,
+        projectId: nextProjectData?.project?.id || null,
+      });
       window.history.replaceState({}, "", nextUrl);
       try {
         window.dispatchEvent(new PopStateEvent("popstate"));
@@ -690,7 +625,7 @@ const StudioPageInner = ({ assetId, projectId }) => {
 
   const lyricsEntry = selectionLyricsEntry;
 
-  const jobStatus = summarizeJob(currentJob);
+  const jobStatus = summarizeJob(currentJob, "Idle");
 
   if (loading) {
     return <div className="studio-page" style={{ "--studio-lane-height": `${LANE_HEIGHT}px` }}>Loading Studio...</div>;

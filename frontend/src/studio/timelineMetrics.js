@@ -43,8 +43,20 @@ export const ZOOM_MAX = 4;
 const LOG_MIN = Math.log(ZOOM_MIN);
 const LOG_MAX = Math.log(ZOOM_MAX);
 
-export const clampZoom = (zoom) =>
-  Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Number(zoom) || 1));
+/* `Number(zoom) || 1` looked like a guard against NaN, but 0 is falsy too, so
+   a zoom of 0 became 1 — a full zoom-in — while -5 correctly clamped to the
+   minimum. Same class of input, opposite results. isFinite says what was
+   meant: fall back only when there is no usable number. */
+export const clampZoom = (zoom) => {
+  // `zoom == null` catches both null and undefined; "" is the third way a
+  // missing value arrives here (from an input element). All three mean "no
+  // value", not "zero" — Number() would turn null and "" into 0 and clamp them
+  // to the minimum, which is a real zoom level and not what was meant.
+  if (zoom == null || zoom === "") return 1;
+  const value = Number(zoom);
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+};
 
 /** zoom → slider position in 0..1 */
 export const zoomToSlider = (zoom) =>

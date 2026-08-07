@@ -1,13 +1,17 @@
 # Minimal dependency set for GitHub Actions CI.
 #
-# CI only runs the pure-Python unit tests in tests/ — it does NOT load
-# ACE-Step, Applio, WhisperX, pyannote, or any GPU model. Keep this file
-# as small as possible so CI stays fast (< 3 minutes).
+# CI runs the pure-Python unit tests in tests/ and the Flask route tests in
+# backend/tests/ — it does NOT load ACE-Step, Applio, WhisperX, pyannote, or
+# any GPU model. Keep this file as small as possible so CI stays fast.
 #
 # CREPE / torch are intentionally excluded: dubler_melody.py wraps the
 # crepe import in a try/except so it degrades gracefully when torch is
 # unavailable. The unit tests never call CREPE functions so no GPU deps
 # are needed here.
+#
+# backend/tests/test_dubler_melody.py is the one test that does pull torch,
+# torchaudio and torchcrepe in transitively, so CI skips that file by name
+# rather than installing a GPU stack to run it.
 #
 # If a new test starts failing in CI with an ImportError, add the missing
 # package here rather than bloating the full requirements.txt.
@@ -16,6 +20,30 @@ numpy==1.23.5
 scipy==1.10.1
 librosa==0.10.1
 soundfile==0.12.1
+
+# backend/tests spins up the real Flask app through create_app(), so the web
+# layer has to be installed. Measured, not guessed: importing the route tests
+# pulls flask, flask_cors and mido and nothing heavier.
+Flask==2.2.3
+Flask-Cors==3.0.10
+mido==1.3.2
+
+# Flask 2.2.3 declares `Werkzeug>=2.2.2` with no upper bound, but imports
+# `werkzeug.urls.url_quote`, which Werkzeug 3.0 removed. A fresh resolve picks
+# Werkzeug 3 and every Flask test module fails to import — which is exactly
+# what CI had been doing: 3 collection errors per run, so the route tests
+# never executed and the job was red for a reason unrelated to the code.
+Werkzeug<3
+
+# create_app() registers every blueprint, including the model browser, which
+# scrapes a listing page. Nothing in the tests calls it, but importing the
+# module is enough to need these.
+requests==2.31.0
+beautifulsoup4==4.12.3
+
+# The beatbox wizard declares its request/response shapes with pydantic. Pure
+# Python, no GPU — the model loading behind it is already lazy.
+pydantic>=2.0
 
 # Test runner
 pytest>=7.4
