@@ -11,12 +11,10 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Divider,
-} from "@mui/material";
+  Divider } from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUploadOutlined";
 import AudioFileIcon from "@mui/icons-material/AudioFileOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
-import ErrorIcon from "@mui/icons-material/ErrorOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import axios from "axios";
 import { devLog } from "../utils/logger";
@@ -64,9 +62,7 @@ function TalkingDatasetUpload({ onBack }) {
     try {
       const response = await axios.post("/api/upload-talking", formData, {
         headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+          "Content-Type": "multipart/form-data" } });
 
       setUploadSuccess(true);
       devLog("Upload successful:", response.data);
@@ -92,8 +88,7 @@ function TalkingDatasetUpload({ onBack }) {
 
     try {
       const response = await axios.post("/api/process-talking", {
-        filename: filename || file.name,
-      });
+        filename: filename || file.name });
 
       setJobId(response.data.job_id);
 ;
@@ -189,9 +184,7 @@ function TalkingDatasetUpload({ onBack }) {
             cursor: "pointer",
             "&:hover": {
               borderColor: "primary.main",
-              backgroundColor: "rgba(0, 0, 0, 0.01)",
-            },
-          }}
+              backgroundColor: "rgba(0, 0, 0, 0.01)" } }}
           onClick={() => fileInputRef.current.click()}
         >
           <input
