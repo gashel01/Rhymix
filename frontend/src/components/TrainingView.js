@@ -40,6 +40,15 @@ import ScheduleIcon from "@mui/icons-material/ScheduleOutlined";
 import { useTheme } from "@mui/material/styles";
 import PageHeader from "./common/PageHeader";
 import Section from "./common/Section";
+import {
+  DEFAULT_TRAINING_CONFIG,
+  buildTrainingPayload,
+  canStartTraining,
+  datasetFileName,
+  readTrainingStatus,
+  takeNewLogs,
+  toVocalFiles,
+} from "./trainingConfig";
 
 function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
   const theme = useTheme();
@@ -47,39 +56,7 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
   // Transform the selected tracks array into the expected structure
   const processedVocals = selectedVocals?.filter(track => track.vocal)?.map(track => track.vocal) || [];
   const rawVocals = selectedVocals?.filter(track => track.vocal)?.map(track => track.vocal) || [];
-  const [config, setConfig] = useState({
-    // Basic settings
-    modelName: "",
-    epochs: 100,
-    batchSize: 8,
-    saveEvery: 20,
-    learningRate: 0.0001,
-
-    // Voice features
-    modelType: "standard", // standard, light, tiny
-    useF0: true,
-    usePitch: true,
-    customPitch: 0, // -12 to +12
-    useEnhancer: false,
-    useEmotional: false,
-
-    // Applio specific settings
-    saveOnlyLatest: false,
-    saveEveryWeights: true,
-    sampleRate: 48000,
-    gpu: 0,
-    rvcVersion: "v2",
-    pitchGuidance: true,
-    overtrainingDetector: true,
-    overtrainingThreshold: 5,
-    pretrained: true,
-    cleanup: true,
-    indexAlgorithm: "Auto",
-    cacheDataInGpu: false,
-    customPretrained: false,
-    gPretrainedPath: null,
-    dPretrainedPath: null,
-  });
+  const [config, setConfig] = useState(DEFAULT_TRAINING_CONFIG);
 
   const [isTraining, setIsTraining] = useState(false);
   const [trainingLogs, setTrainingLogs] = useState([]);
@@ -141,38 +118,24 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
         if (response.ok) {
           const data = await response.json();
 
-          // Update progress
-          if (data.progress !== undefined) {
-            setTrainingProgress(data.progress);
+          const update = readTrainingStatus(data);
+          if (update.progress !== undefined) {
+            setTrainingProgress(update.progress);
           }
 
-          // Append only the lines we haven't shown yet — the endpoint returns
-          // the full log each time.
-          if (data.logs && data.logs.length > consumedLogsRef.current) {
-            const fresh = data.logs.slice(consumedLogsRef.current);
-            consumedLogsRef.current = data.logs.length;
-            setTrainingLogs((prev) => [...prev, ...fresh]);
-          }
+          const { fresh, consumed } = takeNewLogs(data.logs, consumedLogsRef.current);
+          consumedLogsRef.current = consumed;
+          if (fresh.length) setTrainingLogs((prev) => [...prev, ...fresh]);
 
-          // Check if training is complete
-          if (data.status === "completed") {
-            clearInterval(pollInterval);
-            setIsTraining(false);
-            setTrainingCompleted(true);
-            setCompletionDialogOpen(true);
-            setCurrentJobId(null);
-            setTrainingLogs((prev) => [
-              ...prev,
-              "Training completed successfully!",
-            ]);
-          } else if (data.status === "failed") {
+          if (update.done) {
             clearInterval(pollInterval);
             setIsTraining(false);
             setCurrentJobId(null);
-            setTrainingLogs((prev) => [
-              ...prev,
-              `Training failed: ${data.error || "Unknown error"}`,
-            ]);
+            if (!update.failed) {
+              setTrainingCompleted(true);
+              setCompletionDialogOpen(true);
+            }
+            setTrainingLogs((prev) => [...prev, update.message]);
           }
         } else {
           console.error("Failed to fetch training status");
@@ -201,8 +164,7 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
   };
 
   const startTraining = async () => {
-    const totalVocals = selectedVocals?.length || 0;
-    if (!config.modelName || totalVocals === 0) {
+    if (!canStartTraining(config, selectedVocals)) {
       alert("Please enter a model name and select vocals for training");
       return;
     }
@@ -219,27 +181,7 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          modelName: config.modelName,
-          rvcVersion: config.rvcVersion,
-          saveEveryEpoch: config.saveEvery,
-          saveOnlyLatest: config.saveOnlyLatest,
-          saveEveryWeights: config.saveEveryWeights,
-          totalEpoch: config.epochs,
-          sampleRate: config.sampleRate,
-          batchSize: config.batchSize,
-          gpu: config.gpu,
-          pitchGuidance: config.pitchGuidance || config.useF0,
-          overtrainingDetector: config.overtrainingDetector,
-          overtrainingThreshold: config.overtrainingThreshold,
-          pretrained: config.pretrained,
-          cleanup: config.cleanup,
-          indexAlgorithm: config.indexAlgorithm,
-          cacheDataInGpu: config.cacheDataInGpu,
-          customPretrained: config.customPretrained,
-          gPretrainedPath: config.gPretrainedPath,
-          dPretrainedPath: config.dPretrainedPath,
-        }),
+        body: JSON.stringify(buildTrainingPayload(config)),
       });
 
       if (response.ok) {
@@ -284,21 +226,7 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
       // First, we need to download the audio files from the URLs
       setTrainingLogs((prev) => [...prev, "Downloading audio files..."]);
 
-      // Extract vocal files from selected tracks
-      const toSafeName = (name) =>
-        (name || "track")
-          .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
-          .replace(/\s+/g, "_")
-          .slice(0, 80);
-
-      const allVocalFiles = selectedVocals.map(track => {
-        const baseFilename = track.displayName || track.originalName || track.vocal;
-        return {
-          filename: baseFilename,
-          url: track.vocalUrl,
-          type: 'vocal'
-        };
-      });
+      const allVocalFiles = toVocalFiles(selectedVocals);
 
       setTrainingLogs((prev) => [
         ...prev,
@@ -321,11 +249,9 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
 
             const blob = await response.blob();
 
-            // Create a unique filename with speaker prefix
-            const baseFilename = toSafeName(vocalFile.filename);
-            const filename = `speaker01_${index + 1}_${baseFilename}_${vocalFile.type}.wav`;
-
-            return new File([blob], filename, { type: "audio/wav" });
+            return new File([blob], datasetFileName(vocalFile, index), {
+              type: "audio/wav",
+            });
           } catch (error) {
             console.error(`Error downloading file ${index + 1}:`, error);
             setTrainingLogs((prev) => [
