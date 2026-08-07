@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { ticksToSec } from "../audioMath";
 import { hexToRgba, readableInk } from "../../utils/color";
 import { createPortal } from "react-dom";
 import StudioWaveform from "./StudioWaveform";
@@ -227,20 +228,17 @@ const ClipView = ({
       if (isMod && key === "c") {
         event.preventDefault();
         if (!selectedNoteIndices || selectedNoteIndices.size === 0) return;
-        const ticksToSec = (ticks) => {
-          const tps = (midiBpm * midiPpq) / 60;
-          return Number(ticks || 0) / (tps || 1);
-        };
+        const toSec = (ticks) => ticksToSec(ticks, midiBpm, midiPpq);
         const selected = Array.from(selectedNoteIndices)
           .map((idx) => {
             const note = midiNotes[idx];
             if (!note) return null;
             const startSecRaw = Number.isFinite(note.startSec)
               ? Number(note.startSec)
-              : ticksToSec(note.startTick);
+              : toSec(note.startTick);
             const durationSecRaw = Number.isFinite(note.durationSec)
               ? Number(note.durationSec)
-              : ticksToSec(note.durationTick);
+              : toSec(note.durationTick);
             return {
               note: note.note,
               midi: note.midi,
@@ -383,10 +381,7 @@ const ClipView = ({
       clamp(127 - Math.floor((clamp(y, 0, usableHeight) / usableHeight) * range), 0, 127);
     const maxNote = noteAtY(minY);
     const minNote = noteAtY(maxY);
-    const ticksToSec = (ticks) => {
-      const tps = (midiBpm * midiPpq) / 60;
-      return Number(ticks || 0) / (tps || 1);
-    };
+    const toSec = (ticks) => ticksToSec(ticks, midiBpm, midiPpq);
     const clipStart = Number(effectiveClip.srcStartSec || 0);
     const next = new Set();
     midiNotes.forEach((note, idx) => {
@@ -394,10 +389,10 @@ const ClipView = ({
       if (noteNum < minNote || noteNum > maxNote) return;
       const startSecRaw = Number.isFinite(note.startSec)
         ? Number(note.startSec)
-        : ticksToSec(note.startTick);
+        : toSec(note.startTick);
       const durationSecRaw = Number.isFinite(note.durationSec)
         ? Number(note.durationSec)
-        : ticksToSec(note.durationTick);
+        : toSec(note.durationTick);
       const relStart = startSecRaw - clipStart;
       const relEnd = relStart + Math.max(0.01, durationSecRaw || 0);
       if (relEnd >= startSec && relStart <= endSec) {

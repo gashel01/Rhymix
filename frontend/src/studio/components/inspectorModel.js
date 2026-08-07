@@ -11,6 +11,19 @@
  * it is also 150 lines Inspector no longer carries.
  */
 
+import {
+  JOB_TYPE_LABELS,
+  clipLengthSec,
+  normalizeRange,
+  summarizeJob,
+} from "../studioSelectors";
+
+/* Re-exported rather than redefined: StudioPage asks the same questions of
+   the same state, and the two copies of summarizeJob had already drifted —
+   one showed a failed job's stale status message instead of its error. */
+export { normalizeRange, summarizeJob };
+export const JOB_LABELS = JOB_TYPE_LABELS;
+
 export const SOUND_FONT_OPTIONS = [
   { value: "", label: "Use lane default" },
   { value: "acoustic_grand_piano", label: "Piano" },
@@ -41,18 +54,6 @@ export const FOUNDATION_INSTRUMENT_OPTIONS = [
 
 export const FOUNDATION_KEY_NOTES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 export const FOUNDATION_KEY_SCALES = ["major", "minor"];
-
-export const JOB_LABELS = {
-  understand: "Analyze",
-  orchestrate_song: "AI Orchestrator",
-  foundation_generate: "Foundation Generate",
-  foundation_restyle: "Foundation Restyle",
-  foundation_extend: "Foundation Extend",
-  stage_drums_generate: "STAGE Drums",
-  stem_extract: "Stem Extract",
-  stem_extract_uvr: "UVR Stem Extract",
-  render: "Export",
-};
 
 export const JOB_TOOL_MAP = {
   understand: "analyze",
@@ -108,17 +109,9 @@ export const getVisibleAiCards = ({ resolvedRightPanelContext, canAnalyze, canGe
   }
 };
 
-export const normalizeRange = (range) => {
-  if (!range) return null;
-  const start = Math.min(Number(range.start ?? 0), Number(range.end ?? 0));
-  const end = Math.max(Number(range.start ?? 0), Number(range.end ?? 0));
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
-  return { start, end };
-};
-
 export const getClipBounds = (clip) => {
   const start = Number(clip?.timelineStartSec ?? 0);
-  const duration = Math.max(0.01, Number(clip?.srcEndSec ?? 0) - Number(clip?.srcStartSec ?? 0));
+  const duration = clipLengthSec(clip);
   return { start, end: start + duration, duration };
 };
 
@@ -133,13 +126,6 @@ export const parseKeyParts = (rawKey) => {
   return { note, scale };
 };
 export const formatKeyParts = (note, scale) => `${note || "C"} ${scale || "major"}`.trim();
-
-export const summarizeJob = (job) => {
-  if (!job) return "No recent activity";
-  const label = JOB_LABELS[job.type] || String(job.type || "job").replace(/_/g, " ");
-  const detail = job.error || job.statusMessage || job.status || "idle";
-  return `${label} · ${detail}`;
-};
 
 export const nextStepForJob = (job) => {
   if (!job) return "";

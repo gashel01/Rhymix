@@ -1,12 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ticksToSec } from "../audioMath";
 import { hexToRgba } from "../../utils/color";
-
-const ticksToSec = (ticks, bpm, ppq) => {
-  const safeBpm = Number(bpm) || 120;
-  const safePpq = Number(ppq) || 480;
-  const tps = (safeBpm * safePpq) / 60;
-  return Number(ticks || 0) / tps;
-};
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const MidiOverlay = ({

@@ -1,9 +1,23 @@
 import { useEffect, useRef } from 'react';
-const dbToGain = (value) => Math.pow(10, (value || 0) / 20);
-const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-const PLAYBACK_LOOKAHEAD_SEC = 0.75;
-const PLAYBACK_START_DELAY_SEC = 0.05;
-const PLAYBACK_TRANSPORT_UPDATE_MS = 50;
+import {
+  PLAYBACK_LOOKAHEAD_SEC,
+  PLAYBACK_START_DELAY_SEC,
+  PLAYBACK_TRANSPORT_UPDATE_MS,
+  clamp,
+  computeLaneGain,
+  dbToGain,
+  getLoopBounds,
+  getSoloSet,
+  makeDistortionCurve,
+  midiNoteToName,
+  midiToFreq,
+  noteNameToMidi,
+  resolveFxParams,
+  resolveSoundfontName,
+  resolveWindowEnd,
+  semitonesToRate,
+  ticksToSec,
+} from "../audioMath";
 
 export const useStudioPlayback = (state, actions) => {
   const audioCtxRef = useRef(null);
@@ -93,36 +107,6 @@ export const useStudioPlayback = (state, actions) => {
     return audioCtxRef.current;
   };
 
-  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-
-  const ticksToSec = (ticks, bpm, ppq) => {
-    const safeBpm = Number(bpm) || 120;
-    const safePpq = Number(ppq) || 480;
-    return (Number(ticks) || 0) / ((safeBpm * safePpq) / 60);
-  };
-
-  const midiNoteToName = (noteNumber) => {
-    const value = Math.round(Number(noteNumber) || 0);
-    const octave = Math.floor(value / 12) - 1;
-    const name = NOTE_NAMES[(value % 12 + 12) % 12];
-    return `${name}${octave}`;
-  };
-
-  const noteNameToMidi = (noteName) => {
-    if (!noteName || typeof noteName !== "string") return 60;
-    const match = /^([A-Ga-g])([#b]?)(-?\d+)$/.exec(noteName.trim());
-    if (!match) return 60;
-    const letter = match[1].toUpperCase();
-    const accidental = match[2];
-    const octave = Number(match[3]);
-    const base = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[letter] ?? 0;
-    const offset = accidental === "#" ? 1 : accidental === "b" ? -1 : 0;
-    return (octave + 1) * 12 + base + offset;
-  };
-
-  const midiToFreq = (noteNumber) => 440 * Math.pow(2, (Number(noteNumber || 60) - 69) / 12);
-  const semitonesToRate = (semitones) => Math.pow(2, (Number(semitones) || 0) / 12);
-
   const createFallbackInstrument = (ctx, destination) => ({
     play: (noteName, when, opts = {}) => {
       const midi = noteNameToMidi(noteName);
@@ -142,17 +126,6 @@ export const useStudioPlayback = (state, actions) => {
       return osc;
     },
   });
-
-  const resolveSoundfontName = (instrumentLabel, laneName) => {
-    const key = `${instrumentLabel || ""} ${laneName || ""}`.toLowerCase();
-    if (key.includes("piano")) return "acoustic_grand_piano";
-    if (key.includes("guitar")) return "electric_guitar_clean";
-    if (key.includes("bass")) return "acoustic_bass";
-    if (key.includes("string")) return "string_ensemble_1";
-    if (key.includes("synth")) return "synth_pad_1_new_age";
-    if (key.includes("drum") || key.includes("beat")) return "synth_drum";
-    return "acoustic_grand_piano";
-  };
 
   const loadSoundfontModule = async () => {
     if (soundfontModuleRef.current) return soundfontModuleRef.current;
@@ -202,22 +175,6 @@ export const useStudioPlayback = (state, actions) => {
     const instrument = await promise;
     instrumentCacheRef.current.set(cacheKey, { name, instrument, laneId: lane.id });
     return instrument;
-  };
-
-  const makeDistortionCurve = (amount) => {
-    const k = clamp(Number(amount) || 0, 0, 100);
-    const n = 44100;
-    const curve = new Float32Array(n);
-    const deg = Math.PI / 180;
-    for (let i = 0; i < n; i += 1) {
-      const x = (i * 2) / n - 1;
-      if (k <= 0) {
-        curve[i] = x;
-      } else {
-        curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
-      }
-    }
-    return curve;
   };
 
   const createReverbImpulse = (ctx, seconds, decay) => {
@@ -332,82 +289,62 @@ export const useStudioPlayback = (state, actions) => {
     } catch {}
   };
 
-  const computeLaneGain = (lane, soloSet) => {
-    if (soloSet.size && !soloSet.has(lane.id)) return 0;
-    if (lane.mute) return 0;
-    return dbToGain(lane.gainDb ?? 0);
-  };
-
   const applyLaneSettings = (bus, lane, soloSet) => {
     const ctx = audioCtxRef.current;
     if (!ctx || !bus) return;
     const now = ctx.currentTime;
-    const targetGain = computeLaneGain(lane, soloSet);
+    const fx = resolveFxParams(lane.fx);
+
+    // Every setTargetAtTime is wrapped: a node whose context has been closed
+    // under us throws, and one lane failing to update must not stop the rest.
     try {
-      bus.output.gain.setTargetAtTime(targetGain, now, 0.02);
+      bus.output.gain.setTargetAtTime(computeLaneGain(lane, soloSet), now, 0.02);
     } catch {}
 
-    const fx = lane.fx || {};
     if (bus.nodes.lowpass) {
       try {
-        bus.nodes.lowpass.frequency.setTargetAtTime(
-          fx.lowpass?.enabled
-            ? clamp(Number(fx.lowpass?.cutoff ?? 12000), 200, 20000)
-            : 20000,
-          now,
-          0.02
-        );
+        bus.nodes.lowpass.frequency.setTargetAtTime(fx.lowpassCutoff, now, 0.02);
       } catch {}
     }
-    if (bus.nodes.distortion) {
-      const drive = fx.distortion?.enabled ? clamp(Number(fx.distortion?.drive ?? 20), 0, 100) : 0;
-      if (bus.nodes.distortionDrive !== drive) {
-        bus.nodes.distortion.curve = makeDistortionCurve(drive);
-        bus.nodes.distortionDrive = drive;
-      }
+
+    // The curve is rebuilt only when the drive actually changed: it is 44,100
+    // samples, and playback would stutter if it were rebuilt every render.
+    if (bus.nodes.distortion && bus.nodes.distortionDrive !== fx.distortionDrive) {
+      bus.nodes.distortion.curve = makeDistortionCurve(fx.distortionDrive);
+      bus.nodes.distortionDrive = fx.distortionDrive;
     }
+
     if (bus.nodes.echo) {
-      const mix = fx.echo?.enabled ? clamp(Number(fx.echo?.mix ?? 0.25), 0, 1) : 0;
       try {
-        bus.nodes.echo.delay.delayTime.setTargetAtTime(
-          clamp(Number(fx.echo?.time ?? 0.25), 0.05, 1.5),
-          now,
-          0.02
-        );
-        bus.nodes.echo.feedback.gain.setTargetAtTime(
-          clamp(Number(fx.echo?.feedback ?? 0.3), 0, 0.85),
-          now,
-          0.02
-        );
+        bus.nodes.echo.delay.delayTime.setTargetAtTime(fx.echoTime, now, 0.02);
+        bus.nodes.echo.feedback.gain.setTargetAtTime(fx.echoFeedback, now, 0.02);
         if (bus.nodes.echo.wetGain) {
-          bus.nodes.echo.wetGain.gain.setTargetAtTime(mix, now, 0.02);
+          bus.nodes.echo.wetGain.gain.setTargetAtTime(fx.echoMix, now, 0.02);
         }
         if (bus.nodes.dryGain) {
-          bus.nodes.dryGain.gain.setTargetAtTime(1 - mix, now, 0.02);
+          bus.nodes.dryGain.gain.setTargetAtTime(1 - fx.echoMix, now, 0.02);
         }
       } catch {}
     }
+
     if (bus.nodes.reverb) {
-      const decay = clamp(Number(fx.reverb?.decay ?? 2.5), 0.5, 8);
-      if (bus.nodes.reverb.decay !== decay) {
-        bus.nodes.reverb.convolver.buffer = createReverbImpulse(ctx, decay, decay);
-        bus.nodes.reverb.decay = decay;
+      // Same reasoning as the distortion curve: generating an impulse response
+      // is expensive, so only on a real change.
+      if (bus.nodes.reverb.decay !== fx.reverbDecay) {
+        bus.nodes.reverb.convolver.buffer = createReverbImpulse(ctx, fx.reverbDecay, fx.reverbDecay);
+        bus.nodes.reverb.decay = fx.reverbDecay;
       }
-      const mix = fx.reverb?.enabled ? clamp(Number(fx.reverb?.mix ?? 0.25), 0, 1) : 0;
       try {
-        bus.nodes.reverb.wetGain.gain.setTargetAtTime(mix, now, 0.02);
+        bus.nodes.reverb.wetGain.gain.setTargetAtTime(fx.reverbMix, now, 0.02);
       } catch {}
     }
+
     if (bus.nodes.chorus) {
-      const rate = clamp(Number(fx.chorus?.rate ?? 0.8), 0.1, 5);
-      const depth = clamp(Number(fx.chorus?.depth ?? 0.012), 0, 0.03);
-      const baseTime = clamp(Number(fx.chorus?.time ?? 0.02), 0.005, 0.05);
-      const mix = fx.chorus?.enabled ? clamp(Number(fx.chorus?.mix ?? 0.3), 0, 1) : 0;
       try {
-        bus.nodes.chorus.delay.delayTime.setTargetAtTime(baseTime, now, 0.02);
-        bus.nodes.chorus.lfo.frequency.setTargetAtTime(rate, now, 0.02);
-        bus.nodes.chorus.lfoGain.gain.setTargetAtTime(depth, now, 0.02);
-        bus.nodes.chorus.wetGain.gain.setTargetAtTime(mix, now, 0.02);
+        bus.nodes.chorus.delay.delayTime.setTargetAtTime(fx.chorusTime, now, 0.02);
+        bus.nodes.chorus.lfo.frequency.setTargetAtTime(fx.chorusRate, now, 0.02);
+        bus.nodes.chorus.lfoGain.gain.setTargetAtTime(fx.chorusDepth, now, 0.02);
+        bus.nodes.chorus.wetGain.gain.setTargetAtTime(fx.chorusMix, now, 0.02);
       } catch {}
     }
   };
@@ -415,7 +352,7 @@ export const useStudioPlayback = (state, actions) => {
   const syncLaneBuses = (lanes) => {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
-    const soloSet = new Set(lanes.filter((lane) => lane.solo).map((lane) => lane.id));
+    const soloSet = getSoloSet(lanes);
     const seen = new Set();
 
     lanes.forEach((lane) => {
@@ -447,21 +384,6 @@ export const useStudioPlayback = (state, actions) => {
       Number(playOffsetRef.current || 0),
       ctx.currentTime - playStartRef.current + playOffsetRef.current
     );
-  };
-
-  const getLoopBounds = (runtimeState) => {
-    if (!runtimeState?.ui?.loop || !runtimeState?.selection?.range) return null;
-    const start = Math.min(runtimeState.selection.range.start, runtimeState.selection.range.end);
-    const end = Math.max(runtimeState.selection.range.start, runtimeState.selection.range.end);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
-    return { start, end };
-  };
-
-  const resolveWindowEnd = (windowStart, runtimeState) => {
-    const loopBounds = getLoopBounds(runtimeState);
-    const baseEnd = windowStart + PLAYBACK_LOOKAHEAD_SEC;
-    if (!loopBounds) return baseEnd;
-    return Math.min(baseEnd, loopBounds.end);
   };
 
   const loadBuffer = async (asset) => {
