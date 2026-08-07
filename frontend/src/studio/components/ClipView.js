@@ -332,6 +332,10 @@ const ClipView = ({
     editorPlayheadSec,
     effectiveClip.srcStartSec,
     lengthSec,
+    // The handler calls onUpdateClip(clip.id, ...). Timeline keys ClipView by
+    // clip.id so today a change remounts rather than re-runs, but the effect
+    // should not depend on that staying true.
+    clip.id,
     clip.midi,
     onUpdateClip,
     onStopPreviewMidiNote,

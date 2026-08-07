@@ -106,7 +106,9 @@ const MidiOverlay = ({
         },
       };
     });
-  }, [notes, bpm, ppq, pxPerSec, height, clipStartSec, clipDurationSec]);
+  // noteRange is read above (it clamps minNote/maxNote) but was missing here,
+  // so changing the visible pitch range left the notes drawn at the old one.
+  }, [notes, bpm, ppq, pxPerSec, height, clipStartSec, clipDurationSec, noteRange]);
 
   const startDrag = useCallback(
     (event, info, mode = "move") => {
@@ -196,7 +198,9 @@ const MidiOverlay = ({
         dragRef.current.lastPreviewAt = performance.now();
       }
     },
-    [editable, onUpdateNotes, clipStartSec, clipDurationSec, bpm, ppq, onPreviewNote, selectedSet, onSelectionChange]
+    // onSelectionChange is not referenced in this callback; listing it only
+    // rebuilt startDrag whenever the parent passed a new function identity.
+    [editable, onUpdateNotes, clipStartSec, clipDurationSec, bpm, ppq, onPreviewNote, selectedSet]
   );
 
   useEffect(() => {

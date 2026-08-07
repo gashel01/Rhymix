@@ -107,7 +107,13 @@ function TalkingDatasetUpload({ onBack }) {
   // Clean up interval on component unmount
   React.useEffect(() => {
     return () => {
+      /* Reading the ref at cleanup time is the point. The rule assumes a ref
+         holds a DOM node and warns it may have changed since mount; here it
+         holds an interval id, and the id that must be cleared is precisely the
+         current one. Copying it into a local at mount — what the rule suggests
+         — would capture null and leak the interval started afterwards. */
       if (statusCheckIntervalRef.current) {
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         clearInterval(statusCheckIntervalRef.current);
       }
     };
