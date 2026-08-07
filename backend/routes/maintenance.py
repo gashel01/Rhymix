@@ -5,12 +5,24 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from clean_vocals import clean_directories
 from backend.jobs.registry import active_jobs
 from backend.paths.manager import paths
 import logging
 
 bp = Blueprint("maintenance", __name__)
+
+
+def clean_directories(*args, **kwargs):
+    """Imported where it is used, like ace_step and applio.core below.
+
+    clean_vocals pulls in the separation stack, so importing it at module
+    level made every blueprint — and therefore create_app() — depend on it.
+    That is why the Flask route tests could not run anywhere the models are
+    not installed, CI included.
+    """
+    from clean_vocals import clean_directories as _clean_directories
+
+    return _clean_directories(*args, **kwargs)
 
 
 def _coerce_bool(value, default: bool = True) -> bool:

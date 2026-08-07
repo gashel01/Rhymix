@@ -3,8 +3,6 @@ import queue
 import threading
 import time
 
-from clean_vocals import process_all, progress_queue
-
 from backend.jobs.registry import active_jobs
 from backend.paths.manager import paths
 from backend.storage.metadata import (
@@ -50,7 +48,15 @@ def _get_active_processing_job():
     return max(candidates, key=lambda j: j.get("started_at", 0))
 
 
+# clean_vocals pulls in the separation stack (`vocal`, which lives with the
+# models rather than in the repo). Importing it at module level made every
+# blueprint — and so create_app() — depend on it, which is why the Flask route
+# tests could not run anywhere the models are not installed, CI included.
+# Imported where used instead, the same way ace_step and applio.core already
+# are elsewhere.
 def get_progress_events():
+    from clean_vocals import progress_queue
+
     events = []
     try:
         while True:
@@ -162,6 +168,8 @@ def process_audio_files_thread(job_id, segment, process, export, clean):
                 message="Queued for processing",
                 progress=0,
             )
+
+        from clean_vocals import process_all
 
         process_all(
             segment_audio=segment,
