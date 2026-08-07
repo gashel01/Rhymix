@@ -57,10 +57,14 @@ jobs:
             --ignore=backend/tests/test_dubler_melody.py
 
   # ---------------------------------------------------------------------------
-  # Frontend build — proves the React app compiles cleanly.
+  # Frontend — runs the jest suite, then proves the app compiles.
+  #
+  # The test step is new. @testing-library was never listed in package.json, so
+  # `npm test` reported "Cannot find module" for two of the three suites and
+  # nobody saw it; they had never run since the day they were written.
   # ---------------------------------------------------------------------------
   frontend-build:
-    name: Frontend build (React)
+    name: Frontend tests + build (React)
     runs-on: ubuntu-latest
 
     defaults:
@@ -77,7 +81,15 @@ jobs:
           node-version: "18"
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        # --legacy-peer-deps: typescript@5 is installed against react-scripts@5,
+        # which declares a peerOptional of ^3 || ^4. Pre-existing, unrelated to
+        # the test libraries, and npm refuses to resolve without it.
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+
+      - name: Test
+        env:
+          CI: "true"
+        run: npm test -- --watchAll=false
 
       - name: Build
         env:
