@@ -152,8 +152,10 @@ export const getSelectionNames = (selectedTracks = []) =>
     )
     .filter(Boolean);
 
-export const formatSelectionPreview = (names = []) => {
-  const list = names.slice(0, 3);
+/** The first few names, then a count. The limit differs by view — the models
+ *  toolbar has less room than the inference header. */
+export const formatSelectionPreview = (names = [], limit = 3) => {
+  const list = names.slice(0, limit);
   const extra = names.length - list.length;
   const base = list.join(", ");
   return extra > 0 ? `${base} +${extra} more` : base;
