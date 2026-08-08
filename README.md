@@ -2,241 +2,244 @@
 
 # 🎛️ Rhymix
 
-**A browser-based music production app built in React — DAW-style editor, real-time voice-to-MIDI, AI song generation, and voice conversion, all in one tab.**
+**A digital audio workstation that runs in a browser tab — timeline editor, real-time voice-to-MIDI, AI song generation and voice conversion, all driving local models on one consumer GPU.**
 
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
-![Web Audio API](https://img.shields.io/badge/Web%20Audio%20API-AudioWorklet-FF6B35)
-![JavaScript](https://img.shields.io/badge/JavaScript-ES2022-F7DF1E?logo=javascript&logoColor=black)
-![Flask](https://img.shields.io/badge/Flask-REST%20API-000000?logo=flask&logoColor=white)
+![Web Audio API](https://img.shields.io/badge/Web%20Audio-AudioWorklet-FF6B35)
+![Flask](https://img.shields.io/badge/Flask-REST-000000?logo=flask&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-WebSocket-009688?logo=fastapi&logoColor=white)
-![PyTorch](https://img.shields.io/badge/PyTorch-CUDA%2012.1-EE4C2C?logo=pytorch&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-CUDA-EE4C2C?logo=pytorch&logoColor=white)
 [![CI](https://github.com/gashel01/Rhymix/actions/workflows/ci.yml/badge.svg)](https://github.com/gashel01/Rhymix/actions/workflows/ci.yml)
 
 </div>
 
 ---
 
-> 📸 **Screenshots / demo GIF coming soon** — Studio editor, Voice→MIDI panel, and song generation in action.
+> ### 🚧 This is a workbench, not a product
+>
+> Rhymix is a personal project and it has never tried to be anything else. There
+> is no hosted version, no installer, no account system, no roadmap and no
+> support. It runs on one machine — mine — against a pile of local model
+> checkpoints, and half of it exists because I wanted to find out whether a
+> browser could do it at all.
+>
+> Parts of it are polished. Parts of it are scaffolding with the paint still
+> wet. Where something is half-wired, the code says so out loud rather than
+> pretending otherwise. You are very welcome to read it, take ideas from it, or
+> run it if you have the patience — but treat it as a workshop you are walking
+> through, not a tool you are buying.
 
 ---
 
-## What it is
+## The pitch
 
-Rhymix is a full-stack music production web app I built to explore how far you can push the browser as an audio engineering environment. The frontend is a React DAW with a custom Web Audio API playback engine, an AudioWorklet-based voice capture pipeline, a non-destructive timeline editor, and real-time MIDI rendering — all talking to a Python backend (Flask REST + FastAPI WebSocket) that routes work to AI models for song generation, voice conversion, vocal separation, and transcription.
+Music software makes you choose. A DAW gives you a timeline and a mixer but
+knows nothing about generating audio. An AI music tool gives you a text box and
+hands back a finished stereo file you cannot open up. The interesting work lives
+in between: generate a part, drop it on a lane, re-sing one phrase, convert a
+voice, hum a bassline in and quantise it — then mix the result like any other
+audio.
 
-The project started as "can I build a Dubler-style voice→MIDI tool in the browser?" and grew from there.
+Rhymix is an attempt at that middle ground, in a browser tab, on hardware you
+already own. Every model runs locally. Nothing is uploaded anywhere.
 
----
-
-## ✨ Features
-
-| | |
-|---|---|
-| 🎚️ **Studio — DAW editor** | Non-destructive timeline with lanes, clips, fades, looping, and a multi-lane Web Audio API mixing engine. |
-| 🎤 **Voice → MIDI** | Hum or sing into a mic. An AudioWorklet captures PCM in real time, streams it over WebSocket, and drops a quantized MIDI clip into the timeline. Three pluggable pitch engines (Basic Pitch / CREPE / DDSP). |
-| 🥁 **Beatbox Wizard** | Record vocal percussion and get a rhythm MIDI clip back, ready to insert into any lane. |
-| 🎵 **AI Song Generation** | Generate complete songs from a text prompt + lyrics (ACE-Step foundation model). Result drops straight into the timeline. |
-| 🎭 **Voice Conversion** | Apply a trained RVC voice model to any audio clip. Train new voice models from the browser. |
-| 🗣️ **Speaker Diarization** | WhisperX + pyannote pipeline to separate multiple speakers in a recording. |
-| 🎸 **Stem Extraction** | Pull drums / bass / guitar / keys out of an instrumental — each stem gets its own lane. |
+It began as a much smaller question — *could I build a Dubler-style voice→MIDI
+tool in the browser?* — and kept growing outward from the answer.
 
 ---
 
-## 🖥️ Frontend engineering
+## Screenshots
 
-The frontend is where most of the interesting engineering lives. Some highlights:
-
-### Custom Web Audio API playback engine (`useStudioPlayback`)
-A 1,000-line custom hook that implements a DAW-grade playback engine from scratch:
-- **Lookahead scheduler** — buffers audio events 750ms ahead using `AudioContext.currentTime` to avoid glitches when the JS thread is busy
-- **Per-lane bus routing** — each Studio lane gets its own `GainNode` chain for independent volume, mute, and solo
-- **Buffer cache** — decoded `AudioBuffer` objects are kept in a `Map` keyed by source URL to avoid re-decoding on loop
-- **SoundFont/MIDI synthesis** — MIDI clips are synthesized in real time using a SoundFont player, with per-clip instrument override from the Inspector
-- **Metronome** — generated with `OscillatorNode` + `GainNode` envelope, synced to project BPM
-- **Race-condition safety** — playback token system ensures stale async callbacks from a previous play session never affect the current one
-
-### AudioWorklet voice capture (`voiceToMidiWorklet.js`)
-Runs in a **dedicated audio rendering thread** (not the main JS thread):
-- Accumulates `Float32` PCM frames from the mic input
-- Converts to `Int16` little-endian and ships frames to the main thread via `postMessage` with **transferable `ArrayBuffer`s** (zero-copy — no serialization overhead)
-- The main thread hook (`useVoiceToMidiWs`) forwards each frame to the FastAPI WebSocket server as binary, and reconstructs a MIDI clip from the final response
-
-### Non-destructive EDL (`edlOps.js` + `studio/store.js`)
-All timeline edits are **pure functions over the EDL** — split, trim, duplicate, move, fade — nothing mutates in place:
-- Makes undo/redo trivial to implement (the state IS the history)
-- AI jobs write their output back as new EDL operations, keeping human edits and AI edits consistent
-- `edlOps.test.js` covers the core operations — the kind of code that actually needs tests
-
-### Real-time WebSocket hooks
-Two custom hooks manage binary streaming:
-- `useVoiceToMidiWs` — opens a WS connection, feeds Int16 PCM frames from the worklet, handles `status/error/final` message types, injects the returned MIDI clip into the EDL
-- `useStudioLiveInferenceWs` — manages an SSE + WS stream for live AI inference feedback during generation jobs
-
-### Other frontend details worth mentioning
-- **`useStudioKeyboardShortcuts`** — context-aware shortcut system that correctly skips `<input>`, `<textarea>`, `contentEditable`, and conditionally active modals before firing any action
-- **`MidiOverlay`** — custom piano-roll renderer overlaid on the waveform timeline
-- **`Inspector`** (1,630 lines) — context-sensitive properties panel for clips, lanes, and the project; updates in sync with selection state
-- **`ClipView`** (997 lines) — handles waveform rendering, clip resize handles, fade in/out curves, drag-to-move, and snap-to-grid
-- **`Timeline`** (584 lines) — ruler, playhead, loop region, click-to-seek, scroll sync
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/images/studio.jpg" alt="Studio timeline with lanes, clips and inspector" />
+      <p align="center"><em><b>Studio</b> — multitrack timeline, per-lane faders, AI tools in the right panel</em></p>
+    </td>
+    <td width="50%">
+      <img src="docs/images/home.jpg" alt="Track library with per-track waveforms" />
+      <p align="center"><em><b>Library</b> — every track with its instrumental and vocal stems side by side</em></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/images/create-song.jpg" alt="Song generation view" />
+      <p align="center"><em><b>Create</b> — prompt, lyrics and a full ACE-Step parameter panel</em></p>
+    </td>
+    <td width="50%">
+      <img src="docs/images/models.jpg" alt="Trained voice model library" />
+      <p align="center"><em><b>Models</b> — trained voice models, with download and training progress live on the card</em></p>
+    </td>
+  </tr>
+</table>
 
 ---
 
-## 🗂️ Frontend structure
+## What it does
+
+### 🎚️ Studio — a real timeline
+Non-destructive multitrack editing: lanes, clips, trims, fades, snap-to-grid,
+looping, per-lane gain, mute and solo. Playback is a custom Web Audio graph —
+one bus per lane with its own filter, distortion, echo, reverb and chorus nodes,
+scheduled ahead of the playhead so toggling an effect mid-playback never clicks.
+The mixdown is rendered server-side by ffmpeg from the same edit list the
+browser plays.
+
+### 🎤 Voice → MIDI
+Hum, sing or beatbox into a microphone. An `AudioWorklet` captures PCM in real
+time and streams it over a WebSocket; the backend runs pitch detection and sends
+back notes, which land as a quantised MIDI clip on the timeline. Three
+interchangeable engines — **Basic Pitch**, **CREPE** and **DDSP** — plus a
+"magic wand" pass that snaps a take to a key and scale, merges the stutter that
+pitch trackers produce on held notes, and applies swing.
+
+### 🥁 Beatbox calibration wizard
+Record a few examples of each drum sound in your own voice, train a small
+classifier on them, and turn vocal percussion into drum MIDI.
+
+### 🎵 AI song generation
+Full songs from a prompt and lyrics, via **ACE-Step v1.5** running locally. The
+parameter panel exposes the real controls — BPM, key, time signature, diffusion
+steps, guidance shift, the language-model backend, int8 quantisation, CPU
+offload — because the defaults that fit an 8 GB card are not the defaults that
+fit a 24 GB one. Results land in the library and open in the Studio.
+
+### 🎭 Voice conversion and training
+Apply a trained **RVC v2** model to any track, or train a new one from your own
+audio without leaving the browser. Runs stay visible while they work: a training
+job survives a page reload, and its progress shows on the model's card in the
+library.
+
+### 🗣️ Speaker diarization
+**WhisperX** and **pyannote** split a multi-speaker recording into per-speaker
+segments, drawn as coloured regions over a shared waveform, with per-speaker
+export.
+
+### 🎛️ And the rest
+Stem separation, lyric transcription, song covers, an AI orchestrator that plans
+a multi-section arrangement and generates each part, and a Groq-backed assist
+button on the prompt fields.
+
+---
+
+## Architecture
+
+Three processes. The browser talks REST to one, WebSocket to another, and never
+talks to a model directly.
 
 ```
-frontend/src/
-├── studio/                     # DAW editor (the core of the app)
-│   ├── StudioPage.js           # Root layout and state wiring
-│   ├── store.js                # Studio state store (actions + reducers)
-│   ├── edlOps.js               # Pure-function EDL operations (+ tests)
-│   ├── components/
-│   │   ├── Timeline.js         # Ruler, playhead, loop region
-│   │   ├── ClipView.js         # Clip rendering, drag, resize, fades
-│   │   ├── TrackList.js        # Lane list with mute/solo/volume
-│   │   ├── Inspector.js        # Context-sensitive properties panel
-│   │   ├── MidiOverlay.js      # Piano-roll overlay renderer
-│   │   ├── VoiceToMidiPanel.js # Mic recording + engine controls
-│   │   ├── Transport.js        # Play/pause/stop/BPM/loop controls
-│   │   └── ...13 more
-│   ├── hooks/
-│   │   ├── useStudioPlayback.js        # Web Audio engine
-│   │   ├── useVoiceToMidiWs.js         # Binary PCM WebSocket stream
-│   │   ├── useStudioLiveInferenceWs.js # AI job SSE stream
-│   │   ├── useStudioKeyboardShortcuts.js
-│   │   └── useLyricsActions.js
-│   └── audio/
-│       └── voiceToMidiWorklet.js       # AudioWorklet (audio thread)
-├── components/
-│   ├── AudioTrackTable/        # Main asset list with waveform previews
-│   ├── CreateSongView/         # AI song generation form + results
-│   ├── Homeview/               # Design-system primitives (Glass, Panel, Btn...)
-│   └── ...
-├── beatboxWizard/              # Mic → rhythm MIDI wizard (TypeScript)
-├── contexts/                   # VolumeContext
-├── hooks/                      # Shared hooks (waveform sync, vocal mode, files)
-└── utils/
+┌──────────────────────────────────────────────────────────────────────┐
+│  React 18  ·  :3001                                                  │
+│                                                                      │
+│  Studio          Library / Inference / Models / Training / Diarize   │
+│  ├ store.js      reducer + undo stack, the single source of truth    │
+│  ├ playback      Web Audio graph: lane buses, FX chain, scheduler    │
+│  ├ selectors     pure — what a selection covers, which job is live   │
+│  └ audioMath     dB↔gain, ticks↔seconds, note names, FX clamps       │
+└───────────────┬──────────────────────────────────┬───────────────────┘
+                │ REST                             │ WebSocket
+┌───────────────▼──────────────┐   ┌───────────────▼───────────────────┐
+│  Flask  ·  :5000             │   │  FastAPI  ·  :8002                │
+│                              │   │                                   │
+│  upload · processing · models│   │  /ws/voice_to_midi                │
+│  training · studio · songgen │   │  /ws/studio_live_infer            │
+│  diarization · beatbox       │   │                                   │
+│                              │   │  streams PCM in, notes/audio out  │
+│  project_edits  (pure)       │   └───────────────────────────────────┘
+│  orchestrator_plan (pure)    │
+│  note_math      (pure)       │
+└───────────────┬──────────────┘
+                │ subprocess, one venv per engine
+┌───────────────▼──────────────────────────────────────────────────────┐
+│  ACE-Step 1.5   Applio / RVC   UVR stems   WhisperX   pyannote        │
+│  SoulX-Singer   Foundation-1   STAGE drums   CREPE · Basic Pitch      │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
----
+**Why subprocesses.** Each engine wants its own torch build and its own pinned
+dependency set — CUDA 11.8 here, 12.8 there — and they cannot coexist in one
+interpreter. Each lives in its own virtualenv and is driven over a stdout line
+protocol. It also means a model that crashes takes its own process down and not
+the app.
 
-## 🔧 Full-stack architecture
+**Why the pure modules.** Anything that decides something rather than performing
+it was pulled out of the code that touches ffmpeg, a GPU or the DOM:
+`project_edits`, `orchestrator_plan`, `note_math` on the backend;
+`studioSelectors`, `audioMath`, `appRoutes` and the per-view models on the
+frontend. They are plain functions over plain data, so they can be tested in
+milliseconds instead of by running a job. That is where most of this project's
+tests live, and where four real bugs were found by writing them.
 
-Rhymix is three processes. The frontend talks REST + SSE to Flask for everything persistent (projects, jobs, uploads), and streams binary audio directly to FastAPI over WebSocket for the realtime voice pipeline.
-
-```mermaid
-flowchart TD
-    subgraph Frontend["🖥️ React SPA · port 3001"]
-        Studio["Studio editor"]
-        VMIDI["Voice → MIDI panel\n(AudioWorklet)"]
-        CreateSong["Song generation UI"]
-        TrackTable["Audio track table"]
-    end
-
-    subgraph Flask["🐍 Flask REST · port 5000"]
-        Jobs["Job queue + SSE streams"]
-        Projects["Studio EDL / projects"]
-        Uploads["File uploads / downloads"]
-        Features["features/ — song_gen · inference\ndiarization · processing · studio"]
-    end
-
-    subgraph FastAPI["⚡ FastAPI WebSocket · port 8002"]
-        WS["/ws/voice_to_midi\nbinary PCM16 frames"]
-    end
-
-    subgraph Models["🧠 AI model layer"]
-        ACE["ACE-Step 1.5"]
-        RVC["Applio / RVC"]
-        Whisper["WhisperX + pyannote"]
-        Pitch["Basic Pitch · CREPE · DDSP"]
-    end
-
-    Frontend -- "HTTP · SSE" --> Flask
-    VMIDI -- "WS · binary PCM16" --> FastAPI
-    Flask --> Models
-    FastAPI --> Pitch
-
-    classDef fe fill:#1e3a5f,stroke:#4a90e2,color:#fff
-    classDef be fill:#2d1b4e,stroke:#9b6dff,color:#fff
-    classDef ws fill:#1b3d2d,stroke:#4caf50,color:#fff
-    classDef ml fill:#4e2d1b,stroke:#ff9b6d,color:#fff
-    class Studio,VMIDI,CreateSong,TrackTable fe
-    class Jobs,Projects,Uploads,Features be
-    class WS ws
-    class ACE,RVC,Whisper,Pitch ml
-```
+More detail in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
+[`docs/STUDIO.md`](docs/STUDIO.md) and [`docs/API.md`](docs/API.md).
 
 ---
 
-## 🧰 Tech stack
+## Running it
 
-**Frontend**
-- React 18, Material-UI, wavesurfer.js
-- Web Audio API — `AudioContext`, `AudioWorklet`, `GainNode`, `OscillatorNode`, `AudioBuffer`
-- WebSocket (binary PCM streaming), SSE (job progress)
-- SoundFont-based MIDI synthesis (`soundfont-player`)
-- AG Grid (`@tanstack/react-virtual`)
-- TypeScript (partial — `beatboxWizard/`)
-
-**Backend**
-- Flask 2.2 (REST API, file I/O, job queue)
-- FastAPI + uvicorn (WebSocket, async audio streaming)
-- Python 3.10, PyTorch 2.4.1, CUDA 12.1
-
-**AI models** (integrated, not authored)
-- ACE-Step 1.5, Applio/RVC, WhisperX, pyannote.audio, Basic Pitch, CREPE, DDSP
-
----
-
-## 🚀 Quickstart
-
-> Windows · Python 3.10 · Node 18+ · Git · CUDA 12.1 GPU (recommended)
+You need a CUDA GPU, Python 3.10 and Node 18+. Model checkpoints are **not** in
+this repository — see [`docs/SETUP_MODELS.md`](docs/SETUP_MODELS.md) for what to
+download and where to put it.
 
 ```bash
-git clone https://github.com/gashel01/Rhymix.git
-cd Rhymix
-setup.bat          # venv, deps, AI repos, whisperX venv, npm install
-# Download model weights → see docs/SETUP_MODELS.md
-run_all.bat        # starts Flask + FastAPI + React dev server
+py -3.10 -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+
+cd frontend && npm install --legacy-peer-deps && cd ..
+
+run_all.bat          # Flask :5000 · FastAPI :8002 · React :3001
 ```
 
-Open **http://127.0.0.1:3001**
+Then open **http://localhost:3001**.
 
-> Use `127.0.0.1`, not `localhost`. The dev server binds IPv4 (`0.0.0.0`) while
-> Chrome resolves `localhost` to IPv6 `::1` first, which yields a connection error.
-
-For configuration (60+ env vars) see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
-For model weights see [docs/SETUP_MODELS.md](docs/SETUP_MODELS.md).
+Developed against an **RTX 3070 Ti Laptop (8 GB)**, which is the reason for
+every offload and quantisation default you will find in
+`backend/features/song_generation/providers/ace_step.py`. On a larger card, turn
+them off.
 
 ---
 
-## 🧪 Tests
+## Tests
 
 ```bash
-# Backend (Python)
-pytest tests/
-
-# Frontend EDL operations
-cd frontend && npm test -- --testPathPattern=edlOps
+pytest tests/ backend/tests/ --ignore=backend/tests/test_dubler_melody.py
+cd frontend && npm test
 ```
 
-CI runs both on every push — see `.github/workflows/ci.yml`.
+**546 tests**, none of which need a GPU, a model checkpoint or a network call.
+They cover the parts where being wrong is quiet rather than loud — the payload
+posted to the generator, the arithmetic that places a clip on the timeline, the
+rules that decide which AI tools a selection unlocks, the conversion between
+ticks and seconds.
+
+The one excluded file is the CREPE test, which pulls in torch; everything else
+runs in CI on every push.
 
 ---
 
-## 📚 Documentation
+## Honest status
 
-| | |
-|---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Request flow, job system, AI adapter pattern |
-| [docs/STUDIO.md](docs/STUDIO.md) | Studio mode, Voice→MIDI, Magic Wand, stem extraction |
-| [docs/API.md](docs/API.md) | REST endpoints + WebSocket protocol |
-| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Every environment variable |
-| [docs/SETUP_MODELS.md](docs/SETUP_MODELS.md) | Model weight downloads and folder layout |
+Things worth knowing before you read the code:
+
+- **No end-to-end generation has ever been run in CI**, or with a fresh model
+  install. Correctness is asserted by tests and by use on one machine.
+- **Some features are wired but not connected.** Where that is true the code
+  says so, with the reason. `TalkDownloadResults` has a waveform sync that was
+  never plugged in; the comment explains what is missing and why turning it on
+  is not a one-line change.
+- **Re-singing a selection layers rather than replaces.** The new audio lands on
+  a "Generated Layers" lane over the original. That is deliberate — you mix the
+  two — and the split-and-replace alternative was removed rather than left
+  around as a suggestion.
+- **`ace_step.py` prints instead of logging.** Those `print()` calls are the IPC
+  protocol its worker subprocess speaks. They look like debug noise and are not.
+
+The git history is written to be read. Commits explain why a change was made and
+what was rejected, not just what moved.
 
 ---
 
-## 🙏 Credits
-
-AI models used as backends: [ACE-Step](https://github.com/ace-step/ACE-Step), [Applio/RVC](https://github.com/IAHispano/Applio), [WhisperX](https://github.com/m-bain/whisperX), [pyannote.audio](https://github.com/pyannote/pyannote-audio), [Basic Pitch](https://github.com/spotify/basic-pitch), [CREPE](https://github.com/marl/crepe), [DDSP](https://github.com/magenta/ddsp), [SoulX-Singer](https://github.com/Soul-AILab/SoulX-Singer).
-
-Built by **gg**.
+<div align="center">
+<sub>Built out of curiosity. Kept honest on purpose.</sub>
+</div>
