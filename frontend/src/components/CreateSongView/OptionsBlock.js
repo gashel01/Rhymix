@@ -65,7 +65,7 @@ export function CustomizeContent({
   timeSignature,
   setTimeSignature,
 }) {
-  const { Input, Slider, Pill } = ui;
+  const { Input, Slider } = ui;
 
   return (
     <div style={{ display: "grid", gap: 20, paddingTop: 18 }}>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { LABELS, type DrumLabel, type ReviewResponse, type TakeResponse, type TrainResponse, type WizardState } from "./types";
 import { useSessionApi } from "./useSessionApi";
 import { useMicrophoneRecorder } from "./useMicrophoneRecorder";
@@ -49,11 +49,6 @@ export default function BeatboxCalibrationWizard() {
   const [reviewLabel, setReviewLabel] = useState<DrumLabel>("kick");
   const [reviewData, setReviewData] = useState<ReviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const progress = useMemo(() => {
-    const done = labels.findIndex((x) => x === currentLabel);
-    return Math.max(1, done + 1);
-  }, [labels, currentLabel]);
 
   const playTick = () => {
     if (!metronome) return;

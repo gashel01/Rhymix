@@ -91,7 +91,7 @@ function CreateSongView({
   const [coverPitchShift, setCoverPitchShift] = useState("0");
   const [coverStylePrompt, setCoverStylePrompt] = useState("");
   const [coverPreserveTempo, setCoverPreserveTempo] = useState(true);
-  const [coverOutputFormat, setCoverOutputFormat] = useState("wav");
+  const [coverOutputFormat] = useState("wav");
   const [coverStrength, setCoverStrength] = useState(1.0);
   const [coverLyrics, setCoverLyrics] = useState("");
   const [coverLyricsMode, setCoverLyricsMode] = useState("lyrics");

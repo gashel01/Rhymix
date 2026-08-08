@@ -27,7 +27,6 @@ function TalkingDatasetUpload({ onBack }) {
   const [processing, setProcessing] = useState(false);
   const [processingError, setProcessingError] = useState(null);
   const [processingComplete, setProcessingComplete] = useState(false);
-  const [jobId, setJobId] = useState(null);
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
   const [result, setResult] = useState(null);
@@ -87,11 +86,8 @@ function TalkingDatasetUpload({ onBack }) {
     setStatusMessage("Starting processing...");
 
     try {
-      const response = await axios.post("/api/process-talking", {
+      await axios.post("/api/process-talking", {
         filename: filename || file.name });
-
-      setJobId(response.data.job_id);
-;
     } catch (error) {
       console.error("Processing error:", error);
       setProcessingError(

@@ -42,7 +42,7 @@ export function CoverFormPanel({
   onGenerate,
   styleAssist,
 }) {
-  const { Panel, Btn, Input, Slider, Alert, Modal, Pill } = ui;
+  const { Panel, Input, Slider, Alert, Modal, Pill } = ui;
   const [personaModalOpen, setPersonaModalOpen] = useState(false);
   const [personaQuery, setPersonaQuery] = useState("");
   const [personaPage, setPersonaPage] = useState(1);

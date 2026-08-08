@@ -74,10 +74,6 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
     }
   };
 
-  const handleCheckpointChange = (checkpoint) => {
-    setSelectedCheckpoint(checkpoint);
-  };
-
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',

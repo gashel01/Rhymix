@@ -44,15 +44,11 @@ import {
 function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
   const theme = useTheme();
 
-  // Transform the selected tracks array into the expected structure
-  const processedVocals = selectedVocals?.filter(track => track.vocal)?.map(track => track.vocal) || [];
-  const rawVocals = selectedVocals?.filter(track => track.vocal)?.map(track => track.vocal) || [];
   const [config, setConfig] = useState(DEFAULT_TRAINING_CONFIG);
 
   const [isTraining, setIsTraining] = useState(false);
   const [trainingLogs, setTrainingLogs] = useState([]);
   const [trainingProgress, setTrainingProgress] = useState(0);
-  const [trainingCompleted, setTrainingCompleted] = useState(false);
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
   const [fileDetailsModalOpen, setFileDetailsModalOpen] = useState(false);
   const [currentJobId, setCurrentJobId] = useState(null);
@@ -123,7 +119,6 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
             setIsTraining(false);
             setCurrentJobId(null);
             if (!update.failed) {
-              setTrainingCompleted(true);
               setCompletionDialogOpen(true);
             }
             setTrainingLogs((prev) => [...prev, update.message]);

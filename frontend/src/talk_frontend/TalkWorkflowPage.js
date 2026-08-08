@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
   Stepper,
@@ -32,7 +32,7 @@ function TalkWorkflowPage({ onBack, handleTrainWithDataset }) {
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
-  const [pollingCount, setPollingCount] = useState(0);
+  const pollingCountRef = useRef(0);
   const MAX_POLLING_ATTEMPTS = 300; // Stop polling after ~10 minutes (300 * 2 seconds)
 
   // Clean up polling on unmount
@@ -55,25 +55,23 @@ function TalkWorkflowPage({ onBack, handleTrainWithDataset }) {
         devLog(`Checking status for job ${jobId}...`);
 
         // Increment polling count
-        setPollingCount((prev) => {
-          const newCount = prev + 1;
-          // Stop polling after max attempts
-          if (newCount >= MAX_POLLING_ATTEMPTS) {
-            devLog(
-              `Reached max polling attempts (${MAX_POLLING_ATTEMPTS}), stopping poll`
-            );
-            if (intervalId) {
-              clearInterval(intervalId);
-              intervalId = null;
-            }
-            setProcessing(false);
-            setError(
-              "Polling timed out. The process may still be running in the background."
-            );
-            return newCount;
+        /* A ref, not state: this counter only decides when to stop polling
+           and is never rendered, so storing it in state re-rendered the page
+           on every tick for nothing. */
+        pollingCountRef.current += 1;
+        if (pollingCountRef.current >= MAX_POLLING_ATTEMPTS) {
+          devLog(
+            `Reached max polling attempts (${MAX_POLLING_ATTEMPTS}), stopping poll`
+          );
+          if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
           }
-          return newCount;
-        });
+          setProcessing(false);
+          setError(
+            "Polling timed out. The process may still be running in the background."
+          );
+        }
 
         fetch(`/api/talking-status/${jobId}`)
           .then((res) => {

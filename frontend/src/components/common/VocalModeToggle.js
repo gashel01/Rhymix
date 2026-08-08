@@ -24,15 +24,6 @@ function VocalModeToggle({ value, onChange, show = true, mode = 'inference' }) {
     right: 'original'
   };
 
-  // Map values based on mode
-  const valueMapping = mode === 'dataset' ? {
-    'raw': 'raw',
-    'processed': 'processed'
-  } : {
-    'converted': 'converted',
-    'original': 'original'
-  };
-
   return (
     <Box className={styles.container}>
       <ToggleButtonGroup
