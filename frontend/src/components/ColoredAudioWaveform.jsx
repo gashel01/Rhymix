@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -17,6 +18,27 @@ import PauseIcon from "@mui/icons-material/Pause";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.js";
 
+/* Default prop values, hoisted out of the parameter list.
+
+   Written inline as `= []`, `= {}` and `= () => {}`, a default is evaluated on
+   every render, so a caller that omits the prop handed this component a fresh
+   identity each time. Every hook depending on one of them then re-ran on every
+   render — which is why so many of the effects below had to omit their real
+   dependencies to stay quiet. Hoisted, an omitted prop is genuinely constant. */
+/* Pure, so it belongs outside the component: defined inside, it was a new
+   function every render and made everything closing over it unstable too. */
+const segmentMatchesFilter = (segment, filters) => {
+  // If no filters are applied, all segments match
+  if (!filters || filters.length === 0) return true;
+  // Check if this segment's speaker is in the filter list using exact match
+  return filters.includes(segment.speaker);
+};
+
+const NO_SPEAKER_FILTER = [];
+const NO_DISPLAY_NAME_MAP = {};
+const identityName = (name) => name;
+const noop = () => {};
+
 const ColoredAudioWaveform = forwardRef(
   (
     {
@@ -26,16 +48,16 @@ const ColoredAudioWaveform = forwardRef(
       isPlaying,
       onPlayPause,
       onSegmentClick,
-      filteredSpeakers = [], // Empty array means show all speakers
+      filteredSpeakers = NO_SPEAKER_FILTER, // Empty array means show all speakers
       height = 140,
       waveColor = "#8e8e8e",
       progressColor = "#ffffff",
       backgroundColor = "#2a2a2a",
-      onReady = () => {},
-      onTimeUpdate = () => {}, // Add onTimeUpdate prop
-      onSeek = () => {}, // Add onSeek prop
-      speakerDisplayNameMap = {}, // Add this prop
-      getDisplayName = (name) => name, // Add this prop with a default implementation
+      onReady = noop,
+      onTimeUpdate = noop, // Add onTimeUpdate prop
+      onSeek = noop, // Add onSeek prop
+      speakerDisplayNameMap = NO_DISPLAY_NAME_MAP, // Add this prop
+      getDisplayName = identityName, // Add this prop with a default implementation
     },
     ref
   ) => {
@@ -87,16 +109,11 @@ const ColoredAudioWaveform = forwardRef(
         );
         setSpeakerColorMap(colorMap);
       }
-    }, [segments]);
-
-    // Near the beginning of the component, add a more generic function to determine if a segment matches filters
-    const segmentMatchesFilter = (segment, filters) => {
-      // If no filters are applied, all segments match
-      if (!filters || filters.length === 0) return true;
-
-      // Check if this segment's speaker is in the filter list using exact match
-      return filters.includes(segment.speaker);
-    };
+      // speakerColors is a module constant imported from utils/audioUtils, so
+      // listing it cannot make this effect re-run — it just stops the palette
+      // being read from a closure that predates it.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [segments, speakerColors]);
 
     // Replace both existing wheel event handling mechanisms with a single solution
     useEffect(() => {
@@ -344,10 +361,19 @@ const ColoredAudioWaveform = forwardRef(
           }
         }
       };
+      /* Keyed on the audio, deliberately. Listing the style props would tear
+         down and rebuild the wavesurfer instance whenever a colour or the
+         height changed, and listing addRegions would rebuild it on every
+         change of segments — both visible as the waveform flashing and
+         reloading. The instance should outlive all of that. */
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [url]);
 
-    // Add regions for speakers
-    const addRegions = (wavesurfer) => {
+    /* Memoised so the two effects that call it can list it. It reads the
+       segments, the filters and the palette; every one of those is either
+       state or a stable prop, so this changes identity only when the regions
+       it would draw actually differ. */
+    const addRegions = useCallback((wavesurfer) => {
       if (!segments || segments.length === 0) {
         return;
       }
@@ -470,8 +496,7 @@ const ColoredAudioWaveform = forwardRef(
           }
         }
       });
-
-    };
+    }, [segments, filteredSpeakers, speakerColors, speakerColorMap, onSegmentClick]);
 
     // Helper to adjust color opacity
     const adjustColorOpacity = (color, opacity) => {
@@ -510,7 +535,7 @@ const ColoredAudioWaveform = forwardRef(
       if (wavesurferRef.current && ready) {
         addRegions(wavesurferRef.current);
       }
-    }, [filteredSpeakers, segments]);
+    }, [filteredSpeakers, segments, addRegions, ready]);
 
     // Add this effect to apply fading to non-selected parts of the waveform
     useEffect(() => {
@@ -561,7 +586,9 @@ const ColoredAudioWaveform = forwardRef(
           }
         });
       }
-    }, [ready]);
+      // Resetting every region to full opacity is idempotent, so re-running it
+      // when the regions themselves change is right rather than merely safe.
+    }, [ready, addRegions]);
 
     // Format time display
     const formatTime = (time) => {
