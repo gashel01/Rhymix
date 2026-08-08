@@ -101,43 +101,10 @@ function TalkDownloadResults({
     severity: "" });
 
   // Clear playback timer on unmount
-  useEffect(() => {
-    return () => {
-      if (segmentPlaybackTimer) {
-        clearTimeout(segmentPlaybackTimer);
-      }
-    };
-  }, [segmentPlaybackTimer]);
-
-  // Fetch timeline data on component mount
-  useEffect(() => {
-    if (jobStatus?.job_id) {
-      fetchTimelineData();
-      setupOriginalAudio();
-    }
-  }, [jobStatus]);
-
-  // Cleanup audio on unmount
-  useEffect(() => {
-    devLog("TalkDownloadResults jobStatus:", jobStatus);
-
-    return () => {
-      // Stop any playing audio
-      Object.values(waveforms).forEach((waveform) => {
-        if (waveform && typeof waveform.pause === "function") {
-          waveform.pause();
-        }
-      });
-    };
-  }, [jobStatus, waveforms]);
-
-  // Update speakers list when timeline data changes
-  useEffect(() => {
-    if (timelineData?.length > 0) {
-      updateSpeakersList();
-    }
-  }, [timelineData]);
-
+  /* These three sit above the effects that call them on purpose: those
+     effects name them in their dependency arrays, and a dependency array is
+     evaluated during render — referencing a `const` declared further down
+     would be a ReferenceError, not a hoisted function. */
   // Fetch and set up original audio
   const setupOriginalAudio = useCallback(() => {
     if (jobStatus?.input_audio_path) {
@@ -194,7 +161,10 @@ function TalkDownloadResults({
   }, [timelineData]);
 
   // Fetch timeline data from the server
-  const fetchTimelineData = async () => {
+  /* Same dependency as setupOriginalAudio below — the job id is all it reads,
+     the rest are useState setters. Wrapped so the effect that calls it can
+     list it without re-fetching the timeline on every render. */
+  const fetchTimelineData = useCallback(async () => {
     const jobId = jobStatus?.job_id;
     if (!jobId) return;
 
@@ -242,7 +212,47 @@ function TalkDownloadResults({
         console.error("Error fetching timeline data:", error);
       }
     }
-  };
+  }, [jobStatus]);
+
+  useEffect(() => {
+    return () => {
+      if (segmentPlaybackTimer) {
+        clearTimeout(segmentPlaybackTimer);
+      }
+    };
+  }, [segmentPlaybackTimer]);
+
+  // Fetch timeline data on component mount
+  useEffect(() => {
+    if (jobStatus?.job_id) {
+      fetchTimelineData();
+      setupOriginalAudio();
+    }
+    // Both are memoised over [jobStatus], so this still runs exactly when the
+    // job changes — listing them only stops it holding last job's closures.
+  }, [jobStatus, fetchTimelineData, setupOriginalAudio]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    devLog("TalkDownloadResults jobStatus:", jobStatus);
+
+    return () => {
+      // Stop any playing audio
+      Object.values(waveforms).forEach((waveform) => {
+        if (waveform && typeof waveform.pause === "function") {
+          waveform.pause();
+        }
+      });
+    };
+  }, [jobStatus, waveforms]);
+
+  // Update speakers list when timeline data changes
+  useEffect(() => {
+    if (timelineData?.length > 0) {
+      updateSpeakersList();
+    }
+    // updateSpeakersList is memoised over [timelineData]; same cadence.
+  }, [timelineData, updateSpeakersList]);
 
   // Play sample handling
   const handlePlaySample = useCallback(
@@ -294,26 +304,11 @@ function TalkDownloadResults({
     document.body.removeChild(a);
   }, [jobStatus]);
 
-  // Handle segment selection in timeline
-  const handleTimelineSegmentClick = useCallback(
-    (segment) => {
-      devLog("Timeline segment clicked:", segment);
-      setHighlightedSegment(segment);
-
-      if (!segment) return;
-
-      const segmentUrl = getSegmentUrl(segment);
-      if (segmentUrl) {
-        setSegmentPlayerUrl(segmentUrl);
-        setSegmentPlayerVisible(true);
-        updateWaveformPosition(segment);
-      }
-    },
-    [jobStatus, timelineData, audioWavesurfer, totalDuration]
-  );
-
   // Get URL for a segment based on type (known speaker vs unknown)
-  const getSegmentUrl = (segment) => {
+  /* Memoised over the two reactive values it reads. Unwrapped it was a new
+     function every render, which is what made the click handler below rebuild
+     every render too. */
+  const getSegmentUrl = useCallback((segment) => {
     // For unknown/gap segments
     const isUnknown =
       segment.speaker === "Unknown" || segment.id?.startsWith("gap-");
@@ -438,7 +433,7 @@ function TalkDownloadResults({
         )}&job_id=${jobStatus.job_id}`;
       }
     }
-  };
+  }, [jobStatus, timelineData]);
 
   // Update waveform position when segment is selected
   const updateWaveformPosition = useCallback(
@@ -453,6 +448,31 @@ function TalkDownloadResults({
       }
     },
     [audioWavesurfer, totalDuration]
+  );
+
+  // Handle segment selection in timeline
+  const handleTimelineSegmentClick = useCallback(
+    (segment) => {
+      devLog("Timeline segment clicked:", segment);
+      setHighlightedSegment(segment);
+
+      if (!segment) return;
+
+      const segmentUrl = getSegmentUrl(segment);
+      if (segmentUrl) {
+        setSegmentPlayerUrl(segmentUrl);
+        setSegmentPlayerVisible(true);
+        updateWaveformPosition(segment);
+      }
+    },
+    /* getSegmentUrl and updateWaveformPosition are both defined below
+       and both memoised over what they read. This callback had to sit
+       above them, so naming them here would have been a TDZ error at
+       render time — hence the move down rather than an edit in place. */
+    /* Only the two functions: each is memoised over what it reads, so naming
+       jobStatus and timelineData here as well would just duplicate their
+       dependencies. */
+    [getSegmentUrl, updateWaveformPosition]
   );
 
   // Tab change handler
