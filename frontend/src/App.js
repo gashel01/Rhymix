@@ -267,12 +267,9 @@ function App() {
     export: false,
     clean: true,
   };
-  const [jobId, setJobId] = useState(null);
-  const [jobStatus, setJobStatus] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [optimisticTracks, setOptimisticTracks] = useState([]);
-  const [showHomeView, setShowHomeView] = useState(true);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [createDatasetModalOpen, setCreateDatasetModalOpen] = useState(false);
   const [currentView, setCurrentView] = useState("home");
@@ -294,8 +291,6 @@ function App() {
   // Inference flow state
   const [selectedTracksForInference, setSelectedTracksForInference] = useState(null);
   const [selectedModelForInference, setSelectedModelForInference] = useState(null);
-  const [inferenceParams, setInferenceParams] = useState(null);
-  const [inferenceData, setInferenceData] = useState(null);
   const [liveInferenceData, setLiveInferenceData] = useState(null);
   const [navContext, setNavContext] = useState(null);
   const [inferenceParamsOrigin, setInferenceParamsOrigin] = useState(null);
@@ -308,8 +303,6 @@ function App() {
   const getStudioRouteInfo = useCallback(() => readStudioRoute(window.location), []);
 
   const [studioRouteInfo, setStudioRouteInfo] = useState(() => getStudioRouteInfo());
-  // Keep legacy studioAssetId alias for remaining references
-  const studioAssetId = studioRouteInfo?.assetId || null;
 
   const theme = createAppTheme(darkMode ? 'dark' : 'light');
 
@@ -326,11 +319,9 @@ function App() {
     const route = readHashRoute(window.location.hash);
     if (!route) {
       setCurrentView("home");
-      setShowHomeView(true);
       return;
     }
     setCurrentView(route.view);
-    setShowHomeView(false);
     if (route.view === "create-song" && route.query) {
       setCreateSongNav(parseCreateSongQuery(route.query));
     }
@@ -445,13 +436,10 @@ function App() {
       return;
     }
     setCurrentView(view);
-    setShowHomeView(view === "home");
     setSelectedVocalsForTraining(null);
     setResumeTrainingJobId(null);
     setSelectedTracksForInference(null);
     setSelectedModelForInference(null);
-    setInferenceParams(null);
-    setInferenceData(null);
     setNavContext(null);
     setInferenceParamsOrigin(null);
     // Both branches of the old code set the same thing: navigating anywhere,
@@ -478,7 +466,6 @@ function App() {
       sourceSong,
     });
     setCurrentView("create-song");
-    setShowHomeView(false);
     setDrawerOpen(false);
     window.history.replaceState(null, "", createSongHash(sourceSong.sourceSongId));
   }, []);
@@ -527,7 +514,6 @@ function App() {
       updateInferenceContext({ source, selectedTracks, selectedModel: null });
       setInferenceParamsOrigin(null);
       setCurrentView("inference-model-selection");
-      setShowHomeView(false);
       window.history.replaceState(null, "", "#inference-model-selection");
     },
     [updateInferenceContext]
@@ -538,7 +524,6 @@ function App() {
       updateInferenceContext({ source, selectedTracks, selectedModel });
       setInferenceParamsOrigin(from || null);
       setCurrentView("inference-params");
-      setShowHomeView(false);
       window.history.replaceState(null, "", "#inference-params");
     },
     [updateInferenceContext]
@@ -665,11 +650,12 @@ function App() {
       }
 
       // Step 2: Start processing only the files we just uploaded
-      const response = await startProcessing({
+      // The job id it returns was only ever stored in state nothing read, so
+      // the call is awaited for its effect and its result dropped.
+      await startProcessing({
         ...config,
         fileIds: uploadedRecords.map((r) => r.fileId),
       });
-      setJobId(response.job_id);
       setActiveStep(0);
     } catch (err) {
       console.error("Error:", err);
@@ -690,17 +676,11 @@ function App() {
     }
   };
 
-  const handleBack = () => {
-    setActiveStep(activeStep - 1);
-  };
-
   const handleCleanDirectories = async (includeInput = false) => {
     setLoading(true);
     try {
       await cleanDirectories({ includeInput, force: true });
       setFiles([]);
-      setJobId(null);
-      setJobStatus(null);
       setActiveStep(0);
     } catch (err) {
       setError(`Failed to clean directories: ${err.message}`);
@@ -709,24 +689,12 @@ function App() {
     }
   };
 
-  const handleReset = () => {
-    setFiles([]);
-    setJobId(null);
-    setJobStatus(null);
-    setActiveStep(0);
-    setCurrentView("home");
-    setShowHomeView(true);
-    setCreateDatasetModalOpen(false);
-    setOptimisticTracks([]);
-  };
-
   // Open a training run that is already going, from its card in the Models list.
   const handleResumeTraining = useCallback((jobId) => {
     if (!jobId) return;
     setResumeTrainingJobId(jobId);
     setSelectedVocalsForTraining(null);
     setCurrentView("training");
-    setShowHomeView(false);
     const base = `${window.location.pathname}${window.location.search}`;
     if (`${base}#training` !== `${base}${window.location.hash}`) {
       window.history.pushState(null, '', `${base}#training`);
@@ -737,7 +705,6 @@ function App() {
     setResumeTrainingJobId(null);
     setSelectedVocalsForTraining(selectedVocals);
     setCurrentView("training");
-    setShowHomeView(false);
     setShowVoiceConversion(false);
     // Push the entry by hand: handleNavigation can't be used here because it
     // clears selectedVocalsForTraining, which is exactly what we just set.
@@ -1000,7 +967,6 @@ function App() {
             onStartInference={(data) => {
               setLiveInferenceData(data);
               setCurrentView("inference");
-              setShowHomeView(false);
               window.history.replaceState(null, '', '#inference');
             }}
           />
@@ -1190,7 +1156,6 @@ function App() {
                   onNavigate={handleNavigation}
                   onBack={() => {
                     setShowVoiceConversion(false);
-                    setShowHomeView(true);
                   }}
                 />
               )}
