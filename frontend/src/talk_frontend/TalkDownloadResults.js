@@ -3,7 +3,8 @@ import React, {
   useEffect,
   useRef,
   useCallback,
-  useMemo } from "react";
+  useMemo
+} from "react";
 import {
   Box,
   Typography,
@@ -13,14 +14,14 @@ import {
   Tab,
   Tabs,
   Card,
-  Alert } from "@mui/material";
+  Alert
+} from "@mui/material";
 import {
   Replay as ReplayIcon,
   FolderZip as ZipIcon,
-  Person as PersonIcon } from "@mui/icons-material";
-import AudioWaveform from "../components/AudioWaveform";
+  Person as PersonIcon
+} from "@mui/icons-material";
 import { devLog } from "../utils/logger";
-import ColoredAudioWaveform from "../components/ColoredAudioWaveform";
 import { styled } from "@mui/material/styles";
 
 // Component imports
@@ -33,7 +34,8 @@ import SpeakerRenameDialog from "./components/SpeakerRenameDialog";
 import {
   formatDuration,
   getSpeakerColor,
-  speakerColors } from "./utils/audioUtils";
+  speakerColors
+} from "./utils/audioUtils";
 
 // Styled components
 const SpeakerCard = styled(Card)(({ theme, color }) => ({

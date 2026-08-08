@@ -1,21 +1,4 @@
 
-import {
-  Box,
-  Typography,
-  IconButton,
-  Drawer,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  Divider,
-  Button,
-  Slider,
-  Collapse,
-  Stack,
-  alpha,
-} from "@mui/material";
-import ClickAwayListener from "@mui/material/ClickAwayListener";
 
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import CloseIcon from "@mui/icons-material/CloseOutlined";
@@ -32,7 +15,7 @@ import {
   clearStoredGroqApiKey,
   getStoredGroqApiKey,
   looksLikeGroqApiKey,
-  setStoredGroqApiKey,
+  setStoredGroqApiKey
 } from "../utils/groqSettings";
 
 /**

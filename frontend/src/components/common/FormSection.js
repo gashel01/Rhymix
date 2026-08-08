@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grid, Typography, Box } from '@mui/material';
+import { Grid, Typography } from '@mui/material';
 import styles from './FormSection.module.css';
 
 /**

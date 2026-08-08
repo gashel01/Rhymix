@@ -1,5 +1,5 @@
 import React from 'react';
-import { TableHead, TableRow, TableCell, Typography, Grid, Box, useTheme } from '@mui/material';
+import { TableRow, Typography, Grid, Box, useTheme } from '@mui/material';
 import VocalModeToggle from '../common/VocalModeToggle';
 import styles from './AudioTrackHeader.module.css';
 

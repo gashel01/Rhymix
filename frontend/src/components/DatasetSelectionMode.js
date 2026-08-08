@@ -4,8 +4,7 @@ import {
   Typography,
   Button,
   Collapse,
-  Chip,
-  Checkbox,
+  Chip
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/CloseOutlined';
 import SchoolIcon from '@mui/icons-material/SchoolOutlined';

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef } from "react";
 import {
   Box,
   Typography,
@@ -8,13 +8,13 @@ import {
   FormControl,
   Select,
   MenuItem,
-  Alert,
+  Alert
 } from "@mui/material";
 import {
   PlayArrow as PlayIcon,
   Pause as PauseIcon,
   DownloadOutlined as DownloadIcon,
-  SwapHoriz as SwapHorizIcon,
+  SwapHoriz as SwapHorizIcon
 } from "@mui/icons-material";
 import ColoredAudioWaveform from "../../components/ColoredAudioWaveform";
 import { formatDuration } from "../utils/audioUtils";

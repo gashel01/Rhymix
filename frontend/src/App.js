@@ -7,11 +7,10 @@ import {
   nextNavigationUrl,
   parseCreateSongQuery,
   readHashRoute,
-  readStudioRoute,
+  readStudioRoute
 } from "./appRoutes";
 import {
   Box,
-  Container,
   Typography,
   Stepper,
   Step,
@@ -24,7 +23,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogContentText,
-  DialogActions,
+  DialogActions
 } from "@mui/material";
 
 import { createTheme, ThemeProvider } from "@mui/material/styles";
@@ -38,7 +37,6 @@ import FileUpload from "./components/FileUpload";
 // import DownloadResults from "./components/DownloadResults";
 import HomeView from "./components/HomeView";
 import TrainingView from "./components/TrainingView";
-import TalkingDatasetUpload from "./components/TalkingDatasetUpload";
 import TalkWorkflowPage from "./talk_frontend/TalkWorkflowPage";
 import InferenceView from "./components/InferenceView";
 import InferenceParams from "./components/InferenceParams";

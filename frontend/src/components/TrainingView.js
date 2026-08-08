@@ -5,18 +5,13 @@ import {
   Button,
   Container,
   Grid,
-  Slider,
   FormControlLabel,
   Switch,
-  Chip,
   Tooltip,
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
-  IconButton,
   Paper,
-  Divider,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -26,20 +21,16 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
+  TextField
 } from "@mui/material";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
-import TuneIcon from "@mui/icons-material/TuneOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import AudioFileIcon from "@mui/icons-material/AudioFileOutlined";
-import GraphicEqIcon from "@mui/icons-material/GraphicEqOutlined";
 import SchoolIcon from "@mui/icons-material/SchoolOutlined";
-import MemoryIcon from "@mui/icons-material/MemoryOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBackOutlined";
 import ScheduleIcon from "@mui/icons-material/ScheduleOutlined";
 import { useTheme } from "@mui/material/styles";
 import PageHeader from "./common/PageHeader";
-import Section from "./common/Section";
 import {
   DEFAULT_TRAINING_CONFIG,
   buildTrainingPayload,
@@ -47,7 +38,7 @@ import {
   datasetFileName,
   readTrainingStatus,
   takeNewLogs,
-  toVocalFiles,
+  toVocalFiles
 } from "./trainingConfig";
 
 function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {

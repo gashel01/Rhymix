@@ -8,11 +8,10 @@ import {
   Card,
   CardContent,
   CardActions,
-  Button,
+  Button
 } from '@mui/material';
 import MicIcon from '@mui/icons-material/MicOutlined';
 import MusicNoteIcon from '@mui/icons-material/MusicNoteOutlined';
-import styles from './CreateDatasetModal.module.css';
 
 const modalStyle = {
   position: 'absolute',
