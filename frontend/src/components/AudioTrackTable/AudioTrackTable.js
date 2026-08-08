@@ -18,6 +18,9 @@ const parseCreatedAt = (value) => {
 };
 
 
+const NO_WAVEFORMS = {};
+const noop = () => {};
+
 const AudioTrackTable = (props) => {
   const {
     trackPairs = [],
@@ -77,11 +80,20 @@ const AudioTrackTable = (props) => {
   const [expandedGroups, setExpandedGroups] = useState(() => new Set());
   const lastSeekedRef = useRef({});
   const parentRef = useRef(null);
-  const { instrumentalWaveforms = {}, vocalWaveforms = {} } = {};
+  /* Vestigial: both are destructured from an empty object literal, so they are
+     always the empty map. Left in place — removing them is a separate change —
+     but pointed at a module constant, because as written they were a *new*
+     empty object every render. That alone made the sync effect below tear down
+     and recreate its 50ms interval on every single render. */
+  const instrumentalWaveforms = NO_WAVEFORMS;
+  const vocalWaveforms = NO_WAVEFORMS;
   const { playingFile } = {}
 
   const selectedRows = externalSelectedRows ?? internalSelectedRows;
-  const setSelectedRows = onRowSelect ? () => { } : setInternalSelectedRows;
+  // `noop` hoisted for the same reason: written inline, the disabled branch was
+  // a new function every render, which is what three of this file's warnings
+  // were pointing at.
+  const setSelectedRows = onRowSelect ? noop : setInternalSelectedRows;
 
   const pageSize = Math.max(1, Number(pageSizeProp) || 10);
 
@@ -248,11 +260,11 @@ const AudioTrackTable = (props) => {
       })
       : header;
 
-  const getWaveform = (type, pair) => {
+  const getWaveform = useCallback((type, pair) => {
     const key = type === "instrumental" ? pair.instrumentalKey : pair.vocalKey;
     const waveforms = type === "instrumental" ? instrumentalWaveforms : vocalWaveforms;
     return waveforms[key];
-  };
+  }, [instrumentalWaveforms, vocalWaveforms]);
 
   const handlePlayBothInternal = (pairId) => {
     const id = pairId;
@@ -300,7 +312,7 @@ const AudioTrackTable = (props) => {
       });
     }, 50);
     return () => clearInterval(interval);
-  }, [displayTrackPairs, instrumentalWaveforms, vocalWaveforms]);
+  }, [displayTrackPairs, instrumentalWaveforms, vocalWaveforms, getWaveform]);
 
   useWaveformSync(playingBoth, instrumentalWaveforms, vocalWaveforms, () => {
     setPlayingBoth(null);

@@ -476,10 +476,16 @@ const ClipView = ({
     editorPlayRef.current.raf = requestAnimationFrame(tick);
   };
 
+  /* No dependency array on purpose. This is the "keep the latest closure in a
+     ref" pattern: it wants to run after every render, so that whoever calls
+     through the ref gets the current playhead, selection and loop settings.
+     Listing the two functions asked for them to be wrapped in useCallback —
+     which would have meant naming every value they read, to arrive back at an
+     effect that runs every render anyway. */
   useEffect(() => {
     editorPlaybackApiRef.current.start = startEditorPlayback;
     editorPlaybackApiRef.current.stop = stopEditorPlayback;
-  }, [startEditorPlayback, stopEditorPlayback]);
+  });
 
   return (
     <div
