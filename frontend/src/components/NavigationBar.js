@@ -441,7 +441,6 @@ function NavigationBar({
                         padding: "12px 12px",
                         cursor: loading ? "not-allowed" : "pointer",
                         fontWeight: 650,
-                        textAlign: "left",
                         boxShadow: tokens.shadowSoft,
                         textAlign: "center",
                         opacity: loading ? 0.6 : 1,

@@ -248,10 +248,11 @@ const globalStylesInputProps = {
     "*::-webkit-scrollbar": {
       display: "none !important",
     },
+    /* One rule, not two: written as two "*" blocks the second replaced the
+       first outright, so scrollbarWidth never reached the page and Firefox
+       went on drawing scrollbars the other two rules were hiding. */
     "*": {
       scrollbarWidth: "none !important",
-    },
-    "*": {
       msOverflowStyle: "none !important",
     },
   },
