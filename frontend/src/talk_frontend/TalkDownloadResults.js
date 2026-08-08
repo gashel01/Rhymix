@@ -50,6 +50,13 @@ function TalkDownloadResults({
 
   // Audio playback state
   const [waveforms, setWaveforms] = useState({});
+  /* Never assigned, so permanently null — and the three callbacks below that
+     guard on it (updateWaveformPosition, handleSegmentTimeUpdate,
+     handleSegmentSeek) therefore do nothing. The wiring that is missing is
+     small: ColoredAudioWaveform already calls onReady(wavesurfer), it is just
+     not passed down here. Left disconnected on purpose: turning it on starts
+     an untested sync between two waveforms, and isHandlingSeekRef further down
+     this file says seek loops have been a problem here before. */
   const [audioWavesurfer] = useState(null);
   const [segmentPlaybackTimer, setSegmentPlaybackTimer] = useState(null);
   const segmentPlayerRef = useRef(null);
