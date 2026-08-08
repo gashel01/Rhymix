@@ -69,7 +69,6 @@ const ColoredAudioWaveform = forwardRef(
     const [hoveredSegment, setHoveredSegment] = useState(null);
     const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
     const [currentTimeDisplay, setCurrentTimeDisplay] = useState(0);
-    const [error, setError] = useState(null);
     const [zoom, setZoom] = useState(1); // Track zoom level
 
     // At the beginning of the component, add a function to create a consistent speaker-to-color mapping
@@ -289,7 +288,6 @@ const ColoredAudioWaveform = forwardRef(
       // Add more detailed error handling
       wavesurfer.on("error", (err) => {
         console.error("WaveSurfer error:", err);
-        setError(`Error loading audio: ${err.message || "Unknown error"}`);
         setLoading(false);
         setReady(false);
       });
@@ -299,7 +297,6 @@ const ColoredAudioWaveform = forwardRef(
         wavesurfer.load(url);
       } catch (e) {
         console.error("Exception loading audio:", e);
-        setError(`Exception loading audio: ${e.message}`);
         setLoading(false);
       }
 

@@ -5,18 +5,13 @@ import {
   Button,
   Container,
   Grid,
-  Slider,
   FormControlLabel,
   Switch,
-  Chip,
   Tooltip,
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
-  IconButton,
   Paper,
-  Divider,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -26,20 +21,16 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
+  TextField
 } from "@mui/material";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
-import TuneIcon from "@mui/icons-material/TuneOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import AudioFileIcon from "@mui/icons-material/AudioFileOutlined";
-import GraphicEqIcon from "@mui/icons-material/GraphicEqOutlined";
 import SchoolIcon from "@mui/icons-material/SchoolOutlined";
-import MemoryIcon from "@mui/icons-material/MemoryOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBackOutlined";
 import ScheduleIcon from "@mui/icons-material/ScheduleOutlined";
 import { useTheme } from "@mui/material/styles";
 import PageHeader from "./common/PageHeader";
-import Section from "./common/Section";
 import {
   DEFAULT_TRAINING_CONFIG,
   buildTrainingPayload,
@@ -47,21 +38,17 @@ import {
   datasetFileName,
   readTrainingStatus,
   takeNewLogs,
-  toVocalFiles,
+  toVocalFiles
 } from "./trainingConfig";
 
 function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
   const theme = useTheme();
 
-  // Transform the selected tracks array into the expected structure
-  const processedVocals = selectedVocals?.filter(track => track.vocal)?.map(track => track.vocal) || [];
-  const rawVocals = selectedVocals?.filter(track => track.vocal)?.map(track => track.vocal) || [];
   const [config, setConfig] = useState(DEFAULT_TRAINING_CONFIG);
 
   const [isTraining, setIsTraining] = useState(false);
   const [trainingLogs, setTrainingLogs] = useState([]);
   const [trainingProgress, setTrainingProgress] = useState(0);
-  const [trainingCompleted, setTrainingCompleted] = useState(false);
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
   const [fileDetailsModalOpen, setFileDetailsModalOpen] = useState(false);
   const [currentJobId, setCurrentJobId] = useState(null);
@@ -132,7 +119,6 @@ function TrainingView({ selectedVocals, onBack, resumeJobId = null }) {
             setIsTraining(false);
             setCurrentJobId(null);
             if (!update.failed) {
-              setTrainingCompleted(true);
               setCompletionDialogOpen(true);
             }
             setTrainingLogs((prev) => [...prev, update.message]);

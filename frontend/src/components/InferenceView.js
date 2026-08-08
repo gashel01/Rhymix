@@ -26,7 +26,6 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [optimisticRuns, setOptimisticRuns] = useState([]);
-  const [liveLoading, setLiveLoading] = useState(false);
   const [reactionPendingByRunId, setReactionPendingByRunId] = useState({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteState, setDeleteState] = useState({ loading: false, result: null });
@@ -96,7 +95,6 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
 
     const startLiveInference = async () => {
       try {
-        setLiveLoading(true);
         setError(null);
         const tracks = liveInferenceData.tracks;
         const startedAt = new Date().toISOString();
@@ -140,7 +138,6 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
       } catch (err) {
         console.error("Error starting inference:", err);
         setError(err?.message || "Failed to start inference");
-        setLiveLoading(false);
       }
     };
     startLiveInference();
@@ -193,7 +190,6 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
           clearInterval(intervalId);
           pollingJobsRef.current = null;
           setPollingCount(0);
-          setLiveLoading(false);
           fetchInferenceResults();
         }
       } catch (e) {

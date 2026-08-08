@@ -3,30 +3,14 @@ import {
   Box,
   Typography,
   Button,
-  Paper,
-  IconButton,
   Container,
-  Grid,
-  Card,
-  CardContent,
-  CardActions,
-  Chip,
-  Alert,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
+  Dialog
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import ArrowBackIcon from "@mui/icons-material/ArrowBackOutlined";
 import ModelTrainingIcon from "@mui/icons-material/ModelTrainingOutlined";
 import AccessTimeIcon from "@mui/icons-material/AccessTimeOutlined";
 import PageHeader from "./common/PageHeader";
-import Section from "./common/Section";
 
 function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
   const theme = useTheme();
@@ -88,10 +72,6 @@ function InferenceModelSelection({ selectedTracks, onBack, onModelSelected }) {
       onModelSelected(modelWithCheckpoint, selectedTracks);
       setCheckpointDialogOpen(false);
     }
-  };
-
-  const handleCheckpointChange = (checkpoint) => {
-    setSelectedCheckpoint(checkpoint);
   };
 
   const formatDate = (dateString) => {

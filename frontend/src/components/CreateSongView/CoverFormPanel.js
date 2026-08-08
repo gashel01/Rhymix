@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutlined";
 import { GENRE_RECS, normalize, toKey } from "./constants";
 import { Segmented } from "../Homeview/Segmented";
@@ -43,7 +42,7 @@ export function CoverFormPanel({
   onGenerate,
   styleAssist,
 }) {
-  const { Panel, Btn, Input, Slider, Alert, Modal, Pill } = ui;
+  const { Panel, Input, Slider, Alert, Modal, Pill } = ui;
   const [personaModalOpen, setPersonaModalOpen] = useState(false);
   const [personaQuery, setPersonaQuery] = useState("");
   const [personaPage, setPersonaPage] = useState(1);

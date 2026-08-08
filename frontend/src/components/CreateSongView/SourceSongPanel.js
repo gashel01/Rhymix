@@ -3,7 +3,6 @@ import MusicNoteIcon from "@mui/icons-material/MusicNoteOutlined";
 
 export function SourceSongPanel({ ui, t, sourceSong, loading, error }) {
   const { Panel } = ui;
-  const hasAudio = Boolean(sourceSong?.audioUrl || sourceSong?.instrumentalUrl || sourceSong?.vocalsUrl);
 
   return (
     <Panel style={{ padding: "0px 14px" , borderRadius: 12}}>

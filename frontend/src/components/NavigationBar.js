@@ -1,21 +1,4 @@
 
-import {
-  Box,
-  Typography,
-  IconButton,
-  Drawer,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  Divider,
-  Button,
-  Slider,
-  Collapse,
-  Stack,
-  alpha,
-} from "@mui/material";
-import ClickAwayListener from "@mui/material/ClickAwayListener";
 
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import CloseIcon from "@mui/icons-material/CloseOutlined";
@@ -32,7 +15,7 @@ import {
   clearStoredGroqApiKey,
   getStoredGroqApiKey,
   looksLikeGroqApiKey,
-  setStoredGroqApiKey,
+  setStoredGroqApiKey
 } from "../utils/groqSettings";
 
 /**
@@ -458,7 +441,6 @@ function NavigationBar({
                         padding: "12px 12px",
                         cursor: loading ? "not-allowed" : "pointer",
                         fontWeight: 650,
-                        textAlign: "left",
                         boxShadow: tokens.shadowSoft,
                         textAlign: "center",
                         opacity: loading ? 0.6 : 1,

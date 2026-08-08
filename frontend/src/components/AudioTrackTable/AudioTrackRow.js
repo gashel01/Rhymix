@@ -204,10 +204,6 @@ const AudioTrackRow = (props) => {
     error: "Error",
   };
   const processingLabel = processingLabelMap[processingState] || "Processing";
-  const processingTone =
-    processingState === "error"
-      ? { fg: t.danger, bg: t.isDark ? "rgba(255,59,48,0.2)" : "rgba(255,59,48,0.12)" }
-      : { fg: t.primary, bg: t.isDark ? "rgba(10,132,255,0.2)" : "rgba(0,122,255,0.12)" };
   const processingParts = [];
   if (processing?.message) processingParts.push(processing.message);
   if (processing?.step && processing.step !== processing?.message) processingParts.push(`Step: ${processing.step}`);

@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Box,
   Typography,
   Button,
   Collapse,
-  Chip,
-  Checkbox,
+  Chip
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/CloseOutlined';
 import SchoolIcon from '@mui/icons-material/SchoolOutlined';

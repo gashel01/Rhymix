@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   Box,
@@ -7,7 +7,7 @@ import {
   ListItem,
   ListItemText,
   IconButton,
-  Alert,
+  Alert
 } from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUploadOutlined";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";

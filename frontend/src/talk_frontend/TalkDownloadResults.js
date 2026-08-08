@@ -3,7 +3,8 @@ import React, {
   useEffect,
   useRef,
   useCallback,
-  useMemo } from "react";
+  useMemo
+} from "react";
 import {
   Box,
   Typography,
@@ -12,16 +13,14 @@ import {
   Chip,
   Tab,
   Tabs,
-  Card,
-  Alert } from "@mui/material";
+  Alert
+} from "@mui/material";
 import {
   Replay as ReplayIcon,
   FolderZip as ZipIcon,
-  Person as PersonIcon } from "@mui/icons-material";
-import AudioWaveform from "../components/AudioWaveform";
+  Person as PersonIcon
+} from "@mui/icons-material";
 import { devLog } from "../utils/logger";
-import ColoredAudioWaveform from "../components/ColoredAudioWaveform";
-import { styled } from "@mui/material/styles";
 
 // Component imports
 import SpeakerAnalysisSection from "./components/SpeakerAnalysisSection";
@@ -33,28 +32,8 @@ import SpeakerRenameDialog from "./components/SpeakerRenameDialog";
 import {
   formatDuration,
   getSpeakerColor,
-  speakerColors } from "./utils/audioUtils";
-
-// Styled components
-const SpeakerCard = styled(Card)(({ theme, color }) => ({
-  position: "relative",
-  height: "100%",
-  display: "flex",
-  flexDirection: "column",
-  transition: "transform 0.2s ease-in-out",
-  "&:hover": {
-    transform: "translateY(-5px)",
-    boxShadow: theme.shadows[8] },
-  "&::before": {
-    content: '""',
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "6px",
-    backgroundColor: color || theme.palette.primary.main,
-    borderTopLeftRadius: theme.shape.borderRadius,
-    borderTopRightRadius: theme.shape.borderRadius } }));
+  speakerColors
+} from "./utils/audioUtils";
 
 function TalkDownloadResults({
   jobStatus,
@@ -71,7 +50,14 @@ function TalkDownloadResults({
 
   // Audio playback state
   const [waveforms, setWaveforms] = useState({});
-  const [audioWavesurfer, setAudioWavesurfer] = useState(null);
+  /* Never assigned, so permanently null — and the three callbacks below that
+     guard on it (updateWaveformPosition, handleSegmentTimeUpdate,
+     handleSegmentSeek) therefore do nothing. The wiring that is missing is
+     small: ColoredAudioWaveform already calls onReady(wavesurfer), it is just
+     not passed down here. Left disconnected on purpose: turning it on starts
+     an untested sync between two waveforms, and isHandlingSeekRef further down
+     this file says seek loops have been a problem here before. */
+  const [audioWavesurfer] = useState(null);
   const [segmentPlaybackTimer, setSegmentPlaybackTimer] = useState(null);
   const segmentPlayerRef = useRef(null);
 
@@ -82,23 +68,13 @@ function TalkDownloadResults({
 
   // UI state
   const [audioPreviewOpen, setAudioPreviewOpen] = useState(false);
-  const [selectedSpeaker, setSelectedSpeaker] = useState(null);
-  const [currentSamples, setCurrentSamples] = useState([]);
+  const [selectedSpeaker] = useState(null);
+  const [currentSamples] = useState([]);
   const [highlightedSegment, setHighlightedSegment] = useState(null);
-  const [playingSegment, setPlayingSegment] = useState(null);
-  const [segmentPlayerVisible, setSegmentPlayerVisible] = useState(false);
   const [segmentPlayerUrl, setSegmentPlayerUrl] = useState(null);
-  const [segmentPlayerWaveform, setSegmentPlayerWaveform] = useState(null);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [speakerToRename, setSpeakerToRename] = useState(null);
   const [newSpeakerName, setNewSpeakerName] = useState("");
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [refreshWaveform, setRefreshWaveform] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [notification, setNotification] = useState({
-    message: "",
-    severity: "" });
 
   // Clear playback timer on unmount
   /* These three sit above the effects that call them on purpose: those
@@ -318,13 +294,8 @@ function TalkDownloadResults({
 
     if (isUnknown || isGap || isNoSpeech) {
       // Extract part number from the segment ID for gap segments
-      let partNum = "1";
       if (segment.id && segment.id.startsWith("gap-")) {
         // Extract part number from "gap-N-xyz"
-        const match = segment.id.match(/gap-(\d+)/);
-        if (match && match[1]) {
-          partNum = match[1];
-        }
       }
 
       // For unknown segments, use the gap/unknown segment API endpoint
@@ -390,8 +361,6 @@ function TalkDownloadResults({
         if (matchedSegment) {
           // Format the timestamps for constructing a filename
           // This matches the new timestamp-based filename pattern
-          const speakerName = segment.speaker.replace("Speaker ", "SPEAKER_");
-          const segmentId = segment.id.replace("segment-", "");
           const startSeconds = segment.start;
           const endSeconds = segment.end;
 
@@ -461,7 +430,6 @@ function TalkDownloadResults({
       const segmentUrl = getSegmentUrl(segment);
       if (segmentUrl) {
         setSegmentPlayerUrl(segmentUrl);
-        setSegmentPlayerVisible(true);
         updateWaveformPosition(segment);
       }
     },
@@ -502,7 +470,6 @@ function TalkDownloadResults({
   // Segment waveform handlers
   const handleSegmentWaveformReady = useCallback((waveform) => {
     devLog("Segment waveform ready");
-    setSegmentPlayerWaveform(waveform);
   }, []);
 
   const handleSegmentTimeUpdate = useCallback(
@@ -624,14 +591,10 @@ function TalkDownloadResults({
       }
 
       if (segment.start === undefined || segment.end === undefined) {
-        setNotification({
-          message: "Cannot reassign segment: Missing time information",
-          severity: "error" });
         return;
       }
 
       try {
-        setIsProcessing(true);
 
         const isUnknown =
           segment.speaker === "Unknown" ||
@@ -684,9 +647,6 @@ function TalkDownloadResults({
             // This keeps the current playback state
           }
 
-          setNotification({
-            message: `Segment reassigned to ${targetSpeaker}`,
-            severity: "success" });
 
           // After UI update is complete, tell backend to move the file
           // This happens after we've already updated the UI
@@ -706,20 +666,13 @@ function TalkDownloadResults({
             // Don't show error to user since UI update was successful
           }
         } else {
-          setNotification({
-            message: `Error: ${data.error}`,
-            severity: "error" });
         }
       } catch (error) {
         // Don't log AbortError as it's expected when component unmounts
         if (error.name !== 'AbortError') {
           console.error("Error reassigning segment:", error);
-          setNotification({
-            message: "An unexpected error occurred",
-            severity: "error" });
         }
       } finally {
-        setIsProcessing(false);
       }
     },
     [jobStatus, timelineData, highlightedSegment]
@@ -808,18 +761,6 @@ function TalkDownloadResults({
     },
     [jobStatus, onTrainWithSpeaker, getSegmentUrl]
   );
-
-  const handleTrainClick = () => {
-    if (selectedSpeaker) {
-      // Find segments for the selected speaker
-      const speakerSegments = timelineData.filter(
-        (segment) => segment.speaker === selectedSpeaker
-      );
-
-      // Call handleTrainWithSpeaker with the selected speaker segments
-      handleTrainWithSpeaker(selectedSpeaker, speakerSegments);
-    }
-  };
 
   // No results state
   if (!jobStatus?.speakers || Object.keys(jobStatus.speakers).length === 0) {
@@ -955,7 +896,6 @@ function TalkDownloadResults({
               handleDownloadSegment={handleDownloadSegment}
               segmentPlaybackTimer={segmentPlaybackTimer}
               setSegmentPlaybackTimer={setSegmentPlaybackTimer}
-              setPlayingSegment={setPlayingSegment}
             />
           </>
         )}

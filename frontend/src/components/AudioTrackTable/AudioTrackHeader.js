@@ -1,5 +1,5 @@
 import React from 'react';
-import { TableHead, TableRow, TableCell, Typography, Grid, Box, useTheme } from '@mui/material';
+import { TableRow, Typography, Grid, Box, useTheme } from '@mui/material';
 import VocalModeToggle from '../common/VocalModeToggle';
 import styles from './AudioTrackHeader.module.css';
 
@@ -26,8 +26,9 @@ const AudioTrackHeader = ({
         
 
         <div className={styles.waveformsCell} sx={{
-          width: (datasetSelectionMode || inferenceSelectionMode) ? "calc(90% - 40px)" : "90%",
           transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
+          // A conditional width sat above and was overridden by this one, so
+          // the header has always been full width in both selection modes.
           p: "4px 8px", height: 40, width: "100%",
               }}>
           <Grid container sx={{ width: '100%', m: 0, height: '100%', alignItems: 'center' }}>
