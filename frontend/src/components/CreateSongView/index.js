@@ -196,6 +196,11 @@ function CreateSongView({
       if (pollAbortRef.current) pollAbortRef.current.abort();
       /* eslint-enable react-hooks/exhaustive-deps */
     };
+    /* Mount-only by design: this loads the song list and the model list once,
+       when the view opens. Wrapping loadExistingSongs in useCallback purely to
+       list it here would add indirection without changing when it runs — and
+       listing it unwrapped would re-fetch the whole list on every render. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
