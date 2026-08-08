@@ -192,7 +192,9 @@ export default function BeatboxCalibrationWizard() {
       }
     };
     run();
-  }, [wizardState, sessionId]);
+    // `api` is memoised at its source now, so listing it costs nothing and
+    // stops the training run being kicked off through a stale closure.
+  }, [wizardState, sessionId, api]);
 
   return (
     <main className={`bw-page ${proMode ? "pro" : ""}`}>
