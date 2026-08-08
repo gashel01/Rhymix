@@ -403,6 +403,13 @@ const StudioPageInner = ({ assetId, projectId }) => {
     ...SELECTION_ACTION_JOBS,
   ]);
 
+  /* Left unwrapped, deliberately. The memo below lists it and so rebuilds on
+     every render — but that memo only assembles a short array of selection
+     actions, and making it truly memoise would mean wrapping these 94 lines
+     plus subscribeJob, naming every piece of store state they read. That is a
+     large, cascading change to save one small allocation per render. The
+     warning is accurate; acting on it is not worth what it costs. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleStartJob = async (jobType, payload) => {
     if (!state.project?.id) return;
     const sourceRequiredJobs = new Set([

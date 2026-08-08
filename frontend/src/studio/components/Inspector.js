@@ -666,13 +666,13 @@ const Inspector = ({
     };
   }, [assets, lanes, project, resolvedRightPanelContext, selectedAudioClips.length, selectedClip, selectedRange, selection?.laneIds]);
 
-  const runAnalyzeQuick = () => {
+  const runAnalyzeQuick = useCallback(() => {
     if (!canAnalyze || !analyzeRange) return;
     onStartAiJob("understand", {
       startSec: analyzeRange.start,
       endSec: analyzeRange.end,
     });
-  };
+  }, [canAnalyze, analyzeRange, onStartAiJob]);
 
   const quickActions = useMemo(() => {
     if ((resolvedRightPanelContext === PANEL_CONTEXT.AUDIO || resolvedRightPanelContext === PANEL_CONTEXT.MIDI) && selectedClip) {

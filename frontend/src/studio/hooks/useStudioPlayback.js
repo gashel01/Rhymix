@@ -958,6 +958,12 @@ export const useStudioPlayback = (state, actions) => {
   useEffect(() => {
     if (!audioCtxRef.current) return;
     syncLaneBuses(state.lanes || []);
+    /* Keyed on the lanes alone, deliberately. syncLaneBuses and everything it
+       calls take what they need as arguments or read it from refs — the chain
+       closes over no reactive value, so there is no stale closure to catch
+       here. Listing it unwrapped would rebuild the audio graph on every
+       render, which is audible: buses torn down and rebuilt mid-playback. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lanes]);
 
   return {
