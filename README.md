@@ -2,7 +2,7 @@
 
 # 🎛️ Rhymix
 
-**A digital audio workstation that runs in a browser tab — timeline editor, real-time voice-to-MIDI, AI song generation and voice conversion, all driving local models on one consumer GPU.**
+**A local Suno you can open up and edit — generate songs in any voice you own, on your own GPU, then mix them on a real timeline. No credits, no queue, no licence attached to the output.**
 
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
 ![Web Audio API](https://img.shields.io/badge/Web%20Audio-AudioWorklet-FF6B35)
@@ -33,18 +33,27 @@
 
 ## The pitch
 
-Music software makes you choose. A DAW gives you a timeline and a mixer but
-knows nothing about generating audio. An AI music tool gives you a text box and
-hands back a finished stereo file you cannot open up. The interesting work lives
-in between: generate a part, drop it on a lane, re-sing one phrase, convert a
-voice, hum a bassline in and quantise it — then mix the result like any other
-audio.
+**Suno, on my own machine, singing in whatever voice I choose.**
 
-Rhymix is an attempt at that middle ground, in a browser tab, on hardware you
-already own. Every model runs locally. Nothing is uploaded anywhere.
+That was the whole idea. Hosted generators are good, and then they stop being
+good exactly where it matters: a monthly credit count, a queue, a voice you are
+not allowed to use, and a licence attached to whatever comes out. None of those
+are technical limits — they are the limits of running on someone else's
+computer.
 
-It began as a much smaller question — *could I build a Dubler-style voice→MIDI
-tool in the browser?* — and kept growing outward from the answer.
+So Rhymix runs on mine. Every model is local: generation, voice conversion,
+separation, transcription. Nothing is uploaded, nothing is metered, and any
+voice you have a model for is a voice you can use.
+
+The second half of the idea arrived later. A hosted generator hands back a
+finished stereo file, and when the second verse is wrong your only move is to
+roll the dice again. Generating locally is only half the win if the result is
+still a sealed box — so the generator sits inside a real timeline. Generate a
+part, drop it on a lane, re-sing one phrase, convert a voice, hum a bassline in
+and quantise it, then mix it like any other audio.
+
+A local Suno you can open up and edit. That is the target; the rest of this
+README is how far along it is.
 
 ---
 
