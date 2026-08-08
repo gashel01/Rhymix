@@ -112,10 +112,11 @@ function TalkingDatasetUpload({ onBack }) {
          holds an interval id, and the id that must be cleared is precisely the
          current one. Copying it into a local at mount — what the rule suggests
          — would capture null and leak the interval started afterwards. */
+      /* eslint-disable react-hooks/exhaustive-deps */
       if (statusCheckIntervalRef.current) {
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         clearInterval(statusCheckIntervalRef.current);
       }
+      /* eslint-enable react-hooks/exhaustive-deps */
     };
   }, []);
 

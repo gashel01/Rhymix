@@ -42,6 +42,11 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
   const inputGainRef = useRef(1);
   const monitorGainRef = useRef(1);
   const micMonitorGainRef = useRef(1);
+  /* Mirrored into a ref so setupAudio reads the value at the moment it runs
+     rather than the one captured when the callback was built. Listing the
+     state directly would rebuild setupAudio — and the connect callback that
+     depends on it — every time the monitor is toggled. */
+  const micMonitorRef = useRef(false);
   const levelRafRef = useRef(null);
   const levelUpdateRef = useRef(0);
 
@@ -302,7 +307,7 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
       appendDryCapture(event.inputBuffer.getChannelData(0));
     };
     captureMute = ctx.createGain();
-    captureMute.gain.value = micMonitor ? (micMonitorGainRef.current || 1) : 0;
+    captureMute.gain.value = micMonitorRef.current ? (micMonitorGainRef.current || 1) : 0;
     gain.connect(captureNode);
     captureNode.connect(captureMute).connect(ctx.destination);
 
@@ -351,6 +356,10 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
     };
     return ctx.sampleRate;
   }, [appendDryCapture, sendBinary]);
+
+  useEffect(() => {
+    micMonitorRef.current = micMonitor;
+  }, [micMonitor]);
 
   const setInputGain = useCallback((value) => {
     const next = Number(value);

@@ -197,7 +197,12 @@ export const useAudioPlayback = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchInferenceResults = async () => {
+  /* Memoised because two effects in InferenceView depend on it, and one of
+     them already listed it — so while this was a plain function, that effect
+     re-ran on every single render. The three setters come from useState in
+     the parent, whose identities React guarantees stable, so this really has
+     no dependencies of its own. */
+  const fetchInferenceResults = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -211,7 +216,7 @@ export const useAudioPlayback = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [setLoading, setError, setInferenceResults]);
 
   return {
     trackPairs,

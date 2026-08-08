@@ -186,10 +186,21 @@ function CreateSongView({
     loadExistingSongs();
     loadAvailableModels();
     return () => {
+      /* Read at cleanup on purpose. These hold an interval id and an abort
+         controller assigned long after mount, so copying them into locals
+         here — what the rule suggests — would capture null and leak whatever
+         was started afterwards. The rule assumes a ref holds a DOM node. */
+      /* eslint-disable react-hooks/exhaustive-deps */
       if (pollRef.current) clearInterval(pollRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
       if (pollAbortRef.current) pollAbortRef.current.abort();
+      /* eslint-enable react-hooks/exhaustive-deps */
     };
+    /* Mount-only by design: this loads the song list and the model list once,
+       when the view opens. Wrapping loadExistingSongs in useCallback purely to
+       list it here would add indirection without changing when it runs — and
+       listing it unwrapped would re-fetch the whole list on every render. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

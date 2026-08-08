@@ -45,7 +45,9 @@ const TextOverflow: React.FC<TextOverflowProps> = ({
       const isTextOverflowing = textRef.current.scrollWidth > textRef.current.clientWidth;
       setIsOverflowing(isTextOverflowing);
     }
-  }, [text]); 
+    // No dependency on `text`: this reads the DOM, not the prop. The effect
+    // below already re-runs on `text`, so the re-measure still happens.
+  }, []);
 
   // Set up overflow detection and listeners
   useEffect(() => {

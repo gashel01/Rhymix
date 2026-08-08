@@ -74,7 +74,10 @@ export const useAvailableFiles = () => {
       hasFetchedRef.current = true;
       fetchFiles();
     }
-  }, []);
+    // Safe to list: fetchFiles is a useCallback over [], so it never changes
+    // identity and this effect still runs once. The ref guard stays as the
+    // real fetch-once mechanism.
+  }, [fetchFiles]);
 
   return {
     availableFiles,

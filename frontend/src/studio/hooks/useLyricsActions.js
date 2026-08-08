@@ -2,9 +2,14 @@ import React, { useMemo, useRef } from "react";
 import { transcribeStudioSelection } from "../api";
 import { useStudioStore } from "../store";
 
+/* A stable empty map for projects with no lyric replacements. The `|| {}`
+   that used to sit here was a new object every render, so every memo built on
+   lyricsMap rebuilt on every render. */
+const NO_LYRICS = {};
+
 export const useLyricsActions = ({ handleStartJob }) => {
   const { state, actions } = useStudioStore();
-  const lyricsMap = state.metadata?.lyricsReplacement || {};
+  const lyricsMap = state.metadata?.lyricsReplacement || NO_LYRICS;
   const transcribeTokenRef = useRef(0);
 
   const buildSegmentsFromText = React.useCallback((text, startSec, endSec) => {
@@ -212,7 +217,8 @@ export const useLyricsActions = ({ handleStartJob }) => {
       return false;
     });
     return idx >= 0 ? entries[idx] : null;
-  }, [lyricsSelection, lyricsMap, normalizeLyricsEntries, findLyricsEntryIndex]);
+    // findLyricsEntryIndex is not called here — the search is inlined above.
+  }, [lyricsSelection, lyricsMap, normalizeLyricsEntries]);
 
   const detectLyricsLanguage = React.useCallback((text) => {
     const sample = String(text || "");

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type {
   DrumLabel,
   ReviewResponse,
@@ -78,13 +78,21 @@ export function useSessionApi() {
     return toJson<StatusResponse>(res);
   }, []);
 
-  return {
-    startSession,
-    uploadTake,
-    train,
-    review,
-    deleteSample,
-    status,
-  };
+  /* Memoised. Each method above is already a useCallback over [], but the
+     object holding them was rebuilt on every render, so `api` was a new
+     identity every time — which is why the caller's effect could not list it
+     without re-running constantly. With the methods stable, this is now
+     genuinely constant. */
+  return useMemo(
+    () => ({
+      startSession,
+      uploadTake,
+      train,
+      review,
+      deleteSample,
+      status,
+    }),
+    [startSession, uploadTake, train, review, deleteSample, status]
+  );
 }
 

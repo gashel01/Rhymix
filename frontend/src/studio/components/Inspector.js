@@ -605,11 +605,18 @@ const Inspector = ({
     }
   }, [uiState?.drawerTool]);
 
-  const setInspectorUi = (patch) => studioActions?.setUi?.(patch);
+  /* Wrapped so the two effects below can depend on it honestly. Unwrapped it
+     was a new function every render, which is why it had to be omitted from
+     their dependency lists — and an omitted dependency is a stale closure
+     waiting to happen. */
+  const setInspectorUi = useCallback(
+    (patch) => studioActions?.setUi?.(patch),
+    [studioActions]
+  );
 
   useEffect(() => {
     setInspectorUi({ rightPanelContext: resolvedRightPanelContext });
-  }, [resolvedRightPanelContext]);
+  }, [resolvedRightPanelContext, setInspectorUi]);
 
   useEffect(() => {
     setInspectorUi({
@@ -618,7 +625,7 @@ const Inspector = ({
       drawerTool,
       activityFilter,
     });
-  }, [activityFilter, drawerOpen, drawerTool, expandedAiCard]);
+  }, [activityFilter, drawerOpen, drawerTool, expandedAiCard, setInspectorUi]);
 
   const openDrawer = (tool, nextMode = null) => {
     setDrawerToolState(tool);
@@ -659,13 +666,13 @@ const Inspector = ({
     };
   }, [assets, lanes, project, resolvedRightPanelContext, selectedAudioClips.length, selectedClip, selectedRange, selection?.laneIds]);
 
-  const runAnalyzeQuick = () => {
+  const runAnalyzeQuick = useCallback(() => {
     if (!canAnalyze || !analyzeRange) return;
     onStartAiJob("understand", {
       startSec: analyzeRange.start,
       endSec: analyzeRange.end,
     });
-  };
+  }, [canAnalyze, analyzeRange, onStartAiJob]);
 
   const quickActions = useMemo(() => {
     if ((resolvedRightPanelContext === PANEL_CONTEXT.AUDIO || resolvedRightPanelContext === PANEL_CONTEXT.MIDI) && selectedClip) {

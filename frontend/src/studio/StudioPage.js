@@ -60,6 +60,14 @@ import {
    against a 110px lane, so the faders slid 2px per track out of line with
    the lane they control. */
 
+/* Everything offered on a timeline selection. All of them read a stretch of
+   an existing asset, so they need a source clip and a range.
+
+   At module scope rather than in the component: `new Set([...])` in a render
+   body is a new Set every render, so every memo that depends on it was
+   rebuilt every render. */
+const SELECTION_ACTION_JOBS = new Set(["repaint", "extend", "vocal2bgm", "cover"]);
+
 const StudioPageInner = ({ assetId, projectId }) => {
   const { state, actions } = useStudioStore();
   const [showProjectManager, setShowProjectManager] = useState(false);
@@ -166,9 +174,13 @@ const StudioPageInner = ({ assetId, projectId }) => {
   }, []);
 
   useEffect(() => {
+    /* Safe to capture: the Map is created once by useRef and never
+       reassigned, only filled and emptied. So this local is the same Map the
+       cleanup would have read anyway. */
+    const subscriptions = jobSubscriptionsRef.current;
     return () => {
-      jobSubscriptionsRef.current.forEach((unsubscribe) => unsubscribe());
-      jobSubscriptionsRef.current.clear();
+      subscriptions.forEach((unsubscribe) => unsubscribe());
+      subscriptions.clear();
     };
   }, []);
 
@@ -382,10 +394,6 @@ const StudioPageInner = ({ assetId, projectId }) => {
     }
   };
 
-  // Everything offered on a timeline selection. All of them read a stretch of
-  // an existing asset, so they need a source clip and a range.
-  const SELECTION_ACTION_JOBS = new Set(["repaint", "extend", "vocal2bgm", "cover"]);
-
   // Jobs that regenerate part of an existing asset rather than creating one
   // from nothing: the timeline selection has to be mapped onto source offsets.
   const RANGE_SOURCE_JOBS = new Set([
@@ -395,6 +403,13 @@ const StudioPageInner = ({ assetId, projectId }) => {
     ...SELECTION_ACTION_JOBS,
   ]);
 
+  /* Left unwrapped, deliberately. The memo below lists it and so rebuilds on
+     every render — but that memo only assembles a short array of selection
+     actions, and making it truly memoise would mean wrapping these 94 lines
+     plus subscribeJob, naming every piece of store state they read. That is a
+     large, cascading change to save one small allocation per render. The
+     warning is accurate; acting on it is not worth what it costs. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleStartJob = async (jobType, payload) => {
     if (!state.project?.id) return;
     const sourceRequiredJobs = new Set([

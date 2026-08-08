@@ -205,7 +205,9 @@ function InferenceView({ onNavigate, darkMode, liveInferenceData, onSelectionToP
       abortController.abort();
       clearInterval(intervalId);
     };
-  }, [pollingCount]);
+    // fetchInferenceResults is memoised at its source now, so listing it
+    // costs nothing and stops this polling effect from holding a stale one.
+  }, [pollingCount, fetchInferenceResults]);
 
   const filteredTrackPairs = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();

@@ -28,6 +28,11 @@ const OWN_GESTURE = [
 ].join(", ");
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+/* A stable empty list for clips with no MIDI. The literal `[]` that used to
+   sit in this fallback was a new array every render, so every hook depending
+   on midiNotes re-ran on every render of a plain audio clip. */
+const NO_MIDI_NOTES = [];
+
 const ClipView = ({
   clip,
   asset,
@@ -163,7 +168,7 @@ const ClipView = ({
     asset?.label ||
     (clip.clipType === "midi" ? "MIDI Clip" : clip.sourceAssetId || "Clip");
   const midi = clip.midi || null;
-  const midiNotes = Array.isArray(midi?.notes) ? midi.notes : [];
+  const midiNotes = Array.isArray(midi?.notes) ? midi.notes : NO_MIDI_NOTES;
   const midiBpm = Number(midi?.bpm) || Number(bpm) || 120;
   const midiPpq = Number(midi?.ppq) || 480;
   const showMidiOverlay = midiNotes.length > 0;
@@ -471,10 +476,16 @@ const ClipView = ({
     editorPlayRef.current.raf = requestAnimationFrame(tick);
   };
 
+  /* No dependency array on purpose. This is the "keep the latest closure in a
+     ref" pattern: it wants to run after every render, so that whoever calls
+     through the ref gets the current playhead, selection and loop settings.
+     Listing the two functions asked for them to be wrapped in useCallback —
+     which would have meant naming every value they read, to arrive back at an
+     effect that runs every render anyway. */
   useEffect(() => {
     editorPlaybackApiRef.current.start = startEditorPlayback;
     editorPlaybackApiRef.current.stop = stopEditorPlayback;
-  }, [startEditorPlayback, stopEditorPlayback]);
+  });
 
   return (
     <div

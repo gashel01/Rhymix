@@ -91,6 +91,11 @@ export const useStudioKeyboardShortcuts = (playback) => {
     state.ui.showCreatePanel,
     state.ui.showLibraryPanel,
     state.ui.showDetailsPanel,
+    // Was missing while its three siblings were listed. The handler reads it
+    // to stand down while the MIDI editor has focus, so without it the
+    // listener bound before the editor opened still saw `false` — and Delete
+    // went on deleting the timeline selection underneath the open editor.
+    state.ui.midiEditorOpen,
     actions,
     playback,
   ]);

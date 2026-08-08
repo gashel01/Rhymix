@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import ClipView from "./ClipView";
 import SelectionOverlay from "./SelectionOverlay";
 import { LANE_HEIGHT, LANE_GUTTER, BASE_PX_PER_SEC } from "../timelineMetrics";
@@ -139,26 +139,31 @@ const Timeline = ({
     return barSec * barStep * pxPerSec;
   }, [bpm, pxPerSec]);
 
-  const getTimeFromEvent = (event) => {
+  /* The three below turn a pointer position into timeline coordinates. They
+     are wrapped because the drag effects below need them in their dependency
+     lists: unwrapped they were a new function every render, which is why they
+     had to be left out — and a handler left out is one bound to a stale
+     pxPerSec, so a drag started after a zoom moved by the wrong amount. */
+  const getTimeFromEvent = useCallback((event) => {
     const rect = bodyRef.current?.getBoundingClientRect();
     if (!rect) return 0;
     return (event.clientX - rect.left + (bodyRef.current?.scrollLeft || 0)) / pxPerSec;
-  };
+  }, [pxPerSec]);
 
-  const getTimeFromRulerEvent = (event) => {
+  const getTimeFromRulerEvent = useCallback((event) => {
     const rect = rulerRef.current?.getBoundingClientRect();
     if (!rect) return 0;
     return (event.clientX - rect.left + (rulerRef.current?.scrollLeft || 0)) / pxPerSec;
-  };
+  }, [pxPerSec]);
 
-  const getLaneFromEvent = (event) => {
+  const getLaneFromEvent = useCallback((event) => {
     const rect = bodyRef.current?.getBoundingClientRect();
     if (!rect) return null;
     const y = event.clientY - rect.top + (bodyRef.current?.scrollTop || 0);
     const index = Math.floor(y / LANE_HEIGHT);
     if (index < 0 || index >= lanes.length) return null;
     return lanes[index]?.id || null;
-  };
+  }, [lanes]);
 
   const handleExternalDrop = (event) => {
     event.preventDefault();
@@ -309,7 +314,7 @@ const Timeline = ({
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
     };
-  }, [dragPlayhead, onSeek]);
+  }, [dragPlayhead, onSeek, getTimeFromRulerEvent]);
 
   React.useEffect(() => {
     if (!clipDrag) return undefined;
@@ -340,7 +345,7 @@ const Timeline = ({
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
     };
-  }, [clipDrag, dragPreview, onMoveClip, snapEnabled, snapGrid]);
+  }, [clipDrag, dragPreview, onMoveClip, snapEnabled, snapGrid, getLaneFromEvent, getTimeFromEvent]);
 
   React.useEffect(() => {
     if (typeof scrollTopSync !== "number") return;
@@ -409,7 +414,7 @@ const Timeline = ({
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
     };
-  }, [trimDrag, trimPreview, onTrimClip, onTrimClipRight, snapEnabled, snapGrid]);
+  }, [trimDrag, trimPreview, onTrimClip, onTrimClipRight, snapEnabled, snapGrid, getTimeFromEvent]);
 
   return (
     <div className="studio-timeline">
