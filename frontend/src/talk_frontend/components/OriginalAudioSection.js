@@ -44,7 +44,6 @@ const OriginalAudioSection = ({
   handleDownloadSegment,
   segmentPlaybackTimer,
   setSegmentPlaybackTimer,
-  setPlayingSegment,
 }) => {
   const mainWaveformRef = useRef(null);
   const isHandlingSeekRef = useRef(false);
@@ -218,7 +217,6 @@ const OriginalAudioSection = ({
                   setPlaying(null);
                 } else {
                   setPlaying("original-audio");
-                  setPlayingSegment(null);
 
                   // Clear any existing timer
                   if (segmentPlaybackTimer) {
