@@ -1,0 +1,16 @@
+{
+  "name": "rhymix-vst3-host",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Native VST3 plugin host: real audio processing proven end to end against Steinberg's ADelay example. iZotope RX 11 plugins return kNotImplemented from setProcessing() (a documented, DAW-tolerated quirk of that plugin family, not a host bug) but process() now succeeds anyway per real-DAW behavior; whether real DSP occurred for a given RX 11 tool/signal combo is unproven either way (see README.md).",
+  "main": "index.js",
+  "scripts": {
+    "build": "cmake-js compile --runtime=electron --runtime-version=33.4.11 --arch=x64"
+  },
+  "dependencies": {
+    "node-addon-api": "^8.0.0"
+  },
+  "devDependencies": {
+    "cmake-js": "^7.3.0"
+  }
+}

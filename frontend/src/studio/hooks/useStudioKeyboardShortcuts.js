@@ -1,16 +1,32 @@
 import { useEffect } from "react";
 import { useStudioStore } from "../store";
 
-export const useStudioKeyboardShortcuts = (playback) => {
+export const useStudioKeyboardShortcuts = (playback, enabled = true) => {
   const { state, actions } = useStudioStore();
 
   useEffect(() => {
+    if (!enabled) return undefined;
     const handleKeyDown = (event) => {
       if (event.defaultPrevented) return;
       const tag = event.target?.tagName;
       if (tag && ["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
       if (event.target?.isContentEditable) return;
       const key = event.key.toLowerCase();
+      // Ctrl+Z / Cmd+Z everywhere else in the app is browser/OS undo, which
+      // did nothing useful here since nothing on the page has focus-editable
+      // text most of the time — onUndo/onRedo already existed as Transport
+      // button props with no keyboard path to either.
+      if ((event.ctrlKey || event.metaKey) && key === "z") {
+        event.preventDefault();
+        if (event.shiftKey) actions.redo();
+        else actions.undo();
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && key === "y") {
+        event.preventDefault();
+        actions.redo();
+        return;
+      }
       if (event.code === "Space") {
         if (state.ui.midiEditorOpen) return;
         event.preventDefault();
@@ -38,10 +54,19 @@ export const useStudioKeyboardShortcuts = (playback) => {
         return;
       }
       if (key === "s") {
-        const clipId = state.selection?.clipIds?.[0];
-        if (clipId) {
-          actions.splitClip(clipId, state.transport.currentTime || 0);
-        }
+        // Every real DAW's "split" key acts on whatever the playhead is
+        // sitting inside, full stop — not on whatever happens to be
+        // selected. This used to split state.selection.clipIds[0], which
+        // could be a clip the playhead isn't even over (or silently do
+        // nothing if nothing was selected, even with the playhead parked
+        // in the middle of an unselected clip).
+        const t = state.transport.currentTime || 0;
+        const clip = state.clips.find((item) => {
+          const start = item.timelineStartSec ?? 0;
+          const end = start + (item.srcEndSec ?? 0) - (item.srcStartSec ?? 0);
+          return t > start && t < end;
+        });
+        if (clip) actions.splitClip(clip.id, t);
         return;
       }
       if (key === "d") {
@@ -71,6 +96,7 @@ export const useStudioKeyboardShortcuts = (playback) => {
         }
       }
       if (event.key === "Delete" || event.key === "Backspace") {
+        if (state.ui.midiEditorOpen) return;
         event.preventDefault();
         if (state.selection?.clipIds?.length) {
           actions.deleteSelection(null, null, state.selection.clipIds);
@@ -84,6 +110,7 @@ export const useStudioKeyboardShortcuts = (playback) => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
+    enabled,
     state.selection,
     state.transport.currentTime,
     state.transport.isPlaying,

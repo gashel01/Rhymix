@@ -4,11 +4,13 @@ import {
   trimClipLeft,
   trimClipRight,
   moveClip,
+  moveClips,
   deleteSelection,
   duplicateSelection,
 } from "./edlOps";
 import { ensureLaneColors, resolveLaneColor } from "./laneColors";
 import { ticksToSec } from "./audioMath";
+import { getMasterVolume, getMasterPan } from "../masterAudio";
 
 const StudioStateContext = createContext(null);
 const StudioDispatchContext = createContext(null);
@@ -20,12 +22,17 @@ const deepClone = (value) => {
   return JSON.parse(JSON.stringify(value));
 };
 
-const initialState = {
+export const initialState = {
   project: null,
   lanes: [],
   clips: [],
   assets: {},
   metadata: {},
+  /* Session/pattern view (non-linear clip launch, speed-beatmaker backlog item #1) — independent
+     of clips' timelineStartSec: a scene is a "row" (state.scenes), a clip slot is one cell of the
+     grid (scene × lane), state.clipSlots holds at most one slot per (sceneId, laneId) pair. */
+  scenes: [],
+  clipSlots: [],
   selection: {
     clipIds: [],
     range: null,
@@ -38,6 +45,8 @@ const initialState = {
   ui: {
     zoom: 1,
     snap: true,
+    masterVolume: 1,
+    masterPan: 0,
     gridSec: 0.5,
     gridDiv: 1,
     metronome: false,
@@ -47,7 +56,7 @@ const initialState = {
     focusMode: false,
     rightPanelContext: "nothing",
     expandedAiCard: "live",
-    drawerTool: "foundation",
+    drawerTool: "live",
     drawerOpen: false,
     activityFilter: "all",
     showCreatePanel: false,
@@ -75,6 +84,8 @@ const snapshotState = (state) => ({
   clips: deepClone(state.clips),
   metadata: deepClone(state.metadata),
   selection: deepClone(state.selection),
+  scenes: deepClone(state.scenes),
+  clipSlots: deepClone(state.clipSlots),
 });
 
 // Each entry is a deep copy of the whole EDL, so an unbounded stack grows with
@@ -114,7 +125,7 @@ const shiftLyricsEntries = (entries, delta) => {
   return Array.isArray(entries) ? next : next[0];
 };
 
-const studioReducer = (state, action) => {
+export const studioReducer = (state, action) => {
   switch (action.type) {
     case "SET_PROJECT": {
       const bpm = action.payload.project?.bpm || 120;
@@ -127,6 +138,8 @@ const studioReducer = (state, action) => {
         clips: action.payload.clips || [],
         assets: action.payload.assets || {},
         metadata: action.payload.metadata || {},
+        scenes: action.payload.scenes || [],
+        clipSlots: action.payload.clipSlots || [],
         selection: { clipIds: [], range: null, laneIds: null },
         ui: { ...state.ui, gridSec: 60 / bpm / gridDiv },
         history: { past: [], future: [] },
@@ -167,7 +180,7 @@ const studioReducer = (state, action) => {
       return applyEdlChange(state, { lanes });
     }
     case "ADD_CLIP": {
-      const { laneId, assetId, startSec, durationSec } = action.payload;
+      const { laneId, assetId, startSec, durationSec, tempoRate } = action.payload;
       if (!laneId || !assetId) return state;
       const asset = state.assets?.[assetId];
       const resolvedDuration = Math.max(0.01, Number(durationSec ?? asset?.durationSec ?? 5));
@@ -181,8 +194,44 @@ const studioReducer = (state, action) => {
         fadeInSec: 0,
         fadeOutSec: 0,
         gainDb: 0,
+        // Playback-rate-based BPM match from the drag-drop "stretch to match" prompt (Timeline.js
+        // handleExternalDrop) — a simple speed change, not a pitch-preserving time-stretch, so
+        // matching tempo also shifts pitch; that tradeoff is disclosed to the user at drop time.
+        // 1 = play at native speed (the default/only option before this existed).
+        tempoRate: Number(tempoRate) > 0 ? Number(tempoRate) : 1,
       };
       return applyEdlChange(state, { clips: [...state.clips, clip] });
+    }
+    /* "Record to Timeline" (Ableton-style "Record to Arrangement" for the Session view, backlog
+       item #1): materializes a whole performed take — possibly dozens of tiled repeats across
+       several lanes, see sessionRecording.js's tileRecordedSpansIntoClips — as ONE history entry,
+       so undo removes the whole take in one step rather than one undo per tiny tiled clip. Each
+       spec is already a fully-formed clip shape (tileRecordedSpansIntoClips' job), this just fills
+       in the fields every clip needs regardless of origin (id, fade/tempo defaults). */
+    case "ADD_TIMELINE_CLIPS": {
+      const specs = Array.isArray(action.payload?.clips) ? action.payload.clips : [];
+      if (!specs.length) return state;
+      const newClips = specs.map((spec) => {
+        const clip = {
+          id: makeId(),
+          laneId: spec.laneId,
+          sourceAssetId: spec.sourceAssetId ?? null,
+          srcStartSec: Number(spec.srcStartSec) || 0,
+          srcEndSec: Math.max(0.01, Number(spec.srcEndSec) || 0.01),
+          timelineStartSec: Math.max(0, Number(spec.timelineStartSec) || 0),
+          fadeInSec: 0,
+          fadeOutSec: 0,
+          gainDb: Number(spec.gainDb) || 0,
+          tempoRate: 1,
+        };
+        if (spec.clipType === "midi") {
+          clip.clipType = "midi";
+          clip.midi = spec.midi || null;
+          if (spec.label) clip.label = spec.label;
+        }
+        return clip;
+      });
+      return applyEdlChange(state, { clips: [...state.clips, ...newClips] });
     }
     case "REORDER_LANES": {
       const orderedIds = action.payload.laneIds || [];
@@ -220,7 +269,7 @@ const studioReducer = (state, action) => {
       return applyEdlChange(state, { lanes: [...state.lanes, lane] });
     }
     case "ADD_MIDI_CLIP": {
-      const { laneId, clip, startTick, bpm, ppq } = action.payload;
+      const { laneId, clip, startTick, bpm, ppq, minDurationSec } = action.payload;
       if (!laneId || !clip) return state;
       const resolvedBpm = Number(bpm) || clip.bpm || state.project?.bpm || 120;
       const resolvedPpq = Number(ppq) || clip.ppq || 480;
@@ -230,7 +279,8 @@ const studioReducer = (state, action) => {
         const end = (note.startTick || 0) + (note.durationTick || 0);
         if (end > maxTick) maxTick = end;
       });
-      const durationSec = maxTick > 0 ? ticksToSec(maxTick, resolvedBpm, resolvedPpq) : 0.5;
+      const notesDurationSec = maxTick > 0 ? ticksToSec(maxTick, resolvedBpm, resolvedPpq) : 0;
+      const durationSec = Math.max(notesDurationSec, Number(minDurationSec) || 0, 0.5);
       const startSec = ticksToSec(startTick || 0, resolvedBpm, resolvedPpq);
       const clipEntry = {
         id: makeId(),
@@ -275,6 +325,25 @@ const studioReducer = (state, action) => {
         assets,
       };
     }
+    case "REGISTER_ASSET": {
+      const asset = action.payload?.asset;
+      if (!asset?.id) return state;
+      return {
+        ...state,
+        assets: { ...(state.assets || {}), [asset.id]: asset },
+      };
+    }
+    case "SET_ASSET_TAGS": {
+      const { assetId, tags } = action.payload || {};
+      if (!assetId || !state.assets?.[assetId]) return state;
+      return {
+        ...state,
+        assets: {
+          ...state.assets,
+          [assetId]: { ...state.assets[assetId], tags: Array.isArray(tags) ? tags : [] },
+        },
+      };
+    }
     case "SPLIT_CLIP": {
       const clips = splitClip(state.clips, action.payload.clipId, action.payload.atTimeSec);
       return applyEdlChange(state, { clips });
@@ -311,6 +380,33 @@ const studioReducer = (state, action) => {
               },
             };
           }
+        }
+      }
+      return applyEdlChange(state, { clips, metadata });
+    }
+    case "MOVE_CLIPS": {
+      const moves = Array.isArray(action.payload.moves) ? action.payload.moves : [];
+      const prevStartById = new Map(
+        moves.map((move) => [move.clipId, state.clips.find((clip) => clip.id === move.clipId)?.timelineStartSec])
+      );
+      const clips = moveClips(state.clips, moves);
+      let metadata = state.metadata;
+      const lyricsReplacement = state.metadata?.lyricsReplacement;
+      if (lyricsReplacement) {
+        let nextLyricsReplacement = lyricsReplacement;
+        moves.forEach((move) => {
+          if (!lyricsReplacement[move.clipId]) return;
+          const prevStartSec = Number(prevStartById.get(move.clipId));
+          if (!Number.isFinite(prevStartSec)) return;
+          const delta = move.newTimelineStartSec - prevStartSec;
+          if (Math.abs(delta) <= 1e-6) return;
+          if (nextLyricsReplacement === lyricsReplacement) {
+            nextLyricsReplacement = { ...lyricsReplacement };
+          }
+          nextLyricsReplacement[move.clipId] = shiftLyricsEntries(lyricsReplacement[move.clipId], delta);
+        });
+        if (nextLyricsReplacement !== lyricsReplacement) {
+          metadata = { ...(state.metadata || {}), lyricsReplacement: nextLyricsReplacement };
         }
       }
       return applyEdlChange(state, { clips, metadata });
@@ -354,6 +450,60 @@ const studioReducer = (state, action) => {
         }));
       return applyEdlChange(state, { lanes: [...state.lanes, nextLane], clips: [...state.clips, ...nextClips] });
     }
+    case "ADD_SCENE": {
+      const scene = {
+        id: makeId(),
+        name: action.payload?.name || `Scene ${state.scenes.length + 1}`,
+      };
+      return applyEdlChange(state, { scenes: [...state.scenes, scene] });
+    }
+    case "RENAME_SCENE": {
+      const { sceneId, name } = action.payload || {};
+      if (!sceneId) return state;
+      const scenes = state.scenes.map((scene) => (scene.id === sceneId ? { ...scene, name } : scene));
+      return applyEdlChange(state, { scenes });
+    }
+    case "REMOVE_SCENE": {
+      const sceneId = action.payload?.sceneId;
+      if (!sceneId) return state;
+      const scenes = state.scenes.filter((scene) => scene.id !== sceneId);
+      const clipSlots = state.clipSlots.filter((slot) => slot.sceneId !== sceneId);
+      return applyEdlChange(state, { scenes, clipSlots });
+    }
+    case "SET_CLIP_SLOT": {
+      // One slot per (sceneId, laneId) — setting an existing cell replaces it, never duplicates.
+      const { sceneId, laneId, assetId, srcStartSec, srcEndSec, clipType, midi, gainDb, label } =
+        action.payload || {};
+      if (!sceneId || !laneId) return state;
+      const existingIndex = state.clipSlots.findIndex(
+        (slot) => slot.sceneId === sceneId && slot.laneId === laneId
+      );
+      const slot = {
+        id: existingIndex >= 0 ? state.clipSlots[existingIndex].id : makeId(),
+        sceneId,
+        laneId,
+        assetId: assetId ?? null,
+        srcStartSec: Number(srcStartSec) || 0,
+        srcEndSec: Number(srcEndSec) || 0,
+        clipType: clipType || "audio",
+        midi: midi || null,
+        gainDb: Number(gainDb) || 0,
+        label: label || null,
+      };
+      const clipSlots =
+        existingIndex >= 0
+          ? state.clipSlots.map((item, index) => (index === existingIndex ? slot : item))
+          : [...state.clipSlots, slot];
+      return applyEdlChange(state, { clipSlots });
+    }
+    case "CLEAR_CLIP_SLOT": {
+      const { sceneId, laneId } = action.payload || {};
+      if (!sceneId || !laneId) return state;
+      const clipSlots = state.clipSlots.filter(
+        (slot) => !(slot.sceneId === sceneId && slot.laneId === laneId)
+      );
+      return applyEdlChange(state, { clipSlots });
+    }
     case "UNDO": {
       const past = [...state.history.past];
       if (!past.length) return state;
@@ -385,8 +535,19 @@ const studioReducer = (state, action) => {
   }
 };
 
+/* Seeds the store's copy of masterVolume/masterPan from whatever the shared,
+   app-wide fader is already sitting at — rather than always snapping back to
+   unity — since a project's own saved prefs only arrive later (once loaded),
+   and until then this is what the "one fader everywhere" feature relies on
+   to avoid stomping a level set from outside Studio (e.g. the Library) back
+   to defaults the moment Studio is first opened. */
+const buildInitialState = () => ({
+  ...initialState,
+  ui: { ...initialState.ui, masterVolume: getMasterVolume(), masterPan: getMasterPan() },
+});
+
 export const StudioProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(studioReducer, initialState);
+  const [state, dispatch] = useReducer(studioReducer, initialState, buildInitialState);
   return (
     <StudioStateContext.Provider value={state}>
       <StudioDispatchContext.Provider value={dispatch}>
@@ -415,13 +576,14 @@ export const useStudioActions = () => {
       setUi: (payload) => dispatch({ type: "SET_UI", payload }),
       setTransport: (payload) => dispatch({ type: "SET_TRANSPORT", payload }),
       updateLane: (laneId, patch) => dispatch({ type: "UPDATE_LANE", payload: { laneId, patch } }),
-      addClip: (laneId, assetId, startSec, durationSec) =>
-        dispatch({ type: "ADD_CLIP", payload: { laneId, assetId, startSec, durationSec } }),
+      addClip: (laneId, assetId, startSec, durationSec, tempoRate) =>
+        dispatch({ type: "ADD_CLIP", payload: { laneId, assetId, startSec, durationSec, tempoRate } }),
+      addTimelineClips: (clips) => dispatch({ type: "ADD_TIMELINE_CLIPS", payload: { clips } }),
       reorderLanes: (laneIds) => dispatch({ type: "REORDER_LANES", payload: { laneIds } }),
       addLane: (payload) => dispatch({ type: "ADD_LANE", payload }),
       removeLane: (laneId) => dispatch({ type: "REMOVE_LANE", payload: { laneId } }),
-      addMidiClip: (laneId, clip, startTick, bpm, ppq) =>
-        dispatch({ type: "ADD_MIDI_CLIP", payload: { laneId, clip, startTick, bpm, ppq } }),
+      addMidiClip: (laneId, clip, startTick, bpm, ppq, minDurationSec) =>
+        dispatch({ type: "ADD_MIDI_CLIP", payload: { laneId, clip, startTick, bpm, ppq, minDurationSec } }),
       updateClip: (clipId, patch) => dispatch({ type: "UPDATE_CLIP", payload: { clipId, patch } }),
       splitClip: (clipId, atTimeSec) => dispatch({ type: "SPLIT_CLIP", payload: { clipId, atTimeSec } }),
       trimClipLeft: (clipId, newEdgeTimeSec) =>
@@ -432,6 +594,9 @@ export const useStudioActions = () => {
         dispatch({ type: "MOVE_CLIP", payload: { clipId, newTimelineStartSec } }),
       moveClipToLane: (clipId, newTimelineStartSec, laneId) =>
         dispatch({ type: "MOVE_CLIP", payload: { clipId, newTimelineStartSec, laneId } }),
+      // `moves`: [{ clipId, newTimelineStartSec, laneId }] — one dispatch, one
+      // history entry, so dragging a multi-clip selection undoes as one step.
+      moveClips: (moves) => dispatch({ type: "MOVE_CLIPS", payload: { moves } }),
       deleteSelection: (range, laneIds, clipIds) =>
         dispatch({ type: "DELETE_SELECTION", payload: { range, laneIds, clipIds } }),
       duplicateSelection: (range, laneIds, pasteTimeSec) =>
@@ -439,6 +604,13 @@ export const useStudioActions = () => {
       duplicateLane: (laneId) => dispatch({ type: "DUPLICATE_LANE", payload: { laneId } }),
       deleteAllLanes: () => dispatch({ type: "REMOVE_ALL_LANES" }),
       removeAsset: (assetId) => dispatch({ type: "REMOVE_ASSET", payload: { assetId } }),
+      registerAsset: (asset) => dispatch({ type: "REGISTER_ASSET", payload: { asset } }),
+      setAssetTags: (assetId, tags) => dispatch({ type: "SET_ASSET_TAGS", payload: { assetId, tags } }),
+      addScene: (name) => dispatch({ type: "ADD_SCENE", payload: { name } }),
+      renameScene: (sceneId, name) => dispatch({ type: "RENAME_SCENE", payload: { sceneId, name } }),
+      removeScene: (sceneId) => dispatch({ type: "REMOVE_SCENE", payload: { sceneId } }),
+      setClipSlot: (payload) => dispatch({ type: "SET_CLIP_SLOT", payload }),
+      clearClipSlot: (sceneId, laneId) => dispatch({ type: "CLEAR_CLIP_SLOT", payload: { sceneId, laneId } }),
       undo: () => dispatch({ type: "UNDO" }),
       redo: () => dispatch({ type: "REDO" }),
     }),

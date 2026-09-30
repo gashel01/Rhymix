@@ -25,6 +25,12 @@ export const ticksToSec = (ticks, bpm, ppq) => {
   return (Number(ticks) || 0) / ((safeBpm * safePpq) / 60);
 };
 
+export const secToTicks = (sec, bpm, ppq) => {
+  const safeBpm = Number(bpm) || 120;
+  const safePpq = Number(ppq) || 480;
+  return Math.max(0, Number(sec) || 0) * ((safeBpm * safePpq) / 60);
+};
+
 export const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 /** MIDI 60 is C4, so the octave is (note / 12) - 1. */
@@ -56,15 +62,46 @@ export const midiToFreq = (noteNumber) =>
 /** A pitch shift in semitones as a sample playback rate. */
 export const semitonesToRate = (semitones) => Math.pow(2, (Number(semitones) || 0) / 12);
 
+/* Sentinel for the built-in synthesized drum kit (audio/drumKit.js) — not a soundfont name, the
+   playback hook recognizes it and builds the kit instead of loading samples. */
+export const DRUM_KIT_NAME = "kit:drums";
+
+/* Every instrument a lane (or a MIDI clip) can be pointed at without importing anything: the
+   built-in drum kit plus General MIDI sounds from the soundfont CDN. `value` is exactly what gets
+   stored in lane.instrument / clip.midi.soundfont. */
+export const INSTRUMENT_CHOICES = [
+  { value: DRUM_KIT_NAME, label: "Drum kit" },
+  { value: "acoustic_grand_piano", label: "Piano" },
+  { value: "electric_piano_1", label: "Electric piano" },
+  { value: "drawbar_organ", label: "Organ" },
+  { value: "electric_guitar_clean", label: "Guitar (clean)" },
+  { value: "distortion_guitar", label: "Guitar (distorted)" },
+  { value: "acoustic_bass", label: "Bass (acoustic)" },
+  { value: "electric_bass_finger", label: "Bass (electric)" },
+  { value: "synth_bass_1", label: "Bass (synth)" },
+  { value: "string_ensemble_1", label: "Strings" },
+  { value: "brass_section", label: "Brass" },
+  { value: "lead_1_square", label: "Synth lead" },
+  { value: "synth_pad_1_new_age", label: "Synth pad" },
+  { value: "marimba", label: "Marimba" },
+  { value: "choir_aahs", label: "Choir" },
+  { value: "flute", label: "Flute" },
+  { value: "alto_sax", label: "Sax" },
+  { value: "trumpet", label: "Trumpet" },
+];
+
+const CHOICE_VALUES = new Set(INSTRUMENT_CHOICES.map((choice) => choice.value));
+
 /** The soundfont that best matches what the lane says it is. */
 export const resolveSoundfontName = (instrumentLabel, laneName) => {
+  if (CHOICE_VALUES.has(instrumentLabel)) return instrumentLabel;
   const key = `${instrumentLabel || ""} ${laneName || ""}`.toLowerCase();
+  if (key.includes("drum") || key.includes("beat") || key.includes("perc")) return DRUM_KIT_NAME;
   if (key.includes("piano")) return "acoustic_grand_piano";
   if (key.includes("guitar")) return "electric_guitar_clean";
   if (key.includes("bass")) return "acoustic_bass";
   if (key.includes("string")) return "string_ensemble_1";
   if (key.includes("synth")) return "synth_pad_1_new_age";
-  if (key.includes("drum") || key.includes("beat")) return "synth_drum";
   return "acoustic_grand_piano";
 };
 

@@ -1,33 +1,90 @@
 .studio-page {
-  /* Same palette as the Models view: a neutral near-black page, panels made of
-     very low-alpha white rather than their own blue, and one accent — the
-     system blue — instead of a cyan plus an orange fighting each other. */
-  --studio-bg: #0b0b0f;
-  --studio-panel: rgba(255, 255, 255, 0.04);
-  --studio-panel-strong: rgba(255, 255, 255, 0.06);
-  --studio-panel-border: rgba(255, 255, 255, 0.10);
-  --studio-accent: #0a84ff;
-  --studio-accent-wash: rgba(10, 132, 255, 0.18);
-  --studio-accent-strong: #0a84ff;
-  --studio-danger: #ff453a;
-  --studio-text: rgba(255, 255, 255, 0.92);
-  --studio-subtext: rgba(255, 255, 255, 0.62);
-  --studio-muted: rgba(255, 255, 255, 0.12);
+  /* The rest of the app's palette (frontend/src/next/tokens.css's .rx block),
+     not a separate one this page used to keep to itself: a neutral near-black
+     page, panels made of very low-alpha white, and the same accent every
+     other view uses — --vox's orange — so leaving the library for Studio
+     doesn't read as leaving the app. #0a84ff (the blue this used to be) is
+     still in the app's own palette as --inst, just never the primary accent
+     anywhere else, which is what made it the one thing here that looked
+     borrowed from somewhere else. */
+  --studio-bg: #060609;
+  --studio-panel: rgba(var(--studio-ink), 0.04);
+  --studio-panel-strong: rgba(var(--studio-ink), 0.06);
+  --studio-panel-border: rgba(var(--studio-ink), 0.10);
+  --studio-accent: #ff9f0a;
+  --studio-accent-wash: rgba(255, 159, 10, 0.18);
+  --studio-accent-strong: #ff9f0a;
+  --studio-danger: #ff375f;
+  --studio-text: rgba(var(--studio-ink), 0.92);
+  --studio-subtext: rgba(var(--studio-ink), 0.62);
+  --studio-muted: rgba(var(--studio-ink), 0.12);
   --studio-radius-lg: 22px;
   --studio-radius-md: 16px;
   --studio-shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.45);
   --studio-track-top: 96px;
+  /* The other ~90% of this file's colour, below --studio-* itself, is two
+     recurring patterns written as inline rgba()/hex literals rather than
+     through a named token:
+       - "white mixed at X% into the surface" — hairlines, panel fills, hover
+         washes, and (at the high end) text itself, e.g. --studio-text is
+         just this same pattern at 92%. --studio-ink names the white here so
+         every rgba(255, 255, 255, X) in the file can become
+         rgba(var(--studio-ink), X) and still be exactly as specific as it
+         already was, while flipping to black-on-light below.
+       - a family of near-identical near-blacks (rgba(6, 9, 12, …), rgba(8,
+         12, 16, …), rgba(18, 25, 34, …), and a few solid hex fills) used as
+         opaque-ish panel surfaces layered over each other for depth — never
+         meant to be thirty distinct colours, just however each spot got
+         typed. --studio-surface-ink consolidates the alpha ones into one
+         surface tone; --studio-surface-1..4 cover the four solid hex fills
+         that can't be expressed as an alpha triplet at all. Pure
+         rgba(0, 0, 0, X) is deliberately NOT included in that consolidation
+         — those are shadows and modal scrims, which stay dark-on-both in
+         every design system, this one included. */
+  --studio-ink: 255, 255, 255;
+  --studio-surface-ink: 6, 9, 12;
+  --studio-surface-1: #0b0b0f;
+  --studio-surface-2: #0a0e13;
+  --studio-surface-3: #121c25;
+  --studio-surface-4: #041018;
   color: var(--studio-text);
   position: fixed;
   inset: 0;
   height: 100dvh;
   min-height: 100dvh;
   background: var(--studio-bg);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  font-family: ui-sans-serif, -apple-system, "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
   font-feature-settings: "tnum" 1;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
+}
+
+/* Light theme — every other view already gets this via .rx[data-theme=
+   "light"] (next/tokens.css); Studio kept its own fixed dark palette
+   regardless of the toggle until now. :root carries data-theme (see
+   NextApp.js), not .rx, specifically so this also reaches the menus that
+   portal straight to document.body (.studio-ai-bar, .studio-clip-menu,
+   .studio-track-menu), which redeclare this same block further down since
+   being outside .studio-page loses it to them by normal CSS inheritance. */
+:root[data-theme="light"] .studio-page {
+  --studio-panel: rgba(var(--studio-ink), 0.035);
+  --studio-panel-strong: rgba(var(--studio-ink), 0.05);
+  --studio-panel-border: rgba(var(--studio-ink), 0.12);
+  --studio-accent: #e08000;
+  --studio-accent-wash: rgba(224, 128, 0, 0.16);
+  --studio-accent-strong: #e08000;
+  --studio-danger: #d9314f;
+  --studio-text: rgba(var(--studio-ink), 0.92);
+  --studio-subtext: rgba(var(--studio-ink), 0.62);
+  --studio-muted: rgba(var(--studio-ink), 0.12);
+  --studio-shadow-soft: 0 10px 24px rgba(20, 25, 45, 0.14);
+  --studio-ink: 10, 10, 15;
+  --studio-surface-ink: 246, 246, 248;
+  --studio-surface-1: #ffffff;
+  --studio-surface-2: #f7f7fa;
+  --studio-surface-3: #edeff2;
+  --studio-surface-4: #e4e7ec;
 }
 
 .studio-shell {
@@ -41,7 +98,7 @@
 
 .studio-rail {
   width: 96px;
-  background: rgba(6, 10, 14, 0.92);
+  background: rgba(var(--studio-surface-ink), 0.92);
   border-right: 1px solid var(--studio-panel-border);
   padding: 12px 10px;
   display: flex;
@@ -175,7 +232,7 @@
   padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid var(--studio-panel-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--studio-ink), 0.04);
   color: var(--studio-text);
   font-size: 11px;
   font-weight: 600;
@@ -190,8 +247,8 @@
 }
 
 .studio-transport-pill.active {
-  background: rgba(10, 132, 255, 0.16);
-  border-color: rgba(10, 132, 255, 0.35);
+  background: rgba(255, 159, 10, 0.16);
+  border-color: rgba(255, 159, 10, 0.35);
 }
 
 .studio-shortcut-row {
@@ -229,7 +286,7 @@
   gap: 16px;
   padding: 12px 16px;
   border-top: 1px solid var(--studio-panel-border);
-  background: rgba(6, 10, 14, 0.95);
+  background: rgba(var(--studio-surface-ink), 0.95);
   backdrop-filter: blur(10px);
   position: fixed;
   left: 0;
@@ -282,7 +339,7 @@
 
 .studio-field-inline input,
 .studio-field-inline select {
-  background: rgba(8, 12, 16, 0.8);
+  background: rgba(var(--studio-surface-ink), 0.8);
   border: 1px solid var(--studio-panel-border);
   border-radius: 8px;
   color: var(--studio-text);
@@ -310,7 +367,7 @@
 }
 
 .studio-btn {
-  background: linear-gradient(135deg, var(--studio-accent), #0088c6);
+  background: linear-gradient(135deg, var(--studio-accent), #ff7f50);
   border: none;
   color: #041018;
   font-weight: 700;
@@ -340,8 +397,8 @@
 }
 
 .studio-btn.active {
-  background: rgba(10, 132, 255, 0.16);
-  border-color: rgba(10, 132, 255, 0.35);
+  background: rgba(255, 159, 10, 0.16);
+  border-color: rgba(255, 159, 10, 0.35);
   color: var(--studio-text);
 }
 
@@ -374,7 +431,7 @@
 .studio-tracklist-top {
   position: sticky;
   top: 0;
-  /* background: rgba(8, 12, 16, 0.95);
+  /* background: rgba(var(--studio-surface-ink), 0.95);
   height: var(--studio-track-top);
   display: grid;
   align-content: center;
@@ -388,33 +445,45 @@
   align-items: center;
 }
 
-.studio-toggle-group {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+/* Portaled to document.body (TrackList.js) rather than positioned relative
+   to the "+" button that opens it — .studio-track-headers scrolls its own
+   overflow, which clipped an absolutely-positioned popover the instant it
+   grew past the header row (it had no top/left/right of its own, either, so
+   it sat at its static position, out of flow, overlapping the lane list
+   below rather than opening as a dropdown). position/left/top now come from
+   the button's own screen coordinates as an inline style. */
+/* .studio-track-menu (min-width: 160px, defined further down) and this are
+   both single-class selectors, so equal specificity leaves source order to
+   decide — and .studio-track-menu comes later, so its own min-width won.
+   Combined selector here instead of relocating this block, so this stays a
+   guaranteed win regardless of where either rule sits in the file. */
+.studio-track-menu.studio-add-lane-panel {
+  min-width: 220px;
+  padding: 12px;
+  gap: 10px;
 }
 
-.studio-track-add {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr auto;
-  gap: 6px;
-  position: absolute;
-}
-
-.studio-track-add select,
-.studio-track-add input {
-  background: rgba(8, 12, 16, 0.8);
+.studio-add-lane-panel select,
+.studio-add-lane-panel input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(var(--studio-surface-ink), 0.8);
   border: 1px solid var(--studio-panel-border);
   border-radius: 8px;
   color: var(--studio-text);
-  padding: 6px 8px;
-  font-size: 12px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.studio-add-lane-panel .studio-btn {
+  width: 100%;
+  justify-content: center;
 }
 
 .studio-track-row {
   padding: 10px;
   border-radius: 12px;
-  background: rgba(7, 10, 14, 0.6);
+  background: rgba(var(--studio-surface-ink), 0.6);
   border: 1px solid var(--studio-panel-border);
   max-height: 100px;
   min-height: 100px;
@@ -469,11 +538,18 @@
 }
 
 .studio-track-input {
-  background: rgba(8, 12, 16, 0.8);
+  background: rgba(var(--studio-surface-ink), 0.8);
   border: 1px solid var(--studio-panel-border);
   border-radius: 8px;
   color: var(--studio-text);
   padding: 4px 6px;
+  /* A bare <input> has no width of its own — it falls back to a ~20-
+     character intrinsic default, wide enough to run straight over the "⋯"
+     menu button next to it in this narrow sidebar. Fill the flex row
+     (.studio-track-title, already min-width:0) instead. */
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .studio-lane-color {
@@ -507,10 +583,21 @@
 }
 
 .studio-track-menu {
+  /* Same issue as .studio-clip-menu, same fix: portaled to document.body
+     (TrackList.js), which .studio-add-lane-panel shares too, so neither was
+     actually reaching --studio-text/--studio-panel-border/--studio-surface-
+     ink from anywhere. */
+  --studio-ink: 255, 255, 255;
+  --studio-surface-ink: 8, 12, 16;
+  --studio-text: rgba(var(--studio-ink), 0.92);
+  --studio-panel-border: rgba(var(--studio-ink), 0.1);
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
-  background: rgba(8, 12, 16, 0.96);
+  /* Fully opaque, same reason as .studio-right-drawer: at 0.96 the lane rows underneath
+     (names, gain sliders, the FX/mute tags) ghosted through the VST3 plugin list and the
+     Select Lane Clips / Delete Lane rows below it. */
+  background: #0a0e13;
   border: 1px solid var(--studio-panel-border);
   border-radius: 10px;
   padding: 6px;
@@ -518,6 +605,24 @@
   gap: 6px;
   min-width: 160px;
   z-index: 20;
+}
+
+:root[data-theme="light"] .studio-track-menu {
+  --studio-ink: 10, 10, 15;
+  --studio-surface-ink: 255, 255, 255;
+  --studio-text: rgba(var(--studio-ink), 0.92);
+  --studio-panel-border: rgba(var(--studio-ink), 0.12);
+  background: #f7f7fa;
+  box-shadow: 0 10px 28px rgba(20, 25, 45, 0.16);
+}
+
+/* --studio-surface-ink alone would give the add-lane inputs the same near-
+   white as the menu panel they sit on (barely any contrast, unlike dark
+   mode's two visibly different near-blacks) — give them their own explicit
+   tint here instead of relying on that token for this one spot. */
+:root[data-theme="light"] .studio-add-lane-panel select,
+:root[data-theme="light"] .studio-add-lane-panel input[type="text"] {
+  background: rgba(var(--studio-ink), 0.04);
 }
 
 .studio-track-menu-item {
@@ -541,12 +646,132 @@
 
 .studio-track-menu-item:hover {
   border-color: var(--studio-panel-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--studio-ink), 0.04);
 }
 
 .studio-track-menu-item.danger {
   color: #ff9b9b;
   border-color: rgba(255, 155, 155, 0.25);
+}
+
+.studio-track-menu-instrument {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px 8px;
+  border-bottom: 1px solid var(--studio-panel-border);
+  margin-bottom: 2px;
+}
+
+.studio-track-menu-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--studio-subtext);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.studio-track-menu-instrument-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.studio-track-menu-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.studio-track-menu-preset-remove {
+  background: none;
+  border: none;
+  color: var(--studio-subtext);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.studio-track-menu-preset-remove:hover {
+  color: var(--studio-text);
+}
+
+.studio-track-menu-vst3 {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px 8px;
+  border-bottom: 1px solid var(--studio-panel-border);
+  margin-bottom: 2px;
+}
+
+.studio-track-menu-vst3-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.studio-track-menu-vst3-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--studio-subtext);
+  cursor: pointer;
+}
+
+.studio-track-menu-vst3-error {
+  font-size: 11px;
+  color: var(--studio-danger);
+}
+
+.studio-track-menu-vst3-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.studio-track-menu-vst3-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--studio-text);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.studio-track-menu-vst3-item:hover {
+  background: rgba(var(--studio-ink), 0.06);
+}
+
+.studio-track-menu-vst3-item.active {
+  border-color: var(--studio-accent-strong);
+  color: var(--studio-accent-strong);
+}
+
+.studio-track-menu-vst3-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-track-menu-vst3-state {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.8;
 }
 
 .studio-track-controls {
@@ -601,8 +826,8 @@
   border-radius: 12px;
   border: 1px solid var(--studio-panel-border);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent 26px),
-    rgba(6, 9, 12, 0.72);
+    linear-gradient(180deg, rgba(var(--studio-ink), 0.01), transparent 26px),
+    rgba(var(--studio-surface-ink), 0.72);
 }
 
 .studio-ruler-inner {
@@ -669,19 +894,19 @@
   right: 0;
   border-bottom: 1px solid var(--studio-panel-border);
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025), transparent 120px),
+    linear-gradient(90deg, rgba(var(--studio-ink), 0.025), transparent 120px),
     var(--lane-bg, transparent);
 }
 
 .studio-lane.drop-target {
-  background: rgba(10, 132, 255, 0.08);
+  background: rgba(255, 159, 10, 0.08);
 }
 
 .studio-clip {
   position: absolute;
  
   height: 90px;
-  background: var(--lane-clip-bg, rgba(10, 16, 22, 0.9));
+  background: var(--lane-clip-bg, rgba(var(--studio-surface-ink), 0.9));
   border: 1px solid var(--lane-clip-border, var(--studio-panel-border));
   border-radius: 12px;
   padding: 6px;
@@ -697,7 +922,7 @@
   top: 0;
   bottom: 0;
   width: 8px;
-  background: rgba(10, 132, 255, 0.25);
+  background: rgba(255, 159, 10, 0.25);
   cursor: ew-resize;
   opacity: 0;
   transition: opacity 0.15s ease;
@@ -742,6 +967,23 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+  /* The clip's own width is the duration, at the current zoom — full stop.
+     A label that doesn't fit used to wrap onto a second line instead of
+     shrinking, which grew the clip taller than its duration called for.
+     Truncated instead, with the full name as a native tooltip. */
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.studio-clip-title span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.studio-clip-actions {
+  flex: 0 0 auto;
 }
 
 .studio-tag {
@@ -769,17 +1011,43 @@
 }
 
 .studio-clip-menu {
+  /* Portaled to document.body (ClipView.js) rather than positioned relative
+     to the button that opens it — .studio-clip clips its own overflow for
+     its rounded, Suno-style corners, which clipped this the instant it grew
+     past the clip's own small box. position/left/top now come from the
+     button's own screen coordinates as an inline style; this position stays
+     only as the base the inline style overrides.
+     Being outside .studio-page, --studio-ink/--studio-surface-ink/
+     --studio-text/--studio-panel-border were never actually reaching this —
+     var() resolving to nothing made the menu items invisible-on-near-black
+     (computed to plain black text on a near-black fill) rather than the
+     intended near-white. Not a theme bug specifically, just never reached
+     before this pass — redeclared the same way .studio-ai-bar already was. */
+  --studio-ink: 255, 255, 255;
+  --studio-surface-ink: 8, 12, 16;
+  --studio-text: rgba(var(--studio-ink), 0.92);
+  --studio-panel-border: rgba(var(--studio-ink), 0.1);
   position: absolute;
   right: 0;
   top: 18px;
-  background: rgba(8, 12, 16, 0.95);
+  background: rgba(var(--studio-surface-ink), 0.95);
   border: 1px solid var(--studio-panel-border);
   border-radius: 10px;
   padding: 6px;
   display: grid;
   gap: 6px;
   min-width: 150px;
-  z-index: 30;
+  /* Above the transport bar (z-index: 300) and any panel content — this can
+     open from a clip anywhere on the timeline, including behind either. */
+  z-index: 350;
+}
+
+:root[data-theme="light"] .studio-clip-menu {
+  --studio-ink: 10, 10, 15;
+  --studio-surface-ink: 255, 255, 255;
+  --studio-text: rgba(var(--studio-ink), 0.92);
+  --studio-panel-border: rgba(var(--studio-ink), 0.12);
+  box-shadow: 0 10px 28px rgba(20, 25, 45, 0.16);
 }
 
 .studio-clip-menu-item {
@@ -793,9 +1061,18 @@
   cursor: pointer;
 }
 
+.studio-clip-menu-vst3 {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 4px 2px;
+  border-top: 1px solid var(--studio-panel-border);
+  min-width: 200px;
+}
+
 .studio-clip-menu-item:hover {
   border-color: var(--studio-panel-border);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(var(--studio-ink), 0.05);
 }
 
 .studio-clip-placeholder {
@@ -811,8 +1088,8 @@
   height: 54px;
   border-radius: 10px;
   overflow: hidden;
-  background: rgba(5, 9, 14, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(var(--studio-surface-ink), 0.4);
+  border: 1px solid rgba(var(--studio-ink), 0.06);
 }
 
 .studio-clip-lyrics-length {
@@ -832,7 +1109,7 @@
   resize: none;
   border-radius: 8px;
   border: 1px solid var(--studio-panel-border);
-  background: rgba(10, 16, 22, 0.7);
+  background: rgba(var(--studio-surface-ink), 0.7);
   color: var(--studio-text);
   font-size: 11px;
   font-weight: 600;
@@ -858,7 +1135,7 @@
 .studio-clip-lyrics-edit-btn {
   border-radius: 999px;
   border: 1px solid var(--studio-panel-border);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--studio-ink), 0.08);
   color: var(--studio-text);
   font-size: 10px;
   padding: 2px 8px;
@@ -866,7 +1143,7 @@
 }
 
 .studio-clip-lyrics-edit-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(var(--studio-ink), 0.16);
 }
 
 .studio-clip-lyrics-edit-btn:disabled {
@@ -895,8 +1172,8 @@
   gap: 6px;
   padding: 0 8px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(8, 12, 16, 0.7);
+  border: 1px solid rgba(var(--studio-ink), 0.1);
+  background: rgba(var(--studio-surface-ink), 0.7);
   color: var(--studio-subtext);
   font-size: 10px;
   font-weight: 700;
@@ -907,8 +1184,8 @@
 
 .studio-clip-lyrics-entry.active {
   color: var(--studio-text);
-  border-color: rgba(10, 132, 255, 0.45);
-  background: rgba(10, 132, 255, 0.18);
+  border-color: rgba(255, 159, 10, 0.45);
+  background: rgba(255, 159, 10, 0.18);
 }
 
 .studio-clip-lyrics-entry-text {
@@ -925,8 +1202,8 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(var(--studio-ink), 0.4);
+  border-top-color: rgba(var(--studio-ink), 0.9);
   animation: studio-spin 0.9s linear infinite;
   flex-shrink: 0;
 }
@@ -940,7 +1217,7 @@
 .studio-midi-surface {
   position: absolute;
   inset: 0;
-  background: rgba(8, 12, 18, 0.35);
+  background: rgba(var(--studio-surface-ink), 0.35);
 }
 
 .studio-midi-overlay {
@@ -977,7 +1254,7 @@
   top: 0;
   bottom: 0;
   width: 6px;
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(var(--studio-ink), 0.35);
   opacity: 0.0;
   transition: opacity 120ms ease;
   cursor: ew-resize;
@@ -1007,6 +1284,10 @@
 .studio-midi-editor-backdrop {
   position: fixed;
   inset: 0;
+  /* A dimming scrim, not a surface — stays dark in both themes like every
+     other modal backdrop in the app, so this one was wrongly swept up by
+     the mechanical near-black -> --studio-surface-ink pass (0.7 alpha over
+     white would barely dim anything). */
   background: rgba(4, 8, 12, 0.7);
   display: grid;
   place-items: center;
@@ -1015,15 +1296,34 @@
 }
 
 .studio-midi-editor {
+  /* Portaled to document.body (ClipView.js), so — same issue as the other
+     menus above — it needs its own copy of the tokens its children (the
+     piano roll's own .pr-* rules, further down this file) reference. */
+  --studio-ink: 255, 255, 255;
+  --studio-surface-ink: 11, 17, 24;
+  --studio-text: rgba(var(--studio-ink), 0.92);
+  --studio-subtext: rgba(var(--studio-ink), 0.62);
+  --studio-panel-border: rgba(var(--studio-ink), 0.1);
+  --studio-accent-strong: #ff9f0a;
   width: min(1100px, 92vw);
-  background: #0b1118;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--studio-surface-2, #0b1118);
+  border: 1px solid rgba(var(--studio-ink), 0.08);
   border-radius: 14px;
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.55);
   display: flex;
   flex-direction: column;
   max-height: 85vh;
   pointer-events: auto;
+}
+
+:root[data-theme="light"] .studio-midi-editor {
+  --studio-ink: 10, 10, 15;
+  --studio-surface-ink: 246, 246, 248;
+  --studio-text: rgba(var(--studio-ink), 0.92);
+  --studio-subtext: rgba(var(--studio-ink), 0.62);
+  --studio-panel-border: rgba(var(--studio-ink), 0.12);
+  --studio-accent-strong: #e08000;
+  background: #f7f7fa;
 }
 
 .studio-beatbox-wizard-shell {
@@ -1038,7 +1338,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(var(--studio-ink), 0.06);
 }
 
 .studio-midi-editor-title {
@@ -1048,8 +1348,8 @@
 }
 
 .studio-midi-editor-close {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(var(--studio-ink), 0.08);
+  border: 1px solid rgba(var(--studio-ink), 0.12);
   color: var(--studio-text);
   font-size: 12px;
   padding: 6px 10px;
@@ -1083,6 +1383,223 @@
   overflow: auto;
 }
 
+/* --- Piano / drum step-input, above the note canvas -----------------------
+   Present regardless of whether the clip has any notes yet — a brand-new
+   blank MIDI clip (Timeline.js double-click) has nothing to draw a canvas
+   over until its first note exists, so this is what gets it there. */
+.studio-midi-editor-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(var(--studio-ink), 0.06);
+}
+
+.studio-midi-editor-input-toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.studio-piano {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.studio-piano-octave {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--studio-subtext);
+  flex: none;
+}
+
+.studio-piano-keys {
+  position: relative;
+  display: flex;
+  height: 84px;
+  flex: 1;
+  min-width: 0;
+}
+
+.studio-piano-key {
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 6px;
+  user-select: none;
+}
+
+.studio-piano-key.white {
+  flex: 1;
+  background: #eef0f4;
+  color: #0b0b0f;
+  border-radius: 0 0 6px 6px;
+  z-index: 1;
+}
+
+.studio-piano-key.white:active {
+  background: var(--studio-accent-strong);
+}
+
+.studio-piano-key.black {
+  position: absolute;
+  top: 0;
+  width: 5%;
+  height: 60%;
+  left: calc((var(--after) + 1) * (100% / var(--white-count)) - 2.5%);
+  background: #1a1d22;
+  color: rgba(var(--studio-ink), 0.85);
+  border-radius: 0 0 4px 4px;
+  z-index: 2;
+}
+
+.studio-piano-nav {
+  flex: none;
+  width: 26px;
+  height: 84px;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(var(--studio-ink), 0.04);
+  color: var(--studio-subtext);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.studio-piano-nav:hover {
+  color: var(--studio-text);
+  background: rgba(var(--studio-ink), 0.08);
+}
+
+.studio-piano-key.black:active {
+  background: var(--studio-accent-strong);
+  color: #0b0b0f;
+}
+
+.studio-piano-key-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.studio-drum-pads {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.studio-drum-pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 54px;
+  border-radius: 10px;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(var(--studio-ink), 0.05);
+  color: var(--studio-text);
+  cursor: pointer;
+}
+
+.studio-drum-pad:active {
+  background: var(--studio-accent-strong);
+  color: #0b0b0f;
+}
+
+.studio-drum-pad-key {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--studio-subtext);
+}
+
+.studio-drum-pad-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.studio-arp {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin-top: 8px;
+  border: 1px solid var(--studio-panel-border);
+  border-radius: 10px;
+  background: rgba(var(--studio-ink), 0.03);
+}
+
+.studio-arp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--studio-text);
+  cursor: pointer;
+}
+
+.studio-arp-row {
+  display: flex;
+  gap: 8px;
+}
+
+.studio-arp-select {
+  flex: 1;
+  background: rgba(var(--studio-surface-ink), 0.8);
+  border: 1px solid var(--studio-panel-border);
+  border-radius: 8px;
+  color: var(--studio-text);
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.studio-arp-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--studio-subtext);
+}
+
+.studio-arp-field input[type="range"] {
+  width: 100%;
+}
+
+.studio-midi-macro-btn {
+  align-self: flex-start;
+  border: 1px solid var(--studio-panel-border);
+  border-radius: 6px;
+  background: rgba(var(--studio-ink), 0.04);
+  color: var(--studio-subtext);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.studio-midi-macro-btn.mapped {
+  border-color: var(--studio-accent-strong);
+  color: var(--studio-accent-strong);
+}
+
+.studio-midi-macro-btn.learning {
+  border-color: var(--studio-accent-strong);
+  background: var(--studio-accent-strong);
+  color: #0b0b0f;
+  animation: studio-midi-learning-pulse 1s ease-in-out infinite;
+}
+
+@keyframes studio-midi-learning-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
 .studio-midi-editor-canvas {
   position: relative;
   height: 440px;
@@ -1090,20 +1607,20 @@
   background:
     repeating-linear-gradient(
       to right,
-      rgba(255, 255, 255, 0.06) 0,
-      rgba(255, 255, 255, 0.06) 1px,
+      rgba(var(--studio-ink), 0.06) 0,
+      rgba(var(--studio-ink), 0.06) 1px,
       transparent 1px,
       transparent var(--grid-step, 48px)
     ),
     repeating-linear-gradient(
       to top,
-      rgba(255, 255, 255, 0.04) 0,
-      rgba(255, 255, 255, 0.04) 1px,
+      rgba(var(--studio-ink), 0.04) 0,
+      rgba(var(--studio-ink), 0.04) 1px,
       transparent 1px,
       transparent 14px
     ),
-    rgba(6, 10, 16, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+    rgba(var(--studio-surface-ink), 0.85);
+  border: 1px solid rgba(var(--studio-ink), 0.08);
   overflow: hidden;
 }
 
@@ -1117,11 +1634,11 @@
     to right,
     transparent 0,
     transparent 3px,
-    #ff9f1a 3px,
-    #ff9f1a 5px,
+    var(--studio-accent-strong) 3px,
+    var(--studio-accent-strong) 5px,
     transparent 5px
   );
-  box-shadow: 0 0 8px rgba(255, 159, 26, 0.5);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--studio-accent-strong) 50%, transparent);
   z-index: 6;
   pointer-events: auto;
   cursor: ew-resize;
@@ -1131,8 +1648,8 @@
 .studio-midi-editor-selection {
   position: absolute;
   top: 0;
-  background: rgba(255, 159, 26, 0.18);
-  border: 1px dashed rgba(255, 159, 26, 0.7);
+  background: color-mix(in srgb, var(--studio-accent-strong) 18%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--studio-accent-strong) 70%, transparent);
   z-index: 4;
   pointer-events: none;
 }
@@ -1146,49 +1663,229 @@
 .studio-selection {
   position: absolute;
   top: 0;
-  background: rgba(10, 132, 255, 0.15);
-  border: 1px dashed rgba(10, 132, 255, 0.5);
+  background: color-mix(in srgb, var(--studio-accent-strong) 15%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--studio-accent-strong) 50%, transparent);
   pointer-events: none;
   z-index: 5;
 }
 
-.studio-selection-menu {
+/* The floating bar a timeline range selection opens — modelled on Suno's own
+   "ask for a part" bar: a chip naming what's selected, then a prompt row.
+   At 280px wide it ran past .studio-timeline-body's own right edge for any
+   selection past the first few seconds — clipped by the same scrolling
+   overflow that clipped the clip's own "⋯" menu before that got portaled.
+   Same fix here: portaled to document.body (Timeline.js), positioned from a
+   viewport coordinate computed once when the bar opens; position:fixed in
+   the inline style overrides this base value. */
+.studio-ai-bar {
+  /* Redeclared for the same reason #rx-studio-player-slot redeclares them:
+     being outside .studio-page now, this loses that selector's --studio-*
+     custom properties by normal CSS inheritance — portals move DOM
+     position, not React context, and custom properties inherit through the
+     DOM. (font-family used to need the same treatment here — now set
+     globally on body in next/tokens.css instead, since every document.body
+     portal in Studio shared the exact same loss.) */
+  --studio-ink: 255, 255, 255;
+  --studio-surface-ink: 16, 18, 22;
+  --studio-panel-border: rgba(var(--studio-ink), 0.1);
+  --studio-text: rgba(var(--studio-ink), 0.92);
+  --studio-subtext: rgba(var(--studio-ink), 0.62);
+  --studio-accent-strong: #ff9f0a;
   position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 320px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(var(--studio-surface-ink), 0.86);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  border: 1px solid var(--studio-panel-border);
+  /* Outer drop shadow for lift off the timeline, plus a hairline top
+     highlight and a soft inner shade along the bottom edge — the same
+     glass-bevel trick the rest of the app's cards use, redone by hand since
+     this sits outside .rx's --g-bevel token. */
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(var(--studio-ink), 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  z-index: 12;
+  pointer-events: auto;
+  animation: studio-ai-bar-in 0.16s cubic-bezier(0.32, 1.28, 0.4, 1);
+}
+
+:root[data-theme="light"] .studio-ai-bar {
+  --studio-ink: 10, 10, 15;
+  --studio-surface-ink: 255, 255, 255;
+  --studio-panel-border: rgba(var(--studio-ink), 0.12);
+  --studio-text: rgba(var(--studio-ink), 0.92);
+  --studio-subtext: rgba(var(--studio-ink), 0.62);
+  --studio-accent-strong: #e08000;
+  background: rgba(var(--studio-surface-ink), 0.92);
+  box-shadow:
+    0 20px 48px rgba(20, 25, 45, 0.18),
+    inset 0 1px 0 rgba(var(--studio-ink), 0.6),
+    inset 0 -1px 0 rgba(20, 25, 45, 0.06);
+}
+
+@keyframes studio-ai-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.studio-ai-bar-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px;
-  border-radius: 12px;
-  background: rgba(8, 12, 16, 0.92);
-  border: 1px solid var(--studio-panel-border);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
-  z-index: 12;
-  transform: translate(-100%, 0);
-  pointer-events: auto;
 }
 
-.studio-selection-btn {
-  border: 1px solid var(--studio-panel-border);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--studio-text);
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 11px;
+/* Every section of the card — the chip/close header, each action group, the
+   mode toggle, the submit row, the prompt row — is a direct child of
+   .studio-ai-bar in source order. A hairline above every one but the first
+   turns that plain stack into visibly separate sections without having to
+   know which section is which. */
+.studio-ai-bar > * + * {
+  padding-top: 9px;
+  border-top: 1px solid rgba(var(--studio-ink), 0.07);
+}
+
+.studio-ai-bar-chip {
+  flex: 1;
+  font-size: 11.5px;
   font-weight: 700;
-  cursor: pointer;
+  color: var(--studio-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studio-ai-bar-icon {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(var(--studio-ink), 0.06);
+  color: var(--studio-subtext);
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, transform 0.12s ease;
 }
 
-.studio-selection-btn.ghost {
-  background: transparent;
+.studio-ai-bar-icon:hover {
+  color: var(--studio-text);
+  background: rgba(var(--studio-ink), 0.14);
+  transform: scale(1.06);
+}
+
+.studio-ai-bar-icon:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.studio-ai-bar-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(var(--studio-ink), 0.05);
+  border: 1px solid var(--studio-panel-border);
+  border-radius: 999px;
+  color: var(--studio-text);
+  font-size: 12px;
+  padding: 9px 14px;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.studio-ai-bar-input::placeholder {
   color: var(--studio-subtext);
 }
 
-.studio-selection-btn:disabled {
-  opacity: 0.5;
+.studio-ai-bar-input:hover {
+  background: rgba(var(--studio-ink), 0.07);
+}
+
+/* Only shown for a selection that doesn't already have a vocal clip to edit
+   — Generate mode picks what kind of new material the prompt below builds. */
+.studio-ai-bar-mode {
+  flex: 1;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(var(--studio-ink), 0.04);
+  color: var(--studio-subtext);
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.studio-ai-bar-mode:hover {
+  background: rgba(var(--studio-ink), 0.09);
+  color: var(--studio-text);
+}
+
+.studio-ai-bar-mode.active {
+  color: #180f03;
+  background: var(--studio-accent-strong);
+  border-color: transparent;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--studio-accent-strong) 45%, transparent);
+}
+
+.studio-ai-bar-mode.active:hover {
+  background: color-mix(in srgb, var(--studio-accent-strong) 88%, #fff);
+}
+
+.studio-ai-bar-input:focus {
+  outline: none;
+  border-color: var(--studio-accent-strong);
+  background: rgba(var(--studio-ink), 0.07);
+}
+
+.studio-ai-bar-submit {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: var(--studio-accent-strong);
+  color: #180f03;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--studio-accent-strong) 45%, transparent);
+  transition: background-color 0.12s ease, transform 0.12s ease;
+}
+
+.studio-ai-bar-submit:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--studio-accent-strong) 88%, #fff);
+  transform: scale(1.05);
+}
+
+.studio-ai-bar-submit-wide {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.studio-ai-bar-submit:disabled {
+  opacity: 0.35;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .studio-playhead {
@@ -1229,8 +1926,8 @@
   display: grid;
   gap: 10px;
   padding-bottom: 10px;
-  background: linear-gradient(180deg, rgba(18, 25, 34, 0.96), rgba(18, 25, 34, 0.88));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, rgba(var(--studio-surface-ink), 0.96), rgba(var(--studio-surface-ink), 0.88));
+  border-bottom: 1px solid rgba(var(--studio-ink), 0.05);
 }
 
 .studio-inspector-topline {
@@ -1266,15 +1963,15 @@
 }
 
 .studio-ai-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--studio-ink), 0.08);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--studio-ink), 0.03);
   overflow: hidden;
 }
 
 .studio-ai-card.expanded {
-  border-color: rgba(10, 132, 255, 0.26);
-  box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.08);
+  border-color: rgba(255, 159, 10, 0.26);
+  box-shadow: 0 0 0 1px rgba(255, 159, 10, 0.08);
 }
 
 .studio-ai-card-head {
@@ -1338,18 +2035,20 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   padding: 10px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(var(--studio-ink), 0.05);
+  border-bottom: 1px solid rgba(var(--studio-ink), 0.05);
 }
 
 .studio-right-drawer {
   position: absolute;
   inset: 0;
-  background: rgba(8, 12, 16, 0.97);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  /* Fully opaque — at 0.97 the effects panel underneath (which can carry a bold white
+     "No lane selected" title) ghosted through visibly instead of just softening the edge. */
+  background: var(--studio-surface-2);
+  border-left: 1px solid rgba(var(--studio-ink), 0.08);
   transform: translateX(102%);
   transition: transform 0.22s ease;
-  z-index: 12;
+  z-index: 20;
   display: flex;
   flex-direction: column;
 }
@@ -1364,7 +2063,7 @@
   align-items: flex-start;
   gap: 12px;
   padding: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(var(--studio-ink), 0.08);
   min-width: 0;
 }
 
@@ -1395,8 +2094,8 @@
   align-items: flex-start;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(var(--studio-ink), 0.03);
+  border: 1px solid rgba(var(--studio-ink), 0.06);
 }
 
 .studio-activity-item.failed {
@@ -1434,7 +2133,7 @@
 
 .studio-tabs-secondary {
   padding-bottom: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(var(--studio-ink), 0.06);
 }
 
 .studio-tab {
@@ -1462,8 +2161,8 @@
   font-size: 13px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(var(--studio-ink), 0.12);
+  background: rgba(var(--studio-ink), 0.03);
 }
 
 .studio-field {
@@ -1473,18 +2172,10 @@
   min-width: 0;
 }
 
-.studio-field-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .studio-field input,
 .studio-field textarea,
 .studio-field select {
-  background: rgba(8, 12, 16, 0.8);
+  background: rgba(var(--studio-surface-ink), 0.8);
   border: 1px solid var(--studio-panel-border);
   border-radius: 8px;
   color: var(--studio-text);
@@ -1499,6 +2190,38 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   min-width: 0;
+}
+
+.studio-vst-embed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--studio-panel-border);
+  border-radius: var(--studio-radius-md);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.studio-vst-embed-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.studio-vst-embed-head .studio-panel-title {
+  flex: 1;
+}
+
+.studio-vst-embed-surface {
+  /* The plugin's own reparented native window is sized to match this element exactly (see the
+     ResizeObserver in Inspector.js) — this height is the plugin editor's visible height inside
+     the panel, not arbitrary. min-width guards against a collapsed panel handing the native side
+     a near-zero rect. */
+  width: 100%;
+  min-width: 240px;
+  height: 480px;
+  border-radius: 8px;
+  background: #000;
 }
 
 .studio-actions-row {
@@ -1523,46 +2246,9 @@
   padding: 10px;
   border-radius: 12px;
   border: 1px solid var(--studio-panel-border);
-  background: rgba(5, 8, 11, 0.6);
+  background: rgba(var(--studio-surface-ink), 0.6);
   min-width: 0;
   overflow-wrap: anywhere;
-}
-
-.studio-assist-trigger {
-  flex-shrink: 0;
-}
-
-.studio-assist-stack {
-  display: grid;
-  gap: 8px;
-}
-
-.studio-assist-card {
-  display: grid;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(10, 132, 255, 0.22);
-  background: rgba(10, 132, 255, 0.08);
-}
-
-.studio-assist-label {
-  color: var(--studio-accent);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.studio-assist-copy {
-  color: var(--studio-text);
-  font-size: 13px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-}
-
-.studio-assist-actions .studio-btn {
-  min-width: 0;
 }
 
 .studio-job-toasts {
@@ -1577,7 +2263,7 @@
 .studio-job-toast {
   padding: 10px 14px;
   border-radius: 12px;
-  background: rgba(8, 12, 16, 0.9);
+  background: rgba(var(--studio-surface-ink), 0.9);
   border: 1px solid var(--studio-panel-border);
   display: flex;
   justify-content: space-between;
@@ -1595,7 +2281,7 @@
 .studio-progress {
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--studio-ink), 0.08);
   overflow: hidden;
   margin-top: 6px;
 }
@@ -1617,7 +2303,7 @@
   position: relative;
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--studio-ink), 0.08);
   overflow: hidden;
   margin-top: 6px;
 }
@@ -1663,30 +2349,48 @@
   display: none;
 }
 
-.studio-create-panel .studio-actions-grid,
 .studio-library-panel .studio-actions-grid {
   margin-top: 8px;
 }
 
-.studio-create-panel,
 .studio-library-panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+  /* One hue per asset category, used to tint that category's badge and give
+     its cards a thin accent edge — the fastest way to tell a Drums row from
+     a Vocals row at a glance without reading the badge text every time. */
+  --cat-vocals: #ff6482;
+  --cat-drums: #ff9f0a;
+  --cat-bass: #af7aff;
+  --cat-music: #30d158;
+  --cat-midi: #64d2ff;
+  --cat-soundfont: #ffd60a;
+  --cat-generated: #5e9eff;
+  --cat-other: rgba(var(--studio-ink), 0.55);
 }
+
+.studio-library-group[data-category="vocals"],
+.studio-library-item[data-category="vocals"] { --cat-color: var(--cat-vocals); }
+.studio-library-group[data-category="drums"],
+.studio-library-item[data-category="drums"] { --cat-color: var(--cat-drums); }
+.studio-library-group[data-category="bass"],
+.studio-library-item[data-category="bass"] { --cat-color: var(--cat-bass); }
+.studio-library-group[data-category="music"],
+.studio-library-item[data-category="music"] { --cat-color: var(--cat-music); }
+.studio-library-group[data-category="midi"],
+.studio-library-item[data-category="midi"] { --cat-color: var(--cat-midi); }
+.studio-library-group[data-category="soundfont"],
+.studio-library-item[data-category="soundfont"] { --cat-color: var(--cat-soundfont); }
+.studio-library-group[data-category="generated"],
+.studio-library-item[data-category="generated"] { --cat-color: var(--cat-generated); }
+.studio-library-group[data-category="other"],
+.studio-library-item[data-category="other"] { --cat-color: var(--cat-other); }
 
 .studio-left-column .studio-library-panel {
   flex: 1;
   overflow: hidden;
-}
-
-.studio-create-panel-embedded {
-  gap: 10px;
-}
-
-.studio-create-panel-embedded .studio-panel-title {
-  margin-bottom: 2px;
 }
 
 .studio-library-panel-embedded {
@@ -1712,9 +2416,43 @@
   z-index: 3;
   display: grid;
   gap: 10px;
-  padding-bottom: 10px;
-  background: linear-gradient(180deg, rgba(18, 25, 34, 0.98), rgba(18, 25, 34, 0.9));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 12px;
+  background: linear-gradient(180deg, var(--studio-bg) 75%, transparent);
+  border-bottom: 1px solid rgba(var(--studio-ink), 0.06);
+}
+
+.studio-library-header-row {
+  /* Title and links used to sit on one row with space-between, which only
+     ever fit in a wide panel - at this rail's actual width "Library &
+     Workspace" plus three links had nowhere to go but wrap and overflow.
+     Stacking them removes the competition for horizontal space; the links
+     still wrap onto a second line themselves if the rail gets narrower still. */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.studio-library-header-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.studio-library-switch-link {
+  all: unset;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--studio-subtext);
+}
+.studio-library-switch-link:hover {
+  color: var(--studio-accent);
+}
+.studio-library-switch-link:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .studio-library-group-badge {
@@ -1722,24 +2460,29 @@
   align-items: center;
   justify-content: center;
   min-width: 32px;
-  height: 22px;
+  height: 20px;
   padding: 0 7px;
   border-radius: 999px;
-  background: rgba(255, 180, 84, 0.16);
-  color: var(--studio-accent-strong);
+  background: color-mix(in srgb, var(--cat-color, var(--studio-accent-strong)) 20%, transparent);
+  color: var(--cat-color, var(--studio-accent-strong));
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .studio-library-group-count {
   color: var(--studio-subtext);
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .studio-library-group {
   display: grid;
-  gap: 6px;
+  gap: 8px;
+}
+
+.studio-library-group + .studio-library-group {
+  margin-top: 4px;
 }
 
 .studio-library-group-head {
@@ -1748,45 +2491,60 @@
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  padding: 0;
+  padding: 4px 2px;
   border: none;
+  border-radius: 8px;
   background: transparent;
   color: var(--studio-text);
   cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.studio-library-group-head:hover {
+  background: rgba(var(--studio-ink), 0.035);
 }
 
 .studio-library-group-title {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   font-size: 11px;
   font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--studio-subtext);
 }
 
 .studio-library-group-right {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
 .studio-library-group-chevron {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid var(--studio-panel-border);
+  border: none;
+  background: rgba(var(--studio-ink), 0.05);
   color: var(--studio-subtext);
   font-size: 12px;
   font-weight: 700;
+  transition: transform 160ms ease, background 140ms ease;
+}
+
+.studio-library-group-head:hover .studio-library-group-chevron {
+  background: rgba(var(--studio-ink), 0.1);
 }
 
 .studio-library-group-list {
   display: grid;
-  gap: 5px;
+  gap: 6px;
 }
 
 .studio-library-group-list.collapsed {
@@ -1794,15 +2552,37 @@
 }
 
 .studio-library-item {
-  background: rgba(6, 9, 12, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  padding: 6px 8px;
+  position: relative;
+  background: rgba(var(--studio-ink), 0.025);
+  border: 1px solid rgba(var(--studio-ink), 0.05);
+  border-radius: 10px;
+  padding: 8px 10px 8px 13px;
   display: grid;
-  gap: 4px;
+  gap: 5px;
   cursor: grab;
   min-width: 0;
   overflow: hidden;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.studio-library-item::before {
+  /* The category accent lives here rather than on the card border, so it
+     reads as a thin spine (like a folder tab) instead of tinting the whole
+     card outline, which got visually noisy with eight different hues. */
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--cat-color, var(--studio-panel-border));
+  opacity: 0.55;
+}
+
+.studio-library-item:active {
+  cursor: grabbing;
+  transform: scale(0.99);
 }
 
 .studio-library-item-head {
@@ -1829,8 +2609,9 @@
 }
 
 .studio-library-title {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--studio-text);
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -1841,23 +2622,15 @@
   font-size: 10px;
   color: var(--studio-subtext);
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .studio-library-kind-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  color: var(--studio-text);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  display: none;
+  /* The category is already legible from the group it sits under and the
+     accent spine on the card's edge — repeating the same three-letter badge
+     on every single row, right next to a title fighting for the same width,
+     was redundant rather than informative. */
 }
 
 .studio-library-id {
@@ -1865,6 +2638,98 @@
   font-size: 9px;
   overflow-wrap: anywhere;
   line-height: 1.2;
+}
+
+.studio-library-tag-filters,
+.studio-library-saved-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.studio-library-tag-chip,
+.studio-library-save-filter-btn {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--studio-ink), 0.08);
+  background: rgba(var(--studio-ink), 0.04);
+  color: var(--studio-subtext);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.studio-library-tag-chip.active {
+  background: var(--studio-accent, #f5a623);
+  border-color: transparent;
+  color: #1a1206;
+  font-weight: 600;
+}
+
+.studio-library-saved-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--studio-ink), 0.08);
+  background: rgba(var(--studio-ink), 0.04);
+  overflow: hidden;
+}
+
+.studio-library-saved-filter-chip button {
+  background: none;
+  border: none;
+  color: var(--studio-subtext);
+  font-size: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.studio-library-saved-filter-remove {
+  color: var(--studio-subtext);
+  opacity: 0.6;
+  padding-left: 0 !important;
+}
+
+.studio-library-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.studio-library-item-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 999px;
+  background: rgba(var(--studio-ink), 0.06);
+  font-size: 9px;
+}
+
+.studio-library-item-tag button {
+  background: none;
+  border: none;
+  color: var(--studio-text);
+  font-size: 9px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.studio-library-item-tag-remove {
+  opacity: 0.6;
+  padding-left: 0 !important;
+}
+
+.studio-library-tag-input {
+  width: 44px;
+  background: transparent;
+  border: 1px dashed rgba(var(--studio-ink), 0.15);
+  border-radius: 999px;
+  color: var(--studio-text);
+  font-size: 9px;
+  padding: 2px 6px;
 }
 
 .studio-library-item-actions {
@@ -1883,7 +2748,7 @@
   padding: 0;
   border-radius: 7px;
   border: 1px solid var(--studio-panel-border);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(var(--studio-ink), 0.02);
   color: var(--studio-text);
   cursor: pointer;
   font-size: 15px;
@@ -1891,8 +2756,8 @@
 }
 
 .studio-library-icon-btn.active {
-  background: rgba(10, 132, 255, 0.14);
-  border-color: rgba(10, 132, 255, 0.28);
+  background: rgba(255, 159, 10, 0.14);
+  border-color: rgba(255, 159, 10, 0.28);
 }
 
 .studio-library-icon-btn.danger {
@@ -1950,7 +2815,7 @@
 }
 
 .studio-track-headers {
-  background: rgba(8, 12, 16, 0.85);
+  background: rgba(var(--studio-surface-ink), 0.85);
   border-right: 1px solid var(--studio-panel-border);
   overflow: auto;
   padding: 12px;
@@ -2009,147 +2874,11 @@
   position: fixed;
   inset: 0;
   z-index: 120;
-  background: rgba(4, 8, 12, 0.72);
+  background: rgba(var(--studio-surface-ink), 0.72);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 28px;
-}
-
-.studio-orchestrator-modal {
-  width: min(1200px, calc(100vw - 56px));
-  max-height: min(88vh, 920px);
-  border-radius: 18px;
-  border: 1px solid var(--studio-panel-border);
-  background: linear-gradient(180deg, rgba(18, 24, 31, 0.98), rgba(10, 15, 20, 0.98));
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.studio-orchestrator-head {
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--studio-panel-border);
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.studio-orchestrator-body {
-  padding: 18px 20px 20px;
-  display: grid;
-  gap: 14px;
-  min-height: 0;
-}
-
-.studio-orchestrator-scroll {
-  overflow: auto;
-}
-
-.studio-orchestrator-card,
-.studio-orchestrator-step {
-  border: 1px solid rgba(120, 146, 170, 0.18);
-  border-radius: 14px;
-  padding: 12px;
-  display: grid;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.studio-orchestrator-card-head {
-  justify-content: space-between;
-  align-items: center;
-}
-
-.studio-orchestrator-step {
-  margin-top: 8px;
-}
-
-.studio-orchestrator-step-list {
-  display: grid;
-  gap: 8px;
-}
-
-.studio-orchestrator-step-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border: 1px solid rgba(120, 146, 170, 0.18);
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.studio-orchestrator-step-item.active {
-  border-color: rgba(31, 187, 255, 0.55);
-  background: rgba(31, 187, 255, 0.08);
-}
-
-.studio-orchestrator-step-item.complete {
-  border-color: rgba(91, 214, 118, 0.42);
-  background: rgba(91, 214, 118, 0.08);
-}
-
-/* Selection actions — appear under the timeline once a range is selected.
-   Kept next to the selection itself: regenerating a region is a gesture on
-   what you just highlighted, not a command hidden in a side panel. */
-.studio-selection-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  margin-top: 8px;
-  border: 1px solid var(--studio-panel-border);
-  border-radius: 12px;
-  background: rgba(10, 132, 255, 0.06);
-}
-
-.studio-selection-actions__info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.studio-selection-actions__range {
-  font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--studio-text);
-  opacity: 0.75;
-}
-
-.studio-selection-actions__prompt {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--studio-panel-border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--studio-text);
-  font-size: 12px;
-}
-
-.studio-selection-actions__prompt::placeholder {
-  color: var(--studio-text);
-  opacity: 0.4;
-}
-
-.studio-selection-actions__prompt:disabled {
-  opacity: 0.5;
-}
-
-.studio-selection-actions__action {
-  flex: 0 0 auto;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--studio-panel-border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--studio-text);
-  font-size: 12px;
-  font-weight: 600;
 }
 
 .studio-mini.danger {
@@ -2214,8 +2943,8 @@
    audio did. States read as fills now; the accent is reserved for actions. */
 .studio-lane-toggle.active,
 .studio-mini.active {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(var(--studio-ink), 0.14);
+  border-color: rgba(var(--studio-ink), 0.22);
   color: var(--studio-text);
 }
 
@@ -2231,7 +2960,7 @@
 
 .studio-transport-pill.active {
   background: var(--studio-accent-wash);
-  border-color: rgba(10, 132, 255, 0.35);
+  border-color: rgba(255, 159, 10, 0.35);
 }
 
 /* --- Lane controls on demand -------------------------------------------- */
@@ -2249,26 +2978,20 @@
 }
 
 /* --- Type ---------------------------------------------------------------- */
-/* Space Grotesk is a display face; at 11px its letterforms fight legibility
-   and its figures aren't tabular, so the transport clock jitters while
-   playing. Keep it for section titles only. */
 .studio-panel-title,
 .studio-section-title {
-  font-family: "Space Grotesk", system-ui, sans-serif;
   letter-spacing: -0.01em;
 }
 
 .studio-time,
 .studio-transport-pill,
-.studio-lane-db,
-.studio-selection-actions__range {
+.studio-lane-db {
   font-variant-numeric: tabular-nums;
 }
 
 /* --- Motion -------------------------------------------------------------- */
 /* Panels and generated clips used to pop into existence. */
 .studio-panel,
-.studio-selection-actions,
 .studio-job-toast {
   transition: opacity 200ms ease, transform 200ms ease;
 }
@@ -2278,14 +3001,12 @@
   to { opacity: 1; transform: none; }
 }
 
-.studio-selection-actions,
 .studio-job-toast {
   animation: studio-fade-in 200ms ease both;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .studio-panel,
-  .studio-selection-actions,
   .studio-job-toast {
     transition: none;
     animation: none;
@@ -2382,7 +3103,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: rgba(22, 22, 26, 0.92);
+  background: rgba(var(--studio-surface-ink), 0.92);
   border: 1px solid var(--studio-panel-border);
   border-radius: var(--studio-radius-md);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
@@ -2413,7 +3134,7 @@
 }
 
 .studio-export-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--studio-ink), 0.08);
 }
 
 .studio-export-item.danger {
@@ -2422,6 +3143,33 @@
 
 .studio-export-item.danger:hover {
   background: rgba(255, 69, 58, 0.12);
+}
+
+.studio-export-master {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--studio-subtext);
+  border-bottom: 1px solid var(--studio-panel-border);
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+
+.studio-export-master select {
+  margin-left: auto;
+  background: rgba(var(--studio-ink), 0.06);
+  color: var(--studio-text);
+  border: 1px solid var(--studio-panel-border);
+  border-radius: 6px;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+
+.studio-export-master select:disabled {
+  opacity: 0.4;
 }
 
 /* Transport clock: the thing you read while it moves. */
@@ -2481,7 +3229,7 @@
   padding: 9px 12px;
   border-radius: 12px;
   border: 1px solid var(--studio-panel-border);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(var(--studio-ink), 0.05);
   color: var(--studio-text);
   font-size: 13px;
   font-family: inherit;
@@ -2495,14 +3243,14 @@
 .studio-inspector input:focus,
 .studio-inspector select:focus {
   outline: none;
-  border-color: rgba(10, 132, 255, 0.55);
-  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 159, 10, 0.55);
+  background: rgba(var(--studio-ink), 0.07);
 }
 
 .studio-field input::placeholder,
 .studio-inspector textarea::placeholder,
 .studio-inspector input::placeholder {
-  color: rgba(255, 255, 255, 0.32);
+  color: rgba(var(--studio-ink), 0.32);
 }
 
 /* --- Right panel: stop nesting cards ------------------------------------- */
@@ -2529,12 +3277,12 @@
 .studio-meta-block + .studio-meta-block {
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(var(--studio-ink), 0.06);
 }
 
 .studio-embedded-card {
   border: none;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--studio-ink), 0.04);
   border-radius: var(--studio-radius-md);
   padding: 14px;
   margin-bottom: 0;
@@ -2550,7 +3298,7 @@
   color: var(--studio-subtext);
   font-size: 12px;
   line-height: 1.5;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--studio-ink), 0.03);
   border-radius: var(--studio-radius-md);
   padding: 14px;
 }
@@ -2565,7 +3313,7 @@
 
 .studio-inspector-sticky {
   padding-bottom: 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(var(--studio-ink), 0.06);
   margin-bottom: 18px;
 }
 
@@ -2576,36 +3324,22 @@
   display: none;
 }
 
-.studio-library-item-actions {
+.studio-library-item-actions,
+.studio-library-tag-input {
   opacity: 0;
   transition: opacity 160ms ease;
 }
 
 .studio-library-item:hover .studio-library-item-actions,
-.studio-library-item:focus-within .studio-library-item-actions {
+.studio-library-item:focus-within .studio-library-item-actions,
+.studio-library-item:hover .studio-library-tag-input,
+.studio-library-item:focus-within .studio-library-tag-input {
   opacity: 1;
 }
 
-.studio-library-item {
-  border: none;
-  border-radius: 12px;
-  padding: 8px 10px;
-  transition: background 160ms ease;
-}
-
 .studio-library-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-/* The VOX / BAS / MUS / GEN badges were the loudest thing in the column. */
-.studio-library-group-badge,
-.studio-library-kind-chip {
-  background: rgba(255, 255, 255, 0.06);
-  border: none;
-  color: var(--studio-subtext);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  background: rgba(var(--studio-ink), 0.05);
+  border-color: rgba(var(--studio-ink), 0.09);
 }
 
 .studio-library-meta {
@@ -2621,78 +3355,10 @@
   animation: studio-fade-in 180ms ease both;
 }
 
-.studio-orchestrator-modal {
-  width: min(720px, calc(100vw - 56px));
-  border-radius: var(--studio-radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(22, 22, 26, 0.92);
-  backdrop-filter: blur(24px);
-  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.7);
-  animation: studio-fade-in 200ms ease both;
-}
-
-.studio-orchestrator-head {
-  padding: 22px 24px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.studio-orchestrator-body {
-  padding: 20px 24px 24px;
-  gap: 18px;
-}
-
-.studio-orchestrator-card,
-.studio-orchestrator-step {
-  border: none;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: var(--studio-radius-md);
-  padding: 14px;
-}
-
-/* The primary action sat small and bottom-left, where nothing looks for it. */
-.studio-orchestrator-body > .studio-btn,
-.studio-orchestrator-actions {
-  justify-self: end;
-  align-self: end;
-}
-
-.studio-orchestrator-body > .studio-btn {
-  padding: 11px 22px;
-  border-radius: 12px;
-  font-size: 14px;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .studio-modal-backdrop,
-  .studio-orchestrator-modal {
+  .studio-modal-backdrop {
     animation: none;
   }
-}
-
-/* The modal's primary action sat small and bottom-left. In a dialog the eye
-   finishes bottom-right, which is where the commitment belongs. */
-.studio-orchestrator-body .studio-actions-row {
-  justify-content: flex-end;
-  padding-top: 4px;
-}
-
-.studio-orchestrator-body .studio-actions-row .studio-btn {
-  padding: 11px 22px;
-  border-radius: 12px;
-  font-size: 14px;
-}
-
-/* "Close" was a text button competing with the title. */
-.studio-orchestrator-head .studio-mini,
-.studio-orchestrator-head .studio-btn.ghost {
-  border-color: transparent;
-  color: var(--studio-subtext);
-}
-
-.studio-orchestrator-head .studio-mini:hover,
-.studio-orchestrator-head .studio-btn.ghost:hover {
-  color: var(--studio-text);
-  background: rgba(255, 255, 255, 0.08);
 }
 
 /* ==========================================================================
@@ -2716,13 +3382,13 @@
 .studio-page input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(var(--studio-ink), 0.14);
 }
 
 .studio-page input[type="range"]::-moz-range-track {
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(var(--studio-ink), 0.14);
 }
 
 .studio-page input[type="range"]::-webkit-slider-thumb {
@@ -2771,9 +3437,9 @@
    identified by a spine at its left edge. */
 .studio-lane {
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02), transparent 140px),
-    rgba(255, 255, 255, 0.012);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    linear-gradient(90deg, rgba(var(--studio-ink), 0.02), transparent 140px),
+    rgba(var(--studio-ink), 0.012);
+  border-bottom: 1px solid rgba(var(--studio-ink), 0.05);
 }
 
 /* The spine: 3px of the lane's own colour, and the only place it appears at
@@ -2805,8 +3471,8 @@
   display: flex;
   flex-direction: column;
   border-radius: var(--studio-radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(22, 22, 26, 0.92);
+  border: 1px solid rgba(var(--studio-ink), 0.12);
+  background: rgba(var(--studio-surface-ink), 0.92);
   backdrop-filter: blur(24px);
   box-shadow: 0 32px 90px rgba(0, 0, 0, 0.7);
   animation: studio-fade-in 200ms ease both;
@@ -2819,7 +3485,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 20px 24px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(var(--studio-ink), 0.06);
 }
 
 .studio-modal-head .studio-panel-title {
@@ -2833,7 +3499,7 @@
 
 .studio-modal-head .studio-mini:hover {
   color: var(--studio-text);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--studio-ink), 0.08);
 }
 
 .studio-modal-body {
@@ -2872,7 +3538,7 @@
   display: flex;
   justify-content: flex-end;
   padding: 14px 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(var(--studio-ink), 0.06);
 }
 
 /* A picker is a list, not a stack of cards. Rows share one surface and are
@@ -2880,8 +3546,14 @@
 .studio-picker-list {
   margin-top: 10px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--studio-ink), 0.04);
   overflow: hidden;
+}
+
+.studio-template-row {
+  margin-top: 10px;
+  border-radius: 14px;
+  background: rgba(var(--studio-ink), 0.04);
 }
 
 .studio-picker-row {
@@ -2893,11 +3565,11 @@
 }
 
 .studio-picker-row + .studio-picker-row {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(var(--studio-ink), 0.06);
 }
 
 .studio-picker-row:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(var(--studio-ink), 0.05);
 }
 
 .studio-picker-row.active {
@@ -2940,7 +3612,7 @@
 }
 
 .studio-picker-action:hover {
-  background: rgba(10, 132, 255, 0.14);
+  background: rgba(255, 159, 10, 0.14);
 }
 
 .studio-picker-action:disabled {
@@ -2998,42 +3670,6 @@
   .studio-modal-panel {
     animation: none;
   }
-}
-
-/* --- Segmented control --------------------------------------------------- */
-/* "Custom Mode / Simple Mode" are two states of one setting, but they rendered
-   as two separate bordered buttons with a gap, which is the shape of two
-   independent actions. iOS gives a pair like this a single recessed track with
-   the selection riding inside it. */
-.studio-toggle-group {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.07);
-  flex-wrap: nowrap;
-  width: fit-content;
-}
-
-.studio-toggle-group .studio-mini {
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  padding: 5px 13px;
-  color: var(--studio-subtext);
-  box-shadow: none;
-  transition: background 160ms ease, color 160ms ease;
-}
-
-.studio-toggle-group .studio-mini:hover {
-  color: var(--studio-text);
-  background: transparent;
-}
-
-.studio-toggle-group .studio-mini.active {
-  background: rgba(255, 255, 255, 0.16);
-  color: var(--studio-text);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 /* ==========================================================================
@@ -3107,7 +3743,7 @@
    a tinted card pinned to the top of the panel rather than as the panel's own
    surface. Same trick as the modals: a neutral fill plus a blur. */
 .studio-inspector-sticky {
-  background: rgba(20, 20, 24, 0.94);
+  background: rgba(var(--studio-surface-ink), 0.94);
   backdrop-filter: blur(12px);
 }
 
@@ -3278,7 +3914,7 @@
 }
 
 .studio-track-row + .studio-track-row {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(var(--studio-ink), 0.05);
 }
 
 .studio-track-header {
@@ -3353,13 +3989,13 @@
 
 /* One hairline between columns carries the separation the borders used to. */
 .studio-center-column {
-  border-left: 1px solid rgba(255, 255, 255, 0.07);
-  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 1px solid rgba(var(--studio-ink), 0.07);
+  border-right: 1px solid rgba(var(--studio-ink), 0.07);
 }
 
 /* The left rail reads as a sidebar: slightly recessed, like Finder's. */
 .studio-left-column {
-  background: rgba(255, 255, 255, 0.018);
+  background: rgba(var(--studio-ink), 0.018);
 }
 
 /* --- The right panel was cut off at the bottom --------------------------- */
@@ -3482,11 +4118,11 @@
 
 .studio-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: rgba(var(--studio-ink), 0.18);
 }
 
 .studio-card.active {
-  border-color: rgba(10, 132, 255, 0.45);
+  border-color: rgba(255, 159, 10, 0.45);
 }
 
 .studio-card-head {
@@ -3513,9 +4149,9 @@
   width: 40px;
   height: 40px;
   border-radius: 11px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(var(--studio-ink), 0.2);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(var(--studio-ink), 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3529,7 +4165,7 @@
   z-index: 1;
   padding: 3px 8px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(var(--studio-ink), 0.9);
   color: #000;
   font-size: 10px;
   font-weight: 800;
@@ -3574,7 +4210,7 @@
 .studio-card-stat {
   padding: 8px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(var(--studio-ink), 0.05);
   border: 1px solid var(--studio-panel-border);
   min-width: 0;
 }
@@ -3608,7 +4244,7 @@
   padding: 9px 12px;
   border-radius: 10px;
   border: 1px solid var(--studio-panel-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--studio-ink), 0.04);
   color: var(--studio-text);
   font-size: 10.5px;
   font-weight: 700;
@@ -3619,7 +4255,7 @@
 }
 
 .studio-card-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(var(--studio-ink), 0.09);
 }
 
 .studio-card-btn:disabled {
@@ -3672,7 +4308,7 @@
   padding: 32px 28px;
   border-radius: var(--studio-radius-lg);
   border: 1px solid var(--studio-panel-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--studio-ink), 0.04);
   box-shadow: var(--studio-shadow-soft);
   text-align: center;
   display: grid;
@@ -3759,7 +4395,7 @@
    outline would vanish. A white ring plus a dark halo works on every hue. */
 .studio-clip.selected {
   box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.92),
+    0 0 0 2px rgba(var(--studio-ink), 0.92),
     0 0 0 4px rgba(0, 0, 0, 0.55);
   border-color: transparent;
 }
@@ -3773,13 +4409,13 @@
 /* Bar lines behind the clips give the arrangement a rhythm to read against. */
 .studio-lane {
   background-image:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02), transparent 140px);
+    linear-gradient(90deg, rgba(var(--studio-ink), 0.02), transparent 140px);
 }
 
 .studio-timeline-inner {
   background-image: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.055) 0 1px,
+    rgba(var(--studio-ink), 0.055) 0 1px,
     transparent 1px 100%
   );
   background-size: var(--studio-bar-px, 0) 100%;
@@ -3832,7 +4468,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(10, 132, 255, 0.35);
+  box-shadow: 0 2px 10px rgba(255, 159, 10, 0.35);
   transition: transform 120ms ease, filter 120ms ease;
 }
 
@@ -3865,12 +4501,12 @@
 }
 
 .studio-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--studio-ink), 0.08);
   color: var(--studio-text);
 }
 
 .studio-icon-btn:active {
-  background: rgba(255, 255, 255, 0.13);
+  background: rgba(var(--studio-ink), 0.13);
 }
 
 .studio-icon-btn:disabled {
@@ -3897,8 +4533,14 @@
 }
 
 .studio-toggle-btn:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(var(--studio-ink), 0.07);
   color: var(--studio-text);
+}
+
+.studio-toggle-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: none;
 }
 
 .studio-toggle-btn.active {
@@ -3928,7 +4570,7 @@
 }
 
 .studio-back-button:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(var(--studio-ink), 0.07);
   color: var(--studio-text);
 }
 
@@ -3942,7 +4584,7 @@
 }
 
 .studio-btn.accent {
-  box-shadow: 0 1px 8px rgba(10, 132, 255, 0.28);
+  box-shadow: 0 1px 8px rgba(255, 159, 10, 0.28);
 }
 
 /* --- Selects: the native arrow is the one Chrome part left showing -------- */
@@ -3978,7 +4620,7 @@
   padding: 4px 10px;
   border: none;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--studio-ink), 0.06);
   font-size: 12px;
   color: var(--studio-text);
 }
@@ -4025,43 +4667,6 @@
   padding-left: 32px;
 }
 
-/* --- Assist trigger ------------------------------------------------------- */
-/* "AI Assist" was a bordered box the same weight as the field's own label. */
-.studio-assist-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px 3px 7px;
-  border: none;
-  border-radius: 8px;
-  background: rgba(10, 132, 255, 0.14);
-  color: #6cb6ff;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
-}
-
-.studio-assist-trigger:hover:not(:disabled) {
-  background: rgba(10, 132, 255, 0.24);
-  color: #ffffff;
-}
-
-.studio-assist-trigger:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.studio-assist-trigger.active svg {
-  animation: studio-assist-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes studio-assist-pulse {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 1; }
-}
-
 /* --- Library group chevron ------------------------------------------------ */
 .studio-library-group-chevron {
   display: inline-flex;
@@ -4079,18 +4684,17 @@
   margin: 0;
 }
 
-.studio-tracklist-header .studio-mini,
-.studio-tracklist-header button[title*="lane" i] {
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+/* Forced every .studio-mini in this row — "Delete All", a text-labeled
+   button, along with any genuine icon-only one — into a fixed 26x26 square
+   with zero padding. "Delete All" doesn't fit in a 26px square: its own
+   text overflowed the box, which is what pushed this narrow sidebar column
+   into a horizontal scrollbar. Sized to its own label instead, like any
+   other .studio-mini. */
+.studio-tracklist-header .studio-mini {
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .studio-assist-trigger.active svg,
   .studio-library-group-chevron {
     animation: none;
     transition: none;
@@ -4106,4 +4710,657 @@
   padding: 4px 10px;
   border-radius: 9px;
   font-size: 12px;
+}
+
+.studio-view-mode-switch {
+  display: inline-flex;
+  gap: 4px;
+  margin-right: 6px;
+}
+
+/* Session/pattern view — non-linear clip-launch grid (rows = scenes, columns = the project's
+   existing lanes). See SessionView.js and useStudioPlayback.js's triggerScene/triggerClipSlot. */
+.studio-session-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  overflow: auto;
+  height: 100%;
+}
+
+.studio-session-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.studio-session-record-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--studio-panel-border);
+  background: var(--studio-panel-bg);
+  color: var(--studio-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.studio-session-stop-all {
+  margin-left: auto;
+}
+
+.studio-session-record-btn.active {
+  border-color: var(--studio-danger);
+  color: var(--studio-danger);
+  background: color-mix(in srgb, var(--studio-danger) 12%, transparent);
+}
+
+.studio-session-record-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--studio-danger);
+  opacity: 0.4;
+}
+
+.studio-session-record-btn.active .studio-session-record-dot {
+  opacity: 1;
+  animation: studio-session-record-pulse 1s ease-in-out infinite;
+}
+
+@keyframes studio-session-record-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.studio-session-grid {
+  display: grid;
+  gap: 4px;
+  align-items: stretch;
+}
+
+.studio-session-corner {
+  min-height: 32px;
+}
+
+.studio-session-lane-header {
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--studio-subtext);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 2px solid var(--studio-panel-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studio-session-scene-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+}
+
+.studio-session-scene-launch {
+  background: var(--studio-accent-wash);
+  color: var(--studio-accent);
+  border: 1px solid var(--studio-accent);
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.studio-session-scene-name {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--studio-text);
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.studio-session-scene-name:hover,
+.studio-session-scene-name:focus {
+  border-color: var(--studio-panel-border);
+  outline: none;
+}
+
+.studio-session-scene-remove {
+  background: none;
+  border: none;
+  color: var(--studio-subtext);
+  cursor: pointer;
+  font-size: 14px;
+  flex: none;
+  padding: 0 4px;
+}
+
+.studio-session-scene-remove:hover {
+  color: var(--studio-text);
+}
+
+.studio-session-cell {
+  position: relative;
+  min-height: 60px;
+  border: 1px solid var(--studio-panel-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  background: rgba(var(--studio-ink), 0.02);
+  overflow: hidden;
+}
+
+.studio-session-cell:focus-visible {
+  outline: 2px solid var(--studio-accent);
+  outline-offset: 1px;
+}
+
+.studio-session-cell.empty {
+  border-style: dashed;
+  align-items: center;
+}
+
+.studio-session-cell.loaded {
+  border-width: 1px;
+}
+
+.studio-session-cell.playing {
+  border-width: 2px;
+  box-shadow: 0 0 0 1px var(--studio-accent);
+}
+
+.studio-session-cell.drag-over {
+  border-color: var(--studio-accent);
+  box-shadow: 0 0 0 2px var(--studio-accent-wash) inset;
+}
+
+.studio-session-cell-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.studio-session-cell-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studio-session-cell-hint {
+  font-size: 11px;
+  color: var(--studio-subtext);
+}
+
+.studio-session-cell-bars {
+  font-size: 10px;
+  color: var(--studio-subtext);
+  align-self: flex-start;
+}
+
+.studio-session-cell-wave {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* Loop-synced "now playing" indicator — a bar that sweeps left-to-right once per real loop
+   cycle (animation-duration is set inline to the slot's actual srcEndSec-srcStartSec), not a
+   static "playing" tint. Approximate (CSS time, not the AudioContext sample clock the audio
+   itself runs on) but close enough to read as "in time" at a glance, and cheap. */
+.studio-session-cell-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--studio-accent);
+  animation-name: studio-session-cell-sweep;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes studio-session-cell-sweep {
+  from { left: 0; }
+  to { left: calc(100% - 3px); }
+}
+
+.studio-session-cell-menu-btn,
+.studio-session-cell-clear {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 13px;
+  flex: none;
+  line-height: 1;
+}
+
+.studio-session-cell-menu-btn:hover,
+.studio-session-cell-clear:hover {
+  opacity: 1;
+}
+
+.studio-session-add-scene {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.studio-session-popover-wrap {
+  position: relative;
+}
+
+.studio-session-popover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 220px;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--studio-panel-border);
+  background: var(--studio-panel-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.studio-session-popover-search {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--studio-panel-border);
+  background: transparent;
+  color: var(--studio-text);
+  font-size: 12px;
+}
+
+.studio-session-generate-btn {
+  align-self: stretch;
+  justify-content: center;
+}
+
+.studio-session-popover-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.studio-session-popover-item {
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--studio-text);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studio-session-popover-item:hover {
+  background: var(--studio-accent-wash);
+}
+
+.studio-session-popover-empty {
+  font-size: 11px;
+  color: var(--studio-subtext);
+  padding: 6px 8px;
+}
+
+.studio-session-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--studio-subtext);
+}
+
+.studio-session-menu-row input[type="number"] {
+  width: 64px;
+}
+
+.studio-session-menu-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Wider than the base .studio-session-popover — needs room for PianoKeyboard's white/black keys
+   next to a compact note grid, not just a single-column list of rows. */
+.studio-session-notes-popover {
+  min-width: 260px;
+  max-width: 360px;
+}
+
+.studio-session-midi-grid {
+  position: relative;
+  border-radius: 6px;
+  border: 1px solid var(--studio-panel-border);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(var(--studio-ink), 0.04) 0,
+      rgba(var(--studio-ink), 0.04) 1px,
+      transparent 1px,
+      transparent 17.5px
+    );
+  overflow: hidden;
+}
+
+.studio-session-midi-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--studio-subtext);
+  pointer-events: none;
+}
+
+.studio-session-notes-popover .studio-piano {
+  transform: scale(0.85);
+  transform-origin: top left;
+}
+
+.studio-clip-instrument {
+  flex: 0 1 auto;
+  max-width: 96px;
+  margin: 0 4px;
+  padding: 0 2px;
+  font-size: 10px;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(var(--studio-ink), 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* --- Piano roll (PianoRoll.js) ------------------------------------------ */
+/* Two of these colour families are deliberately NOT theme tokens:
+     - .pr-key.white/.pr-key.black draw an actual piano keyboard — those stay
+       white-key/black-key regardless of app theme, the same way a real
+       piano doesn't repaint itself for light mode.
+     - .pr-note's own fill comes from inline style (per-track/instrument
+       colour, same idea as .studio-clip) — not set here, so nothing to flip.
+   Everything else (panel fills, the ruler/keys rail, borders, playhead,
+   selection outline) is this editor's own near-black-on-white-text surface,
+   themed the same way as the rest of Studio: --studio-ink for washes/
+   borders (already in scope from .studio-midi-editor), plus two new panel-
+   local tokens for the two surface shades this editor actually uses. */
+.pr-root {
+  --pr-surface-1: 14, 22, 29;
+  --pr-surface-2: 18, 28, 37;
+  display: flex; flex-direction: column; gap: 6px; color: var(--studio-text); font-size: 12px; user-select: none;
+}
+:root[data-theme="light"] .pr-root {
+  --pr-surface-1: 237, 239, 242;
+  --pr-surface-2: 228, 231, 236;
+}
+.pr-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pr-toolbar select, .pr-toolbar button {
+  background: rgb(var(--pr-surface-2)); color: inherit; border: 1px solid rgba(var(--studio-ink), 0.14); border-radius: 6px; padding: 2px 8px;
+}
+.pr-hint { margin-left: auto; opacity: 0.55; font-size: 11px; }
+.pr-scroll { overflow: auto; border: 1px solid rgba(var(--studio-ink), 0.1); border-radius: 8px; background: rgb(var(--pr-surface-1)); }
+.pr-content { display: grid; position: relative; }
+.pr-corner { position: sticky; top: 0; left: 0; z-index: 6; background: rgb(var(--pr-surface-2)); border-bottom: 1px solid rgba(var(--studio-ink), 0.12); }
+.pr-ruler { position: sticky; top: 0; z-index: 5; background: rgb(var(--pr-surface-2)); border-bottom: 1px solid rgba(var(--studio-ink), 0.12); cursor: pointer; overflow: hidden; }
+.pr-bar-label { position: absolute; top: 4px; font-size: 10px; opacity: 0.7; }
+.pr-playhead-head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--studio-accent-strong); }
+.pr-keys { position: sticky; left: 0; z-index: 4; background: rgb(var(--pr-surface-2)); border-right: 1px solid rgba(var(--studio-ink), 0.12); }
+.pr-key { box-sizing: border-box; padding: 0 6px; font-size: 10px; line-height: 16px; border-bottom: 1px solid rgba(0,0,0,0.35); cursor: pointer; }
+.pr-key.white { background: #e6ecf1; color: #1a2530; }
+.pr-key.black { background: #26323d; color: #cbd6df; margin-right: 22px; }
+.pr-key.c { border-bottom-color: rgba(0,0,0,0.6); }
+.pr-key:hover { filter: brightness(1.15); }
+.pr-grid { position: relative; cursor: crosshair; }
+.pr-row { position: absolute; left: 0; right: 0; box-sizing: border-box; border-bottom: 1px solid rgba(var(--studio-ink), 0.04); pointer-events: none; }
+.pr-row.black { background: rgba(0, 0, 0, 0.28); }
+:root[data-theme="light"] .pr-row.black { background: rgba(10, 10, 15, 0.05); }
+.pr-row.c { border-bottom-color: rgba(var(--studio-ink), 0.18); }
+.pr-note { position: absolute; box-sizing: border-box; border-radius: 3px; border: 1px solid rgba(var(--studio-ink), 0.35); cursor: grab; }
+.pr-note::after { content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 7px; cursor: ew-resize; background: rgba(var(--studio-ink), 0.18); border-radius: 0 3px 3px 0; }
+.pr-note.selected { border-color: var(--studio-text); box-shadow: 0 0 0 1px var(--studio-text); z-index: 2; }
+.pr-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--studio-accent-strong); pointer-events: none; z-index: 3; }
+.pr-velocity { display: flex; border: 1px solid rgba(var(--studio-ink), 0.1); border-radius: 8px; background: rgb(var(--pr-surface-1)); overflow: hidden; }
+.pr-velocity-label { flex: none; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0.7; background: rgb(var(--pr-surface-2)); }
+.pr-velocity-view { position: relative; flex: 1; overflow: hidden; }
+.pr-velocity-lane { position: relative; }
+.pr-vel-bar { position: absolute; bottom: 0; width: 6px; border-radius: 2px 2px 0 0; opacity: 0.75; cursor: ns-resize; }
+.pr-vel-bar.selected { opacity: 1; outline: 1px solid var(--studio-text); }
+
+.studio-ai-bar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.studio-ai-bar-label {
+  flex: 0 0 44px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--studio-subtext);
+}
+
+.studio-ai-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font-size: 11px;
+  border: 1px solid var(--studio-panel-border);
+  background: rgba(var(--studio-ink), 0.06);
+  color: var(--studio-text);
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.studio-ai-bar-btn svg {
+  flex: none;
+  opacity: 0.85;
+}
+
+.studio-ai-bar-btn:hover {
+  background: rgba(var(--studio-ink), 0.14);
+}
+
+.studio-ai-bar-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* --- Effects rack (EffectsRack.js) — same glass cards / orange accent as the AI cards ------ */
+.studio-fx-rack { display: grid; gap: 10px; }
+.studio-fx-summary { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--studio-subtext); padding: 2px 2px 4px; }
+.studio-fx-summary-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.studio-fx-reset { margin-left: auto; border: 1px solid rgba(var(--studio-ink), 0.12); background: rgba(var(--studio-ink), 0.05); color: var(--studio-subtext); border-radius: 999px; font-size: 11px; padding: 3px 10px; cursor: pointer; }
+.studio-fx-reset:hover { color: var(--studio-text); background: rgba(var(--studio-ink), 0.1); }
+.studio-fx-card { border: 1px solid rgba(var(--studio-ink), 0.08); border-radius: 14px; background: rgba(var(--studio-ink), 0.03); overflow: hidden; transition: border-color .15s, box-shadow .15s; }
+.studio-fx-card.on { border-color: rgba(255,159,10,0.32); box-shadow: 0 0 0 1px rgba(255,159,10,0.08); }
+.studio-fx-head { display: flex; align-items: center; gap: 10px; padding: 11px 12px; }
+.studio-fx-headmain { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: none; background: transparent; color: inherit; text-align: left; padding: 0; cursor: pointer; font: inherit; }
+.studio-fx-headmain:disabled { cursor: default; }
+.studio-fx-icon { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 9px; background: rgba(var(--studio-ink), 0.06); color: var(--studio-subtext); font-size: 15px; }
+.studio-fx-card.on .studio-fx-icon { background: rgba(255,159,10,0.16); color: var(--studio-accent-strong); }
+.studio-fx-copy { display: grid; gap: 1px; min-width: 0; }
+.studio-fx-title { font-size: 13px; font-weight: 700; color: var(--studio-text); }
+.studio-fx-hint { font-size: 11px; line-height: 1.3; color: var(--studio-subtext); }
+.studio-fx-chevron { margin-left: auto; padding: 0 2px; color: var(--studio-subtext); font-size: 16px; transition: transform .15s; }
+.studio-fx-chevron.open { transform: rotate(90deg); }
+.studio-fx-switch { flex: none; position: relative; width: 38px; height: 22px; border-radius: 999px; border: 1px solid rgba(var(--studio-ink), 0.14); background: rgba(var(--studio-ink), 0.08); cursor: pointer; padding: 0; transition: background .15s; }
+.studio-fx-switch.on { background: var(--studio-accent-strong); border-color: transparent; }
+.studio-fx-switch-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.studio-fx-switch.on .studio-fx-switch-knob { transform: translateX(16px); }
+.studio-fx-body { display: grid; gap: 12px; padding: 2px 14px 14px; }
+.studio-fx-row { display: grid; gap: 6px; font-size: 12px; color: var(--studio-subtext); }
+.studio-fx-row.dim { opacity: 0.55; }
+.studio-fx-row-top { display: flex; justify-content: space-between; align-items: baseline; }
+.studio-fx-value { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--studio-text); }
+.studio-fx-card.on .studio-fx-value { color: var(--studio-accent-strong); }
+.studio-fx-empty { display: grid; justify-items: center; gap: 6px; text-align: center; padding: 34px 18px; border: 1px dashed rgba(var(--studio-ink), 0.12); border-radius: 14px; }
+.studio-fx-empty-glyph { font-size: 26px; color: var(--studio-accent-strong); }
+.studio-fx-empty-title { font-size: 14px; font-weight: 700; color: var(--studio-text); }
+.studio-fx-empty-text { font-size: 12px; line-height: 1.45; color: var(--studio-subtext); max-width: 220px; }
+
+.studio-track-row { cursor: pointer; }
+.studio-track-row.active { border-color: rgba(255, 159, 10, 0.5); box-shadow: 0 0 0 1px rgba(255, 159, 10, 0.12); }
+
+/* Right panel: fold to a rail, slide in and out. The column animates its width; the content keeps
+   its full width inside so nothing reflows mid-animation, and the timeline (flex: 1) follows. */
+.studio-right-column {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease, visibility 0s linear 0s;
+}
+.studio-right-column.collapsed { width: 40px; }
+.studio-right-column.hidden {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, visibility 0s linear 0.3s;
+}
+.studio-right-inner {
+  width: 392px;
+  height: 100%;
+  min-height: 0;
+  transition: opacity 0.2s ease 0.05s;
+}
+.studio-right-column.collapsed .studio-right-inner { opacity: 0; pointer-events: none; transition-delay: 0s; }
+.studio-right-rail {
+  position: absolute; inset: 0; z-index: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: 14px 0; border: none; border-left: 1px solid var(--studio-panel-border);
+  background: transparent; color: var(--studio-subtext); cursor: pointer;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+}
+.studio-right-column.collapsed .studio-right-rail { opacity: 1; pointer-events: auto; transition-delay: 0.12s; }
+.studio-right-rail:hover { color: var(--studio-text); background: rgba(var(--studio-ink), 0.04); }
+.studio-right-rail-arrow { font-size: 18px; line-height: 1; }
+.studio-right-rail-label { writing-mode: vertical-rl; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+@media (prefers-reduced-motion: reduce) {
+  .studio-right-column, .studio-right-column.hidden, .studio-right-inner, .studio-right-rail { transition: none; }
+}
+.studio-panel-collapse {
+  flex: none; width: 26px; height: 26px; display: grid; place-items: center;
+  border: 1px solid var(--studio-panel-border); border-radius: 8px; background: rgba(var(--studio-ink), 0.05);
+  color: var(--studio-subtext); font-size: 16px; line-height: 1; cursor: pointer;
+}
+.studio-panel-collapse:hover { color: var(--studio-text); background: rgba(var(--studio-ink), 0.12); }
+.studio-right-inner { display: flex; flex-direction: column; }
+.studio-right-inner > .studio-panel { flex: 1; min-height: 0; }
+
+/* --- Live VC (LiveInferencePanel.js) — same glass-card language as EffectsRack.js ---------- */
+.studio-livevc { display: grid; gap: 14px; min-width: 0; overflow-x: hidden; }
+.studio-livevc-intro { display: grid; gap: 4px; }
+.studio-livevc-card {
+  display: grid; gap: 10px; padding: 14px; border-radius: 14px;
+  border: 1px solid rgba(var(--studio-ink), 0.08); background: rgba(var(--studio-ink), 0.03);
+}
+.studio-livevc-card-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--studio-subtext);
+}
+.studio-livevc-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.studio-livevc-chip {
+  font-size: 11px; font-weight: 600; color: var(--studio-subtext);
+  border: 1px solid rgba(var(--studio-ink), 0.12); border-radius: 999px; padding: 2px 9px;
+}
+.studio-livevc-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.studio-livevc-mini-field { display: grid; gap: 5px; font-size: 12px; color: var(--studio-subtext); min-width: 0; }
+.studio-livevc-card { min-width: 0; }
+.studio-livevc-pitch { padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255, 159, 10, 0.22); background: rgba(255, 159, 10, 0.05); }
+.studio-livevc-tuning-toggle {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  border: 1px solid rgba(var(--studio-ink), 0.08); background: rgba(var(--studio-ink), 0.03);
+  color: var(--studio-text); border-radius: 12px; padding: 10px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.studio-livevc-tuning-toggle:hover { background: rgba(var(--studio-ink), 0.06); }
+.studio-livevc-tuning {
+  display: grid; gap: 12px; padding: 12px 14px 4px; margin: -6px 0 0;
+  border-left: 1px dashed rgba(var(--studio-ink), 0.12);
+}
+.studio-livevc-hint { margin-top: -6px; }
+.studio-livevc-toggle { font-size: 13px; }
+.studio-livevc-meter-row { display: flex; align-items: center; gap: 10px; }
+.studio-livevc-meter-label { flex: 0 0 28px; font-size: 11px; font-weight: 600; color: var(--studio-subtext); }
+.studio-livevc-meter {
+  flex: 1; height: 8px; border-radius: 999px; background: rgba(var(--studio-ink), 0.08); overflow: hidden;
+}
+.studio-livevc-meter-fill {
+  height: 100%; border-radius: 999px; transition: width 0.08s linear;
+  background: linear-gradient(90deg, #34d399, var(--studio-accent) 75%, #ff5c5c 95%);
+}
+.studio-livevc-meter.clip .studio-livevc-meter-fill { background: #ff5c5c; }
+.studio-livevc-meter-value {
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--studio-subtext); width: 42px; text-align: right;
+}
+.studio-livevc-meter.clip + .studio-livevc-meter-value,
+.studio-livevc-meter-row:has(.clip) .studio-livevc-meter-value { color: #ff5c5c; }
+.studio-livevc-transport { display: flex; align-items: center; gap: 8px; }
+.studio-livevc-record {
+  display: inline-flex; align-items: center; gap: 8px; flex: 1;
+  justify-content: center; padding: 11px 16px; border-radius: 999px; border: none;
+  background: linear-gradient(135deg, var(--studio-accent), #ff7f50); color: #1a0f00;
+  font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.studio-livevc-record:disabled { opacity: 0.4; cursor: default; }
+.studio-livevc-record-dot { width: 9px; height: 9px; border-radius: 50%; background: #7a1010; }
+.studio-livevc-record.recording {
+  background: linear-gradient(135deg, #ff4d4d, #ff7f50); color: #2a0000;
+  animation: studio-livevc-pulse 1.2s ease-in-out infinite;
+}
+.studio-livevc-record.recording .studio-livevc-record-dot { background: #fff; animation: studio-livevc-blink 1.2s ease-in-out infinite; }
+@keyframes studio-livevc-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.45); } 50% { box-shadow: 0 0 0 7px rgba(255, 77, 77, 0); } }
+@keyframes studio-livevc-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+.studio-livevc-status { display: flex; align-items: center; gap: 10px; }
+.studio-livevc-status-pill {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(var(--studio-ink), 0.12); color: var(--studio-subtext);
+}
+.studio-livevc-status-pill.recording { color: #ff7f7f; border-color: rgba(255, 92, 92, 0.4); background: rgba(255, 92, 92, 0.08); }
+.studio-livevc-status-pill.connecting,
+.studio-livevc-status-pill.processing { color: var(--studio-accent-strong); border-color: rgba(255, 159, 10, 0.35); background: rgba(255, 159, 10, 0.08); }
+.studio-livevc-status-pill.committed { color: #34d399; border-color: rgba(52, 211, 153, 0.35); background: rgba(52, 211, 153, 0.08); }
+.studio-livevc-status-pill.error { color: #ff5c5c; border-color: rgba(255, 92, 92, 0.4); background: rgba(255, 92, 92, 0.08); }
+.studio-livevc-glitch {
+  font-size: 11px; font-weight: 700; color: #ffb020;
+  border: 1px solid rgba(255, 176, 32, 0.35); background: rgba(255, 176, 32, 0.1);
+  border-radius: 999px; padding: 2px 9px; cursor: help;
+}
+
+.studio-livevc-error {
+  font-size: 12px; color: #ff9f9f; background: rgba(255, 92, 92, 0.08);
+  border: 1px solid rgba(255, 92, 92, 0.25); border-radius: 10px; padding: 8px 10px;
 }

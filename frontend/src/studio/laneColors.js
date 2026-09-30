@@ -3,15 +3,16 @@
    next to each other had unrelated hues and visibly different lightness. These
    are tuned as a family against a near-black background.
 
-   The UI accent (#0a84ff, systemBlue) is deliberately absent: it means "the
-   primary action" everywhere else in the Studio, and a lane wearing it would
-   read as selected. */
+   The UI accent (#ff9f0a, the same orange every other view in the app uses)
+   is deliberately absent: it means "the primary action" everywhere, and a
+   lane wearing it would read as selected. */
 export const CATEGORY_COLORS = {
   mix: "#5e5ce6",
   vocal: "#ff375f",
   instrumental: "#30d158",
   stem: "#bf5af2",
-  generated: "#ff9f0a",
+  generated: "#ffd60a",
+  airgen: "#64d2ff",
 };
 
 export const AUTO_COLORS = [
@@ -35,7 +36,7 @@ const LEGACY_CATEGORY_COLORS = {
   vocal: "#ff7a59",
   instrumental: "#6fbf73",
   stem: "#b084f5",
-  generated: "#ffb454",
+  generated: "#ff9f0a",
 };
 
 const normalizeColor = (value) => (typeof value === "string" ? value.toLowerCase() : "");

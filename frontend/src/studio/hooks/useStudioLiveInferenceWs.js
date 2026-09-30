@@ -2,11 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const DEFAULT_FRAME_SIZE = 2048;
 const OUTPUT_SAMPLE_RATE = 48000;
+// Shared with the latency estimate below - schedulePlayback's own scheduling margin
+// so the two numbers can't silently drift apart if this ever gets retuned.
+const PLAYBACK_SAFETY_LEAD_SEC = 0.035;
 
 const getWsUrl = () => {
   const envUrl = process.env.REACT_APP_STUDIO_LIVE_INFER_WS;
   if (envUrl) return envUrl;
-  const host = window.location.hostname || "localhost";
+  // The native shell serves the app from a custom "app://rhymix/..." protocol (see
+  // native/shell/src/main.js) — window.location.hostname there is literally the string "rhymix",
+  // not a real network name, so a WebSocket to it fails outright. The backend always runs on
+  // localhost regardless of which frontend (browser dev server or the Electron shell) is asking.
+  const host = window.location.protocol === "app:" ? "localhost" : window.location.hostname || "localhost";
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
   return `${protocol}://${host}:8002/ws/studio_live_infer`;
 };
@@ -35,9 +42,21 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState(null);
   const [latencyMs, setLatencyMs] = useState(0);
+  const [estimatedLatencyMs, setEstimatedLatencyMs] = useState(0);
+  // latencyMs (from the backend's "metrics" message) is only the GPU compute time
+  // around process_audio() - it doesn't count the extraConvertSec lookahead the
+  // pipeline structurally needs before it can emit a block, the block's own
+  // accumulation time, or this hook's own playback scheduling margin. Set once per
+  // session in start(); estimatedLatencyMs below adds it to each compute reading.
+  const pipelineFloorMsRef = useRef(0);
   const [inputLevel, setInputLevel] = useState(0);
   const [inputDb, setInputDb] = useState(-60);
   const [inputClip, setInputClip] = useState(false);
+  const [outputLevel, setOutputLevel] = useState(0);
+  const [outputDb, setOutputDb] = useState(-60);
+  const [outputClip, setOutputClip] = useState(false);
+  const [droppedChunks, setDroppedChunks] = useState(0);
+  const [stageTimings, setStageTimings] = useState(null);
   const [micMonitor, setMicMonitor] = useState(false);
   const inputGainRef = useRef(1);
   const monitorGainRef = useRef(1);
@@ -116,6 +135,13 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
     setInputLevel(0);
     setInputDb(-60);
     setInputClip(false);
+    setOutputLevel(0);
+    setOutputDb(-60);
+    setOutputClip(false);
+    setDroppedChunks(0);
+    setStageTimings(null);
+    setEstimatedLatencyMs(0);
+    pipelineFloorMsRef.current = 0;
     mediaRef.current = {
       stream: null,
       ctx: null,
@@ -208,16 +234,27 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
     const pcm = new Int16Array(arrayBuffer);
     if (!pcm.length) return;
     const samples = new Float32Array(pcm.length);
+    let sumSquares = 0;
+    let peak = 0;
     for (let i = 0; i < pcm.length; i += 1) {
-      samples[i] = pcm[i] / 32768;
+      const value = pcm[i] / 32768;
+      samples[i] = value;
+      sumSquares += value * value;
+      const abs = Math.abs(value);
+      if (abs > peak) peak = abs;
     }
+    // The converted (wet) signal's own level — the input meter only ever showed the raw mic, so
+    // there was no way to notice the conversion itself clipping or going silent.
+    const rms = Math.sqrt(sumSquares / pcm.length);
+    setOutputLevel(Math.min(1, rms * 2.5));
+    setOutputDb(Math.max(-60, rms > 0 ? 20 * Math.log10(rms) : -120));
+    setOutputClip(peak >= 0.98);
     const audioBuffer = ctx.createBuffer(1, samples.length, OUTPUT_SAMPLE_RATE);
     audioBuffer.copyToChannel(samples, 0);
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(monitorGain);
-    const safetyLead = 0.035;
-    const now = ctx.currentTime + safetyLead;
+    const now = ctx.currentTime + PLAYBACK_SAFETY_LEAD_SEC;
     const queued = mediaRef.current.playbackTime || now;
     const startAt = Math.max(now, queued);
     if (startAt - ctx.currentTime > 0.18) {
@@ -411,7 +448,11 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
               setStatus(data.state || "processing");
               setProgress(data.progress ?? 0);
             } else if (data.type === "metrics") {
-              setLatencyMs(Number(data.latencyMs) || 0);
+              const computeMs = Number(data.latencyMs) || 0;
+              setLatencyMs(computeMs);
+              setEstimatedLatencyMs(computeMs + pipelineFloorMsRef.current);
+              setDroppedChunks(Number(data.droppedChunks) || 0);
+              if (data.stages) setStageTimings(data.stages);
             } else if (data.type === "error") {
               setStatus("error");
               setError(data.message || "Unknown error");
@@ -437,6 +478,15 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
 
       const frameSize = config.frameSize || DEFAULT_FRAME_SIZE;
       const sampleRate = await setupAudio(frameSize);
+      const extraConvertSec = config.extraConvertSec ?? 0.14;
+      // The pipeline structurally can't emit a block until it has that block's own
+      // audio (frameSize/sampleRate) PLUS extraConvertSec of audio that comes AFTER it
+      // (rvc/realtime/core.py's skip_head/return_length - it discards the first
+      // extraConvertSec of a larger processed window, i.e. that much future context has
+      // to exist before "now" can be output). That's on top of, not instead of, the GPU
+      // compute time the backend already reports per block.
+      pipelineFloorMsRef.current =
+        (frameSize / sampleRate) * 1000 + extraConvertSec * 1000 + PLAYBACK_SAFETY_LEAD_SEC * 1000;
       ws.send(
         JSON.stringify({
           type: "start",
@@ -449,7 +499,7 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
           maxQueueChunks: config.maxQueueChunks ?? 6,
           monitorChunkSamples: config.monitorChunkSamples ?? frameSize,
           crossFadeOverlapSec: config.crossFadeOverlapSec ?? 0.035,
-          extraConvertSec: config.extraConvertSec ?? 0.14,
+          extraConvertSec,
           model: config.model || null,
           selectedCheckpoint: config.selectedCheckpoint || null,
           pitch: config.pitch ?? 0,
@@ -461,6 +511,10 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
           formantQfrency: config.formantQfrency ?? 1.0,
           formantTimbre: config.formantTimbre ?? 1.0,
           monitor: config.monitor ?? true,
+          f0Autotune: config.f0Autotune ?? false,
+          f0AutotuneStrength: config.f0AutotuneStrength ?? 1.0,
+          proposedPitch: config.proposedPitch ?? false,
+          proposedPitchThreshold: config.proposedPitchThreshold ?? 155.0,
         })
       );
       setStatus("recording");
@@ -502,9 +556,15 @@ export const useStudioLiveInferenceWs = ({ onCommitted } = {}) => {
     progress,
     error,
     latencyMs,
+    estimatedLatencyMs,
     inputLevel,
     inputDb,
     inputClip,
+    outputLevel,
+    outputDb,
+    outputClip,
+    droppedChunks,
+    stageTimings,
     start,
     stop,
     cancel,

@@ -399,9 +399,15 @@ const MidiOverlay = ({
               "--note-border": noteBorder || undefined,
               "--note-selected-bg": noteSelectedBg || undefined,
               "--note-selected-border": noteSelectedBorder || undefined,
+              // The stylesheet gives notes pointer-events: auto, which overrides the container's
+              // "none" — so in the read-only preview, clicks on a note never reached the clip.
+              pointerEvents: editable ? undefined : "none",
             }}
             onPointerDown={(event) => startDrag(event, note, "move")}
             onDoubleClick={(event) => {
+              // Read-only preview (the clip on the timeline): notes are display only, so no
+              // gesture on them may change anything — that takes opening the MIDI editor.
+              if (!editable) return;
               event.preventDefault();
               event.stopPropagation();
               if (!onUpdateNotes) return;
@@ -411,6 +417,7 @@ const MidiOverlay = ({
               onPreviewEnd?.();
             }}
             onContextMenu={(event) => {
+              if (!editable) return;
               event.preventDefault();
               event.stopPropagation();
               if (!onUpdateNotes) return;
@@ -420,14 +427,18 @@ const MidiOverlay = ({
               onPreviewEnd?.();
             }}
           >
-            <div
-              className="studio-midi-handle left"
-              onPointerDown={(event) => startDrag(event, note, "resize-left")}
-            />
-            <div
-              className="studio-midi-handle right"
-              onPointerDown={(event) => startDrag(event, note, "resize-right")}
-            />
+            {editable && (
+              <>
+                <div
+                  className="studio-midi-handle left"
+                  onPointerDown={(event) => startDrag(event, note, "resize-left")}
+                />
+                <div
+                  className="studio-midi-handle right"
+                  onPointerDown={(event) => startDrag(event, note, "resize-right")}
+                />
+              </>
+            )}
           </div>
         );
       })}

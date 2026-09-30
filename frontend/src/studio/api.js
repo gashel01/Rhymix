@@ -1,6 +1,5 @@
 import axios from "axios";
-
-const API_BASE = "";
+import { API_BASE } from "../utils/apiBase";
 
 export const getOrCreateProjectByAsset = async (assetId) => {
   const response = await axios.get(
@@ -9,10 +8,16 @@ export const getOrCreateProjectByAsset = async (assetId) => {
   return response.data;
 };
 
-export const createProject = async (assetId = null) => {
+export const createProject = async (assetId = null, templateId = null) => {
   const payload = {};
   if (assetId) payload.assetId = assetId;
+  if (templateId) payload.templateId = templateId;
   const response = await axios.post(`${API_BASE}/api/studio/projects`, payload);
+  return response.data;
+};
+
+export const getProjectTemplates = async () => {
+  const response = await axios.get(`${API_BASE}/api/studio/project-templates`);
   return response.data;
 };
 
@@ -41,8 +46,8 @@ export const getProjectById = async (projectId) => {
   return response.data;
 };
 
-export const startRender = async (projectId) => {
-  const response = await axios.post(`${API_BASE}/api/studio/projects/${projectId}/render`);
+export const startRender = async (projectId, master) => {
+  const response = await axios.post(`${API_BASE}/api/studio/projects/${projectId}/render`, { master });
   return response.data;
 };
 
@@ -82,12 +87,18 @@ export const importFoundationVoiceInput = async (projectId, { blob, filename, in
   return response.data;
 };
 
-export const transcribeStudioSelection = async (projectId, payload) => {
-  const response = await axios.post(
-    `${API_BASE}/api/studio/projects/${projectId}/transcribe`,
-    payload || {}
-  );
-  return response.data;
+/* Shared with the rest of the app rather than a studio-scoped route — the
+   file isn't project material yet, just something on disk with a fileId;
+   it only becomes a project asset once the caller registers it (see
+   LibraryPanel.js), the same two-step shape uploading into the standalone
+   Create flow already uses. */
+export const uploadAudioFile = async (file) => {
+  const formData = new FormData();
+  formData.append("files", file);
+  const response = await axios.post(`${API_BASE}/api/upload`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data?.files || [];
 };
 
 export const startMidiExport = async (projectId) => {
@@ -119,4 +130,14 @@ export const subscribeJobEvents = (jobId, onEvent) => {
     source.close();
   };
   return () => source.close();
+};
+
+/* Bring an audio asset onto the project's tempo, key and bar grid (backend/features/studio/
+   loop_match.py). Resolves to { asset, info } — asset is a new, already-registered derived asset. */
+export const matchAsset = async (projectId, assetId, payload = {}) => {
+  const response = await axios.post(
+    `${API_BASE}/api/studio/projects/${projectId}/assets/${encodeURIComponent(assetId)}/match`,
+    payload
+  );
+  return response.data;
 };

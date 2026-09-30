@@ -32,13 +32,6 @@ export const normalizeRange = (range) => {
 };
 
 export const JOB_TYPE_LABELS = {
-  understand: "Analyze",
-  orchestrate_song: "AI Orchestrator",
-  foundation_generate: "Foundation Generate",
-  foundation_restyle: "Foundation Restyle",
-  foundation_extend: "Foundation Extend",
-  stage_drums_generate: "STAGE Drums",
-  stem_extract: "Stem Extract",
   stem_extract_uvr: "UVR Stem Extract",
   render: "Export",
 };
@@ -75,12 +68,19 @@ export const getCurrentJob = (jobs = []) => {
 export const listAssets = (assets) =>
   Object.entries(assets || {}).map(([id, asset]) => ({ id: asset.id || id, ...asset }));
 
-export const filterAssets = (assetList = [], query = "") => {
+/** `selectedTags` narrows to assets carrying every tag listed (AND, not OR) — the useful
+ *  default for combining tags ("140bpm" + "drums"), not the surprising one. */
+export const filterAssets = (assetList = [], query = "", selectedTags = []) => {
   const q = String(query || "").trim().toLowerCase();
-  if (!q) return assetList;
-  return assetList.filter((asset) =>
-    `${asset.label || ""} ${asset.id || ""}`.toLowerCase().includes(q)
-  );
+  const tags = Array.isArray(selectedTags) ? selectedTags.filter(Boolean) : [];
+  if (!q && !tags.length) return assetList;
+  return assetList.filter((asset) => {
+    const assetTags = Array.isArray(asset.tags) ? asset.tags : [];
+    const matchesQuery =
+      !q || `${asset.label || ""} ${asset.id || ""} ${assetTags.join(" ")}`.toLowerCase().includes(q);
+    const matchesTags = !tags.length || tags.every((tag) => assetTags.includes(tag));
+    return matchesQuery && matchesTags;
+  });
 };
 
 export const findSelectedClip = (clips = [], selection) =>

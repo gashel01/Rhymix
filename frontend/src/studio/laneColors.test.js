@@ -73,12 +73,12 @@ describe("ensureLaneColors", () => {
   });
 
   it("never hands a lane the UI accent", () => {
-    // #0a84ff means "primary action" everywhere else; a lane wearing it would
+    // #ff9f0a means "primary action" everywhere else; a lane wearing it would
     // read as selected.
     const lanes = ensureLaneColors(
       Array.from({ length: 12 }, (_, i) => ({ id: String(i) }))
     );
-    lanes.forEach((lane) => expect(lane.color.toLowerCase()).not.toBe("#0a84ff"));
+    lanes.forEach((lane) => expect(lane.color.toLowerCase()).not.toBe("#ff9f0a"));
   });
 
   it("handles an empty list", () => {

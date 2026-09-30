@@ -1,14 +1,11 @@
 import {
   PANEL_CONTEXT,
   describeClip,
-  formatKeyParts,
   formatSeconds,
   getActivityJobs,
   getClipBounds,
-  getVisibleAiCards,
   nextStepForJob,
   normalizeRange,
-  parseKeyParts,
   resolveRightPanelContext,
   summarizeJob,
 } from "./inspectorModel";
@@ -75,33 +72,6 @@ describe("getClipBounds", () => {
   });
 });
 
-describe("key parsing", () => {
-  it("round-trips", () => {
-    const { note, scale } = parseKeyParts("F# minor");
-    expect(formatKeyParts(note, scale)).toBe("F# minor");
-  });
-
-  it("accepts the separators a project file might carry", () => {
-    expect(parseKeyParts("C-minor")).toEqual({ note: "C", scale: "minor" });
-    expect(parseKeyParts("C_minor")).toEqual({ note: "C", scale: "minor" });
-  });
-
-  it("recognises abbreviated minor", () => {
-    expect(parseKeyParts("A min").scale).toBe("minor");
-    expect(parseKeyParts("A MINOR").scale).toBe("minor");
-  });
-
-  it("defaults to C major for anything unrecognised", () => {
-    expect(parseKeyParts("")).toEqual({ note: "C", scale: "major" });
-    expect(parseKeyParts(null)).toEqual({ note: "C", scale: "major" });
-    expect(parseKeyParts("gibberish")).toEqual({ note: "C", scale: "major" });
-  });
-
-  it("does not invent a note that is not in the scale list", () => {
-    expect(parseKeyParts("H major").note).toBe("C");
-  });
-});
-
 describe("formatSeconds", () => {
   it("always shows two decimals and a unit", () => {
     expect(formatSeconds(1)).toBe("1.00s");
@@ -120,7 +90,7 @@ describe("summarizeJob", () => {
   });
 
   it("prefers the error over the status", () => {
-    const text = summarizeJob({ type: "understand", status: "running", error: "boom" });
+    const text = summarizeJob({ type: "stem_extract_uvr", status: "running", error: "boom" });
     expect(text).toContain("boom");
   });
 
@@ -176,42 +146,6 @@ describe("nextStepForJob", () => {
 
   it("has advice for a status it has never seen", () => {
     expect(nextStepForJob({ status: "paused" }).length).toBeGreaterThan(0);
-  });
-});
-
-describe("getVisibleAiCards", () => {
-  const cards = (context, caps = {}) =>
-    getVisibleAiCards({
-      resolvedRightPanelContext: context,
-      canAnalyze: true,
-      canGenerateDrums: true,
-      ...caps,
-    });
-
-  it("offers the tools that need no selection when there is none", () => {
-    expect(cards(PANEL_CONTEXT.NOTHING, { canAnalyze: false, canGenerateDrums: false }))
-      .toEqual(["live", "foundation", "voice"]);
-  });
-
-  it("offers the same set for a range as for an audio clip", () => {
-    expect(cards(PANEL_CONTEXT.RANGE)).toEqual(cards(PANEL_CONTEXT.AUDIO));
-  });
-
-  it("offers nothing on a MIDI clip", () => {
-    // MIDI has its own editor; none of the audio-model cards apply to it.
-    expect(cards(PANEL_CONTEXT.MIDI)).toEqual([]);
-  });
-
-  it("gates each card on its capability, not on the context alone", () => {
-    expect(cards(PANEL_CONTEXT.AUDIO)).toEqual(["analyze", "foundation", "drums"]);
-    expect(cards(PANEL_CONTEXT.AUDIO, { canGenerateDrums: false }))
-      .toEqual(["analyze", "foundation"]);
-    expect(cards(PANEL_CONTEXT.AUDIO, { canAnalyze: false }))
-      .toEqual(["foundation", "drums"]);
-  });
-
-  it("still returns the no-selection set for an unknown context", () => {
-    expect(cards("something-else")).toEqual(["live", "foundation", "voice"]);
   });
 });
 

@@ -121,6 +121,27 @@ describe("assets", () => {
     const list = listAssets(assets);
     expect(filterAssets(list, "  ")).toBe(list);
   });
+
+  it("filters by tags with AND semantics", () => {
+    const tagged = listAssets({
+      "a:1": { label: "Loop A", tags: ["140bpm", "drums"] },
+      "a:2": { label: "Loop B", tags: ["140bpm"] },
+      "a:3": { label: "Loop C", tags: ["drums"] },
+    });
+    expect(filterAssets(tagged, "", ["140bpm"])).toHaveLength(2);
+    expect(filterAssets(tagged, "", ["140bpm", "drums"])).toHaveLength(1);
+    expect(filterAssets(tagged, "", ["140bpm", "drums"])[0].id).toBe("a:1");
+  });
+
+  it("matches tags in the text query too", () => {
+    const tagged = listAssets({ "a:1": { label: "Loop A", tags: ["140bpm"] } });
+    expect(filterAssets(tagged, "140bpm")).toHaveLength(1);
+  });
+
+  it("returns everything when neither query nor tags are set", () => {
+    const list = listAssets(assets);
+    expect(filterAssets(list, "", [])).toBe(list);
+  });
 });
 
 describe("finding the clip a selection is about", () => {

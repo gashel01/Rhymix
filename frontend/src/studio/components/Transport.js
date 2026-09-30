@@ -39,9 +39,15 @@ const Transport = ({
   contextActions = [],
   jobCount = 0,
   bpm = 120,
+  timeSignature = "4/4",
+  transpose = 0,
+  musicalKey = "",
+  onUpdateProject,
   selectionSummary = "No active selection",
 }) => {
   const [exportOpen, setExportOpen] = useState(false);
+  const [masterEnabled, setMasterEnabled] = useState(true);
+  const [masterPreset, setMasterPreset] = useState("spotify");
   const exportRef = useRef(null);
 
   useEffect(() => {
@@ -82,11 +88,59 @@ const Transport = ({
         </button>
         <div className="studio-time">{formatTime(currentTime)}</div>
         {/* The workspace pill was a constant "Studio" — the third copy of that
-            word on the screen. BPM is the one number worth keeping here. */}
-        <div className="studio-transport-pill">
+            word on the screen. BPM, time signature and transpose are the
+            project settings worth reaching for constantly, not the ones
+            worth a drawer of their own two clicks away — they live right
+            here, editable in place. */}
+        <label className="studio-transport-pill studio-transport-field" title="BPM">
           <span>BPM</span>
-          {bpm}
-        </div>
+          <input
+            type="number"
+            min="40"
+            max="240"
+            value={bpm}
+            /* Clamping on every keystroke fights typing: entering "95" over
+               "120" clamps the first "9" up to 40 before the "5" ever lands,
+               and the digits that follow land on that snapped-back value
+               instead of the one being typed. Pass whatever number is there
+               while typing; clamp once, on blur, when the value is final. */
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              if (Number.isFinite(next)) onUpdateProject?.({ bpm: next });
+            }}
+            onBlur={(e) => {
+              const next = Math.max(40, Math.min(240, Number(e.target.value) || 120));
+              onUpdateProject?.({ bpm: next });
+            }}
+          />
+        </label>
+        <label className="studio-transport-pill studio-transport-field" title="Time signature">
+          <span>Time</span>
+          <input
+            type="text"
+            value={timeSignature}
+            onChange={(e) => onUpdateProject?.({ timeSignature: e.target.value })}
+          />
+        </label>
+        <label className="studio-transport-pill studio-transport-field" title="Key of the project (free text, e.g. C minor)">
+          <span>Key</span>
+          <input
+            type="text"
+            value={musicalKey}
+            placeholder="C min"
+            onChange={(e) => onUpdateProject?.({ key: e.target.value })}
+          />
+        </label>
+        <label className="studio-transport-pill studio-transport-field" title="Transpose, in semitones">
+          <span>Transpose</span>
+          <input
+            type="number"
+            min="-12"
+            max="12"
+            value={transpose}
+            onChange={(e) => onUpdateProject?.({ transpose: Number(e.target.value) || 0 })}
+          />
+        </label>
       </div>
 
       <div className="studio-bottom-center">
@@ -140,7 +194,30 @@ const Transport = ({
           </button>
           {exportOpen ? (
             <div className="studio-export-menu" role="menu">
-              <button className="studio-export-item" onClick={() => runExport(onRender)}>
+              <label className="studio-export-master">
+                <input
+                  type="checkbox"
+                  checked={masterEnabled}
+                  onChange={(e) => setMasterEnabled(e.target.checked)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                Master for streaming
+                <select
+                  value={masterPreset}
+                  disabled={!masterEnabled}
+                  onChange={(e) => setMasterPreset(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <option value="spotify">Spotify (-14 LUFS)</option>
+                  <option value="apple_music">Apple Music (-16 LUFS)</option>
+                  <option value="youtube">YouTube (-14 LUFS)</option>
+                  <option value="loud">Loud (-9 LUFS)</option>
+                </select>
+              </label>
+              <button
+                className="studio-export-item"
+                onClick={() => runExport(() => onRender({ enabled: masterEnabled, preset: masterPreset }))}
+              >
                 Mixdown
                 <span>One file, lanes mixed</span>
               </button>

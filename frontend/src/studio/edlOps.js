@@ -73,10 +73,8 @@ export const trimClipLeft = (clips, clipId, newEdgeTimeSec) => {
 export const trimClipRight = (clips, clipId, newEdgeTimeSec) => {
   return clips.map((clip) => {
     if (clip.id !== clipId) return clip;
-    const length = clipLength(clip);
     const clipStart = clip.timelineStartSec;
-    const clipEnd = clipStart + length;
-    const nextEdge = clamp(newEdgeTimeSec, clipStart + MIN_CLIP_LENGTH, clipEnd);
+    const nextEdge = Math.max(newEdgeTimeSec, clipStart + MIN_CLIP_LENGTH);
     const newLength = nextEdge - clipStart;
     return {
       ...clip,
@@ -97,6 +95,25 @@ export const moveClip = (clips, clipId, newTimelineStartSec, options = {}) => {
         }
       : clip
   );
+};
+
+/** Moves several clips in one pass — the group-drag counterpart to moveClip.
+ *  Kept as a single function (rather than calling moveClip once per clip)
+ *  so the reducer wraps the whole group move in one history entry: undo
+ *  after dragging five clips together should put all five back, not just
+ *  the last one moved. */
+export const moveClips = (clips, moves) => {
+  if (!Array.isArray(moves) || !moves.length) return clips;
+  const moveMap = new Map(moves.map((move) => [move.clipId, move]));
+  return clips.map((clip) => {
+    const move = moveMap.get(clip.id);
+    if (!move) return clip;
+    return {
+      ...clip,
+      timelineStartSec: Math.max(0, move.newTimelineStartSec),
+      laneId: move.laneId ?? clip.laneId,
+    };
+  });
 };
 
 export const deleteSelection = (clips, range, laneIds = null, clipIds = null) => {

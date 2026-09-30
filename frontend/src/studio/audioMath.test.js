@@ -132,7 +132,9 @@ describe("resolveSoundfontName", () => {
   });
 
   it("treats a beat as drums", () => {
-    expect(resolveSoundfontName("", "Beat")).toBe("synth_drum");
+    expect(resolveSoundfontName("", "Beat")).toBe("kit:drums");
+    expect(resolveSoundfontName("flute", "Lead")).toBe("flute");
+    expect(resolveSoundfontName("kit:drums", "Piano lane")).toBe("kit:drums");
   });
 
   it("ignores case", () => {

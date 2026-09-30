@@ -5,8 +5,12 @@ import {
   getAllProjects,
   getProjectById,
   getProjectsByAssetList,
+  getProjectTemplates,
 } from "../api";
 import { getAvailableFiles } from "../../utils/apiService";
+import Select from "../../components/common/Select";
+
+const DEFAULT_TEMPLATE_ID = "standard";
 
 /* Same six gradients the Models view cycles through, so a project card and a
    model card are visibly the same kind of object. */
@@ -77,6 +81,8 @@ const ProjectManagerModal = ({
 }) => {
   const [projects, setProjects] = useState([]);
   const [sources, setSources] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [templateId, setTemplateId] = useState(DEFAULT_TEMPLATE_ID);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -100,12 +106,18 @@ const ProjectManagerModal = ({
                 }),
               ])
             : Promise.resolve([null, null]);
-        const [projectData, sourceData] = await Promise.all([projectPromise, sourcesPromise]);
+        const templatesPromise = scope === "all" ? getProjectTemplates().catch(() => []) : Promise.resolve([]);
+        const [projectData, sourceData, templateData] = await Promise.all([
+          projectPromise,
+          sourcesPromise,
+          templatesPromise,
+        ]);
         if (cancelled) return;
         setProjects(Array.isArray(projectData) ? projectData : []);
         if (scope === "all") {
           const [filesResponse, inferenceResponse] = sourceData;
           setSources(buildSourceCatalog(filesResponse, inferenceResponse));
+          setTemplates(Array.isArray(templateData) ? templateData : []);
         } else {
           setSources([]);
         }
@@ -159,7 +171,7 @@ const ProjectManagerModal = ({
     setActionLoading(true);
     setError(null);
     try {
-      const data = await createProject(nextAssetId || null);
+      const data = await createProject(nextAssetId || null, templateId);
       onSwitchProject(data);
       onClose();
     } catch (err) {
@@ -329,6 +341,21 @@ const ProjectManagerModal = ({
                   <div className="studio-subtext">
                     Begin from a track or an inference result, or open a blank project.
                   </div>
+                  {templates.length > 0 && (
+                    <div className="studio-picker-row studio-template-row">
+                      <div className="studio-picker-main">
+                        <div className="studio-picker-name">Lane template</div>
+                        <div className="studio-picker-meta">
+                          {templates.find((t) => t.id === templateId)?.description || ""}
+                        </div>
+                      </div>
+                      <Select
+                        value={templateId}
+                        onChange={setTemplateId}
+                        options={templates.map((t) => ({ value: t.id, label: t.label }))}
+                      />
+                    </div>
+                  )}
                   <div className="studio-picker-list">
                     <div className="studio-picker-row">
                       <div className="studio-picker-main">

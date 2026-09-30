@@ -170,6 +170,8 @@ def update_project(
     clips: list | None = None,
     assets: dict | None = None,
     metadata: dict | None = None,
+    scenes: list | None = None,
+    clip_slots: list | None = None,
 ):
     with _storage_lock:
         store = load_projects_store()
@@ -186,9 +188,37 @@ def update_project(
         if clips is not None:
             existing["clips"] = clips
         if assets is not None:
-            existing["assets"] = assets
+            # public_project_payload strips "path" before an asset ever
+            # reaches the client — local filesystem locations are not
+            # something to hand out over the API. StudioPage.js's debounced
+            # autosave round-trips whatever project state it was given,
+            # which means every asset it PATCHes back is path-less by
+            # construction, every time, for the life of the project.
+            # Overwriting wholesale silently threw "path" away on the very
+            # first autosave, which every render after it depended on to
+            # find the audio at all — resolve_asset_path's URL fallback
+            # covers exports and uploads, but not a song generation job's
+            # own asset URLs, so a clip just vanished from the mix instead
+            # of erroring. Assets are keyed by id and only ever appended by
+            # server-side code (register_asset); merging onto what is
+            # already stored, rather than replacing it, is what keeps a
+            # path the client never had from being able to erase one that
+            # was already there.
+            current_assets = existing.get("assets") or {}
+            merged_assets = dict(current_assets)
+            for asset_id, incoming in (assets or {}).items():
+                prior = current_assets.get(asset_id)
+                if prior and prior.get("path") and not incoming.get("path"):
+                    merged_assets[asset_id] = {**incoming, "path": prior["path"]}
+                else:
+                    merged_assets[asset_id] = incoming
+            existing["assets"] = merged_assets
         if metadata is not None:
             existing["metadata"] = metadata
+        if scenes is not None:
+            existing["scenes"] = scenes
+        if clip_slots is not None:
+            existing["clipSlots"] = clip_slots
         store["projects"][project_id] = existing
         save_projects_store(store)
         return existing
@@ -256,4 +286,6 @@ def public_project_payload(project_record: dict):
         "clips": project_record.get("clips") or [],
         "assets": public_assets,
         "metadata": project_record.get("metadata") or {},
+        "scenes": project_record.get("scenes") or [],
+        "clipSlots": project_record.get("clipSlots") or [],
     }

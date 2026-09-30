@@ -24,51 +24,9 @@ import {
 export { normalizeRange, summarizeJob };
 export const JOB_LABELS = JOB_TYPE_LABELS;
 
-export const SOUND_FONT_OPTIONS = [
-  { value: "", label: "Use lane default" },
-  { value: "acoustic_grand_piano", label: "Piano" },
-  { value: "electric_guitar_clean", label: "Guitar (Clean)" },
-  { value: "acoustic_bass", label: "Bass" },
-  { value: "string_ensemble_1", label: "Strings" },
-  { value: "synth_pad_1_new_age", label: "Synth Pad" },
-  { value: "synth_drum", label: "Synth Drum" },
-  { value: "choir_aahs", label: "Choir" },
-  { value: "flute", label: "Flute" },
-  { value: "alto_sax", label: "Sax" },
-  { value: "trumpet", label: "Trumpet" },
-];
-
-export const FOUNDATION_INSTRUMENT_OPTIONS = [
-  "Keys",
-  "Synth",
-  "Strings",
-  "Guitar",
-  "Bass",
-  "Brass",
-  "Woodwinds",
-  "Choir",
-  "Pluck",
-  "Pad",
-  "FX",
-];
-
-export const FOUNDATION_KEY_NOTES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
-export const FOUNDATION_KEY_SCALES = ["major", "minor"];
-
-export const JOB_TOOL_MAP = {
-  understand: "analyze",
-  foundation_generate: "foundation",
-  foundation_restyle: "foundation",
-  foundation_extend: "foundation",
-  stage_drums_generate: "drums",
-};
-
 export const DRAWER_TITLES = {
   clip: "More Clip Controls",
   lane: "Lane Controls & FX",
-  project: "Project Settings",
-  foundation: "Foundation",
-  drums: "STAGE Drums",
   live: "Live Voice Conversion",
   voice: "Voice to MIDI",
 };
@@ -87,28 +45,6 @@ export const resolveRightPanelContext = (selectedRange, selectedClip) => {
   return PANEL_CONTEXT.NOTHING;
 };
 
-export const getVisibleAiCards = ({ resolvedRightPanelContext, canAnalyze, canGenerateDrums }) => {
-  switch (resolvedRightPanelContext) {
-    case PANEL_CONTEXT.RANGE:
-      return [
-        canAnalyze ? "analyze" : null,
-        "foundation",
-        canGenerateDrums ? "drums" : null,
-      ].filter(Boolean);
-    case PANEL_CONTEXT.MIDI:
-      return [];
-    case PANEL_CONTEXT.AUDIO:
-      return [
-        canAnalyze ? "analyze" : null,
-        "foundation",
-        canGenerateDrums ? "drums" : null,
-      ].filter(Boolean);
-    case PANEL_CONTEXT.NOTHING:
-    default:
-      return ["live", "foundation", "voice"];
-  }
-};
-
 export const getClipBounds = (clip) => {
   const start = Number(clip?.timelineStartSec ?? 0);
   const duration = clipLengthSec(clip);
@@ -116,16 +52,6 @@ export const getClipBounds = (clip) => {
 };
 
 export const formatSeconds = (value) => `${(Number(value) || 0).toFixed(2)}s`;
-export const makeRandomSeed = () => Math.floor(Math.random() * 1000000000);
-export const parseKeyParts = (rawKey) => {
-  const normalized = String(rawKey || "").trim().replace("-", " ").replace("_", " ");
-  if (!normalized) return { note: "C", scale: "major" };
-  const parts = normalized.split(/\s+/);
-  const note = FOUNDATION_KEY_NOTES.includes(parts[0]) ? parts[0] : "C";
-  const scale = parts.some((part) => part.toLowerCase().startsWith("min")) ? "minor" : "major";
-  return { note, scale };
-};
-export const formatKeyParts = (note, scale) => `${note || "C"} ${scale || "major"}`.trim();
 
 export const nextStepForJob = (job) => {
   if (!job) return "";

@@ -5,7 +5,11 @@ const DEFAULT_FRAME_SIZE = 2048;
 const getWsUrl = () => {
   const envUrl = process.env.REACT_APP_VOICE_MIDI_WS;
   if (envUrl) return envUrl;
-  const host = window.location.hostname || "localhost";
+  // The native shell serves the app from a custom "app://rhymix/..." protocol (see
+  // native/shell/src/main.js) — window.location.hostname there is literally the string "rhymix",
+  // not a real network name, so a WebSocket to it fails outright. The backend always runs on
+  // localhost regardless of which frontend (browser dev server or the Electron shell) is asking.
+  const host = window.location.protocol === "app:" ? "localhost" : window.location.hostname || "localhost";
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
   return `${protocol}://${host}:8002/ws/voice_to_midi`;
 };

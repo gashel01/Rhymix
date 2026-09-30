@@ -1,5 +1,4 @@
-import React, { useMemo, useRef } from "react";
-import { transcribeStudioSelection } from "../api";
+import React, { useMemo } from "react";
 import { useStudioStore } from "../store";
 
 /* A stable empty map for projects with no lyric replacements. The `|| {}`
@@ -10,7 +9,6 @@ const NO_LYRICS = {};
 export const useLyricsActions = ({ handleStartJob }) => {
   const { state, actions } = useStudioStore();
   const lyricsMap = state.metadata?.lyricsReplacement || NO_LYRICS;
-  const transcribeTokenRef = useRef(0);
 
   const buildSegmentsFromText = React.useCallback((text, startSec, endSec) => {
     const safeText = String(text || "").trim();
@@ -228,70 +226,6 @@ export const useLyricsActions = ({ handleStartJob }) => {
     return "English";
   }, []);
 
-  const handleTranscribeSelection = React.useCallback(async () => {
-    if (!state.project?.id || !lyricsSelection) return;
-    const { clip, range } = lyricsSelection;
-    if (!clip?.sourceAssetId) return;
-
-    const start = range.start;
-    const end = range.end;
-    const clipStart = clip.timelineStartSec ?? 0;
-    const clipSrcStart = clip.srcStartSec ?? 0;
-    const clipLen = Math.max(0.01, (clip.srcEndSec ?? 0) - (clip.srcStartSec ?? 0));
-    const localStart = Math.max(0, Math.min(clipLen, start - clipStart));
-    const localEnd = Math.max(localStart + 0.01, Math.min(clipLen, end - clipStart));
-    const sourceStart = clipSrcStart + localStart;
-    const sourceEnd = clipSrcStart + localEnd;
-
-    updateLyricsEntry(clip.id, {
-      status: "transcribing",
-      range: { start, end },
-      sourceRange: { start: sourceStart, end: sourceEnd },
-      rangeClip: { start: localStart, end: localEnd },
-      clipStartAtTranscribe: clipStart,
-      error: null,
-    });
-
-    const token = (transcribeTokenRef.current += 1);
-    try {
-      const data = await transcribeStudioSelection(state.project.id, {
-        assetId: clip.sourceAssetId,
-        startSec: sourceStart,
-        endSec: sourceEnd,
-        engine: "whisperx",
-      });
-      if (token !== transcribeTokenRef.current) return;
-      const text = String(data?.text || "").trim();
-      const segments = buildSegmentsFromText(text, start, end);
-      updateLyricsEntry(clip.id, {
-        status: "ready",
-        text,
-        originalText: text,
-        segments,
-        range: { start, end },
-        sourceRange: { start: sourceStart, end: sourceEnd },
-        rangeClip: { start: localStart, end: localEnd },
-        clipStartAtTranscribe: clipStart,
-        error: null,
-      });
-    } catch (err) {
-      if (token !== transcribeTokenRef.current) return;
-      updateLyricsEntry(clip.id, {
-        status: "error",
-        error: err?.message || "Transcription failed",
-        range: { start, end },
-        sourceRange: { start: sourceStart, end: sourceEnd },
-        rangeClip: { start: localStart, end: localEnd },
-        clipStartAtTranscribe: clipStart,
-      });
-    }
-  }, [
-    state.project?.id,
-    lyricsSelection,
-    updateLyricsEntry,
-    buildSegmentsFromText,
-  ]);
-
   const handleResynthesizeSelection = React.useCallback(async (override = null) => {
     if (!state.project?.id) return;
     const overrideClip = override?.clip || null;
@@ -335,7 +269,6 @@ export const useLyricsActions = ({ handleStartJob }) => {
     updateLyricsText,
     removeLyricsEntry,
     restoreLyricsEntry,
-    handleTranscribeSelection,
     handleResynthesizeSelection,
   };
 };

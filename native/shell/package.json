@@ -1,0 +1,13 @@
+{
+  "name": "rhymix-native-shell",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Rhymix native desktop shell (Electron). Skeleton only — see README.md.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

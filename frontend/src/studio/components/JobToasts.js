@@ -1,23 +1,10 @@
 import React from "react";
 
 const JOB_LABELS = {
-  understand: "Analyze",
-  orchestrate_song: "AI Orchestrator",
-  foundation_generate: "Foundation Generate",
-  foundation_restyle: "Foundation Restyle",
-  foundation_extend: "Foundation Extend",
-  stage_drums_generate: "STAGE Drums",
-  stem_extract: "Stem Extract",
   stem_extract_uvr: "UVR Stems",
   render: "Export",
   render_stems: "Export Stems",
-  repaint: "Regenerate",
-  replace_section: "Replace Section",
-  extend: "Extend",
-  cover: "Cover",
-  vocal2bgm: "Vocals → Backing",
-  lrc: "Lyrics Timing",
-  quality_score: "Quality Score",
+  airgen_regen: "AI Regen (drums)",
 };
 
 const TERMINAL = new Set(["completed", "failed", "cancelled"]);

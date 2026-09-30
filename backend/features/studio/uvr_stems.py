@@ -1,127 +1,160 @@
-import os
+"""Stem separation for the Studio timeline.
+
+This used to be four hand-rolled DSP bands — an HPSS split followed by
+Butterworth filters — labelled "drums", "bass", "mids" and "highs". None of
+those were stems: "bass" was a lowpass of the harmonic residue and "drums" was
+whatever HPSS called percussive, so a bassline bled into the mids and the hats
+landed in "drums" together with every transient in the mix. Worse, the one real
+step in it — vocal removal — silently returned the untouched input when the UVR
+model failed to import, so a failed separation produced four filtered copies of
+the original song and reported success.
+
+It now calls the same UVR pipeline that song generation uses, which is a real
+separation model and is already installed, and returns what that model actually
+produces: vocals and instrumental.
+"""
+
+from __future__ import annotations
+
+import shutil
+import time
 import uuid
 from pathlib import Path
 
-import librosa
-import numpy as np
-import soundfile as sf
-from scipy.signal import butter, sosfilt
-
+from backend.features.processing.service import process_audio_files_thread
 from backend.features.studio.assets import probe_audio
+from backend.jobs.registry import active_jobs
 from backend.paths.manager import paths
+from backend.storage.metadata import (
+    make_storage_name,
+    register_upload_metadata,
+    sanitize_filename_for_display,
+    unregister_upload_metadata,
+)
+
+# The UVR pipeline only writes these two out. Drums and bass do not exist as a
+# separate output of it — asking it for them used to return vocals and
+# instrumental regardless, so "Extract Drums" never extracted drums.
+UVR_STEMS = ("vocals", "instrumental")
+# A real four-way split comes from Demucs (htdemucs). "other" is what is left
+# once vocals, drums and bass are taken out.
+DEMUCS_STEMS = ("vocals", "drums", "bass", "other")
+SUPPORTED_STEMS = tuple(dict.fromkeys(UVR_STEMS + DEMUCS_STEMS))
 
 
-def _ensure_stereo(audio: np.ndarray) -> np.ndarray:
-    if audio.ndim == 1:
-        return np.stack([audio, audio], axis=0)
-    if audio.shape[0] == 1:
-        return np.repeat(audio, 2, axis=0)
-    if audio.shape[0] > 2:
-        return audio[:2]
-    return audio
+def _publish(produced: Path, key: str) -> dict:
+    """Copy a pipeline output into exports and describe it for the timeline."""
+    output_name = f"uvr_stem_{key}_{uuid.uuid4().hex}.wav"
+    output_path = paths.EXPORT_DIR / output_name
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(produced, output_path)
+    info = probe_audio(output_path)
+    return {
+        "assetId": f"uvr_stem:{uuid.uuid4().hex}",
+        "assetPath": str(output_path),
+        "assetUrl": f"/api/download/exports/{output_name}",
+        "durationSec": info.get("durationSec", 0.0),
+        "sampleRate": info.get("sampleRate"),
+        "trackName": key,
+        "label": key.title(),
+    }
 
 
-def _sos_filter(audio: np.ndarray, sr: int, cutoff, btype: str) -> np.ndarray:
-    nyq = 0.5 * sr
-    if isinstance(cutoff, (list, tuple)):
-        cutoff = [max(10.0, min(nyq - 10.0, c)) for c in cutoff]
-        normalized = [c / nyq for c in cutoff]
-    else:
-        cutoff = max(10.0, min(nyq - 10.0, cutoff))
-        normalized = cutoff / nyq
-    sos = butter(4, normalized, btype=btype, output="sos")
-    filtered = []
-    for ch in audio:
-        filtered.append(sosfilt(sos, ch))
-    return np.stack(filtered, axis=0)
+def _extract_demucs_stems(source: Path, wanted: list[str]) -> list[dict]:
+    """Separate with Demucs' htdemucs model and publish only the requested stems.
 
+    Weights (~80 MB) are fetched by Demucs on first use and cached by torch. Falls back to
+    the CPU if the GPU is out of memory — Live VC and this share the card.
+    """
+    import torch
+    from demucs.api import Separator, save_audio
 
-def _split_harmonic_percussive(audio: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    harmonic = np.zeros_like(audio)
-    percussive = np.zeros_like(audio)
-    for i in range(audio.shape[0]):
-        h, p = librosa.effects.hpss(audio[i])
-        harmonic[i] = h
-        percussive[i] = p
-    return harmonic, percussive
+    names = [name for name in wanted if name in DEMUCS_STEMS]
+    if not names:
+        raise RuntimeError("None of the requested stems can be separated by Demucs.")
 
+    def run(device: str):
+        separator = Separator(model="htdemucs", device=device, progress=False)
+        _, separated = separator.separate_audio_file(source)
+        return separator.samplerate, separated
 
-def _maybe_remove_vocals(audio: np.ndarray, sr: int) -> np.ndarray:
     try:
-        from vocal import get_model, separate_vocal
-        import torch
-    except Exception:
-        # Fallback to original audio if UVR isn't available.
-        return audio
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        try:
+            samplerate, separated = run(device)
+        except torch.cuda.OutOfMemoryError:
+            torch.cuda.empty_cache()
+            samplerate, separated = run("cpu")
+    except Exception as exc:  # model download / decode failures surface as the job's error
+        raise RuntimeError(f"Stem separation failed: {exc}") from exc
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = get_model(device)
-    vocals = separate_vocal(model, audio, device, silent=True)
-
-    vocals = _ensure_stereo(vocals)
-    audio = _ensure_stereo(audio)
-    if vocals.shape[1] > audio.shape[1]:
-        vocals = vocals[:, : audio.shape[1]]
-    elif vocals.shape[1] < audio.shape[1]:
-        audio = audio[:, : vocals.shape[1]]
-    return audio - vocals
+    stems = []
+    for name in names:
+        tensor = separated.get(name)
+        if tensor is None:
+            continue
+        temp = paths.EXPORT_DIR / f"demucs_tmp_{uuid.uuid4().hex}_{name}.wav"
+        temp.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            save_audio(tensor.cpu(), str(temp), samplerate=samplerate)
+            stems.append(_publish(temp, name))
+        finally:
+            temp.unlink(missing_ok=True)
+    if not stems:
+        raise RuntimeError("Stem separation produced no output files.")
+    return stems
 
 
 def extract_uvr_multi_stems(source_path: str, stem_names: list[str] | None = None) -> list[dict]:
     if not source_path:
-        raise RuntimeError("sourceAssetPath is required for UVR stem extraction.")
+        raise RuntimeError("sourceAssetPath is required for stem extraction.")
+    source = Path(source_path)
+    if not source.exists():
+        raise RuntimeError(f"Source audio not found: {source_path}")
 
-    raw = os.environ.get("STUDIO_UVR_STEMS") or ""
-    if stem_names is None:
-        stem_names = [s.strip() for s in raw.split(",") if s.strip()]
-    if not stem_names:
-        stem_names = ["drums", "bass", "mids", "highs"]
+    wanted = [name.strip().lower() for name in (stem_names or UVR_STEMS) if name and name.strip()]
+    wanted = [name for name in wanted if name in SUPPORTED_STEMS] or list(UVR_STEMS)
+    if any(name not in UVR_STEMS for name in wanted):
+        return _extract_demucs_stems(source, wanted)
 
-    audio, sr = librosa.load(source_path, sr=44100, mono=False)
-    audio = _ensure_stereo(audio)
+    # The pipeline works off the shared input directory and keys everything by
+    # the stored filename, so the source has to be registered like an upload.
+    title_safe = sanitize_filename_for_display(source.stem or "studio_stem")
+    stored_name, file_id = make_storage_name(f"{title_safe}.wav")
+    input_path = paths.INPUT_DIR / stored_name
+    input_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, input_path)
+    register_upload_metadata(title_safe, stored_name, file_id)
 
-    instrumental = _maybe_remove_vocals(audio, sr)
-    harmonic, percussive = _split_harmonic_percussive(instrumental)
-
-    bass = _sos_filter(harmonic, sr, 200, "lowpass")
-    highs = _sos_filter(harmonic, sr, 5000, "highpass")
-    mids = harmonic - bass - highs
-
-    stem_map = {
-        "instrumental": instrumental,
-        "drums": percussive,
-        "percussion": percussive,
-        "bass": bass,
-        "mids": mids,
-        "mid": mids,
-        "highs": highs,
-        "high": highs,
-        "harmonic": harmonic,
+    job_id = str(uuid.uuid4())
+    active_jobs[job_id] = {
+        "id": job_id,
+        "status": "starting",
+        "progress": 0,
+        "config": {"segment": False, "process": True, "export": False, "clean": False},
+        "started_at": time.time(),
+        "fileIds": [file_id],
     }
 
-    stems = []
-    for name in stem_names:
-        key = name.strip().lower()
-        if key not in stem_map:
-            continue
-        output_name = f"uvr_stem_{key}_{uuid.uuid4().hex}.wav"
-        output_path = paths.EXPORT_DIR / output_name
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        sf.write(str(output_path), stem_map[key].T, sr)
-        info = probe_audio(output_path)
-        stems.append(
-            {
-                "assetId": f"uvr_stem:{uuid.uuid4().hex}",
-                "assetPath": str(output_path),
-                "assetUrl": f"/api/download/exports/{output_name}",
-                "durationSec": info.get("durationSec", 0.0),
-                "sampleRate": info.get("sampleRate"),
-                "trackName": key,
-                "label": key.replace("_", " ").title(),
-            }
-        )
+    try:
+        process_audio_files_thread(job_id, segment=False, process=True, export=False, clean=False)
+        result = active_jobs.get(job_id, {})
+        if result.get("status") == "failed":
+            raise RuntimeError(result.get("error") or "Stem separation failed.")
 
-    if not stems:
-        raise RuntimeError("No stems were produced. Check STUDIO_UVR_STEMS configuration.")
+        base = Path(stored_name).stem
+        produced = {
+            "vocals": paths.UVR_RAW_DIR / f"{base}_vocals.wav",
+            "instrumental": paths.INSTRUMENTAL_DIR / f"{base}_instrumental.wav",
+        }
 
-    return stems
+        stems = [_publish(produced[key], key) for key in wanted if produced[key].exists()]
+        if not stems:
+            raise RuntimeError("Stem separation produced no output files.")
+        return stems
+    finally:
+        input_path.unlink(missing_ok=True)
+        # The upload record exists only to get this file past the separation
+        # pipeline; it must not outlive it and show up as an import.
+        unregister_upload_metadata(file_id)
+        active_jobs.pop(job_id, None)

@@ -11,18 +11,21 @@ from backend.features.studio.assets import (
     detect_asset_source,
     probe_audio,
     resolve_inference_asset,
+    resolve_songgen_asset,
     resolve_upload_assets,
 )
-from backend.features.song_generation.cover import transcribe_audio_path
+from backend.features.studio.loop_match import match_loop
 from backend.features.studio.jobs import (
     create_job,
     run_ai_job,
-    run_orchestrate_song_job,
+    run_generate_job,
     cancel_job,
+    run_midi_clip_render_job,
     run_midi_export_job,
     run_render_job,
     run_stems_render_job,
     run_soulx_resing_job,
+    run_airgen_regen_job,
     start_job_thread,
 )
 from backend.features.studio.storage import (
@@ -42,63 +45,63 @@ from backend.paths.manager import paths
 bp = Blueprint("studio", __name__)
 
 
-def _default_lanes(project_id: str):
+# Starter lane layouts for "New from template" — (laneType, laneName) pairs, laneType must be
+# one of the types TrackList.js's LANE_TYPES recognizes (midi/custom/mix/vocal/instrumental/
+# stem/generated) since that's what drives the lane's icon/color in the UI.
+PROJECT_TEMPLATES = {
+    "standard": {
+        "label": "Standard",
+        "description": "Mix / Vocals / Instrumental / Stems — the general-purpose starting point.",
+        "lanes": [
+            ("mix", "Mix"),
+            ("vocal", "Vocals"),
+            ("instrumental", "Instrumental"),
+            ("stem", "Stems"),
+            ("generated", "Generated Layers"),
+        ],
+    },
+    "beat_vocals": {
+        "label": "Beat + Vocals",
+        "description": "A beat, a melody idea, and vocal takes — for sketching a song fast.",
+        "lanes": [
+            ("instrumental", "Beat"),
+            ("midi", "Melody MIDI"),
+            ("vocal", "Lead Vocals"),
+            ("vocal", "Ad-libs"),
+            ("generated", "Generated Layers"),
+        ],
+    },
+    "multitrack_stems": {
+        "label": "Multitrack Stems",
+        "description": "One lane per stem, for building or mixing a full arrangement.",
+        "lanes": [
+            ("stem", "Drums"),
+            ("stem", "Bass"),
+            ("stem", "Melody"),
+            ("vocal", "Vocals"),
+            ("stem", "FX / Ambience"),
+            ("mix", "Mix"),
+        ],
+    },
+}
+DEFAULT_TEMPLATE_ID = "standard"
+
+
+def _default_lanes(project_id: str, template_id: str = DEFAULT_TEMPLATE_ID):
+    template = PROJECT_TEMPLATES.get(template_id) or PROJECT_TEMPLATES[DEFAULT_TEMPLATE_ID]
     return [
         {
             "id": uuid.uuid4().hex,
             "projectId": project_id,
-            "type": "mix",
-            "name": "Mix",
+            "type": lane_type,
+            "name": lane_name,
             "sourceAssetId": None,
             "mute": False,
             "solo": False,
             "gainDb": 0.0,
-            "order": 1,
-        },
-        {
-            "id": uuid.uuid4().hex,
-            "projectId": project_id,
-            "type": "vocal",
-            "name": "Vocals",
-            "sourceAssetId": None,
-            "mute": False,
-            "solo": False,
-            "gainDb": 0.0,
-            "order": 2,
-        },
-        {
-            "id": uuid.uuid4().hex,
-            "projectId": project_id,
-            "type": "instrumental",
-            "name": "Instrumental",
-            "sourceAssetId": None,
-            "mute": False,
-            "solo": False,
-            "gainDb": 0.0,
-            "order": 3,
-        },
-        {
-            "id": uuid.uuid4().hex,
-            "projectId": project_id,
-            "type": "stem",
-            "name": "Stems",
-            "sourceAssetId": None,
-            "mute": False,
-            "solo": False,
-            "gainDb": 0.0,
-            "order": 4,
-        },
-        {
-            "id": uuid.uuid4().hex,
-            "projectId": project_id,
-            "type": "generated",
-            "name": "Generated Layers",
-            "sourceAssetId": None,
-            "mute": False,
-            "solo": False,
-            "gainDb": 0.0,
-            "order": 5,
-        },
+            "order": index + 1,
+        }
+        for index, (lane_type, lane_name) in enumerate(template["lanes"])
     ]
 
 
@@ -122,9 +125,9 @@ def _add_clip(clips, lane_id, asset_id, duration):
     )
 
 
-def _build_project(asset_id: str):
+def _build_project(asset_id: str, template_id: str = DEFAULT_TEMPLATE_ID):
     project_id = uuid.uuid4().hex
-    lanes = _default_lanes(project_id)
+    lanes = _default_lanes(project_id, template_id)
     clips = []
     assets = {}
     sample_rate = None
@@ -145,6 +148,9 @@ def _build_project(asset_id: str):
         file_id = source[1]
         upload_assets = resolve_upload_assets(file_id)
         assets.update(upload_assets)
+    elif source and source[0] == "songgen":
+        songgen_assets = resolve_songgen_asset(source[1])
+        assets.update(songgen_assets)
     else:
         upload_assets = resolve_upload_assets(asset_id)
         assets.update(upload_assets)
@@ -191,6 +197,8 @@ def _build_project(asset_id: str):
         "clips": clips,
         "assets": assets,
         "metadata": {},
+        "scenes": [],
+        "clipSlots": [],
     }
 
 
@@ -258,10 +266,21 @@ def _create_project_lane(project: dict, lane_type: str, name: str):
 def create_project():
     data = request.get_json() or {}
     asset_id = str(data.get("assetId") or "").strip()
+    template_id = str(data.get("templateId") or "").strip() or DEFAULT_TEMPLATE_ID
     # Always create a fresh project — do not reuse an existing one
-    record = _build_project(asset_id)
+    record = _build_project(asset_id, template_id=template_id)
     save_project(record, asset_id=asset_id or None)
     return jsonify(public_project_payload(record))
+
+
+@bp.route("/api/studio/project-templates", methods=["GET"])
+def list_project_templates():
+    return jsonify(
+        [
+            {"id": template_id, "label": template["label"], "description": template["description"]}
+            for template_id, template in PROJECT_TEMPLATES.items()
+        ]
+    )
 
 
 @bp.route("/api/studio/projects", methods=["GET"])
@@ -316,15 +335,63 @@ def patch_project(project_id):
     clips = data.get("clips")
     assets = data.get("assets")
     metadata = data.get("metadata")
-    updated = update_project(project_id, project=project, lanes=lanes, clips=clips, assets=assets, metadata=metadata)
+    scenes = data.get("scenes")
+    clip_slots = data.get("clipSlots")
+    updated = update_project(
+        project_id,
+        project=project,
+        lanes=lanes,
+        clips=clips,
+        assets=assets,
+        metadata=metadata,
+        scenes=scenes,
+        clip_slots=clip_slots,
+    )
     if not updated:
         return jsonify({"error": "Project not found"}), 404
     return jsonify(public_project_payload(updated))
 
 
+@bp.route("/api/studio/projects/<project_id>/assets/<path:asset_id>/match", methods=["POST"])
+def match_project_asset(project_id, asset_id):
+    """Bring an audio asset onto the project's tempo, key and bar grid; returns a new asset."""
+    from backend.features.studio.assets import resolve_asset_path
+
+    project = get_project(project_id)
+    if not project:
+        return jsonify({"error": "Project not found"}), 404
+    assets = project.get("assets") or {}
+    source = resolve_asset_path(assets, asset_id)
+    if not source:
+        return jsonify({"error": "Asset not found"}), 404
+    data = request.get_json() or {}
+    bpm = data.get("bpm") or (project.get("project") or {}).get("bpm") or 120
+    key = data.get("key") if "key" in data else (project.get("project") or {}).get("key")
+    try:
+        matched = match_loop(source, bpm, key, normalize=bool(data.get("normalize", True)))
+    except (ValueError, RuntimeError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    original = assets.get(asset_id) or {}
+    asset = {
+        "id": matched["assetId"],
+        "kind": "derived",
+        "label": f"{original.get('label') or 'Loop'} (matched)",
+        "path": matched["assetPath"],
+        "url": matched["assetUrl"],
+        "durationSec": matched["durationSec"],
+        "sampleRate": matched["sampleRate"],
+        "bpm": float(bpm),
+        "matchedFrom": asset_id,
+    }
+    update_project(project_id, assets={asset["id"]: asset})
+    return jsonify({"asset": {k: v for k, v in asset.items() if k != "path"}, "info": matched["info"]})
+
+
 @bp.route("/api/studio/projects/<project_id>/render", methods=["POST"])
 def render_project(project_id):
-    job = create_job("render", project_id, {})
+    data = request.get_json(silent=True) or {}
+    master = data.get("master")
+    job = create_job("render", project_id, {"master": master})
     start_job_thread(run_render_job, (job["id"], project_id))
     return jsonify({"jobId": job["id"]})
 
@@ -367,15 +434,23 @@ def start_ai_job(project_id, job_type):
     job = create_job(job_type, project_id, payload)
     if job_type == "resynthesize":
         start_job_thread(run_soulx_resing_job, (job["id"], project_id, payload))
-    elif job_type == "orchestrate_song":
-        start_job_thread(run_orchestrate_song_job, (job["id"], project_id, payload))
+    elif job_type == "render_midi_clip":
+        start_job_thread(run_midi_clip_render_job, (job["id"], project_id, payload))
+    elif job_type == "generate":
+        start_job_thread(run_generate_job, (job["id"], project_id, payload))
+    elif job_type == "airgen_regen":
+        start_job_thread(run_airgen_regen_job, (job["id"], project_id, payload))
     else:
         start_job_thread(run_ai_job, (job["id"], project_id, job_type, payload))
     return jsonify({"jobId": job["id"]})
 
 
+@bp.route("/api/studio/projects/<project_id>/voice-input", methods=["POST"])
+# Foundation-1 is gone, but this endpoint never had anything to do with it: it
+# takes a recorded take and drops it on the timeline. The old path stays so an
+# unrefreshed client doesn't lose a recording mid-session.
 @bp.route("/api/studio/projects/<project_id>/foundation-voice-input", methods=["POST"])
-def import_foundation_voice_input(project_id):
+def import_voice_input(project_id):
     project = get_project(project_id)
     if not project:
         return jsonify({"error": "Project not found"}), 404
@@ -389,8 +464,8 @@ def import_foundation_voice_input(project_id):
     except Exception:
         return jsonify({"error": "Invalid insertSec"}), 400
 
-    label = str(request.form.get("label") or "Foundation Voice Input").strip() or "Foundation Voice Input"
-    lane_name = str(request.form.get("laneName") or "Foundation Voice Input").strip() or "Foundation Voice Input"
+    label = str(request.form.get("label") or "Voice Input").strip() or "Voice Input"
+    lane_name = str(request.form.get("laneName") or "Voice Input").strip() or "Voice Input"
 
     temp_dir = paths.TEMP_WAV_DIR
     temp_dir.mkdir(parents=True, exist_ok=True)
@@ -398,8 +473,8 @@ def import_foundation_voice_input(project_id):
     exports_dir.mkdir(parents=True, exist_ok=True)
 
     raw_suffix = Path(audio.filename).suffix or ".webm"
-    raw_path = temp_dir / f"foundation_voice_input_{uuid.uuid4().hex}{raw_suffix}"
-    out_name = f"foundation_voice_input_{uuid.uuid4().hex}.wav"
+    raw_path = temp_dir / f"voice_input_{uuid.uuid4().hex}{raw_suffix}"
+    out_name = f"voice_input_{uuid.uuid4().hex}.wav"
     out_path = exports_dir / out_name
 
     try:
@@ -420,7 +495,7 @@ def import_foundation_voice_input(project_id):
             raise RuntimeError(result.stderr.strip() or "Failed to import recorded voice")
 
         audio_info = probe_audio(out_path)
-        asset_id = f"foundation_voice:{uuid.uuid4().hex}"
+        asset_id = f"voice_input:{uuid.uuid4().hex}"
         asset = {
             "id": asset_id,
             "kind": "recording",
@@ -468,47 +543,6 @@ def import_foundation_voice_input(project_id):
             raw_path.unlink(missing_ok=True)
         except Exception:
             pass
-
-
-@bp.route("/api/studio/projects/<project_id>/transcribe", methods=["POST"])
-def transcribe_studio_segment(project_id):
-    data = request.get_json() or {}
-    asset_id = str(data.get("assetId") or data.get("sourceAssetId") or "").strip()
-    if not asset_id:
-        return jsonify({"error": "assetId is required"}), 400
-
-    project = get_project(project_id)
-    if not project:
-        return jsonify({"error": "Project not found"}), 404
-
-    source_path = _resolve_project_asset_path(project, asset_id)
-    if not source_path:
-        return jsonify({"error": "Asset audio not found"}), 404
-
-    start_sec = data.get("startSec")
-    end_sec = data.get("endSec")
-    engine = str(data.get("engine") or "whisperx").strip().lower()
-
-    clip_path = None
-    try:
-        if start_sec is not None and end_sec is not None:
-            try:
-                start_val = float(start_sec)
-                end_val = float(end_sec)
-            except Exception:
-                return jsonify({"error": "Invalid startSec or endSec"}), 400
-            if end_val > start_val:
-                clip_path = _extract_audio_segment(source_path, start_val, end_val)
-        text = transcribe_audio_path(clip_path or source_path, engine=engine)
-        return jsonify({"text": text})
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
-    finally:
-        if clip_path:
-            try:
-                clip_path.unlink(missing_ok=True)
-            except Exception:
-                pass
 
 
 @bp.route("/api/jobs/<job_id>", methods=["GET"])

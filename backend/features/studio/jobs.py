@@ -1,19 +1,17 @@
 import os
+import shutil
 import subprocess
 import threading
+import time
 import uuid
 from pathlib import Path
 
-from backend.features.studio.ai_adapters import get_ai_adapter, terminate_ai_adapter
+from backend.app import yue2_params
+from backend.features.song_generation.jobs_common import SONG_GENERATION_JOBS_DIR, _asset_path as _song_asset_path
+from backend.features.song_generation.service import run_song_generation_thread
 from backend.features.studio.assets import probe_audio, resolve_asset_path
-from backend.features.studio.foundation_one import run_foundation_studio_job
 from backend.features.studio.midi_export import export_midi
-from backend.features.studio.orchestrator_plan import (
-    apply_lane_fx_preset,
-    apply_orchestrator_project_settings,
-    bars_to_seconds,
-    normalize_orchestrator_plan,
-)
+from backend.features.studio.midi_render import render_midi_clip
 from backend.features.studio.project_edits import (
     append_clip,
     append_midi_clip,
@@ -26,7 +24,6 @@ from backend.features.studio.project_edits import (
     update_project_duration,
 )
 from backend.features.studio.render import render_mixdown, render_stems
-from backend.features.studio.stage_drums import run_stage_drums_job
 from backend.features.studio.uvr_stems import extract_uvr_multi_stems
 from backend.features.studio.storage import (
     append_job_event,
@@ -36,6 +33,7 @@ from backend.features.studio.storage import (
     save_project,
     update_job,
 )
+from backend.jobs.registry import song_generation_jobs
 from backend.paths.manager import paths
 
 
@@ -63,10 +61,6 @@ def create_job(job_type: str, project_id: str, payload: dict | None = None):
     save_job(job)
     append_job_event(job_id, {"type": "status", "status": "queued", "progress": 0})
     return job
-
-
-def _should_skip_missing_target_lane(payload: dict | None) -> bool:
-    return bool(isinstance(payload, dict) and payload.get("skipIfTargetLaneMissing"))
 
 
 def _reload_project_for_async_write(project_id: str, fallback_record: dict) -> dict:
@@ -145,584 +139,6 @@ def _record_stem_result(project_record: dict, payload: dict, result: dict):
         append_clip(project_record, lane["id"], asset_id, 0.0, asset.get("durationSec", 0.0))
 
 
-def _resolve_audio_clip_candidates(project_record: dict, payload: dict):
-    clips = project_record.get("clips") or []
-    selected_ids = {
-        str(item)
-        for item in (payload.get("clipIds") or [])
-        if str(item).strip()
-    }
-    if selected_ids:
-        resolved = [
-            clip for clip in clips
-            if clip.get("id") in selected_ids and clip.get("clipType") != "midi" and clip.get("sourceAssetId")
-        ]
-        if resolved:
-            return resolved
-
-    lane_ids = {
-        str(item)
-        for item in (payload.get("laneIds") or [])
-        if str(item).strip()
-    }
-    try:
-        range_start = float(payload.get("startSec")) if payload.get("startSec") is not None else None
-        range_end = float(payload.get("endSec")) if payload.get("endSec") is not None else None
-    except Exception:
-        range_start = None
-        range_end = None
-    if range_start is not None and range_end is not None:
-        range_start, range_end = min(range_start, range_end), max(range_start, range_end)
-        resolved = []
-        for clip in clips:
-            if clip.get("clipType") == "midi" or not clip.get("sourceAssetId"):
-                continue
-            if lane_ids and clip.get("laneId") not in lane_ids:
-                continue
-            clip_start = float(clip.get("timelineStartSec") or 0.0)
-            clip_end = clip_start + clip_length_sec(clip)
-            if range_end > clip_start and range_start < clip_end:
-                resolved.append(clip)
-        if resolved:
-            return resolved
-
-    source_asset_id = payload.get("sourceAssetId")
-    if source_asset_id:
-        return [
-            clip for clip in clips
-            if clip.get("clipType") != "midi" and clip.get("sourceAssetId") == source_asset_id
-        ]
-    return []
-
-
-def _render_stage_conditioning_mix(project_record: dict, payload: dict) -> tuple[Path, float, float]:
-    candidate_clips = _resolve_audio_clip_candidates(project_record, payload)
-    if not candidate_clips:
-        raise RuntimeError("Select one or more audio clips or a timeline range before generating drums")
-
-    try:
-        range_start = float(payload.get("startSec")) if payload.get("startSec") is not None else None
-        range_end = float(payload.get("endSec")) if payload.get("endSec") is not None else None
-    except Exception:
-        range_start = None
-        range_end = None
-
-    if range_start is None or range_end is None or range_end <= range_start:
-        starts = []
-        ends = []
-        for clip in candidate_clips:
-            clip_start = float(clip.get("timelineStartSec") or 0.0)
-            starts.append(clip_start)
-            ends.append(clip_start + clip_length_sec(clip))
-        if not starts or not ends:
-            raise RuntimeError("Selected clips do not have a valid audio duration")
-        range_start = min(starts)
-        range_end = max(ends)
-    else:
-        range_start, range_end = min(range_start, range_end), max(range_start, range_end)
-
-    lanes = project_record.get("lanes") or []
-    lane_gain = {lane.get("id"): float(lane.get("gainDb") or 0.0) for lane in lanes}
-    assets = project_record.get("assets") if isinstance(project_record.get("assets"), dict) else {}
-
-    inputs = []
-    filters = []
-    labels = []
-
-    for _idx, clip in enumerate(candidate_clips):
-        asset = assets.get(clip.get("sourceAssetId")) if isinstance(assets, dict) else None
-        asset_path = asset.get("path") if isinstance(asset, dict) else None
-        if not asset_path:
-            continue
-        path = Path(asset_path)
-        if not path.exists():
-            continue
-
-        clip_start = float(clip.get("timelineStartSec") or 0.0)
-        clip_src_start = float(clip.get("srcStartSec") or 0.0)
-        clip_src_end = float(clip.get("srcEndSec") or 0.0)
-        clip_len = max(0.01, clip_src_end - clip_src_start)
-        clip_end = clip_start + clip_len
-        overlap_start = max(range_start, clip_start)
-        overlap_end = min(range_end, clip_end)
-        if overlap_end <= overlap_start:
-            continue
-
-        trim_start = clip_src_start + (overlap_start - clip_start)
-        trim_end = clip_src_start + (overlap_end - clip_start)
-        delay_ms = int(max(0.0, overlap_start - range_start) * 1000)
-        gain = 10 ** ((lane_gain.get(clip.get("laneId"), 0.0) + float(clip.get("gainDb") or 0.0)) / 20.0)
-        input_index = len(inputs)
-        label = f"sc{input_index}"
-
-        inputs.append(str(path))
-        labels.append(label)
-
-        filter_parts = [f"[{input_index}:a]atrim=start={trim_start:.6f}:end={trim_end:.6f}", "asetpts=PTS-STARTPTS"]
-        if gain != 1.0:
-            filter_parts.append(f"volume={gain:.8f}")
-        if delay_ms > 0:
-            filter_parts.append(f"adelay={delay_ms}")
-        filters.append(f"{','.join(part for part in filter_parts if part)}[{label}]")
-
-    if not inputs or not labels:
-        raise RuntimeError("No valid audio sources found for STAGE conditioning")
-
-    mix_label = "stage_mix"
-    if len(labels) == 1:
-        filters.append(f"[{labels[0]}]anull[{mix_label}]")
-    else:
-        joined = "".join(f"[{label}]" for label in labels)
-        filters.append(f"{joined}amix=inputs={len(labels)}:normalize=0:dropout_transition=0[{mix_label}]")
-
-    output_path = paths.TEMP_WAV_DIR / f"stage_context_{uuid.uuid4().hex}.wav"
-    paths.TEMP_WAV_DIR.mkdir(parents=True, exist_ok=True)
-    cmd = ["ffmpeg", "-y"]
-    for inp in inputs:
-        cmd += ["-i", inp]
-    cmd += [
-        "-filter_complex",
-        ";".join(part for part in filters if part),
-        "-map",
-        f"[{mix_label}]",
-        "-ac",
-        "1",
-        "-ar",
-        "32000",
-        str(output_path),
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
-    if result.returncode != 0 or not output_path.exists():
-        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "Failed to render STAGE conditioning mix")
-    return output_path, range_start, range_end
-
-
-def _resolve_foundation_audio_lane(project_record: dict, payload: dict, label: str, variant_index: int, variant_total: int):
-    target_lane_id = payload.get("targetAudioLaneId") if isinstance(payload, dict) else None
-    target_lane = get_lane_by_id(project_record, target_lane_id)
-    if target_lane:
-        return target_lane
-    if target_lane_id and _should_skip_missing_target_lane(payload):
-        return None
-    lane_name = f"{label} Audio"
-    if variant_total > 1:
-        lane_name = f"{lane_name} {variant_index + 1}"
-    return create_lane(project_record, "generated", lane_name)
-
-
-def _resolve_foundation_midi_lane(project_record: dict, payload: dict, label: str, variant_index: int, variant_total: int):
-    target_lane_id = payload.get("targetMidiLaneId") if isinstance(payload, dict) else None
-    target_lane = get_lane_by_id(project_record, target_lane_id)
-    if target_lane:
-        return target_lane
-    if target_lane_id and _should_skip_missing_target_lane(payload):
-        return None
-    name = f"{label} MIDI"
-    if variant_total > 1:
-        name = f"{label} MIDI {variant_index + 1}"
-    return create_lane(project_record, "midi", name, muted=True)
-
-
-def _record_foundation_result(project_record: dict, payload: dict, result: dict):
-    commit_mode = str(payload.get("commitMode") or "both").strip().lower()
-    commit_audio = commit_mode in {"both", "audio"}
-    commit_midi = commit_mode in {"both", "midi"}
-    start_sec = float(payload.get("timelineStartSec") or payload.get("insertSec") or 0.0)
-    pair_group_id = uuid.uuid4().hex
-    variants = result.get("variants") if isinstance(result.get("variants"), list) else []
-    variant_total = max(1, len(variants))
-    project = project_record.get("project") or {}
-    metadata = project_record.get("metadata") or {}
-    foundation_runs = metadata.get("foundationOne") if isinstance(metadata.get("foundationOne"), list) else []
-    if payload.get("applyProjectTempo") and not project.get("bpm") and result.get("bpm"):
-        project["bpm"] = result.get("bpm")
-    if payload.get("applyProjectTempo") and not project.get("key") and result.get("key"):
-        project["key"] = result.get("key")
-
-    inserted_count = 0
-    for index, variant in enumerate(variants):
-        if not isinstance(variant, dict):
-            continue
-        label = str(variant.get("label") or "Foundation").strip() or "Foundation"
-        pair_id = uuid.uuid4().hex
-        asset_id = None
-
-        if commit_audio and variant.get("audioPath"):
-            lane = _resolve_foundation_audio_lane(project_record, payload, label, index, variant_total)
-            if lane is not None:
-                asset_id = variant.get("assetId") or f"foundation:{uuid.uuid4().hex}"
-                asset = {
-                    "id": asset_id,
-                    "kind": "generated",
-                    "label": label,
-                    "url": variant.get("audioUrl"),
-                    "path": variant.get("audioPath"),
-                    "durationSec": variant.get("durationSec", 0.0),
-                    "sampleRate": variant.get("sampleRate"),
-                    "source": "foundation_one",
-                    "pairId": pair_id,
-                }
-                register_asset(project_record, asset)
-                clip = append_clip(project_record, lane["id"], asset_id, start_sec, asset.get("durationSec", 0.0))
-                clip["foundationPairId"] = pair_id
-                clip["foundationGroupId"] = pair_group_id
-                clip["foundationMode"] = result.get("mode")
-                inserted_count += 1
-
-        midi_data = variant.get("midiData") if isinstance(variant.get("midiData"), dict) else None
-        if commit_midi and midi_data:
-            if not project.get("bpm") and midi_data.get("bpm"):
-                project["bpm"] = midi_data.get("bpm")
-            lane = _resolve_foundation_midi_lane(project_record, payload, label, index, variant_total)
-            if lane is not None:
-                midi_clip = {
-                    **midi_data,
-                    "instrument": midi_data.get("instrument") or variant.get("instrumentFamily") or "Foundation MIDI",
-                    "source": "foundation_one",
-                    "pairId": pair_id,
-                }
-                clip = append_midi_clip(project_record, lane["id"], midi_clip, start_sec)
-                clip["foundationPairId"] = pair_id
-                clip["foundationGroupId"] = pair_group_id
-                clip["foundationMode"] = result.get("mode")
-                inserted_count += 1
-
-        foundation_runs.append(
-            {
-                "pairId": pair_id,
-                "groupId": pair_group_id,
-                "mode": result.get("mode"),
-                "label": label,
-                "prompt": result.get("prompt") or payload.get("prompt"),
-                "bars": result.get("bars") or payload.get("bars"),
-                "bpm": variant.get("bpm") or result.get("bpm") or payload.get("bpm"),
-                "key": variant.get("key") or result.get("key") or payload.get("key"),
-                "instrumentFamily": variant.get("instrumentFamily") or payload.get("instrumentFamily"),
-                "styleTags": variant.get("styleTags") or payload.get("styleTags") or [],
-                "fxTags": variant.get("fxTags") or payload.get("fxTags") or [],
-                "audioAssetId": asset_id,
-                "hasMidi": bool(midi_data),
-                "sourceAssetId": payload.get("sourceAssetId"),
-            }
-        )
-
-    metadata["foundationOne"] = foundation_runs[-24:]
-    project_record["metadata"] = metadata
-    project_record["project"] = project
-    return inserted_count
-
-
-def _record_stage_result(project_record: dict, payload: dict, result: dict):
-    start_sec = float(payload.get("timelineStartSec") or payload.get("insertSec") or 0.0)
-    variants = result.get("variants") if isinstance(result.get("variants"), list) else []
-    if not variants:
-        return
-
-    project = project_record.get("project") or {}
-    metadata = project_record.get("metadata") or {}
-    stage_runs = metadata.get("stageDrums") if isinstance(metadata.get("stageDrums"), list) else []
-
-    inserted_count = 0
-    for index, variant in enumerate(variants):
-        if not isinstance(variant, dict) or not variant.get("audioPath"):
-            continue
-        label = str(variant.get("label") or "STAGE Drums").strip() or "STAGE Drums"
-        if len(variants) > 1:
-            label = f"{label} {index + 1}"
-        target_lane_id = payload.get("targetLaneId") if isinstance(payload, dict) else None
-        lane = get_lane_by_id(project_record, target_lane_id)
-        if not lane:
-            if target_lane_id and _should_skip_missing_target_lane(payload):
-                continue
-            lane = create_lane(project_record, "generated", label)
-        asset_id = variant.get("assetId") or f"stage:{uuid.uuid4().hex}"
-        asset = {
-            "id": asset_id,
-            "kind": "generated",
-            "label": label,
-            "url": variant.get("audioUrl"),
-            "path": variant.get("audioPath"),
-            "durationSec": variant.get("durationSec", 0.0),
-            "sampleRate": variant.get("sampleRate"),
-            "source": "stage",
-        }
-        register_asset(project_record, asset)
-        clip = append_clip(project_record, lane["id"], asset_id, start_sec, asset.get("durationSec", 0.0))
-        clip["stageMode"] = result.get("mode") or "drums"
-        inserted_count += 1
-        stage_runs.append(
-            {
-                "assetId": asset_id,
-                "label": label,
-                "prompt": result.get("prompt") or payload.get("prompt"),
-                "bpm": result.get("bpm") or payload.get("bpm"),
-                "startSec": start_sec,
-                "durationSec": variant.get("durationSec", 0.0),
-                "sourceClipIds": payload.get("clipIds") or [],
-            }
-        )
-
-    metadata["stageDrums"] = stage_runs[-24:]
-    project_record["metadata"] = metadata
-    project_record["project"] = project
-    return inserted_count
-
-
-def _append_job_progress(job_id: str, *, progress: int, status_message: str, stage: str, current_step_label: str | None = None, completed_steps: list | None = None, total_steps: int | None = None):
-    update_job(job_id, status="running", progress=progress, statusMessage=status_message)
-    append_job_event(
-        job_id,
-        {
-            "type": "status",
-            "status": "running",
-            "progress": progress,
-            "statusMessage": status_message,
-            "stage": stage,
-            "currentStepLabel": current_step_label,
-            "completedSteps": completed_steps or [],
-            "totalSteps": total_steps or 0,
-        },
-    )
-
-
-def _append_project_updated(job_id: str, *, progress: int, stage: str, current_step_label: str | None = None, completed_steps: list | None = None, total_steps: int | None = None):
-    append_job_event(
-        job_id,
-        {
-            "type": "project_updated",
-            "progress": progress,
-            "stage": stage,
-            "currentStepLabel": current_step_label,
-            "completedSteps": completed_steps or [],
-            "totalSteps": total_steps or 0,
-        },
-    )
-
-
-def run_orchestrate_song_job(job_id: str, project_id: str, payload: dict):
-    _append_job_progress(job_id, progress=0, status_message="Planning orchestration...", stage="plan")
-
-    project_record = get_project(project_id)
-    if not project_record:
-        update_job(job_id, status="failed", error="Project not found", progress=100)
-        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": "Project not found"})
-        return
-
-    stage_conditioning_path = None
-    try:
-        plan = normalize_orchestrator_plan(payload)
-        insert_sec = max(0.0, float(payload.get("insertSec") or 0.0))
-        global_plan = plan["global"]
-        apply_orchestrator_project_settings(project_record, global_plan)
-
-        role_lane_map = {}
-        generated_audio_lane_ids = []
-        generated_midi_lane_ids = []
-        for role in plan["roles"]:
-            audio_lane = create_lane(project_record, "generated", f"AI · {role['laneName']}")
-            midi_lane = create_lane(project_record, "midi", f"AI · {role['laneName']} MIDI", muted=True)
-            apply_lane_fx_preset(project_record, audio_lane["id"], role.get("fxPreset"))
-            role_lane_map[role["id"]] = {
-                "audioLaneId": audio_lane["id"],
-                "midiLaneId": midi_lane["id"],
-                "audioLaneName": audio_lane["name"],
-            }
-            generated_audio_lane_ids.append(audio_lane["id"])
-            generated_midi_lane_ids.append(midi_lane["id"])
-
-        section_cursor = insert_sec
-        completed_steps = []
-        enabled_sections = [section for section in plan["sections"] if section.get("enabled")]
-        execution_steps = [
-            f"{section['label']} · {next((role['laneName'] for role in plan['roles'] if role['id'] == step['roleId']), step['roleId'])}"
-            for section in enabled_sections
-            for step in section.get("steps", [])
-            if step.get("enabled", True)
-        ]
-        execution_steps.extend(f"{section['label']} · Drums" for section in enabled_sections)
-        total_steps = max(1, len(execution_steps))
-
-        _append_job_progress(
-            job_id,
-            progress=5,
-            status_message="Creating role lanes...",
-            stage="prepare",
-            completed_steps=completed_steps,
-            total_steps=total_steps,
-        )
-        update_project_duration(project_record)
-        save_project(project_record)
-        _append_project_updated(
-            job_id,
-            progress=5,
-            stage="prepare",
-            completed_steps=completed_steps,
-            total_steps=total_steps,
-        )
-
-        for section in enabled_sections:
-            section_start_sec = section_cursor
-            section_duration_sec = bars_to_seconds(section["bars"], global_plan["bpm"])
-            for step in section.get("steps", []):
-                if step.get("enabled") is False:
-                    continue
-                role = next((item for item in plan["roles"] if item["id"] == step["roleId"]), None)
-                if not role:
-                    continue
-                step_label = f"{section['label']} · {role['laneName']}"
-                current_progress = min(94, 5 + int((len(completed_steps) / total_steps) * 85))
-                _append_job_progress(
-                    job_id,
-                    progress=current_progress,
-                    status_message=f"Generating {step_label}...",
-                    stage="foundation",
-                    current_step_label=step_label,
-                    completed_steps=completed_steps,
-                    total_steps=total_steps,
-                )
-                foundation_payload = {
-                    "prompt": step.get("prompt") or role.get("basePrompt"),
-                    "bars": section["bars"],
-                    "bpm": global_plan["bpm"],
-                    "key": format_key_signature(global_plan["keyNote"], global_plan["scale"]),
-                    "instrumentFamily": role.get("instrumentFamily"),
-                    "styleTags": step.get("styleTags") or role.get("styleTags"),
-                    "fxTags": step.get("fxTags") or role.get("fxTags"),
-                    "variantCount": 1,
-                    "commitMode": "both",
-                    "timelineStartSec": section_start_sec,
-                    "insertSec": section_start_sec,
-                    "targetAudioLaneId": role_lane_map[role["id"]]["audioLaneId"],
-                    "targetMidiLaneId": role_lane_map[role["id"]]["midiLaneId"],
-                    "skipIfTargetLaneMissing": True,
-                }
-                result = run_foundation_studio_job("generate", foundation_payload)
-                project_record = _reload_project_for_async_write(project_id, project_record)
-                apply_orchestrator_project_settings(project_record, global_plan)
-                _record_foundation_result(project_record, foundation_payload, result)
-                completed_steps.append(step_label)
-                save_project(project_record)
-                _append_project_updated(
-                    job_id,
-                    progress=min(94, 5 + int((len(completed_steps) / total_steps) * 85)),
-                    stage="foundation",
-                    current_step_label=step_label,
-                    completed_steps=completed_steps,
-                    total_steps=total_steps,
-                )
-            section_cursor += section_duration_sec
-
-        drums_lane = create_lane(project_record, "generated", "AI · Drums")
-        section_cursor = insert_sec
-        for section in enabled_sections:
-            section_start_sec = section_cursor
-            section_duration_sec = bars_to_seconds(section["bars"], global_plan["bpm"])
-            section_end_sec = section_start_sec + section_duration_sec
-            drum_step_label = f"{section['label']} · Drums"
-            project_record = _reload_project_for_async_write(project_id, project_record)
-            apply_orchestrator_project_settings(project_record, global_plan)
-            current_progress = min(97, 5 + int((len(completed_steps) / total_steps) * 85))
-            _append_job_progress(
-                job_id,
-                progress=current_progress,
-                status_message=f"Preparing drums for {section['label']}...",
-                stage="drums_prepare",
-                current_step_label=drum_step_label,
-                completed_steps=completed_steps,
-                total_steps=total_steps,
-            )
-            stage_conditioning_path, _mix_start, _mix_end = _render_stage_conditioning_mix(
-                project_record,
-                {
-                    "laneIds": generated_audio_lane_ids,
-                    "startSec": section_start_sec,
-                    "endSec": section_end_sec,
-                },
-            )
-            stage_payload = {
-                "conditioningAudioPath": str(stage_conditioning_path),
-                "timelineStartSec": section_start_sec,
-                "insertSec": section_start_sec,
-                "durationSec": max(0.5, section_end_sec - section_start_sec),
-                "prompt": global_plan["drumPrompt"],
-                "bpm": global_plan["bpm"],
-                "label": "AI Drums",
-                "targetLaneId": drums_lane["id"],
-                "skipIfTargetLaneMissing": True,
-            }
-            _append_job_progress(
-                job_id,
-                progress=min(98, current_progress + 1),
-                status_message=f"Generating drums for {section['label']}...",
-                stage="drums",
-                current_step_label=drum_step_label,
-                completed_steps=completed_steps,
-                total_steps=total_steps,
-            )
-            stage_result = run_stage_drums_job(stage_payload)
-            project_record = _reload_project_for_async_write(project_id, project_record)
-            apply_orchestrator_project_settings(project_record, global_plan)
-            _record_stage_result(project_record, stage_payload, stage_result)
-            completed_steps.append(drum_step_label)
-            update_project_duration(project_record)
-            save_project(project_record)
-            _append_project_updated(
-                job_id,
-                progress=min(99, 5 + int((len(completed_steps) / total_steps) * 90)),
-                stage="drums",
-                current_step_label=drum_step_label,
-                completed_steps=completed_steps,
-                total_steps=total_steps,
-            )
-            try:
-                Path(stage_conditioning_path).unlink(missing_ok=True)
-            except Exception:
-                pass
-            stage_conditioning_path = None
-            section_cursor += section_duration_sec
-
-        update_project_duration(project_record)
-        save_project(project_record)
-        _append_project_updated(
-            job_id,
-            progress=99,
-            stage="drums",
-            current_step_label=completed_steps[-1] if completed_steps else None,
-            completed_steps=completed_steps,
-            total_steps=total_steps,
-        )
-        result = {
-            "insertSec": insert_sec,
-            "totalBars": global_plan["totalBars"],
-            "audioLaneIds": generated_audio_lane_ids + [drums_lane["id"]],
-            "midiLaneIds": generated_midi_lane_ids,
-            "completedSteps": completed_steps,
-        }
-        update_job(job_id, status="completed", progress=100, result=result, statusMessage="Song orchestration completed.")
-        append_job_event(
-            job_id,
-            {
-                "type": "status",
-                "status": "completed",
-                "progress": 100,
-                "statusMessage": "Song orchestration completed.",
-                "stage": "completed",
-                "completedSteps": completed_steps,
-                "totalSteps": total_steps,
-                "result": result,
-            },
-        )
-    except Exception as exc:
-        update_job(job_id, status="failed", progress=100, error=str(exc))
-        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
-    finally:
-        if stage_conditioning_path:
-            try:
-                Path(stage_conditioning_path).unlink(missing_ok=True)
-            except Exception:
-                pass
-
-
 def _asset_source_path(assets: dict, asset_id):
     """String form of resolve_asset_path, for payloads sent to the AI bridge."""
     resolved = resolve_asset_path(assets, asset_id)
@@ -730,45 +146,10 @@ def _asset_source_path(assets: dict, asset_id):
 
 
 def _record_result(project_record: dict, job_type: str, payload: dict, result: dict):
-    if job_type in {"understand", "lrc", "quality_score"}:
-        metadata = project_record.get("metadata") or {}
-        metadata[job_type] = result
-        project_record["metadata"] = metadata
-        if job_type == "understand":
-            project = project_record.get("project") or {}
-            if result.get("bpm") is not None:
-                project["bpm"] = result.get("bpm")
-            if result.get("key"):
-                project["key"] = result.get("key")
-            if result.get("timeSignature"):
-                project["timeSignature"] = result.get("timeSignature")
-            project_record["project"] = project
-        return
     if job_type in {"stem_extract", "stem_extract_uvr"}:
         _record_stem_result(project_record, payload, result)
         return
-    if job_type in {"foundation_generate", "foundation_restyle", "foundation_extend"}:
-        _record_foundation_result(project_record, payload, result)
-        return
-    if job_type == "stage_drums_generate":
-        _record_stage_result(project_record, payload, result)
-        return
-
-    asset_id = result.get("assetId") or uuid.uuid4().hex
-    asset = {
-        "id": asset_id,
-        "kind": "generated",
-        "label": job_type.replace("_", " ").title(),
-        "url": result.get("assetUrl"),
-        "path": result.get("assetPath"),
-        "durationSec": result.get("durationSec", 0.0),
-        "sampleRate": result.get("sampleRate"),
-    }
-    register_asset(project_record, asset)
-
-    lane = ensure_lane(project_record, "generated", "Generated Layers")
-    start_sec = payload.get("startSec") or payload.get("timelineStartSec") or 0.0
-    append_clip(project_record, lane["id"], asset_id, start_sec, asset.get("durationSec", 0.0))
+    raise RuntimeError(f"No result recorder for job type: {job_type}")
 
 
 def run_render_job(job_id: str, project_id: str):
@@ -781,8 +162,11 @@ def run_render_job(job_id: str, project_id: str):
         append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
         return
 
+    job_record = get_job(job_id) or {}
+    master = (job_record.get("payload") or {}).get("master")
+
     try:
-        output = render_mixdown(project_record)
+        output = render_mixdown(project_record, master=master)
         project_record = _reload_project_for_async_write(project_id, project_record)
         asset_id = f"render:{job_id}"
         asset = {
@@ -813,10 +197,10 @@ TERMINAL_JOB_STATUSES = {"completed", "failed", "cancelled"}
 def cancel_job(job_id: str):
     """Stop a running job.
 
-    The AI work happens in a bridge subprocess that holds the models and the
-    GPU, so cancelling means killing it — there is no cooperative stop to ask
-    for. The flag is written first: the worker thread checks it before writing
-    a terminal status, so the kill isn't reported as a failure.
+    There is no cooperative stop to ask for, so cancelling is just a flag. The
+    worker thread checks it before writing a terminal status, so the abort is
+    not reported as a failure. Workers that own a subprocess (SoulX) kill it on
+    their way out.
     """
     job = get_job(job_id)
     if not job:
@@ -831,11 +215,7 @@ def cancel_job(job_id: str):
         error="Cancelled",
         statusMessage="Cancelled",
     )
-    stopped = terminate_ai_adapter()
-    append_job_event(
-        job_id,
-        {"type": "status", "status": "cancelled", "progress": 100, "stoppedBridge": stopped},
-    )
+    append_job_event(job_id, {"type": "status", "status": "cancelled", "progress": 100})
     return get_job(job_id), None
 
 
@@ -911,6 +291,87 @@ def run_midi_export_job(job_id: str, project_id: str):
         save_project(project_record)
 
         update_job(job_id, status="completed", progress=100, result=output)
+        append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
+    except Exception as exc:
+        update_job(job_id, status="failed", progress=100, error=str(exc))
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
+
+
+def run_midi_clip_render_job(job_id: str, project_id: str, payload: dict):
+    """Render one MIDI clip through the GM soundfont and point it at its own
+    output.
+
+    The notes stay the source of truth — re-running this replaces which
+    audio the clip points to, it doesn't fork a new clip — sourceAssetId is
+    only ever "what this clip currently sounds like", the same relationship
+    a stem or a resynthesized take has to the clip that plays it.
+    """
+    update_job(job_id, status="running", progress=0, statusMessage="Rendering instrument...")
+    append_job_event(job_id, {"type": "status", "status": "running", "progress": 0})
+
+    project_record = get_project(project_id)
+    if not project_record:
+        update_job(job_id, status="failed", error="Project not found", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+
+    clip_id = payload.get("clipId")
+    clips = project_record.get("clips") or []
+    clip = next((c for c in clips if c.get("id") == clip_id), None)
+    if not clip or clip.get("clipType") != "midi":
+        update_job(job_id, status="failed", error="MIDI clip not found", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+
+    # The request can pick an instrument on the spot; otherwise the clip's
+    # own choice (Inspector.js's "MIDI Sound" dropdown, already persisted)
+    # wins, and a lane the clip sits on can supply a default for either —
+    # "Use lane default" in that same dropdown is what an empty
+    # clip.midi.soundfont means.
+    lane = next((l for l in (project_record.get("lanes") or []) if l.get("id") == clip.get("laneId")), None)
+    soundfont = (
+        payload.get("soundfont")
+        or (clip.get("midi") or {}).get("soundfont")
+        or (lane or {}).get("instrument")
+    )
+    if soundfont:
+        clip["midi"] = {**(clip.get("midi") or {}), "soundfont": soundfont}
+
+    try:
+        bpm = (project_record.get("project") or {}).get("bpm")
+        output = render_midi_clip(clip, bpm=bpm)
+
+        project_record = _reload_project_for_async_write(project_id, project_record)
+        asset_id = f"midi_render:{uuid.uuid4().hex}"
+        register_asset(
+            project_record,
+            {
+                "id": asset_id,
+                "kind": "derived",
+                "label": "Instrument Render",
+                "path": output.get("path"),
+                "url": output.get("url"),
+                "durationSec": output.get("durationSec", 0.0),
+                "sampleRate": output.get("sampleRate"),
+            },
+        )
+
+        updated_clips = project_record.get("clips") or []
+        for updated_clip in updated_clips:
+            if updated_clip.get("id") != clip_id:
+                continue
+            if soundfont:
+                updated_clip["midi"] = {**(updated_clip.get("midi") or {}), "soundfont": soundfont}
+            updated_clip["sourceAssetId"] = asset_id
+            updated_clip["srcStartSec"] = 0.0
+            updated_clip["srcEndSec"] = max(0.01, float(output.get("durationSec") or 0.0))
+        project_record["clips"] = updated_clips
+        update_project_duration(project_record)
+        save_project(project_record)
+
+        update_job(
+            job_id, status="completed", progress=100, result={"assetId": asset_id, "clipId": clip_id}
+        )
         append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
     except Exception as exc:
         update_job(job_id, status="failed", progress=100, error=str(exc))
@@ -1027,8 +488,21 @@ def run_soulx_resing_job(job_id: str, project_id: str, payload: dict):
                 pass
 
 
-def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
-    update_job(job_id, status="running", progress=0, statusMessage="Running AI job...")
+def run_generate_job(job_id: str, project_id: str, payload: dict):
+    """Generate new material (song or instrumental, from a typed prompt) and
+    land it as a new clip in THIS project only.
+
+    Reuses the standalone Create flow's own engine (YuE2, via
+    run_song_generation_thread) rather than a second generation pipeline, but
+    deliberately does not go through anything that would make the result show
+    up in the general Library: it registers its own transient entry in
+    song_generation_jobs (the provider requires one to exist, keyed by job id,
+    before it will run), then deletes that entry and its on-disk job folder
+    once the audio has been copied out — otherwise it would sit there for
+    GET /api/song-generation/jobs's own disk-recovery scan to pick back up
+    as an orphaned song days later.
+    """
+    update_job(job_id, status="running", progress=0, statusMessage="Generating...")
     append_job_event(job_id, {"type": "status", "status": "running", "progress": 0})
 
     project_record = get_project(project_id)
@@ -1037,91 +511,325 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
         append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
         return
 
-    stage_conditioning_path = None
+    prompt = str(payload.get("prompt") or "").strip()
+    if not prompt:
+        update_job(job_id, status="failed", error="A prompt is required", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+
+    mode = str(payload.get("mode") or "song").strip().lower()
+    is_instrumental = mode == "instrumental"
     try:
-        assets = project_record.get("assets") if isinstance(project_record.get("assets"), dict) else {}
-        if isinstance(payload, dict):
-            source_id = payload.get("sourceAssetId")
-            source_path = _asset_source_path(assets, source_id)
-            if source_path:
-                payload["sourceAssetPath"] = source_path
-            ref_id = payload.get("referenceAssetId")
-            ref_path = _asset_source_path(assets, ref_id)
-            if ref_path:
-                payload["referenceAssetPath"] = ref_path
-            if job_type == "cover" and not payload.get("referenceAssetPath") and source_path:
-                payload["referenceAssetPath"] = source_path
+        duration_sec = max(5, min(180, int(payload.get("durationSec") or 30)))
+    except (TypeError, ValueError):
+        duration_sec = 30
+    start_sec = max(0.0, float(payload.get("startSec") or 0.0))
+    lane_id = payload.get("laneId")
 
-        adapter = None
-        if job_type in {
-            "repaint",
-            "add_layer",
-            "replace_section",
-            "extend",
-            "cover",
-            "vocal2bgm",
-            "stem_extract",
-            "understand",
-            "lrc",
-            "quality_score",
-        }:
-            adapter = get_ai_adapter()
+    song_job_id = uuid.uuid4().hex
+    title = prompt[:60]
+    generation_params = {
+        "title": title,
+        # A magic sentinel YuE2 was trained on for a wordless track, not a
+        # placeholder — see next/views/CreateView.js, which uses the same
+        # value for its own Instrumental toggle.
+        "lyrics": "[instrumental]" if is_instrumental else prompt,
+        "style": prompt if is_instrumental else "",
+        "duration_seconds": duration_sec,
+        "model_mode": yue2_params.MODE_MELODY_AND_CHORDS,
+        "instrumental_only": is_instrumental,
+        # Stem separation is only needed here to enforce "no vocals" for the
+        # instrumental case (see jobs_common._run_separation); a plain song
+        # only wants the raw mix, and skipping it roughly halves the wait.
+        "separate_stems": is_instrumental,
+        "enhance_vocals": False,
+        "save_score": False,
+        "hum": False,
+    }
+    errors = yue2_params.validate(generation_params)
+    if errors:
+        update_job(job_id, status="failed", error=" ".join(errors), progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
 
-        if job_type == "repaint":
-            result = adapter.repaint(payload)
-        elif job_type == "add_layer":
-            result = adapter.add_layer(payload)
-        elif job_type == "replace_section":
-            result = adapter.repaint(payload)
-        elif job_type == "extend":
-            result = adapter.repaint(payload)
-        elif job_type == "cover":
-            result = adapter.cover(payload)
-        elif job_type == "vocal2bgm":
-            result = adapter.vocal2bgm(payload)
-        elif job_type == "stem_extract":
-            result = adapter.stem_extract(payload)
-        elif job_type == "stem_extract_uvr":
-            source_path = payload.get("sourceAssetPath") if isinstance(payload, dict) else None
-            stem_names = payload.get("stemNames") if isinstance(payload, dict) else None
-            result = {"stems": extract_uvr_multi_stems(source_path, stem_names)}
-        elif job_type == "understand":
-            result = adapter.understand(payload)
-        elif job_type == "lrc":
-            result = adapter.lrc(payload)
-        elif job_type == "quality_score":
-            result = adapter.quality_score(payload)
-        elif job_type == "foundation_generate":
-            update_job(job_id, statusMessage="Running Foundation-1 generate...")
-            result = run_foundation_studio_job("generate", payload)
-        elif job_type == "foundation_restyle":
-            update_job(job_id, statusMessage="Running Foundation-1 restyle...")
-            result = run_foundation_studio_job("restyle", payload)
-        elif job_type == "foundation_extend":
-            update_job(job_id, statusMessage="Running Foundation-1 extend...")
-            result = run_foundation_studio_job("extend", payload)
-        elif job_type == "stage_drums_generate":
-            update_job(job_id, statusMessage="Preparing STAGE conditioning mix...")
-            stage_conditioning_path, mix_start, mix_end = _render_stage_conditioning_mix(project_record, payload)
-            payload["conditioningAudioPath"] = str(stage_conditioning_path)
-            payload["timelineStartSec"] = float(payload.get("timelineStartSec") or payload.get("insertSec") or mix_start)
-            payload["insertSec"] = float(payload.get("insertSec") or mix_start)
-            payload["durationSec"] = max(0.5, float(payload.get("durationSec") or (mix_end - mix_start)))
-            update_job(job_id, statusMessage="Running STAGE drums...")
-            result = run_stage_drums_job(payload)
-        else:
+    song_generation_jobs[song_job_id] = {"id": song_job_id}
+
+    stop_polling = threading.Event()
+
+    def _mirror_progress():
+        while not stop_polling.wait(1.5):
+            sg = song_generation_jobs.get(song_job_id)
+            if not sg:
+                return
+            progress = min(95, int(sg.get("progress") or 0))
+            message = sg.get("status_message") or "Generating..."
+            update_job(job_id, progress=progress, statusMessage=message)
+            append_job_event(job_id, {"type": "status", "status": "running", "progress": progress})
+
+    poll_thread = threading.Thread(target=_mirror_progress, daemon=True)
+    poll_thread.start()
+
+    try:
+        run_song_generation_thread(song_job_id, generation_params)
+        stop_polling.set()
+
+        song_job = song_generation_jobs.get(song_job_id) or {}
+        if song_job.get("status") != "completed":
+            raise RuntimeError(song_job.get("error") or song_job.get("status_message") or "Generation failed")
+
+        source_path = _song_asset_path(song_job_id, "full_mix")
+        if not source_path.exists():
+            raise RuntimeError("Generation finished but produced no audio")
+
+        paths.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        output_name = f"generate_{uuid.uuid4().hex}.wav"
+        output_path = paths.EXPORT_DIR / output_name
+        shutil.move(str(source_path), str(output_path))
+
+        info = probe_audio(output_path)
+        asset_id = f"generate:{uuid.uuid4().hex}"
+
+        project_record = _reload_project_for_async_write(project_id, project_record)
+        register_asset(
+            project_record,
+            {
+                "id": asset_id,
+                "kind": "generated",
+                "label": title or ("Instrumental" if is_instrumental else "Generated Song"),
+                "path": str(output_path),
+                "url": f"/api/download/exports/{output_name}",
+                "durationSec": info.get("durationSec", 0.0),
+                "sampleRate": info.get("sampleRate"),
+            },
+        )
+        lane = get_lane_by_id(project_record, lane_id) or ensure_lane(project_record, "generated", "Generated Layers")
+        append_clip(project_record, lane["id"], asset_id, start_sec, info.get("durationSec", 0.0))
+        update_project_duration(project_record)
+        save_project(project_record)
+
+        update_job(job_id, status="completed", progress=100, result={"assetId": asset_id})
+        append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
+    except Exception as exc:
+        update_job(job_id, status="failed", progress=100, error=str(exc))
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
+    finally:
+        stop_polling.set()
+        song_generation_jobs.pop(song_job_id, None)
+        shutil.rmtree(SONG_GENERATION_JOBS_DIR / song_job_id, ignore_errors=True)
+
+
+AIRGEN_WINDOW_SEC = 15.0
+# The drums.pth checkpoint's own trained window: it always regenerates exactly the
+# middle span below, anchored by the surrounding context on each side. Hardcoded in
+# cli_studio_regen.py's get_mask_2 mask, not a choice this job gets to make.
+AIRGEN_REGEN_SPAN_SEC = 7.5
+AIRGEN_CONTEXT_SEC = (AIRGEN_WINDOW_SEC - AIRGEN_REGEN_SPAN_SEC) / 2
+
+
+def run_airgen_regen_job(job_id: str, project_id: str, payload: dict):
+    """Regenerate the drums under the timeline selection, guided by AIRGen
+    (github.com/Kikyo-16/airgen) - not a general "fill any gap" tool.
+
+    The model's checkpoint only ever regenerates a fixed ~7.5s span in the
+    middle of a 15s window it was trained on (~3.75s of real audio anchoring
+    it on each side), so the selection's midpoint becomes that window's
+    center and the selection itself must fit inside the ~7.5s span - a
+    longer selection is rejected rather than silently only fixing part of
+    it or stretching the model past what it was trained on.
+    """
+    update_job(job_id, status="running", progress=0, statusMessage="Rendering mix...")
+    append_job_event(job_id, {"type": "status", "status": "running", "progress": 0})
+
+    project_record = get_project(project_id)
+    if not project_record:
+        update_job(job_id, status="failed", error="Project not found", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+
+    mode = str(payload.get("mode") or "fix_drums").strip()
+    if mode not in ("fix_drums", "edit_drums"):
+        update_job(job_id, status="failed", error=f"Unsupported mode: {mode}", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+
+    try:
+        sel_start = float(payload.get("selStart"))
+        sel_end = float(payload.get("selEnd"))
+    except (TypeError, ValueError):
+        update_job(job_id, status="failed", error="Select a range on the timeline first", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+    sel_start, sel_end = min(sel_start, sel_end), max(sel_start, sel_end)
+    sel_duration = sel_end - sel_start
+    if sel_duration <= 0:
+        update_job(job_id, status="failed", error="Select a range on the timeline first", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+    if sel_duration > AIRGEN_REGEN_SPAN_SEC:
+        update_job(
+            job_id,
+            status="failed",
+            error=(
+                f"AIRGen only regenerates {AIRGEN_REGEN_SPAN_SEC:.1f}s at a time - your "
+                f"selection is {sel_duration:.1f}s. Select a shorter range."
+            ),
+            progress=100,
+        )
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+
+    lane_id = payload.get("laneId")
+    window_sec = AIRGEN_WINDOW_SEC
+    mix_path = None
+    segment_path = None
+    try:
+        update_job(job_id, progress=5, statusMessage="Rendering mix...")
+        append_job_event(job_id, {"type": "status", "status": "running", "progress": 5})
+        mix = render_mixdown(project_record)
+        mix_path = Path(mix["path"])
+        mix_duration = mix.get("durationSec", 0.0)
+
+        # Center the fixed 15s window on the selection's midpoint, then clamp it into the
+        # mix's actual bounds - clamping shifts how much context lands on each side, so
+        # re-check afterwards that the model's fixed regen span still fully covers the
+        # selection rather than trusting the clamp blindly.
+        sel_center = (sel_start + sel_end) / 2
+        start_sec = max(0.0, min(sel_center - window_sec / 2, mix_duration - window_sec))
+        regen_start = start_sec + AIRGEN_CONTEXT_SEC
+        regen_end = regen_start + AIRGEN_REGEN_SPAN_SEC
+        if mix_duration < window_sec or sel_start < regen_start or sel_end > regen_end:
+            raise RuntimeError(
+                f"Not enough mix around the selection ({sel_start:.1f}s-{sel_end:.1f}s) for "
+                f"AIRGen's {AIRGEN_CONTEXT_SEC:.2f}s of context on each side - needs the "
+                f"arrangement to extend further before and/or after it."
+            )
+
+        update_job(job_id, progress=15, statusMessage="Extracting window...")
+        append_job_event(job_id, {"type": "status", "status": "running", "progress": 15})
+        # A little past the 15s AIRGen actually needs, so its own internal
+        # onset + DUR*SAMPLE_RATE <= len(audio) check has rounding headroom.
+        segment_path = _extract_audio_segment(mix_path, start_sec, start_sec + window_sec + 0.5, "airgen_window")
+
+        airgen_dir = Path(os.environ.get("AIRGEN_DIR") or (paths.BASE_DIR / "AIRGen"))
+        python_exe = Path(os.environ.get("AIRGEN_PYTHON") or (airgen_dir / "venv" / "Scripts" / "python.exe"))
+        if not airgen_dir.exists():
+            raise RuntimeError(f"AIRGen directory not found at {airgen_dir}")
+        if not python_exe.exists():
+            raise RuntimeError(f"AIRGen venv python not found at {python_exe}")
+
+        checkpoint = airgen_dir / "model_weights" / "drums.pth"
+        if not checkpoint.exists():
+            raise RuntimeError(f"AIRGen checkpoint not found at {checkpoint}")
+
+        output_name = f"airgen_{mode}_{uuid.uuid4().hex}.wav"
+        paths.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        final_output_path = paths.EXPORT_DIR / output_name
+
+        update_job(job_id, progress=30, statusMessage="Generating (AIRGen)...")
+        append_job_event(job_id, {"type": "status", "status": "running", "progress": 30})
+        cmd = [
+            str(python_exe),
+            "cli_studio_regen.py",
+            "--audio_path", str(segment_path),
+            "--model_path", str(checkpoint),
+            "--mode", mode,
+            "--output_wav", str(final_output_path),
+            "--onset", "0",
+        ]
+        if mode == "edit_drums":
+            drums_path = payload.get("drumsAssetPath")
+            if not drums_path:
+                raise RuntimeError("edit_drums mode needs a reference drums track")
+            cmd.extend(["--drums_path", str(drums_path)])
+
+        result = subprocess.run(cmd, cwd=str(airgen_dir), capture_output=True, text=True, check=False)
+        if result.returncode != 0 or not final_output_path.exists():
+            raise RuntimeError(result.stderr.strip()[-2000:] or result.stdout.strip()[-2000:] or "AIRGen failed")
+
+        update_job(job_id, progress=90, statusMessage="Placing clip...")
+        append_job_event(job_id, {"type": "status", "status": "running", "progress": 90})
+        info = probe_audio(final_output_path)
+        asset_id = f"airgen_regen:{uuid.uuid4().hex}"
+
+        project_record = _reload_project_for_async_write(project_id, project_record)
+        register_asset(
+            project_record,
+            {
+                "id": asset_id,
+                "kind": "generated",
+                "label": "AI Regen (AIRGen)",
+                "path": str(final_output_path),
+                "url": f"/api/download/exports/{output_name}",
+                "durationSec": info.get("durationSec", 0.0),
+                "sampleRate": info.get("sampleRate"),
+            },
+        )
+        # Its own lane, not the target lane it's regenerating from: it overlaps that
+        # lane's own audio on the timeline (same window) by design, so the two can be
+        # muted/soloed against each other for A/B - dropping it into the source lane
+        # would just silently overlap two clips in the same spot.
+        lane = get_lane_by_id(project_record, lane_id) or ensure_lane(project_record, "airgen", "AI Regen (AIRGen)")
+        clip = append_clip(project_record, lane["id"], asset_id, start_sec, info.get("durationSec", 0.0))
+        update_project_duration(project_record)
+        save_project(project_record)
+
+        update_job(
+            job_id,
+            status="completed",
+            progress=100,
+            result={"assetId": asset_id, "laneId": lane["id"], "clipId": clip.get("id")},
+        )
+        append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
+    except Exception as exc:
+        update_job(job_id, status="failed", progress=100, error=str(exc))
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
+    finally:
+        for p in (segment_path, mix_path):
+            if p:
+                try:
+                    p.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+
+def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
+    """Run one of the Studio's offline audio jobs.
+
+    Only stem separation survives here. The other ten job types (repaint,
+    add_layer, cover, understand, lrc, quality_score...) went through an AI
+    bridge subprocess backed by ACE-Step; that model was removed, and the
+    Studio is being rebuilt rather than ported, so they were failing with
+    "AI backend not configured" rather than doing anything.
+    """
+    update_job(job_id, status="running", progress=0, statusMessage="Separating stems...")
+    append_job_event(job_id, {"type": "status", "status": "running", "progress": 0})
+
+    project_record = get_project(project_id)
+    if not project_record:
+        update_job(job_id, status="failed", error="Project not found", progress=100)
+        append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100})
+        return
+
+    try:
+        if job_type != "stem_extract_uvr":
             raise RuntimeError(f"Unknown job type: {job_type}")
 
-        # Killing the bridge mid-run surfaces here as a normal return or an
-        # exception; either way the user asked for it, so don't overwrite it.
+        assets = project_record.get("assets") if isinstance(project_record.get("assets"), dict) else {}
+        source_path = _asset_source_path(assets, payload.get("sourceAssetId"))
+        if source_path:
+            payload["sourceAssetPath"] = source_path
+
+        result = {"stems": extract_uvr_multi_stems(payload.get("sourceAssetPath"), payload.get("stemNames"))}
+
+        # Killing the job mid-run surfaces here as a normal return; the user
+        # asked for it, so don't overwrite the cancelled status.
         if _job_cancelled(job_id):
             return
 
-        if isinstance(result, dict):
-            project_record = _reload_project_for_async_write(project_id, project_record)
-            _record_result(project_record, job_type, payload, result)
-            update_project_duration(project_record)
-            save_project(project_record)
+        project_record = _reload_project_for_async_write(project_id, project_record)
+        _record_result(project_record, job_type, payload, result)
+        update_project_duration(project_record)
+        save_project(project_record)
 
         update_job(job_id, status="completed", progress=100, result=result)
         append_job_event(job_id, {"type": "status", "status": "completed", "progress": 100})
@@ -1130,12 +838,6 @@ def run_ai_job(job_id: str, project_id: str, job_type: str, payload: dict):
             return
         update_job(job_id, status="failed", progress=100, error=str(exc))
         append_job_event(job_id, {"type": "status", "status": "failed", "progress": 100, "error": str(exc)})
-    finally:
-        if stage_conditioning_path:
-            try:
-                Path(stage_conditioning_path).unlink(missing_ok=True)
-            except Exception:
-                pass
 
 
 def start_job_thread(target, args):
