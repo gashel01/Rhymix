@@ -276,10 +276,16 @@ def _compute_formants(audio: np.ndarray, sr: int, note_times: List[float]) -> Li
     cc_events = []
     for t in note_times:
         try:
-            f1 = formant.get_value_at_time(1, t) or 0.0
-            f2 = formant.get_value_at_time(2, t) or 0.0
+            f1 = formant.get_value_at_time(1, t)
+            f2 = formant.get_value_at_time(2, t)
         except Exception:
-            f1, f2 = 0.0, 0.0
+            continue
+        # Praat returns NaN on frames where it finds no formant, and NaN is
+        # truthy and fails every "<= 0" test, so it used to sail past the guard
+        # below and blow up on int(np.clip(nan)) — taking the whole
+        # transcription down with it, not just this one frame.
+        if f1 is None or f2 is None or not np.isfinite(f1) or not np.isfinite(f2):
+            continue
         if f1 <= 0 or f2 <= 0:
             continue
         cc_events.append(

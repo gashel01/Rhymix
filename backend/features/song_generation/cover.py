@@ -15,175 +15,21 @@ from backend.jobs.registry import active_jobs, song_generation_jobs
 from backend.paths.manager import paths
 from backend.storage.inference_runs import load_inference_run_metadata, make_run_id
 from backend.storage.metadata import get_upload_base_name, get_upload_metadata
-from backend.features.song_generation.providers.ace_step import (
+from backend.features.song_generation.jobs_common import (
     _asset_path,
     _coerce_bool,
     _init_assets,
     _job_dir,
     _mix_audio,
-    _normalize_acestep15_params,
-    _run_acestep15_generation,
     _run_separation,
     _set_asset_ready,
     _set_progress,
     _set_status,
 )
+from backend.app import yue2_params
+from backend.features.song_generation.providers.yue2 import run_yue2_into
 
 logger = logging.getLogger(__name__)
-_WHISPERX_LOCK = threading.Lock()
-_WHISPER_LOCK = threading.Lock()
-_WHISPER_MODEL = None
-
-
-def _get_whisperx_python() -> str:
-    python_override = os.environ.get("WHISPERX_PYTHON")
-    if python_override:
-        return python_override
-
-    venv_root = os.environ.get("WHISPERX_VENV")
-    if venv_root:
-        venv_root = str(venv_root)
-        if os.name == "nt":
-            candidate = Path(venv_root) / "Scripts" / "python.exe"
-        else:
-            candidate = Path(venv_root) / "bin" / "python"
-        if candidate.exists():
-            return str(candidate)
-
-    raise RuntimeError(
-        "WhisperX must run in a separate venv. Set WHISPERX_PYTHON or WHISPERX_VENV."
-    )
-
-
-def _run_whisperx_transcribe(audio_path: Path) -> str:
-    python_exe = _get_whisperx_python()
-    paths.TEMP_WAV_DIR.mkdir(parents=True, exist_ok=True)
-    script_path = paths.TEMP_WAV_DIR / f"whisperx_transcribe_{uuid.uuid4().hex}.py"
-
-    script_path.write_text(
-        (
-            "import json\n"
-            "import os\n"
-            "import sys\n"
-            "os.environ.setdefault('TORCH_LOAD_WEIGHTS_ONLY', '0')\n"
-            "try:\n"
-            "    import torch.serialization as ts\n"
-            "    from omegaconf import DictConfig, ListConfig\n"
-            "    from omegaconf.base import ContainerMetadata\n"
-            "    try:\n"
-            "        ts.add_safe_globals([DictConfig, ListConfig, ContainerMetadata])\n"
-            "    except Exception:\n"
-            "        pass\n"
-            "except Exception:\n"
-            "    pass\n"
-            "import whisperx\n"
-            "audio_path = sys.argv[1]\n"
-            "model_name = os.environ.get('WHISPERX_MODEL', 'base')\n"
-            "device = os.environ.get('WHISPERX_DEVICE', 'cpu')\n"
-            "compute_type = os.environ.get('WHISPERX_COMPUTE_TYPE', 'int8')\n"
-            "model = whisperx.load_model(model_name, device=device, compute_type=compute_type)\n"
-            "result = model.transcribe(audio_path)\n"
-            "segments = result.get('segments') or []\n"
-            "text = ' '.join([(s.get('text') or '').strip() for s in segments]).strip()\n"
-            "payload = {'text': text or (result.get('text') or '')}\n"
-            "print(json.dumps(payload))\n"
-        ),
-        encoding="utf-8",
-    )
-
-    env = os.environ.copy()
-    env["PYTHONUNBUFFERED"] = "1"
-    proc = subprocess.run(
-        [python_exe, str(script_path), str(audio_path)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=env,
-    )
-    try:
-        script_path.unlink(missing_ok=True)
-    except Exception:
-        pass
-
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or f"WhisperX exited with code {proc.returncode}")
-
-    raw_stdout = proc.stdout.strip()
-    if not raw_stdout:
-        raise RuntimeError("WhisperX returned empty output")
-
-    # WhisperX prints progress logs to stdout; extract the last JSON object.
-    json_line = None
-    for line in reversed(raw_stdout.splitlines()):
-        line = line.strip()
-        if line.startswith("{") and line.endswith("}"):
-            json_line = line
-            break
-
-    if not json_line:
-        raise RuntimeError("WhisperX returned invalid output")
-
-    try:
-        payload = json.loads(json_line)
-        return str(payload.get("text") or "").strip()
-    except Exception:
-        raise RuntimeError("WhisperX returned invalid output")
-
-
-def _get_whisper_model():
-    global _WHISPER_MODEL
-    with _WHISPER_LOCK:
-        if _WHISPER_MODEL is None:
-            try:
-                import whisper  # type: ignore
-            except Exception as exc:
-                raise RuntimeError(
-                    "Whisper is not installed. Install with `pip install openai-whisper`."
-                ) from exc
-            model_name = os.environ.get("WHISPER_MODEL", "base")
-            device = os.environ.get("WHISPER_DEVICE", "cpu")
-            _WHISPER_MODEL = whisper.load_model(model_name, device=device)
-        return _WHISPER_MODEL
-
-
-def _run_whisper_transcribe(audio_path: Path) -> str:
-    model = _get_whisper_model()
-    result = model.transcribe(str(audio_path), fp16=False)
-    return str(result.get("text") or "").strip()
-
-
-def transcribe_audio_path(audio_path: Path, engine: str = "whisperx") -> str:
-    if not audio_path or not audio_path.exists():
-        raise ValueError("Audio path is missing or does not exist")
-
-    engine = str(engine or "whisperx").strip().lower()
-    if engine == "whisper":
-        return _run_whisper_transcribe(audio_path)
-    return _run_whisperx_transcribe(audio_path)
-
-
-def _pick_transcribe_source(source: dict) -> Path | None:
-    p = source.get("vocals_path")
-    if p and isinstance(p, Path) and p.exists():
-        return p
-    return None
-
-
-def transcribe_cover_source(source_song_id: str, engine: str = "whisperx") -> str:
-    source = resolve_cover_source(source_song_id)
-    if not source or not source.get("has_audio"):
-        raise ValueError("Source song is not available or has no audio")
-
-    audio_path = _pick_transcribe_source(source)
-    if not audio_path:
-        raise ValueError("No local vocals audio available for transcription")
-
-    engine = str(engine or "whisperx").strip().lower()
-    if engine == "whisper":
-        return _run_whisper_transcribe(audio_path)
-    return _run_whisperx_transcribe(audio_path)
-
-
 def _parse_source_song_id(source_song_id: str) -> tuple[str, str]:
     raw = str(source_song_id or "").strip()
     if ":" in raw:
@@ -193,10 +39,25 @@ def _parse_source_song_id(source_song_id: str) -> tuple[str, str]:
 
 
 def _resolve_upload_source(file_id: str):
-    base_name = get_upload_base_name(file_id)
-    if not base_name:
-        return None
-    meta = get_upload_metadata(file_id) or {}
+    """An import, as cover material.
+
+    A cover transcribes the whole arrangement, not an isolated vocal, so the
+    original mix is the best source when it is there — and the only one an
+    upload that has never been split has. Before this, an unsplit import had
+    no `audio_path` at all: the two stem lookups both missed, and "make a
+    cover of it" failed with no explanation for exactly the files where it is
+    most likely to be tried first.
+
+    The metadata record can also be gone while the files remain — the same
+    situation `track_sources.py` handles for the same reason: the pipeline
+    registers a temporary upload to push a song through separation and
+    unregisters it afterwards, leaving files named after an id the table no
+    longer knows.
+    """
+    record = get_upload_metadata(file_id)
+    stored_name = record.get("storedName") if record else None
+    base_name = Path(stored_name).stem if stored_name else file_id
+
     inst = paths.INSTRUMENTAL_DIR / f"{base_name}_instrumental.wav"
     raw = paths.UVR_RAW_DIR / f"{base_name}_vocals.wav"
     proc = paths.UVR_PROCESSED_DIR / f"{base_name}_vocals.wav"
@@ -204,19 +65,30 @@ def _resolve_upload_source(file_id: str):
     vocal_type = "processed_vocals" if vocal and vocal == proc else "raw_vocals"
     instrumental_url = f"/api/download/instrumental/{file_id}" if inst.exists() else None
     vocals_url = f"/api/download/{vocal_type}/{file_id}" if vocal else None
-    audio_path = vocal if vocal else (inst if inst.exists() else None)
+
+    original = None
+    if stored_name:
+        candidate = paths.INPUT_DIR / stored_name
+        if candidate.exists():
+            original = candidate
+    original_url = f"/api/uploads/{file_id}/audio" if original else None
+
+    audio_path = original or vocal or (inst if inst.exists() else None)
+
+    if not record and audio_path is None:
+        return None
 
     return {
         "source_song_id": f"upload:{file_id}",
         "source_type": "upload",
         "file_id": file_id,
-        "title": meta.get("safeDisplayName") or meta.get("originalName") or file_id,
+        "title": (record or {}).get("safeDisplayName") or (record or {}).get("originalName") or file_id,
         "artist": None,
         "duration": None,
         "instrumental_path": inst if inst.exists() else None,
         "vocals_path": vocal,
-        "audio_path": audio_path if isinstance(audio_path, Path) and audio_path.exists() else None,
-        "audio_url": vocals_url or instrumental_url,
+        "audio_path": audio_path,
+        "audio_url": original_url or vocals_url or instrumental_url,
         "instrumental_url": instrumental_url,
         "vocals_url": vocals_url,
     }
@@ -259,7 +131,15 @@ def _resolve_inference_source(run_id: str):
 
 
 def _resolve_song_generation_source(job_id: str):
-    job = song_generation_jobs.get(job_id)
+    # Not a raw dict lookup: `song_generation_jobs` is the in-memory registry,
+    # empty for every job on a fresh restart until something loads it. Covering
+    # a song made in an earlier session — the ordinary case — would silently
+    # fail to resolve until the library view happened to hydrate it first.
+    # Imported here rather than at module level: routes.py imports this module,
+    # so the reverse import at load time would be circular.
+    from backend.features.song_generation.routes import _get_or_load_job
+
+    job = _get_or_load_job(job_id)
     if not job:
         return None
 
@@ -521,16 +401,17 @@ def run_cover_generation_thread(job_id: str, params: dict):
         target_voice = str(params.get("target_voice") or "").strip()
         style_prompt = str(params.get("style_prompt") or "").strip()
         cover_lyrics = str(params.get("lyrics") or "").strip()
-        audio_cover_strength = float(params.get("audio_cover_strength") or 1.0)
-        strong_audio_conditioning = _coerce_bool(params.get("strong_audio_conditioning"), False)
-        if strong_audio_conditioning:
-            audio_cover_strength = 1.0
+        # audio_cover_strength and strong_audio_conditioning were ACE-Step dials
+        # for how hard to condition on the source. YuE2 has no equivalent: it
+        # transcribes the source to a score and performs that. They are still
+        # echoed into derivation_metadata so old jobs keep rendering, but they
+        # no longer affect generation.
 
         source_inst = source.get("instrumental_path")
         source_vocal = source.get("vocals_path")
         source_audio = source.get("audio_path")
 
-        # Preferred path: native ACE-Step cover generation (task_type=cover + src_audio).
+        # Preferred path: YuE2 cover - transcribe the source, re-perform it.
         native_src_audio = None
         if source_inst and source_inst.exists() and source_vocal and source_vocal.exists():
             merged_source = _job_dir(job_id) / "native_cover_source_mix.wav"
@@ -550,99 +431,55 @@ def run_cover_generation_thread(job_id: str, params: dict):
         native_cover_ok = False
         if native_src_audio and native_src_audio.exists():
             native_cover_output = _asset_path(job_id, "full_mix")
-            _set_status(job, "full_generating", "Running ACE-Step native cover...")
+            _set_status(job, "full_generating", "Transcribing source and generating cover...")
             _set_progress(job, 25)
             cover_prompt = style_prompt or f"Cover arrangement inspired by {source.get('title') or 'the source song'}"
-            instruction = None
-            if strong_audio_conditioning:
-                instruction = (
-                    "Create a full song cover including instrumental and lyrical performance. "
-                    "Preserve the source melody and match the provided lyrics."
-                )
 
-            base_params = {
+            # YuE2 covers work the other way round from ACE-Step's: SheetSage2
+            # transcribes melody and chords out of the source recording, and the
+            # model performs that score with the lyrics we supply. Notes are
+            # transcribed, words are not, which is why cover_lyrics is required.
+            #
+            # The result is a NEW recording - it does not preserve the original
+            # backing track. When that is what the user wanted, the RVC path
+            # further down is the one that does it.
+            cover_params = {
                 "title": job.get("title") or "cover",
-                "task_type": "cover",
-                "src_audio": str(native_src_audio),
-                "audio_cover_strength": audio_cover_strength,
-                "instruction": instruction,
-                "prompt": cover_prompt,
+                "provider": "yue2",
                 "lyrics": cover_lyrics,
-                "audio_duration": None,
-                "duration": None,
-                "auto_duration": True,
-                "prompt_engine": "fast",
-                "thinking": False,
-                "initialize_lm": False,
-                "enhance_vocals": False,
-                "force_subprocess": True,
+                "style": cover_prompt,
+                "audio_guide": str(native_src_audio),
+                # Chords as well as melody: a cover that drops the harmony is
+                # not recognisable as the same song.
+                "model_mode": yue2_params.MODE_MELODY_AND_CHORDS,
+                # Keep the transcribed score so the cover can be re-sung with
+                # other lyrics without paying for transcription again.
+                "save_score": True,
             }
-            if strong_audio_conditioning:
-                # Prefer stability when forcing strong audio conditioning.
-                base_params.update(
-                    {
-                        "use_flash_attention": False,
-                        "compile_model": False,
-                        "int8_quantization": False,
-                        "offload_to_cpu": True,
-                        "offload_dit_to_cpu": True,
-                        "force_subprocess": True,
-                    }
-                )
-            ace_cover_params = _normalize_acestep15_params(base_params)
             logger.info(
-                "[cover:%s] native ACE-Step cover task_type=%s src_audio=%s audio_cover_strength=%s auto_duration=%s",
+                "[cover:%s] YuE2 cover src_audio=%s lyrics=%d chars",
                 job_id,
-                ace_cover_params.get("task_type"),
                 _path_for_log(native_src_audio),
-                ace_cover_params.get("audio_cover_strength"),
-                ace_cover_params.get("auto_duration"),
+                len(cover_lyrics or ""),
             )
             try:
-                _run_acestep15_generation(job, job_id, ace_cover_params, native_cover_output)
+                run_yue2_into(job, job_id, cover_params, native_cover_output, _job_dir(job_id))
                 if native_cover_output.exists():
                     _set_asset_ready(job, job_id, "full_mix", native_cover_output)
                     job["audio_url"] = f"/api/song-generation/{job_id}/audio/full_mix"
                     native_cover_ok = True
-                    logger.info("[cover:%s] native ACE-Step cover output=%s", job_id, _path_for_log(native_cover_output))
+                    logger.info("[cover:%s] YuE2 cover output=%s", job_id, _path_for_log(native_cover_output))
                 else:
-                    logger.warning("[cover:%s] native ACE-Step returned without output file", job_id)
+                    logger.warning("[cover:%s] YuE2 returned without output file", job_id)
             except Exception as native_cover_error:
-                logger.exception("[cover:%s] native ACE-Step cover failed", job_id)
-                # Retry once with conservative settings to avoid GPU/flash-attn/compile crashes.
-                try:
-                    safe_params = dict(ace_cover_params)
-                    safe_params.update(
-                        {
-                            "use_flash_attention": False,
-                            "compile_model": False,
-                            "int8_quantization": False,
-                            "offload_to_cpu": True,
-                            "offload_dit_to_cpu": True,
-                            "initialize_lm": False,
-                            "force_subprocess": True,
-                        }
-                    )
-                    job["status_message"] = "Native cover failed; retrying with safe settings..."
-                    logger.info("[cover:%s] retrying native cover with safe settings", job_id)
-                    _run_acestep15_generation(job, job_id, safe_params, native_cover_output)
-                    if native_cover_output.exists():
-                        _set_asset_ready(job, job_id, "full_mix", native_cover_output)
-                        job["audio_url"] = f"/api/song-generation/{job_id}/audio/full_mix"
-                        native_cover_ok = True
-                        logger.info(
-                            "[cover:%s] native ACE-Step cover output (safe mode)=%s",
-                            job_id,
-                            _path_for_log(native_cover_output),
-                        )
-                    else:
-                        logger.warning("[cover:%s] native ACE-Step safe retry returned without output file", job_id)
-                except Exception as safe_error:
-                    job["status_message"] = (
-                        "ACE-Step native cover failed, using fallback mix path: "
-                        f"{native_cover_error} | safe retry failed: {safe_error}"
-                    )
-                    logger.exception("[cover:%s] native ACE-Step safe retry failed", job_id)
+                # There is no safe-mode retry any more. The old one existed to
+                # dodge ACE-Step's flash-attn / torch.compile crashes, which
+                # have no YuE2 equivalent; a failure here means the request was
+                # wrong or the engine is down, and retrying the same call would
+                # only cost another five minutes. Fall through to the RVC path,
+                # which needs no generative model at all.
+                job["status_message"] = f"Generated cover failed, using voice conversion instead: {native_cover_error}"
+                logger.exception("[cover:%s] YuE2 cover failed; falling back to the RVC path", job_id)
         else:
             logger.warning("[cover:%s] no local source audio path available for native cover; using fallback mix path", job_id)
 
@@ -695,45 +532,18 @@ def run_cover_generation_thread(job_id: str, params: dict):
         else:
             logger.info("[cover:%s] fallback no source instrumental stem", job_id)
 
-        _set_status(job, "full_generating", "Generating ACE-Step cover backing...")
+        # ACE-Step used to synthesise a replacement backing track here, from a
+        # style prompt and empty lyrics, and copy it over the instrumental that
+        # had just been extracted from the source. That was removed with it, and
+        # not ported to YuE2, for two reasons: YuE2 requires lyrics so the call
+        # has no equivalent, and overwriting a real source instrumental with an
+        # invented one is the opposite of what a cover usually wants.
+        #
+        # The fallback is now the plain RVC cover - the source instrumental with
+        # the source vocals re-sung in the target voice. No generative model is
+        # involved, so it cannot fail the way the old path could.
+        _set_status(job, "full_generating", "Building cover from source stems...")
         _set_progress(job, 35)
-        acelab_path = _job_dir(job_id) / "acestep_cover_backing.wav"
-        cover_prompt = style_prompt or f"Cover arrangement inspired by {source.get('title') or 'the source song'}"
-        ace_params = _normalize_acestep15_params(
-            {
-                "title": f"{job.get('title') or 'cover'} backing",
-                "prompt": f"{cover_prompt}\nReference: {source.get('title') or 'source song'}",
-                "lyrics": "",
-                "audio_duration": None,
-                "duration": None,
-                "auto_duration": True,
-                "prompt_engine": "fast",
-                "thinking": False,
-                "initialize_lm": False,
-                "enhance_vocals": False,
-            }
-        )
-        logger.info(
-            "[cover:%s] fallback backing auto_duration=%s audio_duration=%s",
-            job_id,
-            ace_params.get("auto_duration"),
-            ace_params.get("audio_duration"),
-        )
-        logger.info("[cover:%s] fallback attempting ACE-Step backing generation", job_id)
-        try:
-            _run_acestep15_generation(job, job_id, ace_params, acelab_path)
-            if acelab_path.exists():
-                inst_for_mix = _asset_path(job_id, "instrumental")
-                shutil.copy2(acelab_path, inst_for_mix)
-                _set_asset_ready(job, job_id, "instrumental", inst_for_mix)
-                job["instrumental_url"] = f"/api/song-generation/{job_id}/audio/instrumental"
-                logger.info("[cover:%s] fallback ACE-Step backing=%s", job_id, _path_for_log(acelab_path))
-            else:
-                logger.warning("[cover:%s] fallback ACE-Step backing missing output file", job_id)
-        except Exception as ace_error:
-            # Fall back to source instrumental if ACE-Step backing fails.
-            job["status_message"] = f"ACE-Step backing failed, using source stems: {ace_error}"
-            logger.exception("[cover:%s] fallback ACE-Step backing failed", job_id)
 
         vocal_for_mix = None
         if source_vocal and source_vocal.exists():

@@ -551,6 +551,11 @@ class VoiceConverter:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         self.cpt = None
+        # get_vc() only reloads when self.loaded_model != weight_root - leaving this set
+        # after wiping net_g/vc/cpt above meant a second get_vc() for the SAME path (e.g. two
+        # Live VC takes in a row) saw its own stale value, skipped load_model()/setup_network()
+        # entirely, and left net_g/vc as None, which convert_audio() then raised on.
+        self.loaded_model = None
 
     def load_model(self, weight_root):
         """

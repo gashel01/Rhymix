@@ -15,10 +15,16 @@ from backend.features.studio.storage import get_project, save_project
 from backend.paths.manager import paths
 import logging
 try:
-    from core import run_infer_script
+    # Imported as bare "core" (not "applio.core") so this is the SAME module object
+    # run_infer_script() itself calls import_voice_converter() on internally - Python
+    # treats "core" and "applio.core" as two distinct modules with two distinct
+    # @lru_cache singletons even though they're the same file on disk, so importing
+    # via "applio.core" here would read a cache that run_infer_script() never wrote to.
+    from core import run_infer_script, import_voice_converter
 except ImportError as _e:
     logging.warning(f"[rhymix] WARNING: applio not installed - live inference unavailable ({_e})")
     run_infer_script = None
+    import_voice_converter = None
 
 try:
     from rvc.realtime.core import AUDIO_SAMPLE_RATE, VoiceChanger
@@ -116,6 +122,7 @@ class LiveChunkResult:
     audio_bytes: bytes
     latency_ms: float
     input_rms: float
+    stage_timings_ms: dict | None = None
 
 
 class StudioLiveInferenceSession:
@@ -126,9 +133,15 @@ class StudioLiveInferenceSession:
         self.project_id = str(self.payload.get("projectId") or "").strip() or None
         self.lane_id = str(self.payload.get("laneId") or "").strip() or None
         self.insert_at_sec = _safe_float(self.payload.get("insertAtSec"), 0.0)
-        # Force a minimum frame size of 4096 (85ms) to prevent massive per-chunk GPU overhead.
-        # Frontend default of 1024 (21ms) causes GPU to fall behind realtime on most cards.
-        self.frame_size = max(4096, _safe_int(self.payload.get("frameSize"), 4096))
+        # Frontend default of 1024 (21ms) causes the GPU to fall behind realtime on most cards, so
+        # a minimum is forced regardless of what it asks for. Measured on a real trained model on
+        # real hardware (see docs/ or the "feat: per-stage GPU timing" commit): 4096 samples
+        # (85.3ms budget) ran at 71-102% utilization block to block — no headroom, and the actual
+        # cause of "a lot of glitches" reports. 6144 (128ms budget) measured at 50-68% on the same
+        # model — real margin against a slow block or a moment of GPU contention from another app,
+        # at the cost of ~40ms more monitoring latency. 8192 measured 37-40% utilization if even
+        # more headroom is ever needed, at ~85ms more latency than 4096.
+        self.frame_size = max(6144, _safe_int(self.payload.get("frameSize"), 6144))
         self.input_sample_rate = max(8000, _safe_int(self.payload.get("sampleRate"), AUDIO_SAMPLE_RATE))
         self.embedder_model = str(self.payload.get("embedderModel") or "contentvec")
         self.low_latency_monitor = bool(self.payload.get("lowLatencyMonitor", True))
@@ -200,6 +213,12 @@ class StudioLiveInferenceSession:
         self.protect = min(1.0, max(0.0, _safe_float(self.payload.get("protect"), 0.33)))
         self.volume_envelope = min(1.0, max(0.0, _safe_float(self.payload.get("volumeEnvelope"), 1.0)))
         self.monitor = bool(self.payload.get("monitor", True))
+        # Both already exist on VoiceChanger.on_request — wired through unconditionally False/155.0
+        # until now, so there was no way to reach them from a live session at all.
+        self.f0_autotune = bool(self.payload.get("f0Autotune", False))
+        self.f0_autotune_strength = min(1.0, max(0.0, _safe_float(self.payload.get("f0AutotuneStrength"), 1.0)))
+        self.proposed_pitch = bool(self.payload.get("proposedPitch", False))
+        self.proposed_pitch_threshold = max(50.0, _safe_float(self.payload.get("proposedPitchThreshold"), 155.0))
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="live-infer")
 
     @property
@@ -253,6 +272,8 @@ class StudioLiveInferenceSession:
 
     async def stop(self) -> dict:
         if not self._running:
+            self._executor.shutdown(wait=False)
+            self._release_model()
             return {"projectId": self.project_id}
         self._running = False
         await self._input_queue.put(None)
@@ -265,7 +286,13 @@ class StudioLiveInferenceSession:
         # Other WebSocket connections and FastAPI handlers are unblocked while
         # the full-quality render runs for potentially long recordings.
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._commit_recording)
+        result = await loop.run_in_executor(None, self._commit_recording)
+        # cancel() already did this; the far more common path — a normal Stop — never did, so the
+        # per-session executor (and whatever the last queued task's closure was still holding)
+        # outlived the session that created it every single time.
+        self._executor.shutdown(wait=False)
+        self._release_model()
+        return result
 
     async def cancel(self):
         self._running = False
@@ -275,6 +302,43 @@ class StudioLiveInferenceSession:
         self._monitor_buffer.clear()
         await self._output_queue.put(None)
         self._executor.shutdown(wait=False)
+        self._release_model()
+
+    def _release_model(self):
+        # The Flask process this session lives in stays up across every take,
+        # so nothing else ever dropped the RVC checkpoint from the GPU — each
+        # live session pinned another copy in place of the last one until the
+        # 8GB card filled up and the next generation had nowhere left to fit.
+        self.voice_changer = None
+        try:
+            import gc
+            import torch
+
+            # The realtime VoiceChanger above is only half of what a "Stop" with a
+            # committed take loads: _render_final_output() also ran the offline
+            # re-render through Applio's own VoiceConverter, which caches its loaded
+            # hubert/net_g forever (@lru_cache(maxsize=None) on import_voice_converter)
+            # for reuse across ordinary (non-live) renders. That's the right default for
+            # a webUI serving repeated requests, but here it meant every Live VC take
+            # left a second, separate model resident in VRAM that this function never
+            # touched. Live VC is a performance tool - once you're done, you want the
+            # card back, not a warm cache for a render you may never run again.
+            if import_voice_converter is not None:
+                try:
+                    import_voice_converter().cleanup_model()
+                except Exception:
+                    pass
+
+            # empty_cache() only returns blocks the allocator already knows are free.
+            # The pipeline/pitch-extractor/hubert graph has reference cycles (torch
+            # modules holding hooks/buffers back-referencing their parent), so CPython's
+            # refcounting alone won't collect them until a GC pass runs — without it the
+            # tensors those cycles hold stay "allocated" and empty_cache() has nothing to give back.
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
 
     def set_uploaded_dry_audio(self, data: bytes, sample_rate: int | None = None):
         if data:
@@ -306,14 +370,17 @@ class StudioLiveInferenceSession:
                         await self._queue_monitor_audio(result.audio_bytes)
                     self._processed_chunks += 1
                     if self._processed_chunks % self._metrics_every == 0:
-                        await self._output_queue.put(
-                            {
-                                "type": "metrics",
-                                "latencyMs": round(result.latency_ms, 2),
-                                "inputRms": round(result.input_rms, 4),
-                                "droppedChunks": self._dropped_chunks,
+                        metrics_msg = {
+                            "type": "metrics",
+                            "latencyMs": round(result.latency_ms, 2),
+                            "inputRms": round(result.input_rms, 4),
+                            "droppedChunks": self._dropped_chunks,
+                        }
+                        if result.stage_timings_ms:
+                            metrics_msg["stages"] = {
+                                key: round(value, 2) for key, value in result.stage_timings_ms.items()
                             }
-                        )
+                        await self._output_queue.put(metrics_msg)
             except Exception as exc:
                 import traceback
                 traceback.print_exc()
@@ -376,10 +443,10 @@ class StudioLiveInferenceSession:
                     self.index_rate,
                     self.protect,
                     self.volume_envelope,
-                    False,
-                    1.0,
-                    False,
-                    155.0,
+                    self.f0_autotune,
+                    self.f0_autotune_strength,
+                    self.proposed_pitch,
+                    self.proposed_pitch_threshold,
                 )
             
             wet = np.asarray(wet, dtype=np.float32)
@@ -395,12 +462,14 @@ class StudioLiveInferenceSession:
             self._wet_frames.append(wet.copy())
             wet_pcm = (np.clip(wet, -1.0, 1.0) * 32767.0).astype(np.int16)
             latency_ms = perf[1] if isinstance(perf, (list, tuple)) and len(perf) > 1 else 0.0
-            
+            stage_timings = perf[3] if isinstance(perf, (list, tuple)) and len(perf) > 3 else None
+
             results.append(
                 LiveChunkResult(
                     audio_bytes=wet_pcm.tobytes(),
                     latency_ms=float(latency_ms),
                     input_rms=float(vol or 0.0),
+                    stage_timings_ms=stage_timings,
                 )
             )
             
@@ -408,6 +477,14 @@ class StudioLiveInferenceSession:
 
     def _render_final_output(self) -> tuple[Path | None, float]:
         if not self._uploaded_dry_audio and not self._dry_frames:
+            return None, 0.0
+        if run_infer_script is None:
+            # The two imports at the top of this file can fail independently:
+            # realtime RVC coming up without applio is enough to start a session
+            # and monitor through it, but not to render the take afterwards.
+            # Returning None here sends the caller to its fallback, which
+            # commits the realtime stream instead of losing the performance.
+            logging.warning("[rhymix] applio unavailable - keeping the realtime take instead of re-rendering")
             return None, 0.0
         temp_input_path = paths.EXPORT_DIR / f"studio_live_infer_dry_{_make_id()}.wav"
         output_path = paths.EXPORT_DIR / f"studio_live_infer_{_make_id()}.wav"
@@ -438,10 +515,13 @@ class StudioLiveInferenceSession:
                 pth_path=self.model_path,
                 index_path=str(self.index_path or "") if offline_index_enabled else "",
                 split_audio=False,
-                f0_autotune=False,
-                f0_autotune_strength=1.0,
-                proposed_pitch=False,
-                proposed_pitch_threshold=155.0,
+                # Match the live monitor's own settings — otherwise the take you heard while
+                # performing and the higher-quality offline re-render actually committed to the
+                # timeline would quietly disagree on autotune/proposed pitch.
+                f0_autotune=self.f0_autotune,
+                f0_autotune_strength=self.f0_autotune_strength,
+                proposed_pitch=self.proposed_pitch,
+                proposed_pitch_threshold=self.proposed_pitch_threshold,
                 clean_audio=bool(self.payload.get("cleanAudio") or False),
                 clean_strength=_safe_float(self.payload.get("cleanStrength"), 0.5),
                 export_format="WAV",

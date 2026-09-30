@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import faiss
 import numpy as np
 import torch
@@ -121,6 +122,7 @@ class Realtime_Pipeline:
         self.sid = torch.tensor([sid], device=self.device, dtype=torch.int64)
         self.autotune = Autotune()
         self.resamplers = {}
+        self.last_stage_timings_ms = None
         self.f0_model = None
 
     def get_f0(
@@ -239,12 +241,24 @@ class Realtime_Pipeline:
         """
         Performs realtime voice conversion on a given audio segment.
         """
+        # Per-stage GPU timing — diagnosing "which of F0 / HuBERT / vocoder is the actual
+        # bottleneck" needs a real sync point at each boundary, since CUDA calls are async and a
+        # plain perf_counter() around one would just measure how long it took to *launch*, not to
+        # *run* — every bit of it would land on whichever line happens to block on the result
+        # first (previously that was the .cpu().numpy() call at the very end of process_audio).
+        # Read back as self.last_stage_timings_ms after this call returns.
+        def _sync_mark():
+            if audio.is_cuda:
+                torch.cuda.synchronize(self.device)
+            return time.perf_counter()
+
         with torch.no_grad():
             assert audio.dim() == 1, audio.dim()
             feats = audio.view(1, -1).to(self.device)
 
             formant_length = int(np.ceil(return_length * 1.0))
 
+            t0 = _sync_mark()
             pitch, pitchf = (
                 self.get_f0(
                     audio[silence_front:],
@@ -259,6 +273,7 @@ class Realtime_Pipeline:
                 if self.use_f0
                 else (None, None)
             )
+            t1 = _sync_mark()
 
             # extract features
             feats = self.hubert_model(feats)["last_hidden_state"]
@@ -303,8 +318,16 @@ class Realtime_Pipeline:
             else:
                 pitch, pitchf = None, None
 
+            t2 = _sync_mark()  # end of HuBERT embedding + index lookup + feature prep
+
             p_len = torch.tensor([p_len], device=self.device, dtype=torch.int64)
             out_audio = self.vc.inference(feats, p_len, self.sid, pitch, pitchf).float()
+            t3 = _sync_mark()  # end of vocoder synthesis
+            self.last_stage_timings_ms = {
+                "f0Ms": (t1 - t0) * 1000,
+                "embedMs": (t2 - t1) * 1000,
+                "vocoderMs": (t3 - t2) * 1000,
+            }
             if volume_envelope != 1:
                 # Pure-GPU RMS envelope — no CPU round-trips
                 src_rms = torch.sqrt(

@@ -4,6 +4,7 @@ import re
 import shutil
 import tempfile
 import threading
+import unicodedata
 import urllib.parse
 import uuid
 import zipfile
@@ -25,6 +26,28 @@ bp = Blueprint("models", __name__)
 # with a 403 — its robots.txt allows crawlers, it just wants a client that names
 # itself. Identify properly rather than pretending to be a browser.
 USER_AGENT = "Rhymix/1.0 (+https://github.com/gashel01/Rhymix)"
+
+
+# Every model name Rhymix creates itself goes through secure_filename, which
+# is ASCII-only and would already drop something like this. Voices don't
+# only arrive that way, though — a checkpoint dragged in by hand, copied from
+# another machine, or unzipped outside Rhymix can carry a folder name with
+# invisible formatting marks nobody typed on purpose (a bidi override picked
+# up mid copy-paste is the one that actually bit us: model "‫brunoimported"
+# crashed the very first print() that touched it, since Windows defaults a
+# redirected/piped stdout to cp1252, which cannot encode it). Every voice
+# name reaches the rest of the app through this one endpoint, so cleaning it
+# here — rather than at each place that later logs, pipes, or displays it —
+# is the one fix that actually covers all of them.
+_INVISIBLE_CATEGORIES = {"Cf", "Cc", "Co", "Cs"}
+
+
+def _clean_label(name: str) -> str:
+    if not name:
+        return name
+    cleaned = "".join(ch for ch in name if unicodedata.category(ch) not in _INVISIBLE_CATEGORIES)
+    cleaned = cleaned.strip()
+    return cleaned or "unnamed voice"
 
 
 def _extract_hf_model_id(url: str) -> str:
@@ -66,9 +89,9 @@ def available_models():
             # split model name to find the correct number of epoch in the string ex: 'Cardi B (RVCv2, RMVPE, 400 Epochs)'
 
             idx = next(d.glob("*.index"), None)
-            model_id = info.get("model_id") or info.get("modelId") or d.name
-            model_name = info.get("model_name") or info.get("name") or d.name
-            folder_name = d.name
+            folder_name = _clean_label(d.name)
+            model_id = _clean_label(info.get("model_id") or info.get("modelId") or d.name)
+            model_name = _clean_label(info.get("model_name") or info.get("name") or d.name)
             installed_at = info.get("installed_at")
             info_epochs = info.get("epochs")
             epochs = None
@@ -272,6 +295,36 @@ def _select_best_pth(pths: list[Path]) -> Path | None:
     return max(pths, key=score)
 
 
+def _reject_non_rvc_checkpoint(pth: Path) -> None:
+    """Refuse a .pth that is not an exported RVC checkpoint.
+
+    A proper RVC model carries top-level "weight" and "config" keys. Some
+    catalogs (HuggingFace repos scraped for voices, in particular) host the
+    raw G_<step>.pth a trainer saves mid-run instead — full optimizer state,
+    under keys like "model"/"iteration"/"optimizer", or a so-vits-svc
+    checkpoint entirely (same G_<step>.pth naming convention, incompatible
+    architecture). Either loads fine as a tensor blob but fails deep inside
+    Applio's network setup with an opaque "Failed to load voice conversion
+    model" — installing it anyway just moves that discovery from download
+    time, where the real cause is one dict away, to the next time someone
+    tries to sing with it.
+    """
+    import torch
+
+    try:
+        cpt = torch.load(str(pth), map_location="cpu", weights_only=True)
+    except Exception as e:
+        raise Exception(f"'{pth.name}' is not a loadable PyTorch checkpoint: {e}") from e
+    if not isinstance(cpt, dict) or "weight" not in cpt or "config" not in cpt:
+        found = list(cpt.keys()) if isinstance(cpt, dict) else type(cpt).__name__
+        raise Exception(
+            f"'{pth.name}' is not an exported RVC model — it looks like a raw training "
+            f"checkpoint or a different architecture (so-vits-svc uses the same G_<step>.pth "
+            f"naming). Found keys {found} instead of the expected \"weight\"/\"config\". "
+            "Look for a properly exported .pth from this source, or try a different one."
+        )
+
+
 def _select_index(indexes: list[Path], pth: Path | None) -> Path | None:
     if not indexes:
         return None
@@ -439,6 +492,7 @@ def _download_and_install_model(payload: dict, on_progress=None) -> dict:
         selected_pth = _select_best_pth(pths)
         if not selected_pth:
             raise Exception("No .pth file found")
+        _reject_non_rvc_checkpoint(selected_pth)
         selected_index = _select_index(indexes, selected_pth)
 
         epochs, rate = extract_epoch_rate_from_filename(selected_pth.name)

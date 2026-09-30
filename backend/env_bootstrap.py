@@ -10,6 +10,21 @@ def bootstrap_env():
         load_dotenv()
     except Exception:
         pass
+
+    # Windows defaults a redirected/piped stdout to the console's ANSI
+    # codepage (cp1252, reported as the "charmap" codec) rather than UTF-8.
+    # Any lyrics, title, or model output containing a character outside that
+    # page — a smart quote, a stray bidi mark from pasted text, anything
+    # non-Latin — then crashes the first print() that touches it. torch/rvc
+    # print progress and paths directly rather than going through logging,
+    # so this has to be fixed at the stream itself, not by quieting loggers.
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
     enable_logs = os.getenv("RHYMIX_ENABLE_LOGS", "").lower() in {"1", "true", "yes"}
     log_level = os.getenv("RHYMIX_LOG_LEVEL", "INFO").upper()
     # Disable FFmpeg requirement for torchaudio BEFORE any torch imports

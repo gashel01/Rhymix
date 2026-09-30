@@ -1,4 +1,7 @@
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from backend.factory import create_app
@@ -23,7 +26,19 @@ class CoverRoutesTestCase(unittest.TestCase):
         self.client = self.app.test_client()
         song_generation_jobs.clear()
 
+        # Starting a cover writes a manifest into the real song library, and the
+        # list endpoint rewrites one per in-memory job on every poll. Without
+        # this redirect a test run leaves dozens of stub jobs stuck at "queued"
+        # sitting in the user's library.
+        self._jobs_dir = Path(tempfile.mkdtemp(prefix="rhymix-test-jobs-"))
+        self._jobs_patch = patch(
+            "backend.features.song_generation.routes.SONG_GENERATION_JOBS_DIR", self._jobs_dir
+        )
+        self._jobs_patch.start()
+
     def tearDown(self):
+        self._jobs_patch.stop()
+        shutil.rmtree(self._jobs_dir, ignore_errors=True)
         song_generation_jobs.clear()
 
     def test_cover_requires_source_song_id(self):

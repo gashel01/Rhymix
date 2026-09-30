@@ -16,6 +16,50 @@ from backend.storage.inference_runs import ALLOWED_RUN_REACTIONS, list_inference
 bp = Blueprint("inference", __name__)
 
 
+def _public_run(run: dict) -> dict:
+    """A run as the browser should see it.
+
+    `instrumentalPath` is an absolute path on this machine; the client has no
+    use for it and no business knowing it. What it needs is whether the file is
+    still there — which is also the honest answer after the source song has
+    been deleted out from under the run.
+    """
+    from backend.routes.download import resolve_run_asset
+
+    public = dict(run)
+    public.pop("instrumentalPath", None)
+    run_id = run.get("runId") or run.get("id")
+    public["hasInstrumental"] = bool(run_id and resolve_run_asset(run_id, "instrumental"))
+    # What it re-sang, with its audio: the library offers both sides, the
+    # original that went into the model and the take that came out.
+    from backend.features.track_sources import resolve_source
+
+    ref = None
+    if run.get("songJobId"):
+        ref = f"songgen:{run['songJobId']}"
+    elif run.get("sourceRunId"):
+        ref = f"run:{run['sourceRunId']}"
+    elif run.get("inputFileId"):
+        ref = f"upload:{run['inputFileId']}"
+    public["source"] = resolve_source(ref) if ref else None
+
+    # A conversion wears the cover of whatever it re-sang: same song, other
+    # voice. None when the source has no cover, which is then a gradient.
+    try:
+        from backend.features.cover_art.routes import run_cover_url
+
+        public["coverUrl"] = run_cover_url(run)
+    except Exception:
+        public["coverUrl"] = None
+    # A real remix, not the vocal the mix endpoint falls back to.
+    public["hasMix"] = bool(
+        run_id
+        and run.get("mixFileName")
+        and (paths.INFERENCE_RUNS_DIR / run_id / run["mixFileName"]).exists()
+    )
+    return public
+
+
 @bp.route("/api/start-inference", methods=["POST"])
 def start_inference():
     """Start an inference job for a track"""
@@ -45,6 +89,51 @@ def start_inference():
     except Exception as e:
         logging.error(f"Error starting inference: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+_INFERENCE_TERMINAL = {"completed", "failed", "error", "cancelled"}
+
+
+@bp.route("/api/inference-jobs", methods=["GET"])
+def list_active_inference_jobs():
+    """Conversions still running — what a fresh page load needs to rebuild the
+    placeholder row a conversion shows before it has landed as a real one.
+
+    `active_jobs` is shared with every other job kind (training, diarisation,
+    song generation's own RVC step), so this only surfaces the ones this
+    endpoint's own start_inference_job put there, and only while they are
+    still going: a page loaded after the job finished should see it as the
+    real row it became, not a placeholder for a job that is already over.
+    """
+    jobs = []
+    for job in active_jobs.values():
+        if job.get("type") != "inference":
+            continue
+        # Song generation's own RVC step registers here too, under the exact
+        # same shape, to get the same status polling this endpoint's own
+        # jobs use — it is not one of this endpoint's own jobs, and the song
+        # generating it already has a visible row of its own. Without this,
+        # a hum (or cover, or plain) generation with a voice attached showed
+        # a second, redundant "Converting" placeholder for the same voice —
+        # and if that internal step ever got stuck instead of reaching a
+        # terminal status, this list never emptied, so the library kept
+        # polling every few seconds forever.
+        if job.get("internal"):
+            continue
+        if job.get("status") in _INFERENCE_TERMINAL:
+            continue
+        track = job.get("track") or {}
+        jobs.append(
+            {
+                "id": job.get("id"),
+                "status": job.get("status"),
+                "progress": job.get("progress", 0),
+                "modelName": job.get("model_name"),
+                "trackId": track.get("songJobId") or track.get("fileId"),
+                "trackTitle": track.get("name"),
+            }
+        )
+    return jsonify({"jobs": jobs})
 
 
 @bp.route("/api/inference-status/<job_id>", methods=["GET"])
@@ -134,7 +223,7 @@ def get_past_inference_results():
     try:
         results = list_inference_runs()
         results.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
-        return jsonify({"results": results})
+        return jsonify({"results": [_public_run(run) for run in results]})
 
     except Exception as e:
         logging.error(f"Error getting past inference results: {e}")

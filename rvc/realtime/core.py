@@ -377,6 +377,10 @@ class VoiceChanger:
             # device
         )
         self.device = self.vc_model.device
+        # generate_strength()/process_audio() build tensors that interact directly with this
+        # model's own output (self.vc_model.inference(...)'s return value) — they must share its
+        # dtype (see generate_strength's comment), so it's read from the model, not assumed.
+        self.dtype = self.vc_model.dtype
         self.vc_model.realloc(
             self.block_frame,
             self.extra_frame,
@@ -386,6 +390,13 @@ class VoiceChanger:
         self.generate_strength()
 
     def generate_strength(self):
+        # Everything downstream of the model (process_audio's SOLA crossfade: F.conv1d against
+        # sola_buffer, then the fade windows applied to the model's own fp16 output) has to be
+        # self.dtype, not a hardcoded float32 — these two were left behind when fp16 was
+        # introduced, and mixing them with the model's real (float16) output is exactly
+        # "Input type (torch.cuda.HalfTensor) and weight type (torch.cuda.FloatTensor) should be
+        # the same": a real crash, not a CPU-fallback edge case, confirmed by the "cuda." prefix
+        # on both tensor types in that error.
         self.fade_in_window: torch.Tensor = (
             torch.sin(
                 0.5
@@ -395,7 +406,7 @@ class VoiceChanger:
                     1.0,
                     steps=self.crossfade_frame,
                     device=self.device,
-                    dtype=torch.float32,
+                    dtype=self.dtype,
                 )
             )
             ** 2
@@ -404,7 +415,7 @@ class VoiceChanger:
         self.fade_out_window: torch.Tensor = 1 - self.fade_in_window
         # The size will change from the previous result, so the record will be deleted.
         self.sola_buffer = torch.zeros(
-            self.crossfade_frame, device=self.device, dtype=torch.float32
+            self.crossfade_frame, device=self.device, dtype=self.dtype
         )
 
     def process_audio(
@@ -432,6 +443,16 @@ class VoiceChanger:
             proposed_pitch,
             proposed_pitch_threshold,
         )
+        # self.vc_model.inference()'s real output dtype isn't guaranteed to be self.dtype — the
+        # first fix here (sola_buffer/fade windows built as self.dtype) assumed it was, verified
+        # only against a mock that was itself forced to self.dtype, so it never actually exercised
+        # this. It wasn't: the very next real take crashed the other way round ("Input type
+        # torch.cuda.FloatTensor and weight type torch.cuda.HalfTensor"), meaning the pipeline's
+        # vocoder output audio in float32 regardless of the model's own half-precision weights —
+        # not unusual for a vocoder kept at full precision for quality. Casting here, once, at the
+        # actual source of the value everything below is built from, is correct regardless of
+        # which way the pipeline's own dtype happens to vary.
+        audio = audio.to(self.dtype)
 
         # if audio is None:
         # In case there's an actual silence - send full block with zeros
@@ -442,7 +463,9 @@ class VoiceChanger:
         cor_den = torch.sqrt(
             F.conv1d(
                 conv_input**2,
-                torch.ones(1, 1, self.crossfade_frame, device=self.device),
+                # Same reason as sola_buffer above: no explicit dtype here defaults to float32,
+                # which mismatches conv_input (self.dtype, i.e. float16) in this second conv1d.
+                torch.ones(1, 1, self.crossfade_frame, device=self.device, dtype=self.dtype),
             )
             + 1e-8
         )
@@ -487,4 +510,11 @@ class VoiceChanger:
         )
         end = time.perf_counter()
 
-        return result, vol, [0, (end - start) * 1000, 0]
+        # [0]/[2] are unused legacy slots from a richer profiler this was originally stubbed down
+        # from — kept as-is so existing perf[1] (total latency) readers don't change. Per-stage
+        # timing (which of F0/HuBERT/vocoder is actually the bottleneck) rides as a 4th element,
+        # read straight off the pipeline instance since voice_conversion() sets it there — None if
+        # the pipeline never actually ran a real conversion this call (e.g. VAD/silence branches
+        # inside Realtime.inference() do call it, so this is populated whenever it matters).
+        stage_timings = getattr(getattr(self.vc_model, "pipeline", None), "last_stage_timings_ms", None)
+        return result, vol, [0, (end - start) * 1000, 0, stage_timings]

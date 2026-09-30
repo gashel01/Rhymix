@@ -1,11 +1,13 @@
 import logging
 import os
+import shutil
 import threading
 import uuid
 from datetime import datetime
 from pathlib import Path
 
 from backend.features.inference.models import resolve_checkpoint
+from backend.features.inference.mixdown import MIX_FILE_NAME, build_mix, resolve_instrumental
 from backend.jobs.registry import active_jobs
 from backend.paths.manager import paths
 from backend.storage.inference_runs import (
@@ -150,8 +152,34 @@ def run_inference_job(job_id, run_id, model, track, params):
         if vocals_file_type in {"raw_vocals", "processed_vocals"}:
             use_processed = vocals_file_type == "processed_vocals"
 
+        # A generated song keeps its vocal inside its own job directory, which
+        # is neither an upload nor a previous run — the three cases below could
+        # not reach it, and asking for one failed with "Unknown fileId" because
+        # the job id was being looked up in the uploads table.
+        #
+        # The id is resolved here rather than accepting a path from the client:
+        # a caller-supplied path is a directory-traversal hole, and the server
+        # already knows where a job's assets live.
+        song_job_id = track.get("songJobId")
+
         input_path = None
-        if source_run_id:
+        if song_job_id:
+            from backend.features.song_generation.jobs_common import _asset_path
+
+            for key in ("vocals_raw", "vocals_rvc"):
+                candidate = _asset_path(song_job_id, key)
+                if candidate.exists():
+                    input_path = str(candidate)
+                    break
+            if not input_path:
+                active_jobs[job_id].update(
+                    {
+                        "status": "failed",
+                        "error": "That song has no isolated vocal — split it into stems first.",
+                    }
+                )
+                return
+        elif source_run_id:
             source_meta = load_inference_run_metadata(source_run_id)
             if not source_meta:
                 active_jobs[job_id].update(
@@ -176,10 +204,17 @@ def run_inference_job(job_id, run_id, model, track, params):
         else:
             vocal_filename = track.get("vocal", "").split("/").pop().split("\\").pop()
             input_path = str(paths.get_vocal_file_path(vocal_filename, processed=use_processed))
+            # A bare filename still names what it came from: vocals are stored
+            # as "<id>_vocals.wav". Without recovering that id the run recorded
+            # no source at all and landed in the library as a converted vocal
+            # with no original beside it and no music under it.
+            stem = Path(vocal_filename).stem
+            if not file_id and stem.endswith("_vocals"):
+                file_id = stem[: -len("_vocals")]
 
         # Fallback: if the file isn't in the processed dir, try the raw one.
         # Only applies to upload-sourced input — a run output lives elsewhere entirely.
-        if not source_run_id and input_path and not os.path.exists(input_path):
+        if not source_run_id and not song_job_id and input_path and not os.path.exists(input_path):
             fallback_name = None
             if file_id:
                 base_name = get_upload_base_name(file_id)
@@ -218,6 +253,13 @@ def run_inference_job(job_id, run_id, model, track, params):
             "volume_envelope": params.get("volumeEnvelope", True),
             "protect": params.get("protectVoiced", 0.5),
             "f0_method": params.get("f0Method", "rmvpe"),
+            # Off unless asked for. It earns its place when the target voice
+            # sits in a different register from the original singer — a man
+            # sung by a woman's model and the reverse — where pitch alone
+            # leaves the timbre sounding synthetic.
+            "formant_shifting": bool(params.get("formantShifting", False)),
+            "formant_qfrency": float(params.get("formantQfrency", 1.0)),
+            "formant_timbre": float(params.get("formantTimbre", 1.0)),
             "input_path": input_path,
             "output_path": output_path,
             "pth_path": model_path,
@@ -266,6 +308,21 @@ def run_inference_job(job_id, run_id, model, track, params):
             message, output_file_path = result
             # Check if output file was actually created
             if os.path.exists(output_file_path):
+                # applio does not always honour output_path verbatim (it can
+                # normalise the extension or write beside the input instead) —
+                # when the path it actually used differs from the one the run
+                # manifest promises ("inferred.wav" in this run's own
+                # directory), copy it there so the vocals-only asset the
+                # library and the mixdown below both rely on actually exists,
+                # instead of the run looking complete while playback 404s.
+                if os.path.abspath(output_file_path) != os.path.abspath(output_path):
+                    try:
+                        shutil.copyfile(output_file_path, output_path)
+                        output_file_path = output_path
+                    except OSError:
+                        logging.exception(
+                            f"[Inference] Could not copy inference output into {output_path}"
+                        )
                 file_record = get_upload_metadata(file_id) if file_id else None
                 model_name = model.get("name") or model.get("modelName")
                 model_id = model.get("id") or model.get("modelId") or model.get("model_id") or model_name
@@ -289,6 +346,37 @@ def run_inference_job(job_id, run_id, model, track, params):
                 if not checkpoint_id and checkpoint_filename:
                     checkpoint_id = Path(checkpoint_filename).stem
                 index_file = Path(index_path).name if index_path else None
+
+                # The model hands back a dry vocal. On its own that is not a
+                # track — it is the singing with the song taken away — so the
+                # instrumental it was sung over is found again and mixed back
+                # under it. A conversion then carries the same three files as
+                # everything else in the library and behaves like a track
+                # rather than a loose stem.
+                instrumental_path = resolve_instrumental(
+                    song_job_id=song_job_id,
+                    file_id=file_id,
+                    source_run_id=source_run_id,
+                )
+                mix_file_name = None
+                if instrumental_path:
+                    active_jobs[job_id].update(
+                        {
+                            "progress": 85,
+                            "logs": active_jobs[job_id].get("logs", []) + ["Mixing it back over the music..."],
+                        }
+                    )
+                    mix_path = run_dir / MIX_FILE_NAME
+                    if build_mix(Path(output_file_path), instrumental_path, mix_path):
+                        mix_file_name = MIX_FILE_NAME
+                    else:
+                        logging.warning(f"[Inference] Mixdown failed for run {run_id}")
+                else:
+                    logging.info(
+                        f"[Inference] No instrumental found for run {run_id}; "
+                        "the converted vocal stands alone."
+                    )
+
                 model_checkpoint = {
                     "epoch": checkpoint_epoch,
                     "checkpointId": checkpoint_id,
@@ -309,17 +397,45 @@ def run_inference_job(job_id, run_id, model, track, params):
                     # what records the layer this run was stacked on.
                     "inputFileId": file_id,
                     "sourceRunId": source_run_id,
-                    "inputStoredName": file_record.get("storedName") if file_record else None,
+                    # Which generated song this came from, when it came from one.
+                    # Without it a converted track has no way back to its source
+                    # and shows up in the library with no name of its own.
+                    "songJobId": song_job_id,
+                    "inputStoredName": (
+                        file_record.get("storedName")
+                        if file_record
+                        else Path(input_path).name if input_path else None
+                    ),
                     "inputOriginalName": file_record.get("originalName") if file_record else None,
-                    "inputDisplayName": file_record.get("safeDisplayName") if file_record else None,
+                    "inputDisplayName": (
+                        file_record.get("safeDisplayName")
+                        if file_record
+                        else (track.get("name") or None)
+                    ),
                     "outputFileName": output_filename,
                     "outputUrl": f"/api/download/inference/{run_id}",
+                    # The remix, and where its music came from. Both are absent
+                    # when the source had no instrumental to find — a vocal-only
+                    # upload, or a song that was never split — in which case the
+                    # converted vocal is the whole track and says so.
+                    "mixFileName": mix_file_name,
+                    "instrumentalPath": str(instrumental_path) if instrumental_path else None,
                     "params": params,
                     "vocalFileType": vocals_file_type
                     or ("processed_vocals" if use_processed else "raw_vocals"),
                     "createdAt": datetime.now().isoformat(),
                 }
-                save_inference_run_metadata(run_id, run_payload)
+                # Song generation's own RVC step reaches this same function to
+                # get the same status polling and file handling everything
+                # else that calls this does — but the song it belongs to is
+                # already the complete record of "this voice got applied
+                # here": vocals_rvc and final_mix_rvc, copied from this exact
+                # run's own output two lines from here. A persisted run on
+                # top of that was a second copy of the same voice, pushed
+                # onto the song's own take list by songJobId and showing up
+                # as an extra "v2" pill for a version that was never made.
+                if not active_jobs.get(job_id, {}).get("internal"):
+                    save_inference_run_metadata(run_id, run_payload)
                 active_jobs[job_id].update(
                     {
                         "status": "completed",
