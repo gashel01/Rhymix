@@ -25,6 +25,7 @@ def create_app():
     from backend.routes.upload import bp as upload_bp
     from backend.routes.download import bp as download_bp
     from backend.routes.waveform import bp as waveform_bp
+    from backend.routes.system import bp as system_bp
     from backend.routes.models import bp as models_bp
     from backend.routes.maintenance import bp as maintenance_bp
     from backend.routes.training import bp as training_bp, restore_training_jobs
@@ -33,6 +34,7 @@ def create_app():
     from backend.features.inference.routes import bp as inference_bp
     from backend.features.llm.routes import bp as llm_bp
     from backend.features.song_generation.routes import bp as song_generation_bp
+    from backend.features.cover_art.routes import bp as cover_art_bp
     from backend.features.diarization.routes import bp as diarization_bp
     from backend.features.studio.routes import bp as studio_bp
     from backend.features.beatbox_wizard.routes import bp as beatbox_wizard_bp
@@ -41,6 +43,7 @@ def create_app():
     app.register_blueprint(upload_bp)
     app.register_blueprint(download_bp)
     app.register_blueprint(waveform_bp)
+    app.register_blueprint(system_bp)
     app.register_blueprint(models_bp)
     app.register_blueprint(maintenance_bp)
     app.register_blueprint(training_bp)
@@ -48,6 +51,7 @@ def create_app():
     app.register_blueprint(inference_bp)
     app.register_blueprint(llm_bp)
     app.register_blueprint(song_generation_bp)
+    app.register_blueprint(cover_art_bp)
     app.register_blueprint(diarization_bp)
     app.register_blueprint(studio_bp)
     app.register_blueprint(beatbox_wizard_bp)

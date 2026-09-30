@@ -14,7 +14,7 @@ import soundfile as sf
 from flask import Blueprint, jsonify
 
 from backend.paths.manager import paths
-from backend.routes.download import resolve_inference_path, resolve_media_path
+from backend.routes.download import resolve_inference_path, resolve_media_path, resolve_run_asset
 
 bp = Blueprint("waveform", __name__)
 logger = logging.getLogger(__name__)
@@ -76,6 +76,37 @@ def _peaks_payload(path):
     return payload
 
 
+@bp.route("/api/song-generation/<job_id>/waveform/<asset_key>")
+def waveform_song_generation(job_id, asset_key):
+    """Peaks for one asset of a generated song.
+
+    Generated songs did not go through resolve_media_path: their assets live
+    under the job's own directory and are addressed by key rather than by
+    filename, so they had no peaks route and the new UI would have had to
+    download and decode every mix in the library to draw a waveform.
+
+    The path sits under /api/song-generation rather than next to the other
+    waveform routes on purpose: `/api/waveform/<file_type>/<path:filename>`
+    swallows any number of segments, so a sibling route here was matched as
+    file_type="song-generation" and rejected before ever reaching this handler.
+    """
+    # Imported here rather than at module scope: song_generation pulls in the
+    # provider registry, which loads engine config, and the waveform blueprint
+    # has no business doing that at import time.
+    from backend.features.song_generation.jobs_common import ASSET_KEYS, _asset_path
+
+    if asset_key not in ASSET_KEYS:
+        return jsonify({"error": "Unknown asset"}), 404
+    try:
+        file_path = _asset_path(job_id, asset_key)
+        if not file_path.exists():
+            return jsonify({"error": "File not found"}), 404
+        return jsonify(_peaks_payload(file_path))
+    except Exception:
+        logger.exception("Error computing peaks for song %s/%s", job_id, asset_key)
+        return jsonify({"error": "Could not compute waveform"}), 500
+
+
 @bp.route("/api/waveform/inference/<path:run_id>")
 def waveform_inference(run_id):
     try:
@@ -85,6 +116,19 @@ def waveform_inference(run_id):
         return jsonify(_peaks_payload(file_path))
     except Exception:
         logger.exception("Error computing inference peaks for %s", run_id)
+        return jsonify({"error": "Could not compute waveform"}), 500
+
+
+@bp.route("/api/inference/<run_id>/waveform/<kind>")
+def waveform_inference_asset(run_id, kind):
+    """Peaks for one track of a conversion — its mix, vocal or instrumental."""
+    try:
+        file_path = resolve_run_asset(run_id, kind)
+        if file_path is None:
+            return jsonify({"error": "File not found"}), 404
+        return jsonify(_peaks_payload(file_path))
+    except Exception:
+        logger.exception("Error computing peaks for run %s/%s", run_id, kind)
         return jsonify({"error": "Could not compute waveform"}), 500
 
 

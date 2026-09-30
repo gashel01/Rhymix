@@ -258,6 +258,8 @@ None
 /data/
 /logs/
 /models/
+/tools/
+/scratchpad/
 /assets/weights/
 /rvc/models/
 /rvc/**/__pycache__/

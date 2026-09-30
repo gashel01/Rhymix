@@ -90,7 +90,7 @@ def _save_metadata_file(path: Path, data: dict) -> None:
         _metadata_cache["expires"] = time.time() + _METADATA_CACHE_TTL
 
 
-def register_upload_metadata(original_name: str, stored_name: str, file_id: str) -> dict:
+def register_upload_metadata(original_name: str, stored_name: str, file_id: str, internal: bool = False) -> dict:
     display_name = sanitize_filename_for_display(original_name)
     created_at = datetime.now().isoformat()
     record = {
@@ -99,12 +99,33 @@ def register_upload_metadata(original_name: str, stored_name: str, file_id: str)
         "storedName": stored_name,
         "safeDisplayName": display_name,
         "createdAt": created_at,
+        # The song pipeline registers its own generated audio as an upload so
+        # the separation pipeline (built to work on uploads) can find it —
+        # not a real import, so /api/uploads hides it.
+        "internal": internal,
     }
     with processing_metadata_lock:
         data = _load_metadata_file(UPLOAD_METADATA_PATH)
         data.setdefault("files", {})[file_id] = record
         _save_metadata_file(UPLOAD_METADATA_PATH, data)
     return record
+
+
+def unregister_upload_metadata(file_id: str) -> bool:
+    """Forget an upload record. True when one was actually removed.
+
+    The song pipeline registers its own output as an upload so the separation
+    code can find it, then deletes the file — without this the record outlived
+    the audio forever. One library had 107 of them and no real imports.
+    """
+    with processing_metadata_lock:
+        data = _load_metadata_file(UPLOAD_METADATA_PATH)
+        files = data.get("files", {})
+        if file_id not in files:
+            return False
+        files.pop(file_id)
+        _save_metadata_file(UPLOAD_METADATA_PATH, data)
+        return True
 
 
 def get_upload_metadata(file_id: str):

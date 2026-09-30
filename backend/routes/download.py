@@ -36,6 +36,11 @@ def resolve_media_path(file_type, filename):
         "processed_vocals": paths.UVR_PROCESSED_DIR,
         "exports": paths.EXPORT_DIR,
         "instrumental": paths.INSTRUMENTAL_DIR,
+        # The raw upload itself — added so a file just POSTed to /api/upload
+        # (which only ever lived in INPUT_DIR) is playable immediately,
+        # rather than only once something derives a processed/instrumental
+        # version of it.
+        "input": paths.INPUT_DIR,
     }
     if file_type not in dir_map:
         return None, ({"error": f"Invalid file type: {file_type}"}, 400)
@@ -86,6 +91,60 @@ def resolve_inference_path(run_id):
         file_path = paths.get_inference_file_path(run_id)
 
     return file_path if file_path.exists() else None
+
+
+# What a conversion run holds, once it has been mixed back over its music. The
+# names are the ones used everywhere else in the app rather than the ones on
+# disk, so a caller asks for the same three things whatever kind of track it is
+# looking at.
+RUN_ASSET_KINDS = ("mix", "vocals", "instrumental")
+
+
+def resolve_run_asset(run_id, kind):
+    """One file of a conversion run, or None when it does not exist.
+
+    The instrumental is the only one that lives outside the run directory: it
+    belongs to whatever the conversion was sung over, and is referenced rather
+    than copied. Deleting that source leaves this None — the mix, which was
+    written into the run, still plays.
+    """
+    run_id = urllib.parse.unquote(run_id)
+    if kind not in RUN_ASSET_KINDS:
+        return None
+    run_meta = load_inference_run_metadata(run_id)
+    if not run_meta:
+        return None
+
+    vocal_path = paths.INFERENCE_RUNS_DIR / run_id / run_meta.get("outputFileName", "inferred.wav")
+
+    if kind == "instrumental":
+        recorded = run_meta.get("instrumentalPath")
+        path = Path(recorded) if recorded else None
+    elif kind == "mix":
+        name = run_meta.get("mixFileName")
+        path = paths.INFERENCE_RUNS_DIR / run_id / name if name else None
+        # No remix means there was no music to mix into — the converted vocal is
+        # the whole track. Asking for "the mix" then has one right answer, and a
+        # 404 would leave the player with nothing to play for a run that is fine.
+        if path is None or not path.exists():
+            path = vocal_path
+    else:
+        path = vocal_path
+
+    return path if path and path.exists() else None
+
+
+@bp.route("/api/inference/<run_id>/audio/<kind>")
+def inference_asset(run_id, kind):
+    """Stream one track of a conversion — for playing, not for saving.
+
+    Separate from /api/download/inference because that one sends an attachment,
+    and an attachment is the wrong answer to <audio src>.
+    """
+    file_path = resolve_run_asset(run_id, kind)
+    if file_path is None:
+        return jsonify({"error": "File not found"}), 404
+    return send_file(file_path, mimetype="audio/wav", conditional=True)
 
 
 @bp.route("/api/download/<file_type>/<path:filename>")

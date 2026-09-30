@@ -36,6 +36,17 @@ def upload_files():
             record = register_upload_metadata(f.filename, stored_name, file_id)
             records.append(record)
             logging.info(f"Saved file: {path}")
+            # An import deserves a picture like anything else in the library.
+            # Imported lazily and swallowed on failure: cover art is optional,
+            # and an import must not fail because diffusers is missing.
+            try:
+                from backend.features.cover_art.routes import render_upload_cover_async
+
+                render_upload_cover_async(
+                    file_id, record.get("safeDisplayName") or f.filename
+                )
+            except Exception:
+                logging.exception("Could not start cover art for %s", file_id)
 
         return jsonify(
             {
@@ -201,3 +212,177 @@ def delete_files():
 
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# The library's view of an upload.
+#
+# /api/available-files deliberately hides anything without separated stems — it
+# was written for the processing screen, where an unprocessed file is not yet
+# work. The library has the opposite need: a track you just imported has to
+# appear immediately, stems or not, or importing looks like it failed.
+# ---------------------------------------------------------------------------
+
+
+def _upload_audio_path(file_id: str) -> Path | None:
+    """The original file as uploaded, by its id."""
+    for record in list_upload_metadata():
+        if record.get("fileId") != file_id:
+            continue
+        stored = record.get("storedName")
+        if not stored:
+            return None
+        candidate = paths.INPUT_DIR / stored
+        return candidate if candidate.exists() else None
+    return None
+
+
+def _upload_cover_url(file_id: str) -> str | None:
+    """Where an import's cover lives, or None. Imported here to keep the
+    cover feature optional — the library still lists without it."""
+    try:
+        from backend.features.cover_art.routes import upload_cover_url
+
+        return upload_cover_url(file_id)
+    except Exception:
+        return None
+
+
+@bp.route("/api/uploads")
+def list_uploads():
+    """Every imported track, processed or not, newest first."""
+    items = []
+    for record in list_upload_metadata():
+        if record.get("internal"):
+            continue
+        file_id = record.get("fileId")
+        stored = record.get("storedName")
+        if not file_id or not stored:
+            continue
+        base = Path(stored).stem
+        original = paths.INPUT_DIR / stored
+        vocals = paths.UVR_PROCESSED_DIR / f"{base}_vocals.wav"
+        if not vocals.exists():
+            vocals = paths.UVR_RAW_DIR / f"{base}_vocals.wav"
+        instrumental = paths.INSTRUMENTAL_DIR / f"{base}_instrumental.wav"
+
+        items.append(
+            {
+                "fileId": file_id,
+                "name": record.get("safeDisplayName") or record.get("originalName") or stored,
+                "originalName": record.get("originalName"),
+                "createdAt": record.get("createdAt"),
+                "hasAudio": original.exists(),
+                "coverUrl": _upload_cover_url(file_id),
+                "audioUrl": f"/api/uploads/{file_id}/audio" if original.exists() else None,
+                "vocalsUrl": f"/api/uploads/{file_id}/audio/vocals" if vocals.exists() else None,
+                "instrumentalUrl": (
+                    f"/api/uploads/{file_id}/audio/instrumental" if instrumental.exists() else None
+                ),
+                "processing": record.get("processing"),
+            }
+        )
+
+    items.sort(key=lambda item: str(item.get("createdAt") or ""), reverse=True)
+    return jsonify({"uploads": items})
+
+
+_UPLOAD_STEMS = {
+    "vocals": (lambda base: paths.UVR_PROCESSED_DIR / f"{base}_vocals.wav",
+               lambda base: paths.UVR_RAW_DIR / f"{base}_vocals.wav"),
+    "instrumental": (lambda base: paths.INSTRUMENTAL_DIR / f"{base}_instrumental.wav",),
+}
+
+
+def _upload_stem_path(file_id: str, kind: str) -> Path | None:
+    record = next((r for r in list_upload_metadata() if r.get("fileId") == file_id), None)
+    if not record or not record.get("storedName"):
+        return None
+    base = Path(record["storedName"]).stem
+    for build in _UPLOAD_STEMS.get(kind, ()):
+        candidate = build(base)
+        if candidate.exists():
+            return candidate
+    return None
+
+
+@bp.route("/api/uploads/<file_id>", methods=["DELETE"])
+def delete_upload(file_id):
+    """Remove an import and everything made from it.
+
+    /api/delete-files only ever removed stems, and only updated the metadata
+    when stems existed — so deleting a freshly imported track that had never
+    been separated did nothing at all, and the row came back on the next
+    refresh. This removes the audio, whatever was separated out of it, its
+    cover, and the record, which is what "delete" means in the library.
+    """
+    record = next((r for r in list_upload_metadata() if r.get("fileId") == file_id), None)
+    if not record or not record.get("storedName"):
+        return jsonify({"error": "Import not found"}), 404
+
+    stored = record["storedName"]
+    base = Path(stored).stem
+    removed = []
+    targets = [
+        paths.INPUT_DIR / stored,
+        paths.UVR_RAW_DIR / f"{base}_vocals.wav",
+        paths.UVR_PROCESSED_DIR / f"{base}_vocals.wav",
+        paths.INSTRUMENTAL_DIR / f"{base}_instrumental.wav",
+    ]
+    try:
+        from backend.features.cover_art.routes import upload_cover_path
+
+        targets.append(upload_cover_path(file_id))
+    except Exception:
+        pass
+
+    for path in targets:
+        try:
+            if path.exists():
+                path.unlink()
+                removed.append(path.name)
+        except Exception:
+            logging.exception("Could not delete %s", path)
+
+    from backend.storage.metadata import unregister_upload_metadata
+
+    unregister_upload_metadata(file_id)
+    return jsonify({"deleted": removed})
+
+
+@bp.route("/api/uploads/<file_id>/audio")
+def get_upload_audio(file_id):
+    from flask import send_file
+
+    path = _upload_audio_path(file_id)
+    if not path:
+        return jsonify({"error": "Upload not found"}), 404
+    return send_file(path, mimetype="audio/wav")
+
+
+@bp.route("/api/uploads/<file_id>/audio/<kind>")
+def get_upload_stem(file_id, kind):
+    from flask import send_file
+
+    if kind not in _UPLOAD_STEMS:
+        return jsonify({"error": f"Unknown stem: {kind}"}), 404
+    path = _upload_stem_path(file_id, kind)
+    if not path:
+        return jsonify({"error": "Stem not available"}), 404
+    return send_file(path, mimetype="audio/wav")
+
+
+@bp.route("/api/uploads/<file_id>/waveform")
+@bp.route("/api/uploads/<file_id>/waveform/<kind>")
+def get_upload_waveform(file_id, kind=None):
+    """Peaks for an import, so it draws like anything else in the library."""
+    from backend.routes.waveform import _peaks_payload
+
+    path = _upload_stem_path(file_id, kind) if kind else _upload_audio_path(file_id)
+    if not path:
+        return jsonify({"error": "Audio not found"}), 404
+    try:
+        return jsonify(_peaks_payload(path))
+    except Exception:
+        logging.exception("Could not compute peaks for upload %s", file_id)
+        return jsonify({"error": "Could not compute waveform"}), 500

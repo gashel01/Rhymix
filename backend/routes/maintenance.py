@@ -68,18 +68,19 @@ def warmup_models(payload: dict | None = None) -> dict:
     data = payload or {}
     results = {"started_at": time.time(), "details": {}}
 
-    if _coerce_bool(data.get("acestep", True), True):
-        params = data.get("acestep") if isinstance(data.get("acestep"), dict) else {}
-        if "initialize_lm" not in params and os.getenv("ACESTEP15_WARMUP_LM") is not None:
-            params["initialize_lm"] = _coerce_bool(os.getenv("ACESTEP15_WARMUP_LM"), True)
+    # Accepts "yue2", and still "acestep" so older clients and scripts keep
+    # working after ACE-Step was removed - the key now warms YuE2 instead.
+    songgen_requested = data.get("yue2", data.get("acestep", True))
+    if _coerce_bool(songgen_requested, True):
+        params = songgen_requested if isinstance(songgen_requested, dict) else {}
         try:
-            from backend.features.song_generation.providers.ace_step import warmup_acestep
+            from backend.features.song_generation.providers.yue2 import warmup_yue2
 
-            results["details"]["acestep"] = warmup_acestep(params)
+            results["details"]["yue2"] = warmup_yue2(params)
         except Exception as exc:
-            results["details"]["acestep"] = {"status": "error", "error": str(exc)}
+            results["details"]["yue2"] = {"status": "error", "error": str(exc)}
     else:
-        results["details"]["acestep"] = {"status": "skipped"}
+        results["details"]["yue2"] = {"status": "skipped"}
 
     if _coerce_bool(data.get("rvc", True), True):
         params = data.get("rvc") if isinstance(data.get("rvc"), dict) else {}
