@@ -10,7 +10,7 @@ Click the ⚙️ next to **About** and paste:
 
 **Description**
 ```
-Full-stack AI music studio — DAW-style editor, song generation, voice conversion, vocal separation, diarization, and live voice→MIDI. Flask + FastAPI + React, powered by ACE-Step, Applio/RVC, WhisperX, and Basic Pitch / CREPE / DDSP.
+Full-stack AI music studio — DAW-style editor, song generation, voice conversion, vocal separation, diarization, and live voice→MIDI. Flask + FastAPI + React, powered by YuE2, Applio/RVC, WhisperX, and Basic Pitch / CREPE / DDSP.
 ```
 
 **Website** — leave blank (or add a demo video link if you record one)
@@ -25,7 +25,6 @@ speaker-diarization
 voice-to-midi
 ace-step
 applio
-whisperx
 flask
 fastapi
 react

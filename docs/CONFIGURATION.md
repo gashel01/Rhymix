@@ -11,15 +11,14 @@ Every environment variable Rhymix reads, grouped by subsystem. Copy `.env.exampl
 
 CREPE logs are emitted under the `voice_midi` logger when enabled.
 
-## Studio — AI adapter
+## Song generation
 
 | Variable | Default | Notes |
 |---|---|---|
-| `STUDIO_AI_ADAPTER` | _unset_ | Set to `local` to enable the in-process Python bridge. Leave unset for NotConfigured (friendly error). |
-| `STUDIO_AI_BRIDGE` | `backend.features.studio.ai_bridge_acestep` | Module / script that speaks JSON on stdin/stdout. |
-| `STUDIO_AI_PYTHON` | `python` | Python executable the bridge is spawned with. |
-| `STUDIO_AI_EXTRACT_MODEL` | `acestep-v15-base` | Model used by the `stem_extract` job. |
-| `STUDIO_AI_PERSISTENT` | `0` | Keep the bridge process alive between jobs. |
+| `WANGP_DIR` | `../WanGP` | Where WanGP (which hosts YuE2) is checked out. |
+| `WANGP_AUDIO_PROFILE` | `3` | mmgp memory profile for audio models. |
+| `YUE2_PERSISTENT` | `1` | Keep the YuE2 worker alive between jobs. |
+| `SONG_GENERATION_PROVIDER` | `yue2` | Default song-generation engine. |
 
 ## Studio — Voice / Beat → MIDI
 
@@ -125,4 +124,4 @@ Rhymix/
 
 | Variable | Default | Notes |
 |---|---|---|
-| `REACT_APP_SOUNDFONT_URL` | _CDN default_ | Override the SoundFont base URL (self-host FluidR3_GM or custom banks). |
+| `REACT_APP_SOUNDFONT_URL` | _CDN default_ | Override the SoundFont base URL (self-host MusyngKite or custom banks). |

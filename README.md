@@ -73,7 +73,7 @@ README is how far along it is.
   <tr>
     <td width="50%">
       <img src="docs/images/create-song.jpg" alt="Song generation view" />
-      <p align="center"><em><b>Create</b> — prompt, lyrics and a full ACE-Step parameter panel</em></p>
+      <p align="center"><em><b>Create</b> — prompt, lyrics and a full YuE2 parameter panel</em></p>
     </td>
     <td width="50%">
       <img src="docs/images/models.jpg" alt="Trained voice model library" />
@@ -107,11 +107,23 @@ Record a few examples of each drum sound in your own voice, train a small
 classifier on them, and turn vocal percussion into drum MIDI.
 
 ### 🎵 AI song generation
-Full songs from a prompt and lyrics, via **ACE-Step v1.5** running locally. The
-parameter panel exposes the real controls — BPM, key, time signature, diffusion
-steps, guidance shift, the language-model backend, int8 quantisation, CPU
-offload — because the defaults that fit an 8 GB card are not the defaults that
-fit a 24 GB one. Results land in the library and open in the Studio.
+Full songs from a prompt and lyrics, via **YuE2** running locally through
+[WanGP](https://github.com/deepbeepmeep/Wan2GP). It plans the composition first —
+writing melody and chords as an ABC score — and then performs it, which is what
+lets it hand the score back.
+
+That is the part that matters here. Turn on **Save Score** and a generated song
+comes with its `.abc` and `.mid`; feed that back in with new lyrics and the
+music survives while only the vocal is sung again. A generated track stops being
+a sealed stereo file.
+
+A hummed melody can go in instead of a prompt, and a source song can be
+transcribed for a cover — both through the same engine.
+
+> **Licence.** YuE2's weights are **CC BY-NC 4.0 — non-commercial**. Rhymix
+> surfaces that on every generated job. This replaced ACE-Step (Apache-2.0),
+> which was removed: YuE2 won on quality and, once its vllm decoder path was
+> enabled, on speed too.
 
 ### 🎭 Voice conversion and training
 Apply a trained **RVC v2** model to any track, or train a new one from your own
@@ -120,13 +132,12 @@ job survives a page reload, and its progress shows on the model's card in the
 library.
 
 ### 🗣️ Speaker diarization
-**WhisperX** and **pyannote** split a multi-speaker recording into per-speaker
+**pyannote** splits a multi-speaker recording into per-speaker
 segments, drawn as coloured regions over a shared waveform, with per-speaker
 export.
 
 ### 🎛️ And the rest
-Stem separation, lyric transcription, song covers, an AI orchestrator that plans
-a multi-section arrangement and generates each part, and a Groq-backed assist
+Stem separation, lyric transcription, song covers, and a Groq-backed assist
 button on the prompt fields.
 
 ---
@@ -155,13 +166,12 @@ talks to a model directly.
 │  diarization · beatbox       │   │                                   │
 │                              │   │  streams PCM in, notes/audio out  │
 │  project_edits  (pure)       │   └───────────────────────────────────┘
-│  orchestrator_plan (pure)    │
 │  note_math      (pure)       │
 └───────────────┬──────────────┘
                 │ subprocess, one venv per engine
 ┌───────────────▼──────────────────────────────────────────────────────┐
-│  ACE-Step 1.5   Applio / RVC   UVR stems   WhisperX   pyannote        │
-│  SoulX-Singer   Foundation-1   STAGE drums   CREPE · Basic Pitch      │
+│  YuE2 (WanGP)   Applio / RVC   UVR stems   pyannote                   │
+│  SoulX-Singer   CREPE · Basic Pitch                                   │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -173,7 +183,7 @@ the app.
 
 **Why the pure modules.** Anything that decides something rather than performing
 it was pulled out of the code that touches ffmpeg, a GPU or the DOM:
-`project_edits`, `orchestrator_plan`, `note_math` on the backend;
+`project_edits`, `yue2_params`, `note_math` on the backend;
 `studioSelectors`, `audioMath`, `appRoutes` and the per-view models on the
 frontend. They are plain functions over plain data, so they can be tested in
 milliseconds instead of by running a job. That is where most of this project's
@@ -204,8 +214,8 @@ Then open **http://localhost:3001**.
 
 Developed against an **RTX 3070 Ti Laptop (8 GB)**, which is the reason for
 every offload and quantisation default you will find in
-`backend/features/song_generation/providers/ace_step.py`. On a larger card, turn
-them off.
+`backend/features/song_generation/providers/yue2.py` and in WanGP's
+`wgp_config.json`. On a larger card, turn them off.
 
 ---
 
@@ -241,8 +251,9 @@ Things worth knowing before you read the code:
   a "Generated Layers" lane over the original. That is deliberate — you mix the
   two — and the split-and-replace alternative was removed rather than left
   around as a suggestion.
-- **`ace_step.py` prints instead of logging.** Those `print()` calls are the IPC
-  protocol its worker subprocess speaks. They look like debug noise and are not.
+- **`yue2_worker.py` prints instead of logging.** Those `print()` calls are the
+  IPC protocol the worker subprocess speaks. They look like debug noise and are
+  not.
 
 The git history is written to be read. Commits explain why a change was made and
 what was rejected, not just what moved.

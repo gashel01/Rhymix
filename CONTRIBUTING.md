@@ -36,7 +36,7 @@ For the full configuration reference see [docs/CONFIGURATION.md](docs/CONFIGURAT
 
 ## Project layout
 
-Only the directories authored in this repo are tracked. The AI model repos (ACE-Step, Applio, WhisperX, SoulX-Singer, stable-audio-tools, stage) live alongside at runtime but are git-ignored. If you're contributing, you should only need to touch code under:
+Only the directories authored in this repo are tracked. The AI model repos (WanGP/YuE2, Applio, SoulX-Singer) live alongside at runtime but are git-ignored. If you're contributing, you should only need to touch code under:
 
 - `app/`, `backend/` — Flask + FastAPI backend
 - `frontend/src/` — React app (Studio, Beatbox Wizard, components, hooks)

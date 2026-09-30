@@ -27,7 +27,7 @@ backend/
 ├── routes/               Base REST routes (upload, download, training, models)
 ├── features/
 │   ├── studio/           EDL + lanes + clips + AI bridge + render jobs
-│   ├── song_generation/  ACE-Step job wrapper
+│   ├── song_generation/  YuE2 job wrapper (via WanGP)
 │   ├── inference/        RVC voice conversion
 │   ├── diarization/      WhisperX + pyannote pipeline
 │   ├── beatbox_wizard/   Rhythm capture → MIDI
@@ -56,13 +56,11 @@ Studio projects are stored as JSON in `data/studio/projects.json`. Each project 
 
 All edits are pure functions over the EDL (`frontend/src/studio/edlOps.js`), which makes undo / redo, AI-driven edits, and headless rendering all trivially consistent.
 
-## AI adapter
+## Studio jobs
 
-Studio AI actions (stem extract, song complete, instrument lego, etc.) are routed through an adapter controlled by `STUDIO_AI_ADAPTER`:
+The Studio runs four offline jobs, each on its own thread and each writing progress into the shared job store: stem separation (UVR), re-singing a clip with one of your voices (SoulX-Singer), mixdown / stem render (ffmpeg) and MIDI export.
 
-- **`NotConfigured`** (default) — returns a friendly error. Safe for CI.
-- **`local`** — spawns a Python subprocess using `STUDIO_AI_BRIDGE` (default: `backend.features.studio.ai_bridge_acestep`). The bridge reads JSON from stdin and writes JSON to stdout.
-- You can replace `STUDIO_AI_BRIDGE` with any script / module that follows the same contract, so the same frontend can target a different model server without touching the UI.
+A fifth family used to sit here — repaint, add layer, cover, understand, transcribe — routed through a subprocess bridge to ACE-Step. ACE-Step was removed and the Studio is being rebuilt rather than ported, so the bridge, the adapter and the ten job types went with it. `run_ai_job` now accepts stem separation and refuses everything else by name.
 
 ## Voice → MIDI engine abstraction
 

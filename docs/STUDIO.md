@@ -106,42 +106,14 @@ notes, cc, pb, debug = transcribe_dubler_melody_v2(
 
 ---
 
-## AI adapter
-
-Studio AI actions are routed through an adapter. By default the adapter is **NotConfigured** and returns a clear error. Enable the local Python adapter:
-
-```
-STUDIO_AI_ADAPTER=local
-STUDIO_AI_BRIDGE=backend.features.studio.ai_bridge_acestep
-STUDIO_AI_PYTHON=python
-```
-
-Replace `STUDIO_AI_BRIDGE` with your own script / module that accepts JSON on stdin and returns JSON on stdout.
-
-On Windows (cmd.exe), for the current session:
-
-```
-set STUDIO_AI_ADAPTER=local
-set STUDIO_AI_BRIDGE=backend.features.studio.ai_bridge_acestep
-set STUDIO_AI_PYTHON=python
-```
-
----
-
 ## Stem extraction (instrumental)
 
-Studio supports a `stem_extract` AI job that runs the **ACE-Step 1.5 base model** to extract instrument stems from an instrumental track. Each stem lands in its own Studio lane.
+> **Currently inert.** `stem_extract` ran on ACE-Step's `acestep-v15-base`, which was removed along with the rest of ACE-Step. The job still exists and still accepts `trackNames`, but the default bridge returns an explanation instead of stems. It will come back when the Studio is rebuilt.
+
+The job splits an instrumental into instrument stems, one per Studio lane.
 
 Defaults:
 - Tracks: `drums`, `bass`, `guitar`, `keyboard`, `strings`, `synth`
-- Model: `acestep-v15-base` (base model is required for extract / lego / complete tasks).
-
-Make sure the base checkpoint is present in `ACE-Step-1.5/checkpoints` (see ACE-Step docs for download).
-
-Optional override:
-```
-STUDIO_AI_EXTRACT_MODEL=acestep-v15-base
-```
 
 You can pass `trackNames` (array or comma-separated string) in the job payload to control which stems are extracted.
 
@@ -186,11 +158,11 @@ See [CONFIGURATION.md](CONFIGURATION.md) for the full voice→MIDI tuning refere
 
 ## MIDI playback (SoundFont)
 
-Studio previews MIDI clips using a lightweight SoundFont renderer in the browser. Default SoundFont: **FluidR3_GM** (loaded from a public CDN).
+Studio previews MIDI clips using a lightweight SoundFont renderer in the browser. Default SoundFont: **MusyngKite** (loaded from a public CDN) — multi-velocity-layered samples, a quality upgrade over the older FluidR3_GM bank at the same host/format.
 
 Override the SoundFont base URL (self-hosted or custom banks):
 ```
-REACT_APP_SOUNDFONT_URL=https://your-cdn/soundfonts/FluidR3_GM/
+REACT_APP_SOUNDFONT_URL=https://your-cdn/soundfonts/MusyngKite/
 ```
 
 You can change the SoundFont per MIDI clip from **Details → SoundFont** in the Inspector.

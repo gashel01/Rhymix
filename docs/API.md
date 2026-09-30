@@ -4,7 +4,7 @@ Rhymix exposes two interfaces: a Flask REST API on port **5000** and a FastAPI W
 
 ## REST API (Flask, port 5000)
 
-### Song generation (ACE-Step)
+### Song generation (YuE2)
 
 | Method | Path | Description |
 |---|---|---|
