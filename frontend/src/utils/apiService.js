@@ -3,8 +3,7 @@
  */
 
 import axios from 'axios';
-
-const API_BASE = '';
+import { API_BASE } from './apiBase';
 
 /**
  * Get available singing files
@@ -323,20 +322,3 @@ export const getCoverGenerationStatus = async (jobId, abortSignal = null) => {
   return data;
 };
 
-/**
- * Transcribe source song lyrics for cover mode
- * @param {string} sourceSongId
- * @returns {Promise<Object>}
- */
-export const transcribeCoverSource = async (sourceSongId, engine = "whisperx") => {
-  const response = await fetch(`${API_BASE}/api/covers/transcribe`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source_song_id: sourceSongId, engine }),
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data?.error || "Failed to transcribe source song");
-  }
-  return data;
-};

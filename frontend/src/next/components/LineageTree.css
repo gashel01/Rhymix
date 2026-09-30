@@ -1,0 +1,117 @@
+/* A map, not a control surface: nodes are read and clicked to jump, nothing
+   here plays audio or opens a menu — that stays on the row itself. */
+
+/* The portal's own wrapper generates no box of its own — it exists only to
+   carry `.rx`'s design tokens across the portal boundary, not to sit in the
+   layout. */
+.rx-lineage-portal {
+  display: contents;
+}
+
+.rx .rx-lineage-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: rx-lineage-fade 0.16s ease both;
+}
+@keyframes rx-lineage-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.rx .rx-lineage-card {
+  width: min(480px, calc(100vw - 40px));
+  max-height: min(70vh, 620px);
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--hair-2);
+  border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  animation: rx-lineage-in 0.18s var(--ease) both;
+}
+@keyframes rx-lineage-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+.rx .rx-lineage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--hair);
+}
+.rx .rx-lineage-head b {
+  font-size: 15.5px;
+  font-weight: 660;
+}
+
+.rx .rx-lineage-body {
+  overflow-y: auto;
+  padding: 14px 16px 18px;
+}
+
+/* Each level of the tree indents and grows a left rail — the rail is what
+   reads as "these branch from that", the same shape as a git graph without
+   needing to actually draw commit dots. */
+.rx .rx-lineage-children {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.rx .rx-lineage-root {
+  padding: 0;
+}
+.rx .rx-lineage-node {
+  position: relative;
+}
+.rx .rx-lineage-node .rx-lineage-children {
+  margin-top: 4px;
+  margin-left: 17px;
+  padding-left: 15px;
+  border-left: 1px solid var(--hair-2);
+}
+
+.rx .rx-lineage-btn {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border-radius: 10px;
+  transition: background 0.14s;
+}
+.rx .rx-lineage-btn:hover {
+  background: var(--card-2);
+}
+.rx .rx-lineage-btn[data-active] {
+  background: color-mix(in srgb, var(--accent) 14%, var(--card-2));
+}
+.rx .rx-lineage-title {
+  font-size: 13.5px;
+  font-weight: 610;
+  overflow-wrap: anywhere;
+}
+.rx .rx-lineage-btn[data-active] .rx-lineage-title {
+  color: var(--accent);
+}
+.rx .rx-lineage-kind {
+  flex: none;
+  font-size: 11px;
+  color: var(--faint);
+  letter-spacing: 0.01em;
+}

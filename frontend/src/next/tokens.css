@@ -1,0 +1,497 @@
+/*
+ * Design tokens for the new UI.
+ *
+ * Everything is scoped under .rx so the legacy MUI views keep their own look
+ * while the two live in the same bundle. Nothing here leaks to `:root`.
+ *
+ * The stem colours are not decoration: each one names a kind of audio, and the
+ * same colour means the same thing everywhere it appears — a waveform, a lane,
+ * a tag, a badge. Orange is the voice as it was generated, green is that voice
+ * re-sung by one of your models. Seeing a track turn from orange to green is
+ * how you know the conversion landed.
+ */
+
+.rx {
+  color-scheme: dark;
+  --bg: #060609;
+  --card: #101015;
+  --card-2: #17171e;
+  --card-3: #1e1e26;
+  --hair: rgba(255, 255, 255, 0.07);
+  --hair-2: rgba(255, 255, 255, 0.13);
+  --text: #f7f8fa;
+  --dim: #9da3ae;
+  --faint: #6a7080;
+
+  --inst: #0a84ff;
+  --vox: #ff9f0a;
+  --conv: #30d158;
+  --score: #bf5af2;
+  --hot: #ff375f;
+  --spk: #64d2ff;
+  --accent: var(--vox);
+
+  --g-fill: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.055));
+  --g-edge: 1px solid rgba(255, 255, 255, 0.17);
+  --g-bevel: inset 0 1px 0 rgba(255, 255, 255, 0.34), inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  --g-lift: 0 18px 50px rgba(0, 0, 0, 0.5);
+  --g-blur: blur(30px) saturate(1.9);
+  --menu-bg: rgba(22, 22, 28, 0.88);
+  --menu-edge: rgba(255, 255, 255, 0.12);
+
+  --sans: ui-sans-serif, -apple-system, "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --ease: cubic-bezier(0.32, 1.28, 0.4, 1);
+
+  --rail: 236px;
+  --pad: 34px;
+  --player: 78px;
+  --topbar: 72px;
+
+  /* Phone only: the bottom bar, and the shorter player that sits on top of it.
+     Kept as tokens because three separate rules have to add them up to know
+     where the content has to stop. */
+  --tabbar: 58px;
+  --player-m: 62px;
+
+  /* The reading width of a view, and what a side panel costs beside it. Kept
+     as tokens because the split layout has to add them up: a panel should come
+     out of the empty margins first and only narrow the content once those are
+     spent. */
+  --content: 1180px;
+  --panel: 340px;
+  --create: 380px;
+  --split-gap: 18px;
+}
+
+/* The second selector covers the menu portal, which renders into document.body
+   and so cannot inherit data-theme from the shell. NextApp stamps the same
+   attribute on documentElement for exactly this. */
+.rx[data-theme="light"],
+:root[data-theme="light"] .rx {
+  color-scheme: light;
+  --bg: #f2f2f7;
+  --card: #fff;
+  --card-2: #f7f7fa;
+  --card-3: #edeff2;
+  --hair: rgba(0, 0, 0, 0.08);
+  --hair-2: rgba(0, 0, 0, 0.15);
+  --text: #0a0a0c;
+  --dim: #6b7280;
+  --faint: #9ca3af;
+
+  --inst: #007aff;
+  --vox: #e08000;
+  --conv: #23a94a;
+  --score: #a63fd9;
+  --hot: #ff2d55;
+  --spk: #0091c2;
+
+  --g-fill: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.74));
+  --g-edge: 1px solid rgba(255, 255, 255, 0.95);
+  --g-bevel: inset 0 1px 0 #fff, inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+  --g-lift: 0 16px 44px rgba(20, 25, 45, 0.14);
+  --menu-bg: rgba(255, 255, 255, 0.92);
+  --menu-edge: rgba(0, 0, 0, 0.08);
+}
+
+/* ---------------------------------------------------------------- reset */
+
+/* The browser default UA stylesheet puts 8px of margin on body. This used to
+   be zeroed by MUI's CssBaseline in the legacy app's ThemeProvider; now that
+   the legacy app is gone, .rx is the only thing rendered and nothing else
+   resets it, so the whole app sat with a visible margin around every edge. */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  /* Third thing MUI's CssBaseline used to set globally, gone with App.js:
+     a handful of Studio menus (the floating selection bar, the clip and
+     track context menus) portal straight to document.body rather than
+     rendering under .rx or .studio-page, so they never inherit either
+     scope's own font-family rule and were quietly falling back to the
+     browser's serif default. Same stack .rx and .studio-page both already
+     use, just reachable from outside either of them too now. */
+  font-family: ui-sans-serif, -apple-system, "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Same reasoning as the margin reset above: the legacy app hid scrollbars
+   everywhere via a global MUI GlobalStyles rule, not anything scoped to .rx.
+   Losing App.js brought the browser's default scrollbars back on every
+   scrollable element in the app. Content still scrolls; only the bar itself
+   is hidden. */
+*::-webkit-scrollbar {
+  display: none !important;
+}
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.rx *,
+.rx *::before,
+.rx *::after {
+  box-sizing: border-box;
+}
+.rx [hidden] {
+  display: none !important;
+}
+
+.rx {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.45;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* The portal wrapper carries the tokens but must not paint a page behind the
+   menu — .rx sets a full-viewport background, which would cover the app. */
+.rx.rx-detached {
+  min-height: 0;
+  background: none;
+}
+
+/* No border-radius here. Setting one on :focus-visible reshapes the element
+   itself while it has focus — a pill search field became a rounded rectangle
+   the moment you clicked into it. Outlines already follow the element's own
+   radius, so there is nothing to declare. */
+.rx :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rx *,
+  .rx *::before,
+  .rx *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------ primitives */
+
+.rx .glass {
+  background: var(--g-fill);
+  backdrop-filter: var(--g-blur);
+  -webkit-backdrop-filter: var(--g-blur);
+  border: var(--g-edge);
+  box-shadow: var(--g-bevel), var(--g-lift);
+}
+
+/* Pills, not rounded rectangles. The whole interface is built on capsules —
+   buttons, tags, filters, toggles — and a 13px radius among them reads as a
+   different product. */
+.rx .btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 99px;
+  font-size: 14.5px;
+  font-weight: 580;
+  background: var(--card-3);
+  border: 1px solid var(--hair);
+  transition: transform 0.16s var(--ease), background 0.16s, opacity 0.16s;
+}
+.rx .btn:hover {
+  background: var(--card-2);
+  transform: translateY(-1px);
+}
+.rx .btn:active {
+  transform: translateY(0) scale(0.985);
+}
+.rx .btn[disabled],
+.rx .btn[aria-disabled="true"] {
+  opacity: 0.42;
+  pointer-events: none;
+}
+.rx .btn.sm {
+  padding: 7px 14px;
+  font-size: 13.5px;
+}
+.rx .btn.ghost {
+  background: transparent;
+}
+.rx .btn.ghost:hover {
+  background: var(--card-3);
+}
+.rx .btn.danger {
+  color: var(--hot);
+}
+.rx .btn.fill {
+  background: var(--accent);
+  color: #12100a;
+  border-color: transparent;
+  font-weight: 650;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.rx .btn.fill:hover {
+  background: color-mix(in srgb, var(--accent) 88%, #fff);
+}
+.rx .btn .ch {
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+.rx .iconbtn {
+  all: unset;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--dim);
+  font-size: 15px;
+  transition: color 0.16s, background 0.16s;
+}
+.rx .iconbtn:hover {
+  color: var(--text);
+  background: var(--card-2);
+}
+
+.rx .pill {
+  all: unset;
+  cursor: pointer;
+  padding: 7px 14px;
+  border-radius: 99px;
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--dim);
+  background: var(--card-2);
+  border: 1px solid var(--hair);
+  transition: color 0.15s, background 0.15s;
+}
+.rx .pill:hover {
+  color: var(--text);
+}
+.rx .pill[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--card-3);
+  border-color: var(--hair-2);
+}
+
+.rx .pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.rx .card {
+  background: var(--card);
+  border: 1px solid var(--hair);
+  border-radius: 21px;
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+.rx .card h3 {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 640;
+  letter-spacing: -0.02em;
+}
+
+.rx .hint {
+  font-size: 13px;
+  color: var(--dim);
+  line-height: 1.5;
+}
+
+.rx .f {
+  display: grid;
+  gap: 7px;
+}
+/* :not(.btn) because a file input's trigger is a <label> too — without this it
+   inherits the field-label treatment and a button comes out uppercase, faint
+   and 12.5px. */
+.rx .f label:not(.btn) {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--faint);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.rx .in {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: var(--card-2);
+  border: 1px solid var(--hair);
+  font-size: 14.5px;
+  color: var(--text);
+  font-family: inherit;
+}
+.rx select.in {
+  cursor: pointer;
+}
+.rx textarea.in {
+  resize: vertical;
+  line-height: 1.5;
+}
+.rx .in:focus-visible {
+  border-color: var(--accent);
+  background: var(--card);
+  outline: none;
+}
+.rx .in::placeholder {
+  color: var(--faint);
+}
+
+.rx .two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 620px) {
+  .rx .two {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rx .kv {
+  display: grid;
+  gap: 9px;
+}
+.rx .kv .r {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+}
+.rx .kv .r span {
+  color: var(--dim);
+}
+.rx .kv .r b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.rx .tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--c, var(--dim));
+  background: color-mix(in srgb, var(--c, var(--dim)) 18%, transparent);
+}
+
+.rx .sect {
+  font-size: 11.5px;
+  font-weight: 660;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.rx .spinner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid var(--hair-2);
+  border-top-color: var(--accent);
+  animation: rx-spin 0.7s linear infinite;
+  flex: none;
+}
+@keyframes rx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ------------------------------------------------------------------ menus */
+
+/* Fixed, not absolute: a menu opened from a row inside a scrolling list would
+   otherwise be clipped by the list's own overflow. Position is measured from
+   the trigger and written as inline coordinates. */
+.rx-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 214px;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--menu-bg);
+  border: 1px solid var(--menu-edge);
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  animation: rx-pop 0.16s var(--ease);
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+}
+@keyframes rx-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+}
+
+.rx-menu .mi {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border-radius: 11px;
+  font-size: 14px;
+  color: var(--text);
+  position: relative;
+}
+.rx-menu .mi:hover,
+.rx-menu .mi:focus-visible {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.rx-menu .mi .msp {
+  flex: 1;
+}
+.rx-menu .mi .sc {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.rx-menu .mi.danger {
+  color: var(--hot);
+}
+.rx-menu .mi.danger:hover {
+  background: color-mix(in srgb, var(--hot) 22%, transparent);
+}
+.rx-menu .mi[aria-checked="true"]::after {
+  content: "✓";
+  font-size: 12px;
+  color: var(--accent);
+}
+.rx-menu .mi[aria-disabled="true"] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.rx-menu .msep {
+  height: 1px;
+  margin: 5px 8px;
+  background: var(--hair);
+}
+.rx-menu .mlabel {
+  font-size: 11px;
+  font-weight: 660;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: 8px 12px 5px;
+}

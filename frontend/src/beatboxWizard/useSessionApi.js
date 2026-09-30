@@ -1,6 +1,5 @@
 import { useCallback } from "react";
-
-const API_BASE = process.env.REACT_APP_API_BASE || "";
+import { API_BASE } from "../utils/apiBase";
 
 async function toJson(res) {
   const data = await res.json().catch(() => ({}));

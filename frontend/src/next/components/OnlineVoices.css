@@ -1,0 +1,106 @@
+.rx .rx-online {
+  display: grid;
+  gap: 15px;
+}
+
+.rx .rx-online-search {
+  max-width: none;
+}
+.rx .rx-online-search .rx-online-spin {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.rx .rx-online-count {
+  margin-top: -4px;
+}
+
+.rx .rx-online-list {
+  display: grid;
+  gap: 10px;
+}
+
+.rx .rx-onlinecard {
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 16px;
+  border-radius: 18px;
+}
+.rx .rx-odot {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  flex: none;
+}
+.rx .rx-oinfo {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+/* Directory titles run long and are one unbroken token as often as not. */
+.rx .rx-oinfo b {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rx .rx-ometa {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--dim);
+}
+
+.rx .rx-downloads {
+  display: grid;
+  gap: 9px;
+}
+.rx .rx-download {
+  gap: 9px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.rx .rx-download[data-state="completed"] {
+  border-color: color-mix(in srgb, var(--conv) 40%, transparent);
+}
+.rx .rx-download[data-state="failed"] {
+  border-color: color-mix(in srgb, var(--hot) 40%, transparent);
+}
+.rx .rx-download-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+}
+.rx .rx-download-row > b {
+  font-size: 14.5px;
+  font-weight: 620;
+  overflow-wrap: anywhere;
+}
+.rx .rx-download .rx-progress {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.rx .rx-download .bar {
+  height: 5px;
+  border-radius: 99px;
+  background: var(--card-3);
+  overflow: hidden;
+}
+.rx .rx-download .bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+  transition: width 0.4s var(--ease);
+}

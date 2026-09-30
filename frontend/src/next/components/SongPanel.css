@@ -1,0 +1,418 @@
+/* Docked to the right of the list, scrolling on its own so the library keeps
+   its own scroll position while you read. Sticky rather than fixed: it belongs
+   to the view's grid, not to the window. */
+/* Full height of the main area, not just as tall as its contents. Sticky so it
+   stays put while the list scrolls past it, and a fixed height rather than a
+   max so a short song still gets a panel the same size as a long one. */
+.rx .rx-panel {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--hair);
+  border-radius: 22px;
+  overflow: hidden;
+  animation: rx-panel-in 0.3s var(--ease) both;
+}
+@keyframes rx-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px) scale(0.985);
+  }
+}
+
+/* Closing is animated too, which means the parent keeps it mounted for the
+   length of this and then drops it — otherwise the panel vanishes on the frame
+   you click the cross while the list is still widening behind it. */
+.rx .rx-panel[data-closing] {
+  animation: rx-panel-out 0.22s ease both;
+  pointer-events: none;
+}
+@keyframes rx-panel-out {
+  to {
+    opacity: 0;
+    transform: translateX(20px) scale(0.985);
+  }
+}
+
+.rx .rx-panel-head {
+  position: relative;
+  padding: 18px 18px 4px;
+  flex: none;
+  isolation: isolate;
+}
+
+/* A wash of the track's own colours behind the artwork, so the cover sits in
+   the panel rather than on it. Blurred and clipped to the head, which is what
+   keeps it a glow and not a second picture. */
+.rx .rx-panel-head::before {
+  content: "";
+  position: absolute;
+  inset: 4px 4px -18px;
+  z-index: -1;
+  background: var(--art, var(--accent));
+  filter: blur(34px) saturate(1.5);
+  opacity: 0.5;
+  border-radius: 24px;
+}
+.rx[data-theme="light"] .rx-panel-head::before {
+  opacity: 0.38;
+}
+
+.rx .rx-panel-art {
+  all: unset;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.rx .rx-panel-art-hint {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 7px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.16s;
+}
+.rx .rx-panel-art:hover .rx-panel-art-hint,
+.rx .rx-panel-art:focus-visible .rx-panel-art-hint,
+.rx .rx-panel-art[data-redrawing] .rx-panel-art-hint {
+  opacity: 1;
+}
+
+/* Same idea as the library row's tile: redrawing is fire-and-forget on the
+   backend, so this is the only sign anything is happening until the new
+   picture lands. */
+.rx .rx-panel-art-redraw {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    115deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.32) 48%,
+    transparent 76%
+  );
+  background-size: 250% 100%;
+  animation: rx-panel-art-shimmer 1.3s ease-in-out infinite;
+}
+@keyframes rx-panel-art-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -120% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rx .rx-panel-art-redraw {
+    animation: none;
+    background: rgba(255, 255, 255, 0.18);
+  }
+}
+/* A conversion's cover belongs to the track it re-sang, so there is nothing
+   here to redraw — no invitation, no cursor promising one. */
+.rx .rx-panel-art:disabled {
+  cursor: default;
+}
+.rx .rx-panel-art:disabled .rx-panel-art-hint {
+  display: none;
+}
+.rx .rx-panel-close {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.rx .rx-panel-close:hover {
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+}
+
+.rx .rx-panel-body {
+  overflow-y: auto;
+  padding: 15px 16px 20px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.rx .rx-panel-title h2 {
+  margin: 0 0 2px;
+  font-size: 20px;
+  font-weight: 660;
+  letter-spacing: -0.028em;
+  overflow-wrap: anywhere;
+}
+.rx .rx-panel-tags {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.rx .rx-panel-card {
+  background: var(--card-2);
+  border: 1px solid var(--hair);
+  border-radius: 15px;
+  padding: 13px 15px;
+  display: grid;
+  gap: 8px;
+}
+.rx .rx-panel-card p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.rx .rx-panel-label {
+  font-size: 11.5px;
+  font-weight: 660;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.rx .rx-panel-more {
+  all: unset;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 580;
+  color: var(--dim);
+  text-align: center;
+}
+.rx .rx-panel-more:hover {
+  color: var(--text);
+}
+
+/* ------------------------------------------------------------- lyrics */
+
+.rx .rx-lyrics {
+  display: grid;
+  gap: 14px;
+}
+.rx .rx-lyrics-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.rx .rx-lyric-section {
+  display: grid;
+  gap: 2px;
+}
+/* The section name is a label on the words, not a heading competing with the
+   song title — hence smaller and quieter than the lines it introduces. */
+.rx .rx-lyric-section h3 {
+  margin: 0 0 5px;
+  font-size: 11px;
+  font-weight: 680;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.rx .rx-lyric-section p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.rx .rx-panel-edit {
+  min-height: 260px;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.rx .rx-panel-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.rx .rx-panel-error {
+  color: var(--hot);
+}
+.rx .rx-panel-card a {
+  color: var(--accent);
+}
+
+/* ---------------------------------------------------------- the split */
+
+/* The library becomes two columns when something is selected. 340px is what
+   fits a lyric line without hyphenating it. */
+.rx .rx-split {
+  display: grid;
+  min-height: 0;
+  height: 100%;
+  grid-template-columns: minmax(0, 1fr) var(--panel);
+  gap: var(--split-gap);
+  align-items: stretch;
+}
+
+@media (max-width: 1080px) {
+  .rx .rx-split {
+    grid-template-columns: 1fr;
+  }
+  /* Below the split point the panel is a sheet, because a 340px column beside
+     nothing is just a narrow page. */
+  .rx .rx-panel {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 120;
+    max-height: 80vh;
+    border-radius: 22px 22px 0 0;
+    box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* backdrop-filter on a child creates its own stacking context, and Chrome then
+   stops clipping it to the parent's rounded corners — the Redraw strip came
+   out square against a rounded cover. Rounded explicitly; 15px, one less than
+   the artwork, so it sits inside the border rather than on it. */
+.rx .rx-panel-art-hint {
+  border-radius: 0 0 15px 15px;
+}
+
+/* ------------------------------------------------- the writing column */
+
+/* Three columns at most: what you are writing, what you have made, what you
+   have selected. The grid is declared per combination rather than with `auto`
+   tracks so each column keeps a width chosen for its contents — a lyrics box
+   and a lyric line do not want the same measure. */
+.rx .rx-view[data-create] .rx-split {
+  grid-template-columns: var(--create) minmax(0, 1fr);
+}
+.rx .rx-view[data-create][data-split] .rx-split {
+  grid-template-columns: var(--create) minmax(0, 1fr) var(--panel);
+}
+
+.rx .rx-createcol {
+  height: 100%;
+  min-height: 0;
+  /* The column itself does not scroll — its middle does, between a fixed head
+     and a fixed foot. */
+  animation: rx-createcol-in 0.3s var(--ease) both;
+}
+@keyframes rx-createcol-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+
+
+
+
+@media (max-width: 1400px) {
+  /* Not enough room for three: the detail panel wins, since it is what you
+     just asked to look at. */
+  .rx .rx-view[data-create][data-split] .rx-split {
+    grid-template-columns: minmax(0, 1fr) var(--panel);
+  }
+  .rx .rx-view[data-create][data-split] .rx-createcol {
+    display: none;
+  }
+}
+@media (max-width: 1080px) {
+  .rx .rx-view[data-create] .rx-split {
+    grid-template-columns: 1fr;
+  }
+  .rx .rx-createcol {
+    position: static;
+    height: auto;
+  }
+}
+
+/* The settings a conversion ran with: label left, value right, one row each. */
+.rx .rx-panel-params {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 14px;
+  margin: 0;
+  font-size: 13px;
+}
+.rx .rx-panel-params dt {
+  color: var(--dim);
+}
+.rx .rx-panel-params dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* ------------------------------------------------------------------ phone
+ *
+ * A square cover is a reasonable head for a 340px column. At 390px it is a
+ * 354px square, which is half a phone screen spent on a picture before the
+ * title has been read — so the art shrinks and the words come up to meet it.
+ */
+@media (max-width: 768px) {
+  .rx .rx-panel-head {
+    display: flex;
+    align-items: flex-end;
+    padding: 16px 16px 6px;
+  }
+  .rx .rx-panel-art {
+    width: 132px;
+    flex: none;
+    /* 16px is gentle on a 300px cover and heavy-handed on a 132px one. */
+    border-radius: 9px;
+  }
+  /* The head becomes two rows: cover beside title-and-tags, then the style
+     prompt full width below both. Everything here is still fixed — only the
+     lyrics scroll — so this is "what the track is", read in one glance
+     before you get to the words. */
+  .rx .rx-panel-head {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+    padding-right: 16px;
+  }
+  .rx .rx-panel-toprow {
+    display: flex;
+    align-items: flex-end;
+    gap: 13px;
+    padding-right: 30px;
+  }
+  .rx .rx-panel-idn {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding-bottom: 2px;
+  }
+  .rx .rx-panel-idn .rx-panel-title h2 {
+    font-size: 19px;
+  }
+  .rx .rx-panel-idn .rx-panel-tags {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  /* Beside the cover-and-title row rather than in the scroll, it earns a
+     tighter card than the one that sits loose in a page of scrolled content. */
+  .rx .rx-panel-head .rx-panel-card {
+    margin: 0;
+  }
+  .rx .rx-panel-close {
+    top: 16px;
+    right: 16px;
+  }
+  .rx .rx-panel-body {
+    padding-bottom: 28px;
+  }
+}

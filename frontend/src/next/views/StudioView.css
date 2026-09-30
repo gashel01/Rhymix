@@ -1,0 +1,805 @@
+/*
+ * Studio embedded in the /next shell.
+ *
+ * studio/StudioPage.css defines every `--studio-*` custom property and the
+ * component-level styling (Transport, TrackList, Timeline, Inspector...) on
+ * the `.studio-page` selector, and that selector also makes the page a fixed
+ * full-viewport layer — correct for the old standalone /studio route, wrong
+ * here, where the rail/topbar/player around it need to stay visible. The
+ * root element below carries both classes so the custom properties and
+ * component styling still apply; only the positioning is overridden, at
+ * higher specificity (.studio-page.rx-studio beats .studio-page alone), so
+ * nothing in StudioPage.css itself has to change for the two routes to
+ * disagree about how much of the screen they own.
+ */
+
+/* Studio now stays mounted (inside an .rx-studio-persist wrapper) even while
+   some other view is on screen, so it can keep playing in the background —
+   see NextApp.js's `studioMounted`. A `:has(.rx-studio)` selector would keep
+   matching forever after the first visit, since the DOM node never goes
+   away, only its `display`; NextApp.js marks `.rx-main` with `data-studio`
+   itself instead, so this only applies while Studio is actually the one
+   visible. */
+.rx-main[data-studio] {
+  /* A small top/bottom gap, not none — full-bleed to zero on every side read
+     as content touching the topbar's own border, with no breathing room at
+     all. Left/right get a little more, matching .rx-main's own base
+     horizontal padding elsewhere in /next. */
+  padding: 10px;
+  padding-left: 16px;
+  padding-right: 16px;
+  overflow: hidden;
+}
+
+/* The wrapper itself needs to actually fill .rx-main, or `.rx-studio.studio-
+   page`'s `height: 100%` below has nothing to resolve against (a percentage
+   height against an auto-height ancestor computes as auto, collapsing Studio
+   to its content height instead of filling the view). */
+.rx-studio-persist {
+  height: 100%;
+  min-height: 0;
+}
+
+.rx-studio.studio-page {
+  position: relative;
+  inset: auto;
+  height: 100%;
+  min-height: 0;
+  /* Let /next's own radial wash (.rx-shell::before) show through instead of
+     a flat near-black page — the rest of the app is panels floating over
+     that wash, not a solid background of its own. */
+  --studio-bg: transparent;
+}
+
+.rx-studio .studio-shell {
+  padding-bottom: 0;
+}
+
+.rx-studio .studio-empty-page {
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+/* Sticky list/panel headers had their own opaque backdrop so text scrolling
+   under them wouldn't show through — needed when the page behind them was a
+   flat colour, redundant now that the page itself is transparent. */
+.rx-studio .studio-library-header,
+.rx-studio .studio-inspector-sticky {
+  background: transparent;
+}
+
+/* Removing the column separators (below) also collapsed the gap between
+   them to 0 — three panels touching edge to edge read as one cramped block
+   rather than three related-but-distinct areas. A visible gap does the job
+   the borders used to, without a hard line. */
+.rx-studio .studio-workspace {
+  padding-top: 0;
+  gap: 18px;
+}
+
+.rx-studio .studio-center-column {
+  border-left: none;
+  border-right: none;
+}
+
+.rx-studio .studio-left-column {
+  background: transparent;
+  /* 320px carried the badge + name + duration + chevron with room to spare —
+     narrower gives the timeline more of the width back. */
+  width: 280px;
+}
+
+/*
+ * Visual language, matched to the /next design reference.
+ *
+ * StudioPage.css already carries the right palette (--studio-accent is the
+ * same orange as --accent, same dark background) — what it never adopted is
+ * the rest of the system's shape language: capsule controls, glass floating
+ * bars, 20+px card radii, gradient clip pills. Everything below re-skins the
+ * existing `.studio-*` classes with the real /next tokens (--card, --g-fill,
+ * --accent, --mono, --ease...) now reachable because `.rx-studio` sits inside
+ * the `.rx` scope. Layout and behaviour are untouched; only paint changes,
+ * scoped under `.rx-studio` so the standalone legacy route is unaffected.
+ */
+
+/* ----------------------------------------------------------- master fader */
+
+/* Same portal idea as the transport slot below, into a slot NextApp renders
+   in the rail's own foot (above the VRAM readout) only while Studio is the
+   active view. It sits outside .studio-page too, but unlike the transport
+   it isn't trying to look like a Studio surface — it's meant to read as
+   part of the rail, so it uses the /next rail's own tokens (the same ones
+   .rx-sys next to it uses), not --studio-*. */
+#rx-studio-master-slot .studio-master-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 27px 10px;
+  border-bottom: 1px solid var(--hair);
+}
+
+#rx-studio-master-slot .studio-master-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--faint);
+}
+
+#rx-studio-master-slot .studio-master-label {
+  font-size: 10.5px;
+  font-weight: 660;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+#rx-studio-master-slot input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  border-radius: 99px;
+  background: var(--card-3);
+  accent-color: var(--accent);
+}
+
+/* Volume and pan on one row — a fader and a balance knob sit side by side
+   on every real mixer strip; stacked, the pan control read as a second,
+   unrelated widget instead of the other half of the same "Main" control. */
+#rx-studio-master-slot .studio-master-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* Same specificity as the generic input[type="range"] rule above (an
+   attribute selector weighs the same as a class) plus this class, so this
+   loses the tie on source order alone without the extra "input" element
+   selector matching it here too. */
+#rx-studio-master-slot input.studio-master-volume {
+  flex: none;
+  width: 90px;
+}
+
+/* The dial and its L/R readout are one control, not two — grouped so
+   nothing can land between them when the row's own space is distributed. */
+#rx-studio-master-slot .studio-master-pan-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+#rx-studio-master-slot .studio-radar-pan {
+  flex: none;
+  cursor: pointer;
+  touch-action: none;
+  overflow: visible;
+}
+
+#rx-studio-master-slot .studio-radar-pan-arc {
+  stroke: var(--hair-2, var(--hair));
+  stroke-width: 1.6;
+}
+
+#rx-studio-master-slot .studio-radar-pan-sweep {
+  stroke: var(--accent);
+  stroke-width: 1.3;
+  opacity: 0.75;
+}
+
+#rx-studio-master-slot .studio-radar-pan-pivot {
+  fill: var(--faint);
+}
+
+#rx-studio-master-slot .studio-radar-pan-dot {
+  fill: var(--accent);
+}
+
+/* Fixed width and right-aligned, and pinned to the group's own right edge
+   with margin-left: auto — independent of the dial, so "C" and "R100" both
+   end at the same x the volume icon in the row above sits at, instead of
+   drifting with the dial's own width or how many characters the reading is. */
+#rx-studio-master-slot .studio-master-pan-value {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  width: 26px;
+  text-align: right;
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------------- transport bar */
+
+/* Studio's transport portals into #rx-studio-player-slot (see StudioView.js
+   and NextApp.js) — a sibling of .rx-main, not a descendant of .rx-studio —
+   so it lands in the same slot the app-wide player bar normally fills
+   instead of floating a second bar above it. It's now a plain child of
+   .rx-player, not a fixed-position element in its own right; the slot's
+   own .rx-player class already supplies the height, padding, border-top and
+   background every other view's player bar has, so this only needs to
+   cancel the standalone page's fixed/floating chrome and fill that box.
+   Being outside .studio-page, it also loses that selector's --studio-*
+   custom properties by normal CSS inheritance (portals move DOM position,
+   not React context, but custom properties inherit through the DOM) — so
+   the same values are redeclared here. */
+#rx-studio-player-slot {
+  --studio-bg: #060609;
+  --studio-ink: 255, 255, 255;
+  --studio-panel: rgba(var(--studio-ink), 0.04);
+  --studio-panel-strong: rgba(var(--studio-ink), 0.06);
+  --studio-panel-border: rgba(var(--studio-ink), 0.1);
+  --studio-accent: #ff9f0a;
+  --studio-accent-wash: rgba(255, 159, 10, 0.18);
+  --studio-accent-strong: #ff9f0a;
+  --studio-danger: #ff375f;
+  --studio-text: rgba(var(--studio-ink), 0.92);
+  --studio-subtext: rgba(var(--studio-ink), 0.62);
+  --studio-muted: rgba(var(--studio-ink), 0.12);
+  --studio-radius-lg: 22px;
+  --studio-radius-md: 16px;
+  --studio-shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.45);
+  color: var(--studio-text);
+  font-family: var(--sans);
+  font-feature-settings: "tnum" 1;
+}
+
+:root[data-theme="light"] #rx-studio-player-slot {
+  --studio-ink: 10, 10, 15;
+  --studio-accent: #e08000;
+  --studio-accent-strong: #e08000;
+  --studio-danger: #d9314f;
+  --studio-shadow-soft: 0 10px 24px rgba(20, 25, 45, 0.14);
+}
+
+#rx-studio-player-slot .studio-bottom-bar {
+  position: static;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0;
+}
+
+#rx-studio-player-slot .studio-transport-play {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #17120a;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: transform 0.2s var(--ease);
+}
+#rx-studio-player-slot .studio-transport-play:hover {
+  transform: scale(1.07);
+}
+#rx-studio-player-slot .studio-transport-play svg {
+  fill: currentColor;
+}
+
+.rx-studio .studio-icon-btn,
+#rx-studio-player-slot .studio-icon-btn {
+  border-radius: 50%;
+  color: var(--dim);
+  transition: color 0.16s, background 0.16s;
+}
+.rx-studio .studio-icon-btn:hover,
+#rx-studio-player-slot .studio-icon-btn:hover {
+  color: var(--text);
+  background: rgba(var(--studio-ink), 0.1);
+}
+
+#rx-studio-player-slot .studio-time {
+  font-family: var(--mono);
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+#rx-studio-player-slot .studio-transport-pill,
+.rx-studio .studio-context-chip {
+  border: none;
+  background: var(--card-3);
+  color: var(--dim);
+  font-weight: 600;
+}
+#rx-studio-player-slot .studio-transport-pill span {
+  color: var(--faint);
+  font-weight: 700;
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+#rx-studio-player-slot .studio-transport-pill.active,
+.rx-studio .studio-context-chip.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+/* BPM, time signature and transpose, editable in place instead of behind
+   a drawer — same pill, a bare input standing in for the plain text that
+   used to follow the label. */
+#rx-studio-player-slot .studio-transport-field {
+  cursor: text;
+}
+#rx-studio-player-slot .studio-transport-field input {
+  all: unset;
+  /* ch tracks the actual character width instead of a guessed px value —
+     32px clipped "120" (3 tabular digits need more room than that at this
+     font size), and 32px vs. the text field's own 28px made the three
+     pills read as three different widths for no reason. All three values
+     (BPM's 3 digits, "4/4", "-12") fit 3 characters; one formula, one
+     width. */
+  width: 3ch;
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* `all: unset` resets standard properties, not the native spinner — Chrome
+   still drew it, and at 3ch wide it was the spinner eating the box, not the
+   digits: BPM showed a single "1" with up/down arrows next to it instead of
+   "120". Hidden outright; the pill is too narrow for the arrows to be a
+   usable target anyway. */
+#rx-studio-player-slot .studio-transport-field input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+#rx-studio-player-slot .studio-transport-field input[type="number"]::-webkit-outer-spin-button,
+#rx-studio-player-slot .studio-transport-field input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#rx-studio-player-slot .studio-transport-field:focus-within {
+  background: var(--card-2);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+#rx-studio-player-slot .studio-context-hint,
+#rx-studio-player-slot .studio-job-status {
+  font-size: 12.5px;
+  color: var(--dim);
+}
+
+/* ------------------------------------------------------------------ buttons */
+
+.rx-studio .studio-btn,
+#rx-studio-player-slot .studio-btn {
+  border: none;
+  border-radius: 99px;
+  background: var(--card-3);
+  color: var(--text);
+  transition: transform 0.16s var(--ease), background 0.16s;
+}
+.rx-studio .studio-btn:hover,
+#rx-studio-player-slot .studio-btn:hover {
+  background: var(--card-2);
+  transform: translateY(-1px);
+}
+.rx-studio .studio-btn:active,
+#rx-studio-player-slot .studio-btn:active {
+  transform: translateY(0) scale(0.985);
+}
+.rx-studio .studio-btn.ghost,
+#rx-studio-player-slot .studio-btn.ghost {
+  background: transparent;
+  border: 1px solid var(--hair);
+}
+.rx-studio .studio-btn.ghost:hover,
+#rx-studio-player-slot .studio-btn.ghost:hover {
+  background: var(--card-3);
+}
+.rx-studio .studio-btn.accent,
+#rx-studio-player-slot .studio-btn.accent {
+  background: var(--accent);
+  color: #12100a;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.rx-studio .studio-btn.accent:hover,
+#rx-studio-player-slot .studio-btn.accent:hover {
+  background: color-mix(in srgb, var(--accent) 88%, #fff);
+}
+.rx-studio .studio-btn.danger,
+#rx-studio-player-slot .studio-btn.danger {
+  color: var(--hot);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--hot) 40%, transparent);
+}
+
+.rx-studio .studio-mini {
+  border: 1px solid var(--hair);
+  background: transparent;
+  color: var(--dim);
+  border-radius: 7px;
+  font-weight: 650;
+  transition: all 0.16s;
+}
+.rx-studio .studio-mini.active {
+  color: var(--text);
+  border-color: var(--hair-2);
+  background: var(--card-3);
+}
+
+#rx-studio-player-slot .studio-export-menu {
+  border-radius: 18px;
+  background: var(--menu-bg);
+  border: 1px solid var(--menu-edge);
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+}
+#rx-studio-player-slot .studio-export-item {
+  border-radius: 11px;
+}
+#rx-studio-player-slot .studio-export-item:hover {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+/* ---------------------------------------------------------------- toolbar */
+
+.rx-studio .studio-toggle-btn,
+.rx-studio .studio-context-strip .studio-toggle-btn {
+  border-radius: 99px;
+  color: var(--dim);
+}
+.rx-studio .studio-toggle-btn.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+.rx-studio .studio-toggle-btn:hover:not(.active) {
+  background: var(--card-3);
+  color: var(--text);
+}
+
+/* ------------------------------------------------------------ library panel */
+
+.rx-studio .studio-library-header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.rx-studio .studio-library-switch-link {
+  all: unset;
+  cursor: pointer;
+  flex: none;
+  font-size: 12px;
+  font-weight: 560;
+  color: var(--faint);
+  transition: color 0.15s;
+}
+.rx-studio .studio-library-switch-link:hover {
+  color: var(--accent);
+}
+.rx-studio .studio-library-switch-link:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* -------------------------------------------------------------- track list */
+
+.rx-studio .studio-track-headers {
+  padding: 0;
+}
+
+/* A card per row doubled up with .studio-timeline-body's own card below —
+   two nested boxes for what reads as one bordered timeline area. Flat here;
+   the border and background live on the timeline body itself. */
+.rx-studio .studio-track-row {
+  height: var(--studio-lane-height, 68px);
+  min-height: var(--studio-lane-height, 68px);
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.rx-studio .studio-tracklist-header {
+  padding: 4px 2px 10px 10px;
+}
+.rx-studio .studio-tracklist-header .studio-panel-title {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+/* The "+" used to be a solid accent-filled square borrowed from .studio-btn's
+   default look, which reads as a primary action sitting next to a sidebar
+   title — it's a secondary, always-available affordance, so it gets the
+   quieter ghost/circular icon-button language the rest of /next uses. */
+.rx-studio .studio-tracklist-header .studio-btn {
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--hair);
+  /* Beats the inline borderRadius:"6px" the button still carries from its
+     old square look — inline style otherwise wins over any class rule
+     regardless of selector specificity. */
+  border-radius: 999px !important;
+  width: 22px !important;
+  height: 22px !important;
+  box-shadow: none;
+  transition: all 0.16s;
+}
+.rx-studio .studio-tracklist-header .studio-btn:hover {
+  background: var(--card-3);
+  color: var(--text);
+  border-color: var(--hair-2);
+}
+.rx-studio .studio-tracklist-header .studio-mini.danger {
+  border-color: transparent;
+  color: var(--faint);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+}
+.rx-studio .studio-tracklist-header .studio-mini.danger:hover:not(:disabled) {
+  color: var(--hot);
+  background: color-mix(in srgb, var(--hot) 12%, transparent);
+}
+.rx-studio .studio-tracklist-header .studio-mini.danger:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.rx-studio .studio-track-row {
+  padding: 0 10px;
+  border-radius: 12px;
+  transition: background 0.14s;
+}
+.rx-studio .studio-track-row:hover {
+  background: var(--card-2);
+}
+.rx-studio .studio-track-header {
+  gap: 10px;
+}
+.rx-studio .studio-track-grip {
+  color: var(--faint);
+}
+/* A glow the same colour as the swatch itself, on every row at once, read as
+   noise rather than as identity — a plain ring that only shows the lane's
+   colour in the fill keeps the row calm and still makes the colour legible. */
+.rx-studio .studio-lane-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 2px var(--card-2), 0 0 0 3px var(--hair);
+}
+.rx-studio .studio-track-title {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.rx-studio .studio-track-name-btn {
+  color: var(--text);
+}
+.rx-studio .studio-track-menu-btn {
+  border-color: var(--hair);
+  color: var(--dim);
+  border-radius: 999px;
+}
+.rx-studio .studio-track-menu-btn:hover {
+  background: var(--card-3);
+  color: var(--text);
+}
+
+/* Fader row: an accent-tinted track instead of the browser default, and
+   Mute/Solo colour-coded by what they mean instead of sharing one neutral
+   "engaged" look — mute silences (hot/red), solo isolates (accent). */
+.rx-studio .studio-track-controls input[type="range"] {
+  accent-color: var(--accent);
+}
+.rx-studio .studio-db {
+  color: var(--faint);
+}
+.rx-studio .studio-track-controls .studio-mini {
+  border-radius: 6px;
+  font-size: 10px;
+}
+.rx-studio .studio-track-controls .studio-mini:first-of-type.active {
+  color: var(--hot);
+  border-color: color-mix(in srgb, var(--hot) 45%, transparent);
+  background: color-mix(in srgb, var(--hot) 16%, transparent);
+}
+.rx-studio .studio-track-controls .studio-mini:last-of-type.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+/* -------------------------------------------------------------------- lanes */
+
+.rx-studio .studio-timeline-ruler {
+  background: var(--card-2);
+  border-bottom: 1px solid var(--hair);
+}
+
+/* The inner scroll surface got a JS-computed pixel width sized to the
+   zoomed content, which could come out narrower than the panel itself at
+   low zoom or on a short/empty project — the ruler and lane rows then
+   stopped short of the right edge instead of filling it. Timeline.js now
+   passes that as minWidth (so a long, zoomed-in project still scrolls
+   correctly); this is the width:100% floor that makes it fill the
+   available space the rest of the time. */
+.rx-studio .studio-timeline-inner {
+  width: 100%;
+}
+
+.rx-studio .studio-clip {
+  border: none;
+  border-radius: 13px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--lane-clip-bg, var(--accent)) 100%, #fff 10%),
+    color-mix(in srgb, var(--lane-clip-bg, var(--accent)) 100%, #000 22%)
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 6px 18px rgba(0, 0, 0, 0.34);
+  transition: transform 0.16s var(--ease);
+}
+.rx-studio .studio-clip:hover {
+  transform: translateY(-1px);
+}
+.rx-studio .studio-clip.selected {
+  box-shadow: 0 0 0 3px var(--text), 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+/* .studio-clip-wave stretches (flex:1) to fill whatever room is left below
+   the clip's header, but its content — StudioWaveform's canvas, a fixed
+   WAVEFORM_HEIGHT tall — never grew to match. A plain block child sits at
+   the top of the box it's in, so on any clip where the header took less
+   than the 8px WAVEFORM_HEIGHT was budgeted for, the wave rode high with a
+   dead gap underneath instead of sitting centered in the space it has. */
+.rx-studio .studio-clip-wave {
+  display: flex;
+  align-items: center;
+}
+/* .studio-waveform is a bare block div with no width rule of its own — as a
+   normal block child that used to be enough to fill .studio-clip-wave's full
+   width by default. Turning that parent into a flex container for the
+   centering fix above also changed what "auto" width means for its children:
+   a flex item shrink-to-fits its content unless told otherwise, so this
+   would have quietly stopped tracking the clip's own width across a zoom
+   change (StudioWaveform.js measures its own canvas size from this very
+   parent) instead of stretching to it. Kept explicit so it still does. */
+.rx-studio .studio-waveform {
+  width: 100%;
+}
+
+/* ------------------------------------------------------------- right panel */
+
+.rx-studio .studio-panel {
+  border-radius: 22px;
+  background: var(--card);
+  border: 1px solid var(--hair);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* .studio-timeline-panel/.studio-timeline-canvas both also carry the generic
+   .studio-panel card treatment above (border, radius, background); with
+   .studio-timeline-body providing its own border and background around the
+   actual ruler+lanes, that outer card was a second, redundant box around the
+   first. Flattened to a plain layout wrapper — same specificity as
+   .studio-panel, placed after it here so it wins on source order. */
+.rx-studio .studio-timeline-panel {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+.rx-studio .studio-timeline-canvas {
+  padding: 0;
+  border-radius: 0;
+}
+.rx-studio .studio-timeline-body {
+  border-radius: 0;
+}
+
+.rx-studio .studio-panel-title {
+  font-size: 11.5px;
+  font-weight: 660;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* Sections used to be told apart only by a hairline and a heading — reading
+   "Relevant Controls", "AI Tools" and "Activity" as one continuous column of
+   text rather than three distinct groups. Each is now its own card, the same
+   relationship Create's .rx-section has to the panel around it: one step
+   lighter than .studio-panel's own background. Nesting continues the ladder
+   — .studio-embedded-card (a card inside a card, e.g. "Lane Controls & FX"
+   inside "Relevant Controls") goes one step lighter again so it doesn't
+   flatten into its parent. */
+.rx-studio .studio-meta-block {
+  border-radius: 16px;
+  background: var(--card-2);
+  border: 1px solid var(--hair);
+  padding: 14px 16px;
+}
+.rx-studio .studio-meta-block + .studio-meta-block {
+  margin-top: 0;
+  padding-top: 14px;
+  border-top: none;
+}
+.rx-studio .studio-panel-content {
+  gap: 14px;
+}
+
+.rx-studio .studio-meta-block.studio-embedded-card {
+  border-radius: 14px;
+  background: var(--card-3);
+  border: 1px solid var(--hair);
+}
+
+.rx-studio .studio-field input:not([type="checkbox"]):not([type="range"]),
+.rx-studio .studio-field select,
+.rx-studio .studio-field textarea {
+  border-radius: 12px;
+  background: var(--card-2);
+  border: 1px solid var(--hair);
+  color: var(--text);
+}
+.rx-studio .studio-field input:not([type="checkbox"]):not([type="range"]):focus-visible,
+.rx-studio .studio-field select:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+.rx-studio .studio-field input[type="range"] {
+  accent-color: var(--accent);
+}
+
+/* The FX "enable" checkbox reused the browser default box — a flat square
+   that read as a form field, not a switch, in a panel where every other
+   on/off control (mute, solo, snap, focus) is a capsule. */
+.rx-studio .studio-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.rx-studio .studio-toggle input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  width: 36px;
+  height: 21px;
+  border-radius: 99px;
+  background: var(--card-3);
+  position: relative;
+  cursor: pointer;
+  flex: none;
+  transition: background 0.2s;
+}
+.rx-studio .studio-toggle input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.22s var(--ease);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.rx-studio .studio-toggle input[type="checkbox"]:checked {
+  background: var(--conv);
+}
+.rx-studio .studio-toggle input[type="checkbox"]:checked::after {
+  left: 17px;
+}

@@ -1,0 +1,109 @@
+.rx .rx-vgrid {
+  display: grid;
+  gap: 15px;
+  grid-template-columns: repeat(auto-fill, minmax(202px, 1fr));
+}
+
+.rx .rx-voice {
+  border-radius: 23px;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--hair);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s;
+  position: relative;
+  cursor: pointer;
+}
+.rx .rx-voice:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.rx .rx-voice:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.42);
+}
+.rx[data-theme="light"] .rx-voice:hover {
+  box-shadow: 0 20px 46px rgba(20, 25, 45, 0.14);
+}
+
+.rx .rx-voice .v-top {
+  height: 104px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.rx .rx-voice .v-top::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(80% 60% at 32% 18%, rgba(255, 255, 255, 0.4), transparent 60%);
+}
+.rx .rx-voice .v-init {
+  position: relative;
+  z-index: 2;
+  font-size: 31px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.96);
+  letter-spacing: -0.03em;
+}
+
+/* Revealed on hover so thirty cards read as artwork rather than as thirty
+   identical buttons — but always reachable from the keyboard. */
+.rx .rx-voice .v-more {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.16s;
+}
+.rx .rx-voice:hover .v-more,
+.rx .rx-voice .v-more:focus-within {
+  opacity: 1;
+}
+.rx .rx-voice .v-more .iconbtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 14px;
+}
+.rx .rx-voice .v-more .iconbtn:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.rx .rx-voice .v-body {
+  padding: 13px 15px 15px;
+  display: grid;
+  gap: 9px;
+}
+/* Long model names are one unbroken token (EdSheeranV3, dualipaimported) and
+   would otherwise break mid-word; an ellipsis is more legible than a hyphen in
+   the middle of a name. */
+.rx .rx-voice .v-name {
+  font-size: 15.5px;
+  font-weight: 630;
+  letter-spacing: -0.018em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rx .rx-voice .v-stats {
+  display: flex;
+  gap: 14px;
+}
+.rx .rx-voice .v-stats div {
+  font-size: 12px;
+  color: var(--dim);
+}
+.rx .rx-voice .v-stats b {
+  display: block;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  color: var(--text);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}

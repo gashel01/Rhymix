@@ -1,0 +1,734 @@
+/*
+ * The frame every view sits in: rail, topbar, scrolling body, player.
+ *
+ * The prototype drew this as a floating rounded card because it was a picture
+ * of an app. Here it fills the window — a real tool should not waste 22px of
+ * screen on a bezel — but keeps the same grid so the views port over unchanged.
+ */
+
+.rx-shell {
+  display: grid;
+  grid-template-columns: var(--rail) 1fr;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  position: relative;
+  isolation: isolate;
+}
+
+/* The wash is what stops a dark UI reading as a black hole. It is three very
+   dilute stem colours, so even the empty state belongs to this product. */
+.rx-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(78% 50% at 6% -8%, #ff9f0a22 0%, transparent 62%),
+    radial-gradient(70% 46% at 96% 2%, #bf5af22a 0%, transparent 58%),
+    radial-gradient(90% 58% at 46% 112%, #0a84ff1e 0%, transparent 62%), var(--bg);
+}
+.rx[data-theme="light"] .rx-shell::before {
+  background: radial-gradient(78% 50% at 6% -8%, #ff9f0a18 0%, transparent 62%),
+    radial-gradient(70% 46% at 96% 2%, #bf5af216 0%, transparent 58%),
+    radial-gradient(90% 58% at 46% 112%, #0a84ff14 0%, transparent 62%), var(--bg);
+}
+
+/* ---------------------------------------------------------------- topbar */
+
+.rx-topbar {
+  grid-column: 1 / 3;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px var(--pad) 14px 0;
+  border-bottom: 1px solid var(--hair);
+}
+.rx-brand {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  width: var(--rail);
+  padding-left: 27px;
+  flex: none;
+}
+.rx-brand span {
+  color: var(--accent);
+}
+/* A second spacer now sits ahead of it, matching the one after — so the gap
+   to the Rhymix logo and the gap to the notification bell grow together and
+   stay equal, and the field itself stops claiming leftover space instead of
+   just the room it needs to read comfortably.
+   flex-shrink stays on: `flex: none` earlier disabled it outright, which held
+   the field at max-width on every viewport and pushed the bell off the right
+   edge of a narrow window — a real, measured overflow, not a display quirk. */
+.rx-search {
+  flex: 0 1 360px;
+  min-width: 0;
+  position: relative;
+}
+.rx-search input {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 16px 10px 40px;
+  border-radius: 99px;
+  background: var(--card-2);
+  border: 1px solid var(--hair);
+  font-size: 14.5px;
+  color: var(--text);
+}
+.rx-search input:focus-visible {
+  border-color: var(--accent);
+  background: var(--card);
+  outline: none;
+}
+.rx-search .ic {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--faint);
+  font-size: 13px;
+  pointer-events: none;
+}
+.rx-sp {
+  flex: 1;
+}
+
+.rx-iconbtn {
+  all: unset;
+  cursor: pointer;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: var(--dim);
+  font-size: 15px;
+  transition: background 0.15s, color 0.15s;
+}
+.rx-iconbtn:hover {
+  background: var(--card-3);
+  color: var(--text);
+}
+
+/* ------------------------------------------------------------------ rail */
+
+.rx-rail {
+  grid-row: 2 / 4;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 16px 14px;
+  border-right: 1px solid var(--hair);
+  overflow-y: auto;
+}
+.rx-rail .sect {
+  padding: 15px 13px 7px;
+}
+.rx-nav {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 13px;
+  border-radius: 12px;
+  font-size: 14.5px;
+  font-weight: 560;
+  color: var(--dim);
+  transition: background 0.15s, color 0.15s;
+}
+.rx-nav:hover {
+  background: var(--card-2);
+  color: var(--text);
+}
+.rx-nav[aria-current="page"] {
+  background: var(--card-3);
+  color: var(--text);
+  font-weight: 620;
+}
+.rx-nav b {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  border-radius: 5px;
+  background: currentColor;
+  opacity: 0.55;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+.rx-nav[aria-current="page"] b {
+  opacity: 1;
+  background: var(--accent);
+}
+.rx-nav .cnt {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 640;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+/* The foot escapes the rail's own padding so its top border lands on exactly
+   the same line as the player's — the rail spans both rows, and the two sit
+   side by side along the bottom of the window. */
+.rx-rail .foot {
+  margin: auto -14px -16px;
+}
+
+/* ------------------------------------------------------------------ main */
+
+.rx-main {
+  overflow-y: auto;
+  padding: 16px;
+  scroll-behavior: smooth;
+}
+/* A view with columns manages its own scrolling, column by column, so the
+   header and filters stay put while the list moves. */
+.rx-main:has(> .rx-view[data-split]),
+.rx-main:has(> .rx-view[data-create]) {
+  overflow: hidden;
+  /* The list runs to the bottom edge, against the player. A scrolling column
+     that stops short of it leaves a dead band that reads as the end of the
+     list rather than as breathing room — the panels beside it keep their
+     margin, because a panel is a card and a card needs a bottom. */
+  padding-bottom: 0;
+}
+/* Create's own writing panel keeps a tight 12-14px rhythm between its head,
+   body and foot — the full var(--pad) above the view's own heading read as
+   loose by comparison, a gap the rest of the page doesn't carry through. */
+.rx-main:has(> .rx-view[data-create]) {
+  padding-top: 10px;
+}
+/* Centred in the main column, not pinned to its left edge. On a wide screen the
+   rail already sits on the left; left-aligning the content too leaves the whole
+   right half empty and the page reads as broken rather than spacious. */
+.rx-view {
+  display: grid;
+  gap: 20px;
+  align-content: start;
+  width: 100%;
+  max-width: var(--content);
+  margin: 0 auto;
+  animation: rx-in 0.34s var(--ease) both;
+}
+/* No transition on max-width. Animating it alongside the view's own mount
+   animation leaves the property pinned at its start value — measured: the
+   split rule resolved to 1538px while the element stayed at 1180px until the
+   transition was removed. The movement lives on the panel and the rows
+   instead, where it is what you are actually watching. */
+
+/* A side panel is paid for out of the empty margins first. Without this the
+   view stayed capped at its reading width and the list shrank by the panel's
+   full width while a thousand pixels of margin sat unused either side. It only
+   narrows once the window genuinely runs out of room. */
+.rx-view[data-split] {
+  max-width: calc(var(--content) + var(--split-gap) + var(--panel));
+}
+.rx-view[data-create] {
+  max-width: calc(var(--content) + var(--split-gap) + var(--create));
+}
+.rx-view[data-create][data-split] {
+  max-width: calc(
+    var(--content) + var(--split-gap) * 2 + var(--create) + var(--panel)
+  );
+}
+
+/* With columns open the view fills the main area and the column row takes
+   whatever the header leaves. Measuring that height in CSS arithmetic was what
+   pushed the Create button below the fold: the columns were sized as if they
+   started at the top of the page, not under the title and the filters. */
+.rx-view[data-split],
+.rx-view[data-create] {
+  height: 100%;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+@keyframes rx-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+}
+
+.rx-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+/* This used to be a big page-name title (Library/Create/Voices/...) with a
+   small status line under it — the name is the one thing the rail beside it
+   already says, so it's gone, and what's left is just the status line,
+   sized to actually read as the page's header rather than a caption. */
+.rx-head h1 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.rx-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------- player */
+
+.rx-player {
+  grid-column: 2;
+  /* Explicit, not left to auto-placement: two elements share this class now
+     (the library/song player bar and Studio's transport slot, see
+     NextApp.js) so both stay mounted and only one is ever visible. Without
+     an explicit row, grid auto-placement would push the second one below
+     the first instead of stacking them in the same cell. */
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 var(--pad);
+  height: var(--player);
+  border-top: 1px solid var(--hair);
+  background: var(--card);
+}
+.rx-player .np {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+  padding: 6px 10px 6px 6px;
+  margin-left: -6px;
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.rx-player .np:hover {
+  background: var(--card-2);
+}
+.rx-player .np:disabled {
+  cursor: default;
+  pointer-events: none;
+}
+.rx-player .np .tile {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  flex: none;
+  background: var(--card-3);
+}
+.rx-player .np .tx {
+  min-width: 0;
+}
+.rx-player .np .tx b {
+  display: block;
+  font-size: 14px;
+  font-weight: 620;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rx-player .np .tx span {
+  font-size: 12.5px;
+  color: var(--dim);
+}
+.rx-player .seek {
+  flex: 2;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+.rx-player .seek .t {
+  font-size: 11.5px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.rx-player .seek .bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--card-3);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.rx-player .seek .bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+  border-radius: 99px;
+}
+.rx-playbtn {
+  all: unset;
+  cursor: pointer;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--text);
+  color: var(--bg);
+  flex: none;
+  transition: transform 0.16s var(--ease);
+}
+.rx-playbtn:hover {
+  transform: scale(1.07);
+}
+.rx-playbtn svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+
+/* ------------------------------------------------------------- responsive */
+
+/* ------------------------------------------------------------------ phone
+ *
+ * Below 768px the rail cannot be a rail: seven labelled rows down the left of a
+ * 390px screen would leave nothing for the tracks. It becomes a bottom bar of
+ * the four things you actually move between, with the rest behind More — which
+ * is the shape every music app on a phone has settled on, Suno included, and
+ * the shape a thumb can reach.
+ *
+ * The desktop layout above is untouched. Everything here is additive and lives
+ * inside this one query.
+ */
+@media (max-width: 768px) {
+  .rx-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    /* dvh, not vh: mobile browsers grow and shrink their own chrome, and vh
+       measures the tallest state — which puts the bottom bar off screen. */
+    height: 100dvh;
+  }
+
+  .rx-topbar {
+    grid-column: 1;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+  .rx-brand {
+    width: auto;
+    padding-left: 0;
+    font-size: 17px;
+  }
+  .rx-search {
+    max-width: none;
+  }
+  /* The spacer and the search field both grow, so on a wide screen the search
+     stops at 440px and the spacer takes the rest. With no cap the two split
+     the bar evenly and the field ended up 110px wide — wide enough for
+     "Search y". There is nothing to push apart here. */
+  .rx-topbar > .rx-sp {
+    display: none;
+  }
+  /* Two of the four top-bar buttons moved into More; what is left is the one
+     that tells you something happened. */
+  .rx-topbar .rx-iconbtn:not(.rx-notif .rx-iconbtn) {
+    display: none;
+  }
+
+  /* --- the bottom bar --- */
+  .rx-rail {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 60;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    height: var(--tabbar);
+    padding: 0 4px env(safe-area-inset-bottom);
+    border-right: none;
+    border-top: 1px solid var(--hair);
+    background: var(--card);
+    overflow: visible;
+  }
+  .rx-rail .sect,
+  .rx-rail .foot {
+    display: none;
+  }
+  .rx-rail .rx-nav {
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  .rx-rail .rx-nav b {
+    width: 21px;
+    height: 21px;
+  }
+  .rx-rail .rx-nav[aria-current="page"] {
+    background: none;
+    color: var(--accent);
+  }
+  .rx-rail .rx-nav .cnt {
+    display: none;
+  }
+
+  /* Create is the one thing you came to do, so it is not a fifth destination
+     among equals: it sits in the middle and wears the accent, the way the
+     compose button does in every app that has one. */
+  .rx-rail .rx-nav[data-cta],
+  .rx-rail .rx-nav[data-cta][aria-current="page"] {
+    /* One pill around the whole control. A badge behind the icon alone left
+       the word sitting outside its own button, which reads as two things. */
+    margin: 7px 6px;
+    border-radius: 13px;
+    background: var(--accent);
+    color: #0b0b0f;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  .rx-rail .rx-nav[data-cta] svg,
+  .rx-rail .rx-nav[data-cta][aria-current="page"] svg {
+    color: #0b0b0f;
+  }
+
+  /* --- the player, stacked on top of it --- */
+  .rx-player {
+    grid-column: 1;
+    position: fixed;
+    inset: auto 0 var(--tabbar) 0;
+    z-index: 50;
+    height: var(--player-m);
+    gap: 10px;
+    padding: 0 14px;
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+  .rx-player .seek .t {
+    display: none;
+  }
+
+  .rx-main {
+    overflow-y: auto;
+    padding: 16px 14px calc(var(--tabbar) + var(--player-m) + 16px);
+  }
+  /* The split views hand their scrolling back: one column on a phone means the
+     page scrolls, and a column that scrolls inside a page that also scrolls is
+     two scrollbars fighting over one gesture. */
+  .rx-main:has(> .rx-view[data-split]),
+  .rx-main:has(> .rx-view[data-create]) {
+    overflow-y: auto;
+    padding-bottom: calc(var(--tabbar) + var(--player-m) + 16px);
+  }
+
+  /* Grid and flex items default to min-width:auto, which refuses to shrink
+     below their content. At 1180px nothing ever hit that floor; at 390px
+     every row did, and the list ran off the right edge. */
+  .rx-view {
+    grid-template-columns: minmax(0, 1fr);
+    /* rx-in animates a transform and fills both ways, which leaves the view a
+       containing block for anything fixed inside it — for good, not just
+       during the 340ms. The phone's full-screen sheets are fixed children, and
+       they were being sized to the view instead of the window. */
+    animation: none;
+  }
+  .rx-view > * {
+    min-width: 0;
+  }
+
+  /* --- the player, at phone width --- */
+  /* The title wins the row. A 390px bar split two-to-one in favour of the
+     seek left room for "Nothi…", which tells you nothing at all. */
+  .rx-player .np {
+    flex: 1.7;
+    gap: 9px;
+  }
+  .rx-player .seek {
+    flex: 1;
+  }
+  .rx-player .np .tile {
+    width: 38px;
+    height: 38px;
+  }
+  .rx-player .np .tx {
+    min-width: 0;
+  }
+  .rx-player .np .tx b {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* The subtitle says which take is playing. On a phone the title has to win
+     the space outright, and the row it belongs to already shows the take. */
+  .rx-player .np .tx span {
+    display: none;
+  }
+}
+
+@media (max-width: 1000px) and (min-width: 769px) {
+  .rx-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr auto;
+    height: auto;
+    min-height: 100vh;
+  }
+  .rx-topbar {
+    grid-column: 1;
+    padding: 14px 18px;
+  }
+  .rx-brand {
+    width: auto;
+    padding-left: 0;
+  }
+  .rx-rail {
+    grid-row: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--hair);
+    padding: 10px 14px;
+  }
+  .rx-rail .sect,
+  .rx-rail .foot {
+    display: none;
+  }
+  .rx-main {
+    padding: 20px 18px 30px;
+  }
+  .rx-player {
+    grid-column: 1;
+    position: sticky;
+    bottom: 0;
+    padding: 0 18px;
+  }
+  .rx-player .seek .t {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------- notifications */
+
+.rx-notif {
+  position: relative;
+  display: inline-flex;
+}
+.rx-notif[data-unread] .rx-iconbtn {
+  color: var(--text);
+}
+.rx-notif-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 99px;
+  background: var(--hot);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.rx-notif-list {
+  display: grid;
+  gap: 2px;
+  min-width: 280px;
+  max-width: 340px;
+}
+.rx-notif-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.rx-notif-clear {
+  all: unset;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--dim);
+}
+.rx-notif-clear:hover {
+  color: var(--text);
+}
+.rx-notif-empty {
+  padding: 10px 12px 14px;
+}
+.rx-notif-item {
+  display: grid;
+  gap: 2px;
+  padding: 9px 12px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.rx-notif-item[data-kind="error"] {
+  color: var(--hot);
+}
+.rx-notif-item em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+/* ---------------------------------------------------- system status */
+
+/* At the foot of the rail, always. This app lives inside one hard limit, and
+   "why did that not start" is usually answered here. */
+.rx-sys {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  /* Exactly the player's height: they are one band across the bottom. */
+  height: var(--player);
+  padding: 0 27px;
+  border-top: 1px solid var(--hair);
+}
+.rx-sys-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  align-items: center;
+}
+.rx-sys-label {
+  font-size: 10.5px;
+  font-weight: 660;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.rx-sys-bar {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--card-3);
+  overflow: hidden;
+}
+.rx-sys-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+  transition: width 0.6s var(--ease);
+}
+.rx-sys-bar[data-hot] i {
+  background: var(--hot);
+}
+.rx-sys-row b {
+  grid-column: 1 / 3;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}

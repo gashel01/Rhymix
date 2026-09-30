@@ -1,0 +1,100 @@
+.rx .rx-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: rx-fade 0.18s ease both;
+}
+.rx[data-theme="light"] .rx-scrim,
+:root[data-theme="light"] .rx .rx-scrim {
+  background: rgba(20, 25, 45, 0.28);
+}
+@keyframes rx-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.rx .rx-sheet {
+  position: fixed;
+  z-index: 301;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(84vh, 780px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px;
+  background: var(--card);
+  border: 1px solid var(--hair-2);
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
+  animation: rx-sheet-in 0.24s var(--ease) both;
+  outline: none;
+}
+.rx[data-theme="light"] .rx-sheet,
+:root[data-theme="light"] .rx .rx-sheet {
+  box-shadow: 0 40px 100px rgba(20, 25, 45, 0.24);
+}
+@keyframes rx-sheet-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 14px)) scale(0.98);
+  }
+}
+
+.rx .rx-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 20px 14px;
+  border-bottom: 1px solid var(--hair);
+}
+.rx .rx-sheet-head h2 {
+  margin: 0 0 2px;
+  font-size: 19px;
+  font-weight: 660;
+  letter-spacing: -0.026em;
+  overflow-wrap: anywhere;
+}
+.rx .rx-sheet-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.rx .rx-sheet-body {
+  padding: 18px 20px;
+  overflow-y: auto;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.rx .rx-sheet-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--hair);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 560px) {
+  .rx .rx-sheet {
+    width: 100vw;
+    max-width: none;
+    max-height: 92vh;
+    top: auto;
+    bottom: 0;
+    transform: translateX(-50%);
+    border-radius: 24px 24px 0 0;
+  }
+  @keyframes rx-sheet-in {
+    from {
+      opacity: 0;
+      transform: translate(-50%, 20px);
+    }
+  }
+}

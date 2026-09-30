@@ -1,0 +1,111 @@
+/* A proper avatar beside its stats, not a banner stretched to the modal's
+   full width — the grid card's tall/narrow proportions read fine at 200px
+   wide; a 96px-tall strip spanning a much wider sheet just looked stretched. */
+.rx .rx-voice-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.rx .rx-voice-modal-avatar {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.96);
+  letter-spacing: -0.03em;
+  position: relative;
+}
+.rx .rx-voice-modal-avatar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(80% 60% at 32% 18%, rgba(255, 255, 255, 0.4), transparent 60%);
+}
+
+.rx .rx-voice-modal-kv {
+  flex: 1;
+  min-width: 0;
+}
+
+.rx .rx-voice-modal-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.rx .rx-voice-modal-songs {
+  display: grid;
+  gap: 6px;
+  max-height: 340px;
+  overflow: auto;
+}
+
+.rx .rx-voice-modal-song {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--hair);
+  transition: background 0.15s, border-color 0.15s;
+}
+.rx .rx-voice-modal-song:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--hair-2);
+}
+
+.rx .rx-voice-modal-song-swatch {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.92);
+}
+.rx .rx-voice-modal-song-swatch svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.rx .rx-voice-modal-song-swatch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.rx .rx-voice-modal-song-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.rx .rx-voice-modal-song-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.rx .rx-voice-modal-song-go {
+  flex-shrink: 0;
+  padding-right: 6px;
+  font-size: 13px;
+  opacity: 0.4;
+}
