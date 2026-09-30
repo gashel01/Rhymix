@@ -9,6 +9,11 @@
   justify-content: space-between;
   gap: 10px;
   width: 100%;
+  /* A grid/flex item defaults to min-width: auto — it won't shrink below its content's intrinsic
+     size, which for a nowrap text span is its full, unwrapped width. Without this, a long option
+     label (a checkpoint filename, say) grows its column instead of the ellipsis in .value/
+     .placeholder ever kicking in, forcing the whole panel to scroll horizontally. */
+  min-width: 0;
   min-height: 38px;
   padding: 8px 12px;
   border-radius: 12px;
