@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎛️ Rhymix
+<img src="docs/images/banner.jpg" alt="Rhymix: a local Suno you can open up and edit" width="100%" />
 
 **A local Suno you can open up and edit — generate songs in any voice you own, on your own GPU, then mix them on a real timeline. No credits, no queue, no licence attached to the output.**
 
@@ -59,28 +59,24 @@ README is how far along it is.
 
 ## Screenshots
 
-<table>
-  <tr>
-    <td width="50%">
-      <img src="docs/images/studio.jpg" alt="Studio timeline with lanes, clips and inspector" />
-      <p align="center"><em><b>Studio</b> — multitrack timeline, per-lane faders, AI tools in the right panel</em></p>
-    </td>
-    <td width="50%">
-      <img src="docs/images/home.jpg" alt="Track library with per-track waveforms" />
-      <p align="center"><em><b>Library</b> — every track with its instrumental and vocal stems side by side</em></p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <img src="docs/images/create-song.jpg" alt="Song generation view" />
-      <p align="center"><em><b>Create</b> — prompt, lyrics and a full YuE2 parameter panel</em></p>
-    </td>
-    <td width="50%">
-      <img src="docs/images/models.jpg" alt="Trained voice model library" />
-      <p align="center"><em><b>Models</b> — trained voice models, with download and training progress live on the card</em></p>
-    </td>
-  </tr>
-</table>
+### Library
+<img src="docs/images/library.jpg" alt="Track library with a song playing and its detail panel open" width="100%" />
+<p align="center"><em>Every track with its instrumental and vocal side by side, original or converted. Pick one and its panel opens with the cover, the style prompt and the lyrics.</em></p>
+
+### Create
+<img src="docs/images/create-song.jpg" alt="Song creation form next to the track list and a selected song" width="100%" />
+<p align="center"><em>Start from words, a track or a hum. The new song lands in the list beside you while you keep working.</em></p>
+
+### Studio
+<img src="docs/images/studio.jpg" alt="Multitrack studio timeline with a song opened as stems" width="100%" />
+<p align="center"><em>A generated cover opened as stems on the multitrack timeline, one lane each.</em></p>
+
+<img src="docs/images/studio-tools.jpg" alt="Studio with a clip selected: lane effects and AI tools" width="100%" />
+<p align="center"><em>Select a clip: lane effects on the right; split, stems, live voice conversion and re-singing on the selection.</em></p>
+
+### Voices
+<img src="docs/images/models.jpg" alt="Trained voice models" width="100%" />
+<p align="center"><em>Trained voice models, ready to sing a new song or convert an existing track.</em></p>
 
 ---
 
@@ -95,16 +91,12 @@ The mixdown is rendered server-side by ffmpeg from the same edit list the
 browser plays.
 
 ### 🎤 Voice → MIDI
-Hum, sing or beatbox into a microphone. An `AudioWorklet` captures PCM in real
+Hum or sing into a microphone. An `AudioWorklet` captures PCM in real
 time and streams it over a WebSocket; the backend runs pitch detection and sends
 back notes, which land as a quantised MIDI clip on the timeline. Three
 interchangeable engines — **Basic Pitch**, **CREPE** and **DDSP** — plus a
 "magic wand" pass that snaps a take to a key and scale, merges the stutter that
 pitch trackers produce on held notes, and applies swing.
-
-### 🥁 Beatbox calibration wizard
-Record a few examples of each drum sound in your own voice, train a small
-classifier on them, and turn vocal percussion into drum MIDI.
 
 ### 🎵 AI song generation
 Full songs from a prompt and lyrics, via **YuE2** running locally through
@@ -163,7 +155,7 @@ talks to a model directly.
 │                              │   │                                   │
 │  upload · processing · models│   │  /ws/voice_to_midi                │
 │  training · studio · songgen │   │  /ws/studio_live_infer            │
-│  diarization · beatbox       │   │                                   │
+│  diarization                 │   │                                   │
 │                              │   │  streams PCM in, notes/audio out  │
 │  project_edits  (pure)       │   └───────────────────────────────────┘
 │  note_math      (pure)       │
